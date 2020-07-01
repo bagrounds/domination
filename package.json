@@ -1,0 +1,21 @@
+{
+  "name": "purescript-wip",
+  "version": "0.1.0",
+  "description": "purescript work in progress",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rm -rf .cache dist",
+    "build": "spago build",
+    "bundle": "spago bundle-app --main Main --to dist/app.js",
+    "hot-reload": "./scripts/hot-reload",
+    "run": "spago run",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "parcel-bundler": "^1.12.4",
+    "purescript": "^0.13.8",
+    "spago": "^0.15.3"
+  }
+}

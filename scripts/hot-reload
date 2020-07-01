@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -eux
+
+inotify_command () (
+  inotifywait -m ./src -e modify -e delete -e move
+)
+
+main () {
+  npm run bundle
+  ./node_modules/.bin/parcel ./assets/index.html &
+  inotify_command | while read path action file; do
+    echo "pureHMR- updating $action"
+    npm run bundle
+  done
+}
+
+main
