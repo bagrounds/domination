@@ -10,6 +10,8 @@ You can edit this file as you like.
   , "psci-support"
   , "generics-rep"
   , "profunctor-lenses"
+  , "foldable-traversable"
+  , "transformers"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
