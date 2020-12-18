@@ -12,6 +12,8 @@ You can edit this file as you like.
   , "profunctor-lenses"
   , "foldable-traversable"
   , "transformers"
+  , "aff"
+  , "web-dom"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

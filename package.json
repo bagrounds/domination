@@ -6,7 +6,6 @@
   "scripts": {
     "clean": "rm -rf .cache dist",
     "build": "spago build",
-    "prebundle": "npm run build",
     "bundle": "spago bundle-app --main Main --to dist/app.js",
     "hot-reload": "./scripts/hot-reload",
     "run": "spago run",
