@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 
+import Halogen.Query.HalogenM (HalogenM, subscribe)
 import Control.MonadZero
 import Control.Monad.Trans.Class
 import Data.Either
@@ -26,11 +27,12 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 import Halogen.Query.EventSource (EventSource)
-import Halogen.Query.EventSource as EventSource
+import Halogen.Query.EventSource as ES
 import Web.DOM.Element
 import Web.DOM.Node
 import Web.DOM.ParentNode
 import Web.DOM.Text as WDT
+import Web.Event.Event (EventType(..), Event)
 import Web.HTML.HTMLElement (toElement)
 
 import Comm as Comm
@@ -41,7 +43,8 @@ main = HA.runHalogenAff do
   runUI component unit body
 
 type GameState =
-  { dataChannel :: Maybe Comm.DataChannel
+  { messages :: Array String
+  , dataChannel :: Maybe Comm.DataChannel
   , peerConnection :: Maybe Comm.PeerConnection
   , offer :: String
   , answer :: String
@@ -72,7 +75,8 @@ instance showPhase :: Show Phase where show = genericShow
 
 newGame :: GameState
 newGame =
-  { dataChannel: Nothing
+  { messages: []
+  , dataChannel: Nothing
   , peerConnection: Nothing
   , offer: ""
   , answer: ""
@@ -159,7 +163,7 @@ silver = { name: "Silver", cost: 3, victoryPoints: 0, treasure: 2, buys: 0, card
 gold :: Card
 gold = { name: "Gold", cost: 6, victoryPoints: 0, treasure: 3, buys: 0, cards: 0, actions: 0 }
 
---component :: forall a b c d. Component HTML a b c d
+component :: forall m a b c. MonadAff m => Component HTML a b c m
 component =
   H.mkComponent
     { initialState
@@ -177,7 +181,8 @@ id =
 render :: forall b. GameState -> HTML b Action
 render state =
   HH.div_
-    [ HH.h1 [] [ HH.text "Creator" ]
+    [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (\e -> Just $ MessageEventReceived e) ] []
+    , HH.h1 [] [ HH.text "Creator" ]
     , HH.button [ HE.onClick \_ -> Just Create ] [ HH.text "Create" ]
     , HH.text state.localDescription
     , HH.input
@@ -207,6 +212,8 @@ render state =
     , HH.h1 [] [ HH.text "Domination" ]
     , HH.button [ HE.onClick \_ -> Just NewGame ] [ HH.text "New Game" ]
     , HH.div_ $ renderPlayers state
+    , HH.div_ $
+      (HH.h2 [] [ HH.text "Messages" ]) : (map (\m -> HH.p [] [ HH.text m ]) state.messages)
     , HH.div_ [ HH.h2 [] [ HH.text "Game State" ] ]
     , HH.div_ [ HH.text $ show state ]
     ]
@@ -259,9 +266,9 @@ data Action =
   | GotAnswer
   | SendMessage
   | SetMessage String
+  | MessageReceived String
+  | MessageEventReceived Event
 
-  | DisplayLocalDescription
-  | ConnectWithRemoteDescription
   | SetOffer String
   | SetAnswer String
   | SetRemoteDescription
@@ -282,14 +289,20 @@ cleanup player = let
 
 --events :: forall m. MonadAff m => EventSource m Action
 
-handleAction :: forall m. MonadAff m
-  => MonadState GameState m
+type Setup = ES.Emitter Effect Action -> Effect (ES.Finalizer Effect)
+handleAction :: forall o m. MonadAff m
   => Action
-  -> m Unit
+  -> HalogenM GameState Action () o m Unit
 handleAction = case _ of
   Create -> do
-    ld <- liftAff $ makeAff $ Comm.create Right
+    ld <- liftAff $ makeAff $ (Comm.create Right)
     H.modify_ \state -> state { localDescription = ld }
+  MessageReceived message -> do
+    liftEffect $ Comm.log message
+  MessageEventReceived customEvent -> do
+    let eventDetail = Comm.detail $ customEvent
+    liftEffect $ Comm.log eventDetail
+    H.modify_ \state -> state { messages = eventDetail : state.messages }
   Join -> do
     s <- H.get
     ld <- liftAff $ makeAff $ Comm.join s.offer Right
@@ -305,11 +318,6 @@ handleAction = case _ of
   SendMessage -> do
     s <- H.get
     liftEffect $ Comm.say s.message
-  DisplayLocalDescription -> do
-    let pc = Comm.mkPeerConnection unit
-    (dc :: Comm.DataChannel) <- liftAff $ makeAff (Comm.mkDataChannel "test" pc Right)
-    (ld :: String) <- liftAff $ makeAff (Comm.getLocalDescription pc Right)
-    H.modify_ \state -> state { localDescription = ld, dataChannel = Just dc, peerConnection = Just pc }
   SetOffer rd -> do
     liftEffect $ Comm.log rd
     H.modify_ \state -> state { offer = rd }
@@ -327,14 +335,6 @@ handleAction = case _ of
       Just pc -> do
         liftEffect $ Comm.setRemoteDescription rd pc
         pure unit
-
-  ConnectWithRemoteDescription -> do
-    s <- H.get
-    let description = s.offer
-    liftEffect $ Comm.log description
-    let pc = Comm.mkPeerConnection unit
-    (dc :: Comm.DataChannel) <- liftAff $ makeAff (Comm.joinDataChannel description pc Right)
-    H.modify_ \state -> state { dataChannel = Just dc, peerConnection = Just pc }
   NewGame -> H.modify_ \state -> newGame
   NextPhase playerIndex -> H.modify_ \state ->
     if playerIndex == state.turn
