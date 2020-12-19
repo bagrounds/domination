@@ -1,56 +1,11 @@
 "use strict";
 
 var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection
-
-exports.setRemoteDescription = rd => pc => () => {
-  console.log(`setRemoteDescription: ${rd}`)
-
-  peerConn.onicecandidate = (e) => {
-    console.log('onicecandidate(', e, ')');
-    if (e.candidate == null) {
-      console.log("Get the creator to call: gotAnswer(", JSON.stringify(peerConn.localDescription), ")");
-    }
-  };
-  pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(rd)))
-  pc.createAnswer({})
-    .then((answerDesc) => pc.setLocalDescription(answerDesc))
-    .catch((err) => console.warn("Couldn't create answer"));
-}
-exports.getLocalDescription = peerConnection => mkResult => callback /* (Either Error a -> Effect Unit) */ => {
-  peerConnection
-    .createOffer({})
-    .then((desc) => {
-      peerConnection.setLocalDescription(desc)
-    })
-    .catch((err) => console.error(err));
-
-  peerConnection.onicecandidate = e => {
-    console.log('onicecandidate(', e, ')');
-    if (e.candidate == null) {
-      callback(mkResult(JSON.stringify(peerConnection.localDescription)))()
-    }
-  };
-
-  return canceller('getLocalDescription')
-}
-
-exports.log = x => () => console.log(x);
-
-exports.joinDataChannel = offer => peerConnection => mkResult => callback => {
-  console.log("joinDataChannel")
-  peerConnection.ondatachannel = e => {
-    console.log(`ondatachannel(${e})`)
-    const dataChannel = e.channel;
-    dataChannel.onopen = e => callback(mkResult(dataChannel))()
-  };
-  return canceller('joinDataChannel')
-}
+const peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 
 const canceller = name => () => console.log(`attempting to cancel ${name}`)
 
-// example code begins here
-var peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
-
+exports.log = x => () => console.log(x);
 exports.detail = customEvent => customEvent.detail
 
 const onmessage = e => {

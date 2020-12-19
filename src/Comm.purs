@@ -8,15 +8,6 @@ import Effect
 import Effect.Class
 import Web.Event.Event (Event)
 
-foreign import data PeerConnection :: Type
-foreign import getLocalDescription :: forall a. PeerConnection -> (a -> Either Error a) -> ((Either Error a -> Effect Unit) -> Effect Canceler)
-foreign import data DataChannel :: Type
-foreign import joinDataChannel :: forall a. String -> PeerConnection -> (a -> Either Error a) -> ((Either Error a -> Effect Unit) -> Effect Canceler)
-foreign import setRemoteDescription :: String -> PeerConnection -> Effect Unit
-
-instance showDataChannel :: Show DataChannel where show _ = "DataChannel"
-instance showPeerConnection :: Show PeerConnection where show _ = "PeerConnection"
-
 foreign import log :: forall a. a -> Effect Unit
 foreign import detail :: Event -> String
 
