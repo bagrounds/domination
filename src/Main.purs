@@ -146,7 +146,7 @@ renderPlayer state playerIndex player = HH.div_
   ]
 
 renderCardView :: forall a. Card -> HTML a AppAction
-renderCardView card = HH.label_ [HH.text card.name]
+renderCardView card = HH.button [] [HH.text card.name]
 
 renderCardInHand :: forall a. Int -> Tuple Int Card -> HTML a AppAction
 renderCardInHand cardIndex (Tuple playerIndex card) = HH.button [HE.onClick \_ -> Just $ GameAction' $ Play playerIndex cardIndex] [ HH.text card.name ]
