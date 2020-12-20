@@ -117,7 +117,10 @@ renderSupply playerIndex player state =
   map (renderCardInSupply playerIndex player) state.supply
 
 renderCardInSupply :: forall a. Int -> Player -> Stack -> HTML a AppAction
-renderCardInSupply playerIndex player stack = HH.button [ HE.onClick \_ -> Just $ GameAction' $ Purchase playerIndex player stack ] [ HH.text stack.card.name ]
+renderCardInSupply playerIndex player stack =
+  HH.button
+    [ HE.onClick \_ -> Just $ GameAction' $ Purchase playerIndex player stack ]
+    [ HH.text $ "(" <> show stack.count <> ") " <> stack.card.name <> " $" <> show stack.card.cost]
 
 renderPlayers :: forall a. GameState -> Array (HTML a AppAction)
 renderPlayers state =
