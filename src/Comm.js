@@ -40,7 +40,7 @@ const create = right => callback => {
 }
 exports.create = right => callback => create(right)(callback)
 exports.gotAnswer = answer => window.gotAnswer(answer)
-exports.say = message => () => window.say(message)
+exports.say = message => () => window.say && window.say(message)
 
 function join(offer, right, callback) {
   peerConn.ondatachannel = (e) => {

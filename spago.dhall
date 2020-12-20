@@ -14,6 +14,8 @@ You can edit this file as you like.
   , "transformers"
   , "aff"
   , "web-dom"
+  , "argonaut"
+  , "argonaut-generic"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

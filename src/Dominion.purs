@@ -13,16 +13,22 @@ module Dominion
   , value
   , allCards
   , score
+  , nextPhase
   ) where
 
 import Prelude
 
 import Data.Array (take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
 import Data.Foldable (foldr)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
+
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..), fromJust)
-import Data.Tuple (Tuple(..))
+import Data.Argonaut.Decode.Class (class DecodeJson)
+import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Encode.Class (class EncodeJson)
+import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 
 type GameState =
   { turn :: Int
@@ -37,15 +43,18 @@ type Stack = { card :: Card, count :: Int }
 
 data Phase = Action | Buy | Cleanup
 
+derive instance genericPhase :: Generic Phase _
 derive instance eqPhase :: Eq Phase
+instance showPhase :: Show Phase where show = genericShow
+instance encodeJsonPhase :: EncodeJson Phase where
+  encodeJson a = genericEncodeJson a
+instance decodeJsonPhase :: DecodeJson Phase where
+  decodeJson a = genericDecodeJson a
 
 next :: Phase -> Phase
 next Action = Buy
 next Buy = Cleanup
 next Cleanup = Action
-
-derive instance genericPhase :: Generic Phase _
-instance showPhase :: Show Phase where show = genericShow
 
 newGame :: GameState
 newGame =
@@ -75,21 +84,37 @@ type Player =
 value :: Array Card -> Int
 value = foldr (+) 0 <<< map _.treasure
 
+nextPhase :: Int -> GameState -> Maybe GameState
+nextPhase playerIndex state =
+    if playerIndex == state.turn
+    then Just $ state
+      { phase = next state.phase
+      , turn =
+        if state.phase == Cleanup
+        then (state.turn + 1) `mod` (length state.players)
+        else state.turn
+      , players =
+          if state.phase == Cleanup
+          then mapWithIndex (\i p -> if i == playerIndex then cleanup p else p) state.players
+          else state.players
+      }
+    else Nothing
+
 purchase :: Int -> Player -> Stack -> GameState -> Maybe GameState
 purchase playerIndex player stack state =
     if playerIndex == state.turn
     then
       if state.phase == Buy
       then do
-        (Tuple player' stack') <- purchase' stack player
+        (Tuple player' stack') <- purchase'
         players' <- updateAt playerIndex player' state.players
         let supply' = stack' : (filter ((/=) stack) state.supply)
         pure state { players = players', supply = supply' }
       else Nothing
     else Nothing
   where
-    purchase' :: Stack -> Player -> Maybe (Tuple Player Stack)
-    purchase' stack player =
+    purchase' :: Maybe (Tuple Player Stack)
+    purchase' =
       if stack.count == 0
       then Nothing
       else
@@ -102,12 +127,22 @@ purchase playerIndex player stack state =
             (player { buying = stack.card : player.buying })
             (stack { count = stack.count - 1 }))
 
-play :: Player -> Int -> Maybe Player
-play x i = do
-  card <- x.hand !! i
-  hand' <- deleteAt i x.hand
-  let atPlay' = card : x.atPlay
-  pure x { hand = hand', atPlay = atPlay' }
+play :: Int -> Int -> GameState -> Maybe GameState
+play player card state =
+  if player == state.turn
+  then do
+    player' <- state.players !! player
+    player'' <- play' player' card
+    players' <- updateAt player player'' state.players
+    pure $ state { players = players' }
+  else Nothing
+    where
+      play' :: Player -> Int -> Maybe Player
+      play' x i = do
+        card' <- x.hand !! i
+        hand' <- deleteAt i x.hand
+        let atPlay' = card' : x.atPlay
+        pure x { hand = hand', atPlay = atPlay' }
 
 newPlayer :: Player
 newPlayer =

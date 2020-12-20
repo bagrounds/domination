@@ -2,9 +2,16 @@ module Main where
 
 import Prelude
 
+import Data.Generic.Rep (class Generic)
+import Data.Argonaut.Core (stringify)
+import Data.Argonaut.Parser (jsonParser)
+import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
+import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Halogen.Query.HalogenM (HalogenM)
 import Data.Either (Either(..))
-import Data.Array (length, mapWithIndex, take, updateAt, (!!), (:))
+import Data.Array (mapWithIndex, take, (:))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -22,8 +29,7 @@ import Halogen.VDom.Driver (runUI)
 import Halogen.Query.EventSource as ES
 import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
-
-import Dominion (Card, GameState, Phase(..), Player, Stack, cleanup, newGame, next, play, purchase, score, value)
+import Dominion (Card, GameState, Player, Stack, newGame, nextPhase, play, purchase, score, value)
 import Comm as Comm
 
 type AppState =
@@ -45,7 +51,7 @@ newApp =
   , answer: ""
   , receivedAnswer: ""
   , message: ""
-  , localDescription: "nada"
+  , localDescription: ""
   , gameState: newGame
   , text: ""
   }
@@ -66,7 +72,7 @@ component =
   initialState :: b -> AppState
   initialState _ = newApp
 
-render :: forall b. AppState -> HTML b Action
+render :: forall b. AppState -> HTML b AppAction
 render state =
   HH.div_
     [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (\e -> Just $ MessageEventReceived e) ] []
@@ -100,30 +106,30 @@ render state =
     , HH.button [ HE.onClick \_ -> Just SendMessage ] [ HH.text "Send" ]
     , HH.div_ $ map (\m -> HH.p [] [ HH.text m ]) (take 5 state.messages)
     , HH.h1 [] [ HH.text "Domination" ]
-    , HH.button [ HE.onClick \_ -> Just NewGame ] [ HH.text "New Game" ]
+    , HH.button [ HE.onClick \_ -> Just $ GameAction' NewGame ] [ HH.text "New Game" ]
     , HH.div_ $ renderPlayers state.gameState
     , HH.div_ [ HH.h2 [] [ HH.text "Game State" ] ]
     , HH.div_ [ HH.text $ show state ]
     ]
 
-renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a Action)
+renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a AppAction)
 renderSupply playerIndex player state =
   map (renderCardInSupply playerIndex player) state.supply
 
-renderCardInSupply :: forall a. Int -> Player -> Stack -> HTML a Action
-renderCardInSupply playerIndex player stack = HH.button [ HE.onClick \_ -> Just $ Purchase playerIndex player stack ] [ HH.text stack.card.name ]
+renderCardInSupply :: forall a. Int -> Player -> Stack -> HTML a AppAction
+renderCardInSupply playerIndex player stack = HH.button [ HE.onClick \_ -> Just $ GameAction' $ Purchase playerIndex player stack ] [ HH.text stack.card.name ]
 
-renderPlayers :: forall a. GameState -> Array (HTML a Action)
+renderPlayers :: forall a. GameState -> Array (HTML a AppAction)
 renderPlayers state =
   [ HH.p [] [ HH.text $ "Turn: Player " <> show state.turn ]
   , HH.p [] [ HH.text $ "Phase: " <> show state.phase ]
   ]
   <> (renderPlayer state) `mapWithIndex` state.players
 
-renderPlayer :: forall a. GameState -> Int -> Player -> HTML a Action
+renderPlayer :: forall a. GameState -> Int -> Player -> HTML a AppAction
 renderPlayer state playerIndex player = HH.div_
   [ HH.h2 [] [ HH.text $ "Player " <> (show playerIndex) <> " (VP: " <> show (score player) <> ")" ]
-  , HH.button [ HE.onClick \_ -> Just $ NextPhase playerIndex ] [ HH.text "Next Phase" ]
+  , HH.button [ HE.onClick \_ -> Just $ GameAction' $ NextPhase playerIndex ] [ HH.text "Next Phase" ]
   , HH.h3 [] [ HH.text $ "Supply ($" <> show (value player.atPlay - value player.buying) <> ")"  ]
   , HH.div_ $ renderSupply playerIndex player state
   , HH.h3 [] [ HH.text $ "Deck" ]
@@ -136,13 +142,13 @@ renderPlayer state playerIndex player = HH.div_
   , HH.div_ $ map renderCardView player.discard
   ]
 
-renderCardView :: forall a. Card -> HTML a Action
+renderCardView :: forall a. Card -> HTML a AppAction
 renderCardView card = HH.label_ [HH.text card.name]
 
-renderCardInHand :: forall a. Int -> Tuple Int Card -> HTML a Action
-renderCardInHand cardIndex (Tuple playerIndex card) = HH.button [HE.onClick \_ -> Just (Play playerIndex cardIndex)] [ HH.text card.name ]
+renderCardInHand :: forall a. Int -> Tuple Int Card -> HTML a AppAction
+renderCardInHand cardIndex (Tuple playerIndex card) = HH.button [HE.onClick \_ -> Just $ GameAction' $ Play playerIndex cardIndex] [ HH.text card.name ]
 
-data Action =
+data AppAction =
   Create
   | Join
   | GotAnswer
@@ -151,23 +157,44 @@ data Action =
   | MessageEventReceived Event
   | SetOffer String
   | SetAnswer String
-  | NewGame
+  | GameAction' GameAction
+
+data GameAction =
+  NewGame
   | NextPhase Int
   | Play Int Int
   | Purchase Int Player Stack
 
-type Setup = ES.Emitter Effect Action -> Effect (ES.Finalizer Effect)
+data MessageType = Chat String | GameState' GameState
+derive instance genericMessageType :: Generic MessageType _
+instance encodeJsonMessageType :: EncodeJson MessageType where
+  encodeJson a = genericEncodeJson a
+instance decodeJsonMessageType :: DecodeJson MessageType where
+  decodeJson a = genericDecodeJson a
+readMessageType :: String -> Either String MessageType
+readMessageType = decodeJson <=< jsonParser
+writeMessageType :: MessageType -> String
+writeMessageType = stringify <<< encodeJson
+
+type Setup = ES.Emitter Effect AppAction -> Effect (ES.Finalizer Effect)
 handleAction :: forall o m. MonadAff m
-  => Action
-  -> HalogenM AppState Action () o m Unit
+  => AppAction
+  -> HalogenM AppState AppAction () o m Unit
 handleAction = case _ of
   Create -> do
     ld <- liftAff $ makeAff $ (Comm.create Right)
-    H.modify_ \state -> state { localDescription = ld }
+    H.modify_ _ { localDescription = ld }
   MessageEventReceived customEvent -> do
-    let message = Comm.detail $ customEvent
-    let remoteMessage = "<- " <> message
-    H.modify_ \state -> state { messages = remoteMessage : state.messages }
+    let msg = readMessageType $ Comm.detail $ customEvent
+    case msg of
+      Left e -> liftEffect $ Comm.log e
+      Right mt -> case mt of
+        GameState' gs -> do
+          liftEffect $ Comm.log gs
+          H.modify_ \state -> state { gameState = gs, messages = "(incoming game state)" : state.messages }
+        Chat message -> do
+          let remoteMessage = "<- " <> message
+          H.modify_ \state -> state { messages = remoteMessage : state.messages }
   Join -> do
     s <- H.get
     ld <- liftAff $ makeAff $ Comm.join s.offer Right
@@ -182,43 +209,31 @@ handleAction = case _ of
     H.modify_ \state -> state { chatInputMessage = s }
   SendMessage -> do
     s <- H.get
-    liftEffect $ Comm.say s.chatInputMessage
+    sendMessage $ writeMessageType $ Chat s.chatInputMessage
     let localMessage = "-> " <> s.chatInputMessage
     H.modify_ \state -> state { messages = localMessage : state.messages, chatInputMessage = "" }
   SetOffer rd -> do
     liftEffect $ Comm.log rd
     H.modify_ \state -> state { offer = rd }
-  NewGame -> H.modify_ \state -> newApp
-  NextPhase playerIndex -> H.modify_ \(state :: AppState) ->
-    if playerIndex == state.gameState.turn
-    then state
-      { gameState = state.gameState
-        { phase = next state.gameState.phase
-        , turn =
-          if state.gameState.phase == Cleanup
-          then (state.gameState.turn + 1) `mod` (length state.gameState.players)
-          else state.gameState.turn
-        , players =
-            if state.gameState.phase == Cleanup
-            then mapWithIndex (\i p -> if i == playerIndex then cleanup p else p) state.gameState.players
-            else state.gameState.players
-        }
-      }
-    else state { text = "Error: not your turn!" }
-  Play player card -> H.modify_ \state -> case f state of
-    Nothing -> state { text = "error" }
-    Just state -> state
-    where
-      f state =
-        if player == state.gameState.turn
-        then do
-          player' <- state.gameState.players !! player
-          player'' <- play player' card
-          players' <- updateAt player player'' state.gameState.players
-          pure $ state { gameState = state.gameState { players = players' }, text = "good" }
-        else pure state { text = "Error: not your turn!" }
-  Purchase playerIndex player stack -> H.modify_ \state ->
-    case purchase playerIndex player stack state.gameState of
-      Nothing -> state { text = "Error trying to buy card!" }
-      Just gameState -> state { gameState = gameState, text = "good" }
+  GameAction' gameAction -> do
+    handleGameAction gameAction
+    s <- H.get
+    sendMessage $ writeMessageType $ GameState' s.gameState
+  where
+    sendMessage = liftEffect <<< Comm.say
+    handleGameAction gameAction =
+      case gameAction of
+        NewGame -> H.modify_ _ { gameState = newGame }
+        NextPhase playerIndex -> H.modify_ \state ->
+          case (nextPhase playerIndex state.gameState) of
+            Nothing -> state { text = "Error: not your turn!" }
+            Just gameState -> state { gameState = gameState }
+        Play player card -> H.modify_ \state ->
+          case play player card state.gameState of
+            Nothing -> state { text = "Error" }
+            Just gameState -> state { gameState = gameState }
+        Purchase playerIndex player stack -> H.modify_ \state ->
+          case purchase playerIndex player stack state.gameState of
+            Nothing -> state { text = "Error trying to buy card!" }
+            Just gameState -> state { gameState = gameState, text = "good" }
 
