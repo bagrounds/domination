@@ -31,7 +31,7 @@ import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-import Dominion (Card, GameState, Player, Stack, newGame, nextPhase, play, purchase, score, value, cash, isAction)
+import Dominion (Card, GameState, Player, Stack, setup, newGame, nextPhase, play, purchase, score, value, cash, isAction)
 import Comm as Comm
 
 type AppState =
@@ -153,12 +153,15 @@ renderPlayer state playerIndex player = HH.div_
     <> ") (VP: " <> show (score player) <> ")"
     ]
   , HH.button [ HE.onClick \_ -> Just $ PlayGame $ NextPhase playerIndex ] [ HH.text "Next Phase" ]
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Supply " ])] : renderSupply playerIndex player state)
-  , HH.div_ [ HH.text $ "Deck: " <> (show ((length player.deck) :: Int)) ]
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Hand " ])] : renderCardInHand playerIndex `mapWithIndex` player.hand)
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Play " ])] : (renderCardView <$> player.atPlay))
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Buying " ])] : (renderCardView <$> player.buying))
-  , HH.div_ [ HH.text $ "Discard " <> (show $ ((length player.discard) :: Int)) ]
+  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])] : renderSupply playerIndex player state)
+  , HH.div_ [ HH.text $ "Deck Size: "
+              <> (show ((length player.deck) :: Int))
+              <> " Discard Size: "
+              <> (show $ ((length player.discard) :: Int))
+            ]
+  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Hand" ])] : renderCardInHand playerIndex `mapWithIndex` player.hand)
+  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])] : (renderCardView <$> player.atPlay))
+  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])] : (renderCardView <$> player.buying))
   ]
 
 prop =
@@ -220,14 +223,12 @@ handleAction = case _ of
     ld <- liftAff $ makeAff $ Comm.create Right
     H.modify_ _ { localDescription = ld }
   WriteOffer rd -> do
-    liftEffect $ Comm.log rd
     H.modify_ \state -> state { offer = rd }
   MakeAnswer -> do
     s <- H.get
     ld <- liftAff $ makeAff $ Comm.join s.offer Right
     H.modify_ \state -> state { answer = ld }
   WriteAnswer rd -> do
-    liftEffect $ Comm.log rd
     H.modify_ \state -> state { receivedAnswer = rd }
   AcceptAnswer -> do
     s <- H.get
@@ -245,7 +246,6 @@ handleAction = case _ of
       Left e -> liftEffect $ Comm.log e
       Right mt -> case mt of
         GameStateMessage gs -> do
-          liftEffect $ Comm.log gs
           H.modify_ \state -> state { gameState = gs, messages = "(incoming game state)" : state.messages }
         ChatMessage message -> do
           let remoteMessage = "<- " <> message
@@ -258,14 +258,19 @@ handleAction = case _ of
     sendMessage = liftEffect <<< Comm.say
     handleGameAction gameAction =
       case gameAction of
-        NewGame -> H.modify_ _ { gameState = newGame }
-        NextPhase playerIndex -> H.modify_ \state ->
-          case (nextPhase playerIndex state.gameState) of
-            Nothing -> state { text = "Error: not your turn!" }
-            Just gameState -> state { gameState = gameState }
+        NewGame -> do
+          gameState <- setup newGame
+          H.modify_ _{ gameState = gameState }
+        NextPhase playerIndex -> do
+          state <- H.get
+          maybeNewGameState <- nextPhase playerIndex state.gameState
+          H.modify_ \state ->
+            case maybeNewGameState of
+              Nothing -> state { text = "Error: not your turn!" }
+              Just gameState -> state { gameState = gameState }
         Play player card -> do
           state <- H.get
-          maybeNewGameState <- liftEffect $ play player card state.gameState
+          maybeNewGameState <- play player card state.gameState
           case maybeNewGameState of
             Nothing -> H.modify_ \state -> state { text = "Error" }
             Just gameState -> H.modify_ \state -> state { gameState = gameState }
