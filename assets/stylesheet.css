@@ -1,0 +1,54 @@
+* {
+  margin: 0;
+  padding: 0;
+  font-family: Sans-serif;
+}
+html,
+body {
+  font-size: 12pt;
+  background: BLACK;
+  color: WHITE;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  display: table;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+header {
+  font-size: 1.3em;
+  height: 3em;
+}
+main {
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+}
+main ul {
+  margin: 0 auto;
+  max-width: 48em;
+  list-style-type: none;
+}
+.stack {
+  display: inline-block;
+  vertical-align: top;
+  width: 7em;
+  height: 10em;
+}
+.card {
+  display: inline-block;
+  vertical-align: top;
+  width: 6em;
+  height: 10em;
+}
+.menu-item svg {
+  width: 4em;
+  height: 4em;
+  fill: #00c6b7;
+}
+.menu-item :hover {
+  color: #00c6b7;
+}
+

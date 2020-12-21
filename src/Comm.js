@@ -66,3 +66,13 @@ function join(offer, right, callback) {
 exports.join = offer => right => callback => join(offer, right, callback)
 window.join = join
 exports.windowLocalDescription = () => window.localDescription
+
+exports.storeItem = ({ right, left, unit }) => k => v => {
+  try {
+    localStorage.setItem(k, v)
+    return right(unit)
+  } catch (e) {
+    return left(e.toString())
+  }
+}
+

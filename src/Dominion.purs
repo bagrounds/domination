@@ -15,12 +15,15 @@ module Dominion
   , allCards
   , score
   , nextPhase
+  , cash
+  , isTreasure
+  , isAction
   ) where
 
 import Prelude
 
 import Data.Array (take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
-import Data.Foldable (foldr)
+import Data.Foldable (class Foldable, foldr, any, null)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Tuple (Tuple(..), fst)
 import Data.Generic.Rep (class Generic)
@@ -90,6 +93,7 @@ newGame =
     , { card: laboratory, count: 10 }
     , { card: smithy, count: 10 }
     , { card: festival, count: 10 }
+    , { card: market, count: 10 }
     , { card: bazaar, count: 10 }
     , { card: monument, count: 10 }
     , { card: workersVillage, count: 10 }
@@ -109,6 +113,9 @@ type Player =
 
 value :: Array Card -> Int
 value = foldr (+) 0 <<< map _.treasure
+
+cost :: Array Card -> Int
+cost = foldr (+) 0 <<< map _.cost
 
 nextPhase :: Int -> GameState -> Maybe GameState
 nextPhase playerIndex state =
@@ -147,11 +154,24 @@ purchase playerIndex player stack state =
       if stack.count == 0
       then Nothing
       else
-        if (value player.atPlay) + (value player.hand) - (value player.buying) < stack.card.cost
+        if cash player < stack.card.cost
         then Nothing
         else Just (Tuple
           (player { buying = stack.card : player.buying, buys = player.buys - 1 })
           (stack { count = stack.count - 1 }))
+
+isTreasure :: Card -> Boolean
+isTreasure = contains Treasure <<< _.types
+isAction :: Card -> Boolean
+isAction = contains Action <<< _.types
+
+cash :: Player -> Int
+cash player = (value player.atPlay)
+  + (value $ isTreasure `filter` player.hand)
+  - (cost player.buying)
+
+contains :: forall a f. Eq a => Foldable f => a -> f a -> Boolean
+contains x xs = ((==) x) `any` xs
 
 play :: Int -> Int -> GameState -> Maybe GameState
 play player card state =
@@ -167,18 +187,34 @@ play player card state =
       play' p i = do
         card' <- p.hand !! i
         hand' <- deleteAt i p.hand
-        let hand'' = hand' <> take card'.cards p.deck
-        let deck' = drop card'.cards p.deck
-        let atPlay' = card' : p.atPlay
-        case card'.type of
-          Action -> pure p
-            { hand = hand''
-            , atPlay = atPlay'
+        let p' = drawCards card'.cards p { hand = hand' }
+        let atPlay' = card' : p'.atPlay
+        if ((==) Action) `any` card'.types
+          then pure p'
+            { atPlay = atPlay'
             , actions = p.actions + card'.actions - 1
             , buys = p.buys + card'.buys
-            , deck = deck'
             }
-          _ -> Nothing
+          else Nothing
+
+drawCards :: Int -> Player -> Player
+drawCards n p = if n > 0
+  then drawCards (n - 1) (drawCard p)
+  else p
+
+drawCard :: Player -> Player
+drawCard player =
+  if null player.deck
+    then (draw player.hand $ shuffle player.discard) { discard = [] }
+    else draw player.hand player.deck
+  where
+    draw h d = let
+      h' = take 1 d <> h
+      d' = drop 1 d
+      in player { hand = h', deck = d' }
+
+shuffle :: forall a. Array a -> Array a
+shuffle xs = xs
 
 newPlayer :: Player
 newPlayer =
@@ -193,7 +229,7 @@ newPlayer =
   }
 
 type Card =
-  { type :: CardType
+  { types :: Array CardType
   , name :: String
   , cost :: Int
   , victoryPoints :: Int
@@ -204,11 +240,11 @@ type Card =
   }
 
 treasure :: Card
-treasure = { type: Treasure, name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0 }
+treasure = { types: [Treasure], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0 }
 victory :: Card
-victory = treasure { type = Victory }
+victory = treasure { types = [Victory] }
 action :: Card
-action = treasure { type = Action }
+action = treasure { types = [Action] }
 copper :: Card
 copper = treasure { name = "Copper", treasure = 1 }
 silver :: Card
@@ -238,11 +274,11 @@ festival = action { name = "Festival", cost = 5, actions = 2, buys = 1, treasure
 market :: Card
 market = action { name = "Market", cost = 5, actions = 1, cards = 1, buys = 1, treasure = 1 }
 harem :: Card
-harem = treasure { name = "Harem", cost = 6, treasure = 2, victoryPoints = 2 }
+harem = treasure { types = [Treasure, Victory], name = "Harem", cost = 6, treasure = 2, victoryPoints = 2 }
 bazaar :: Card
 bazaar = action { name = "Bazaar", cost = 5, cards = 1, actions = 2, treasure = 1 }
 monument :: Card
-monument = action { name = "Monument", cost = 4, treasure = 2, victoryPoints = 1 }
+monument = action { types = [Action, Victory], name = "Monument", cost = 4, treasure = 2, victoryPoints = 1 }
 workersVillage :: Card
 workersVillage = action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
 
@@ -258,8 +294,8 @@ cleanup player = let
   deck'' = drop 5 deck' in
   player { deck = deck'', hand = hand', discard = discard'', atPlay = [], buying = [], toDiscard = [], buys = 1, actions = 1 }
 
-shuffle :: forall a. Partial => Array a -> Effect (Array a)
-shuffle array = fst <$> shuffle' (Tuple [] array)
+shuffle' :: forall a. Partial => Array a -> Effect (Array a)
+shuffle' array = fst <$> shuffle' (Tuple [] array)
   where
     shuffle' :: Partial => Tuple (Array a) (Array a) -> Effect (Tuple (Array a) (Array a))
     shuffle' (Tuple xs []) = pure $ (Tuple xs [])
