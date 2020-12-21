@@ -22,7 +22,8 @@ module Dominion
 
 import Prelude
 
-import Data.Array (take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
+import Control.Apply (lift3)
+import Data.Array (notElem, take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
 import Data.Foldable (class Foldable, foldr, any, null)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Tuple (Tuple(..), fst)
@@ -83,20 +84,21 @@ newGame =
     , { card: silver, count: 50 }
     , { card: gold, count: 50 }
     , { card: platinum, count: 50 }
-    , { card: harem, count: 8 }
     , { card: estate, count: 8 }
     , { card: duchy, count: 8 }
     , { card: province, count: 8 }
     , { card: colony, count: 8 }
+    , { card: greatHall, count: 8 }
     , { card: village, count: 10 }
     , { card: woodCutter, count: 10 }
-    , { card: laboratory, count: 10 }
+    , { card: monument, count: 8 }
     , { card: smithy, count: 10 }
-    , { card: festival, count: 10 }
-    , { card: market, count: 10 }
-    , { card: bazaar, count: 10 }
-    , { card: monument, count: 10 }
     , { card: workersVillage, count: 10 }
+    , { card: bazaar, count: 10 }
+    , { card: festival, count: 10 }
+    , { card: laboratory, count: 10 }
+    , { card: market, count: 10 }
+    , { card: harem, count: 8 }
     ]
   }
 
@@ -146,7 +148,7 @@ purchase playerIndex player stack state =
         else do
           (Tuple player' stack') <- purchase'
           players' <- updateAt playerIndex player' state.players
-          let supply' = stack' : (filter ((/=) stack) state.supply)
+          let supply' = (\s -> if s == stack then stack' else s) <$> state.supply
           pure state { players = players', supply = supply' }
   where
     purchase' :: Maybe (Tuple Player Stack)
@@ -173,54 +175,62 @@ cash player = (value player.atPlay)
 contains :: forall a f. Eq a => Foldable f => a -> f a -> Boolean
 contains x xs = ((==) x) `any` xs
 
-play :: Int -> Int -> GameState -> Maybe GameState
+play :: Int -> Int -> GameState -> Effect (Maybe GameState)
 play player card state =
   if player == state.turn
-  then do
-    player' <- state.players !! player
-    player'' <- play' player' card
-    players' <- updateAt player player'' state.players
-    pure $ state { players = players' }
-  else Nothing
+  then case (state.players !! player) of
+      Nothing -> pure Nothing
+      Just player' -> do
+        (player'' :: Maybe Player) <- play' player' card
+        pure $ case player'' of
+          Nothing -> Nothing
+          Just player''' -> (\p -> state { players = p })
+            <$> (updateAt player player''' state.players)
+  else pure Nothing
     where
-      play' :: Player -> Int -> Maybe Player
-      play' p i = do
-        card' <- p.hand !! i
-        hand' <- deleteAt i p.hand
-        let p' = drawCards card'.cards p { hand = hand' }
-        let atPlay' = card' : p'.atPlay
-        if ((==) Action) `any` card'.types
-          then pure p'
-            { atPlay = atPlay'
-            , actions = p.actions + card'.actions - 1
-            , buys = p.buys + card'.buys
-            }
-          else Nothing
+      play' :: Player -> Int -> Effect (Maybe Player)
+      play' p i =
+        case (do
+          card' <- p.hand !! i
+          hand' <- deleteAt i p.hand
+          pure $ Tuple card' hand') of
+          Nothing -> pure Nothing
+          Just (Tuple c h) -> result c h
+          where
+            result :: Card -> Array Card -> Effect (Maybe Player)
+            result card' hand' = do
+              p' <- drawCards card'.cards p { hand = hand' }
+              let atPlay' = card' : p'.atPlay
+              if ((==) Action) `any` card'.types
+                then pure $ Just p'
+                  { atPlay = atPlay'
+                  , actions = p.actions + card'.actions - 1
+                  , buys = p.buys + card'.buys
+                  }
+                else pure Nothing
 
-drawCards :: Int -> Player -> Player
+drawCards :: Int -> Player -> Effect Player
 drawCards n p = if n > 0
-  then drawCards (n - 1) (drawCard p)
-  else p
+  then drawCards (n - 1) =<< (drawCard p)
+  else pure p
 
-drawCard :: Player -> Player
+drawCard :: Player -> Effect Player
 drawCard player =
   if null player.deck
-    then (draw player.hand $ shuffle player.discard) { discard = [] }
-    else draw player.hand player.deck
+    then do
+    (_{ discard = [] } <<< draw player.hand) <$> (shuffle player.discard)
+    else pure $ draw player.hand player.deck
   where
     draw h d = let
       h' = take 1 d <> h
       d' = drop 1 d
       in player { hand = h', deck = d' }
 
-shuffle :: forall a. Array a -> Array a
-shuffle xs = xs
-
 newPlayer :: Player
 newPlayer =
-  { deck: (replicate 2 copper) <> (replicate 3 estate)
-  , hand: replicate 5 copper
-  , discard: []
+  { deck: []
+  , hand: []
+  , discard: (replicate 5 copper) <> (replicate 3 estate)
   , toDiscard: []
   , atPlay: []
   , buying: []
@@ -261,6 +271,8 @@ province :: Card
 province = victory { name = "Province", cost = 8, victoryPoints = 6 }
 colony :: Card
 colony = victory { name = "Colony", cost = 11, victoryPoints = 10 }
+greatHall :: Card
+greatHall = victory { types = [Action, Victory], name = "Great Hall", cost = 3, cards = 1, actions = 1, victoryPoints = 1 }
 village :: Card
 village = action { name = "Village", cost = 3, cards = 1, actions = 2 }
 woodCutter :: Card
@@ -294,16 +306,16 @@ cleanup player = let
   deck'' = drop 5 deck' in
   player { deck = deck'', hand = hand', discard = discard'', atPlay = [], buying = [], toDiscard = [], buys = 1, actions = 1 }
 
-shuffle' :: forall a. Partial => Array a -> Effect (Array a)
-shuffle' array = fst <$> shuffle' (Tuple [] array)
+shuffle :: forall a. Eq a => Array a -> Effect (Array a)
+shuffle array = fst <$> shuffle' (Tuple [] array)
   where
-    shuffle' :: Partial => Tuple (Array a) (Array a) -> Effect (Tuple (Array a) (Array a))
+    shuffle' :: Tuple (Array a) (Array a) -> Effect (Tuple (Array a) (Array a))
     shuffle' (Tuple xs []) = pure $ (Tuple xs [])
     shuffle' (Tuple xs ys) = do
       i <- randomInt 0 (length ys - 1)
-      let a1 = fromJust $ array !! i
-      let ys' = fromJust $ deleteAt i ys
-      shuffle' (Tuple (a1 : xs) ys')
+      let a1 = take 1 $ drop i array
+      let ys' = (flip notElem a1) `filter` ys
+      shuffle' (Tuple (a1 <> xs) ys')
 
 allCards :: Player -> Array Card
 allCards player = player.hand <> player.deck <> player.atPlay <> player.discard <> player.toDiscard <> player.buying

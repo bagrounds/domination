@@ -108,29 +108,31 @@ render state = HH.main_
 
 renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a AppAction)
 renderSupply playerIndex player state =
-  renderCardInSupply playerIndex player <$> state.supply
+  renderStack playerIndex player <$> state.supply
 
 renderCard :: forall a. (MouseEvent -> Maybe AppAction) -> Card -> HTML a AppAction
 renderCard onClick card = HH.button
   [ HE.onClick onClick
-  , prop.class.card
+  , HP.class_ prop.class.card
   ]
   [ HH.ul_
-    [ HH.li_ [ HH.text $ " " <> card.name ]
-    , HH.li_ [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
-    , HH.li_ [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
-    , HH.li_ [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
-    , HH.li_ [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
-    , HH.li_ [ HH.text (if card.victoryPoints > 0 then " +" <> show card.victoryPoints <> " VP" else "") ]
-    , HH.li_ [ HH.text $ "Cost $" <> show card.cost ]
+    [ HH.li [ HP.classes [ prop.class.cardText, prop.class.cardName ] ] [ HH.text $ " " <> card.name ]
+    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardCards ] ] [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
+    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardActions ] ] [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
+    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardBuys ] ] [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
+    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardTreasure ] ] [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
+    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardVictoryPoints ] ] [ HH.text (if card.victoryPoints > 0 then " +" <> show card.victoryPoints <> " VP" else "") ]
+    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardCost ] ] [ HH.text $ "Cost $" <> show card.cost ]
     ]
   ]
 
-renderCardInSupply :: forall a. Int -> Player -> Stack -> HTML a AppAction
-renderCardInSupply playerIndex player stack =
-  HH.li [ prop.class.stack ]
-    [ HH.text $ "(" <> show stack.count <> ")"
-    , renderCard (\_ -> Just $ PlayGame $ Purchase playerIndex player stack) stack.card
+renderStack :: forall a. Int -> Player -> Stack -> HTML a AppAction
+renderStack playerIndex player stack =
+  HH.li [ HP.class_ prop.class.stack ]
+    [ HH.ul_
+      [ HH.li [ HP.class_ prop.class.stackCount ] [ HH.text $ "(" <> show stack.count <> ")" ]
+      , HH.li [ HP.class_ prop.class.stackCard ] [ renderCard (\_ -> Just $ PlayGame $ Purchase playerIndex player stack) stack.card ]
+      ]
     ]
 
 renderPlayers :: forall a. GameState -> Array (HTML a AppAction)
@@ -161,13 +163,23 @@ renderPlayer state playerIndex player = HH.div_
 
 prop =
   { class:
-    { card: HP.class_ $ H.ClassName "card"
-    , stack: HP.class_ $ H.ClassName "stack"
+    { card: H.ClassName "card"
+    , cardName: H.ClassName "card-name"
+    , cardCards: H.ClassName "card-cards"
+    , cardActions: H.ClassName "card-actions"
+    , cardBuys: H.ClassName "card-buys"
+    , cardTreasure: H.ClassName "card-treasure"
+    , cardVictoryPoints: H.ClassName "card-victory-points"
+    , cardCost: H.ClassName "card-cost"
+    , cardText: H.ClassName "card-text"
+    , stack: H.ClassName "stack"
+    , stackCard: H.ClassName "stack-card"
+    , stackCount: H.ClassName "stack-count"
     }
   }
 
 renderCardView :: forall a. Card -> HTML a AppAction
-renderCardView card = HH.button [ prop.class.card ] [HH.text card.name]
+renderCardView card = renderCard (const Nothing) card
 
 renderCardInHand :: forall a. Int -> Int -> Card -> HTML a AppAction
 renderCardInHand playerIndex cardIndex card =
@@ -251,10 +263,13 @@ handleAction = case _ of
           case (nextPhase playerIndex state.gameState) of
             Nothing -> state { text = "Error: not your turn!" }
             Just gameState -> state { gameState = gameState }
-        Play player card -> H.modify_ \state ->
-          case play player card state.gameState of
-            Nothing -> state { text = "Error" }
-            Just gameState -> state { gameState = gameState }
+        Play player card -> do
+          state <- H.get
+          maybeNewGameState <- liftEffect $ play player card state.gameState
+          case maybeNewGameState of
+            Nothing -> H.modify_ \state -> state { text = "Error" }
+            Just gameState -> H.modify_ \state -> state { gameState = gameState }
+
         Purchase playerIndex player stack -> H.modify_ \state ->
           case purchase playerIndex player stack state.gameState of
             Nothing -> state { text = "Error trying to buy card!" }
