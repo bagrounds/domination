@@ -16,8 +16,9 @@ module Dominion
   , score
   , nextPhase
   , cash
-  , isTreasure
   , isAction
+  , isTreasure
+  , isVictory
   , setup
   ) where
 
@@ -184,10 +185,12 @@ purchase playerIndex player stack state =
           (player { buying = stack.card : player.buying, buys = player.buys - 1 })
           (stack { count = stack.count - 1 }))
 
-isTreasure :: Card -> Boolean
-isTreasure = contains Treasure <<< _.types
 isAction :: Card -> Boolean
 isAction = contains Action <<< _.types
+isTreasure :: Card -> Boolean
+isTreasure = contains Treasure <<< _.types
+isVictory :: Card -> Boolean
+isVictory = contains Victory <<< _.types
 
 cash :: Player -> Int
 cash player = (value player.atPlay)
@@ -198,17 +201,17 @@ contains :: forall a f. Eq a => Foldable f => a -> f a -> Boolean
 contains x xs = ((==) x) `any` xs
 
 play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Maybe GameState)
-play player card state =
-  if player == state.turn
-  then case (state.players !! player) of
+play player cardIndex state =
+  if player /= state.turn
+  then pure Nothing
+  else case (state.players !! player) of
       Nothing -> pure Nothing
       Just player' -> do
-        (player'' :: Maybe Player) <- play' player' card
+        (player'' :: Maybe Player) <- play' player' cardIndex
         pure $ case player'' of
           Nothing -> Nothing
           Just player''' -> (\p -> state { players = p })
             <$> (updateAt player player''' state.players)
-  else pure Nothing
     where
       play' :: Player -> Int -> m (Maybe Player)
       play' p i =
@@ -223,13 +226,13 @@ play player card state =
             result card' hand' = do
               p' <- drawCards card'.cards p { hand = hand' }
               let atPlay' = card' : p'.atPlay
-              if ((==) Action) `any` card'.types
-                then pure $ Just p'
+              if not $ ((==) Action) `any` card'.types
+                then pure Nothing
+                else pure $ Just p'
                   { atPlay = atPlay'
                   , actions = p.actions + card'.actions - 1
                   , buys = p.buys + card'.buys
                   }
-                else pure Nothing
 
 drawCards :: forall m. MonadEffect m => Int -> Player -> m Player
 drawCards n p = do

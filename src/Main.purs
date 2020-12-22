@@ -9,7 +9,7 @@ import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Argonaut.Parser (jsonParser)
-import Data.Array (mapWithIndex, take, (:), filter)
+import Data.Array (intercalate, mapWithIndex, take, (:), filter)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
@@ -31,7 +31,7 @@ import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-import Dominion (Card, GameState, Player, Stack, setup, newGame, nextPhase, play, purchase, score, value, cash, isAction)
+import Dominion (Card, GameState, Player, Stack, Phase(..), setup, newGame, nextPhase, play, purchase, score, value, cash, isAction, isTreasure, isVictory)
 import Comm as Comm
 
 type AppState =
@@ -110,19 +110,49 @@ renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a AppAction)
 renderSupply playerIndex player state =
   renderStack playerIndex player <$> state.supply
 
-renderCard :: forall a. (MouseEvent -> Maybe AppAction) -> Card -> HTML a AppAction
-renderCard onClick card = HH.button
-  [ HE.onClick onClick
-  , HP.class_ prop.class.card
-  ]
+renderDeck :: forall a. Player -> HTML a AppAction
+renderDeck player = HH.button
+  [ HE.onClick (const Nothing), HP.class_ prop.class.deck ]
   [ HH.ul_
-    [ HH.li [ HP.classes [ prop.class.cardText, prop.class.cardName ] ] [ HH.text $ " " <> card.name ]
-    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardCards ] ] [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
-    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardActions ] ] [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
-    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardBuys ] ] [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
-    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardTreasure ] ] [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
-    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardVictoryPoints ] ] [ HH.text (if card.victoryPoints > 0 then " +" <> show card.victoryPoints <> " VP" else "") ]
-    , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardCost ] ] [ HH.text $ "Cost $" <> show card.cost ]
+    [ HH.li [] [ HH.text "Discard" ]
+    , HH.li [] [ HH.text $ show ((length player.discard) :: Int) ]
+    ]
+  ]
+
+renderDiscard :: forall a. Player -> HTML a AppAction
+renderDiscard player = HH.button
+  [ HE.onClick (const Nothing), HP.class_ prop.class.discard ]
+  [ HH.ul_
+    [ HH.li [] [ HH.text "Deck" ]
+    , HH.li [] [ HH.text $ show ((length player.deck) :: Int) ]
+    ]
+  ]
+
+renderCard :: forall a. (MouseEvent -> Maybe AppAction) -> Player -> Card -> HTML a AppAction
+renderCard onClick player card = HH.li
+  (if isTreasure card then [ HP.class_ prop.class.treasureCard ] else [ HP.class_ prop.class.noTreasureCard ])
+  [ HH.li (if isVictory card then [ HP.class_ prop.class.victoryCard ] else [ HP.class_ prop.class.noVictoryCard ])
+    [ HH.li (if isAction card then [ HP.class_ prop.class.actionCard ] else [ HP.class_ prop.class.noActionCard ])
+      [ HH.button
+        [ HE.onClick onClick
+        , HP.classes
+          $ (if player.actions > 0 && isAction card then [ prop.class.canPlay ] else [ prop.class.cantPlay ])
+
+          <> [ prop.class.card ]
+        ]
+        [ HH.ul_
+          [ HH.li [ HP.classes [ prop.class.cardText, prop.class.cardName ] ] [ HH.text $ " " <> card.name ]
+          , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardCards ] ] [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
+          , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardActions ] ] [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
+          , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardBuys ] ] [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
+          , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardTreasure ] ] [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
+          , HH.li [ HP.classes [ prop.class.cardText, prop.class.cardVictoryPoints ] ] [ HH.text (if card.victoryPoints > 0 then " +" <> show card.victoryPoints <> " VP" else "") ]
+          , HH.li
+            [ HP.classes [ prop.class.cardText, prop.class.cardCost ] ]
+            [ HH.text $ "Cost $" <> show card.cost ]
+          ]
+        ]
+      ]
     ]
   ]
 
@@ -131,7 +161,13 @@ renderStack playerIndex player stack =
   HH.li [ HP.class_ prop.class.stack ]
     [ HH.ul_
       [ HH.li [ HP.class_ prop.class.stackCount ] [ HH.text $ "(" <> show stack.count <> ")" ]
-      , HH.li [ HP.class_ prop.class.stackCard ] [ renderCard (\_ -> Just $ PlayGame $ Purchase playerIndex player stack) stack.card ]
+      , HH.li
+        [ HP.classes
+          [ prop.class.stackCard
+          , if player.buys > 0 && cash player >= stack.card.cost then prop.class.canBuy else prop.class.cantBuy
+          ]
+        ]
+        [ renderCard (\_ -> Just $ PlayGame $ Purchase playerIndex player stack) player stack.card ]
       ]
     ]
 
@@ -140,33 +176,60 @@ renderPlayers state =
   [ HH.p [] [ HH.text $ "Turn: Player " <> show state.turn ]
   ] <> renderPlayer state `mapWithIndex` state.players
 
+--playerStats :: GameState -> Int -> Player -> String
+playerStats state playerIndex player = HH.li
+  [ HP.class_ prop.class.stat ]
+  [ HH.text $ "Player " <> show playerIndex
+    <> ": Actions: " <> show player.actions
+    <> "/" <> show (length (isAction `filter` player.hand) :: Int)
+    <> " | $" <> show (cash player)
+    <> " | Buys: " <> show player.buys
+    <> " | Play: " <> (intercalate ", " (_.name <$> player.atPlay))
+    <> " | Buying: " <> (intercalate ", " (_.name <$> player.buying))
+    <> " | VP: " <> show (score player)
+    <> (if state.turn == playerIndex then " | " <> show state.phase else "")
+  ]
+
 renderPlayer :: forall a. GameState -> Int -> Player -> HTML a AppAction
 renderPlayer state playerIndex player = HH.div_
-  [ HH.h2 []
-    [ HH.text
-    $ "Player " <> show playerIndex
-    <> (if state.turn == playerIndex then " " <> show state.phase else "")
-    <> " (Actions: " <> show player.actions
-    <> "/" <> show (length (isAction `filter` player.hand) :: Int)
-    <> ") ($" <> show (cash player)
-    <> ") (Buys: " <> show player.buys
-    <> ") (VP: " <> show (score player) <> ")"
-    ]
+  [ HH.ul [ HP.class_ prop.class.stats ] (playerStats state `mapWithIndex` state.players)
   , HH.button [ HE.onClick \_ -> Just $ PlayGame $ NextPhase playerIndex ] [ HH.text "Next Phase" ]
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])] : renderSupply playerIndex player state)
-  , HH.div_ [ HH.text $ "Deck Size: "
-              <> (show ((length player.deck) :: Int))
-              <> " Discard Size: "
-              <> (show $ ((length player.discard) :: Int))
-            ]
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Hand" ])] : renderCardInHand playerIndex `mapWithIndex` player.hand)
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])] : (renderCardView <$> player.atPlay))
-  , HH.ul_ (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])] : (renderCardView <$> player.buying))
+  , HH.ul
+      [ HP.classes
+        [ prop.class.supply
+        , if state.turn == playerIndex && state.phase == BuyPhase then prop.class.active else prop.class.inactive
+        ]
+      ]
+    (HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])] : renderSupply playerIndex player state)
+  , HH.ul
+    [ HP.classes
+      [ prop.class.hand
+      , if state.turn == playerIndex && state.phase == ActionPhase then prop.class.active else prop.class.inactive
+      ]
+    ]
+    (HH.li_ [(HH.h3 [] [ HH.text $ "Hand" ])]
+    : renderDiscard player : renderCardInHand player playerIndex `mapWithIndex` player.hand <> [ renderDeck player ])
+  , HH.ul [ HP.class_ prop.class.play ] (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])] : (renderCard (const Nothing) player <$> player.atPlay))
+  , HH.ul [ HP.class_ prop.class.buying ] (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])] : (renderCard (const Nothing) player <$> player.buying))
   ]
 
 prop =
   { class:
-    { card: H.ClassName "card"
+    { stats: H.ClassName "stats"
+    , stat: H.ClassName "stat"
+    , supply: H.ClassName "supply"
+    , hand: H.ClassName "hand"
+    , play: H.ClassName "play"
+    , buying: H.ClassName "buying"
+    , deck: H.ClassName "deck"
+    , discard: H.ClassName "discard"
+    , card: H.ClassName "card"
+    , actionCard: H.ClassName "action-card"
+    , noActionCard: H.ClassName "no-action-card"
+    , treasureCard: H.ClassName "treasure-card"
+    , noTreasureCard: H.ClassName "no-treasure-card"
+    , victoryCard: H.ClassName "victory-card"
+    , noVictoryCard: H.ClassName "no-victory-card"
     , cardName: H.ClassName "card-name"
     , cardCards: H.ClassName "card-cards"
     , cardActions: H.ClassName "card-actions"
@@ -178,15 +241,18 @@ prop =
     , stack: H.ClassName "stack"
     , stackCard: H.ClassName "stack-card"
     , stackCount: H.ClassName "stack-count"
+    , active: H.ClassName "active"
+    , inactive: H.ClassName "inactive"
+    , canBuy: H.ClassName "can-buy"
+    , cantBuy: H.ClassName "cant-buy"
+    , canPlay: H.ClassName "can-play"
+    , cantPlay: H.ClassName "cant-play"
     }
   }
 
-renderCardView :: forall a. Card -> HTML a AppAction
-renderCardView card = renderCard (const Nothing) card
-
-renderCardInHand :: forall a. Int -> Int -> Card -> HTML a AppAction
-renderCardInHand playerIndex cardIndex card =
-  renderCard (\_ -> Just $ PlayGame $ Play playerIndex cardIndex) card
+renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a AppAction
+renderCardInHand player playerIndex cardIndex card =
+  renderCard (\_ -> Just $ PlayGame $ Play playerIndex cardIndex) player card
 
 data AppAction = MakeOffer
   | WriteOffer String

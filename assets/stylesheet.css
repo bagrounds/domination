@@ -30,32 +30,107 @@ main ul {
   list-style-type: none;
 }
 .stack {
-  padding 0;
-  margin 0;
   display: inline-block;
+  padding: 1px;
   vertical-align: top;
-  width: 7em;
-  height: 10em;
 }
-.card {
+.card, .deck, .discard {
+  display: inline-block;
+  border-radius: 0.6em;
+  vertical-align: top;
   overflow: hidden;
   display: inline-block;
-  width: 7em;
-  height: 9em;
+  text-color: inherit;
+  width: 6em;
+  height: 10em;
+}
+.supply, .hand, .play, .buying {
+  padding: 2px;
+  border: 1px solid white;
+  min-height: 9em;
+}
+.deck {
+  width: 4em;
+  height: 6em;
+  margin: 1em;
+}
+.discard {
+  width: 4em;
+  height: 6em;
+  margin: 1em;
 }
 .card-text {
-  min-height: 1em;
+  vertical-align: top;
+  height: 1.1em;
 }
 .card-name {
+  min-height: 2.1em;
   font-weight: bold;
-  float: top;
-  vertical-align: top;
+}
+.action-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 1px solid red;
+  background-color: red;
+}
+.no-action-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 1px solid black;
+  background-color: black;
+}
+.victory-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 2px solid lightgreen;
+  background-color: lightgreen;
+}
+.no-victory-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 2px solid black;
+  background-color: black;
+}
+.treasure-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 3px solid yellow;
+  background-color: yellow;
+}
+.no-treasure-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 3px solid black;
+  background-color: black;
 }
 .card-victory-points:not(:empty) {
   background: lightgreen;
 }
+.active {
+    background-color: teal;
+}
 .card-treasure:not(:empty) {
   background: yellow;
+}
+.supply .can-buy .card {
+  background-color: white;
+}
+.supply .cant-buy .card {
+  background-color: darkgray;
+}
+.hand .can-play.card {
+  background-color: white;
+}
+.hand .cant-play.card {
+  background-color: darkgray;
+}
+.stats {
+  margin: 0.2em;
+  padding-left: 3em;
+}
+.stat {
+  font-weight: bold;
+  text-align: left;
 }
 .menu-item svg {
   width: 4em;
