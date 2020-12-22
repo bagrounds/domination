@@ -164,7 +164,7 @@ renderStack playerIndex player stack =
       , HH.li
         [ HP.classes
           [ prop.class.stackCard
-          , if player.buys > 0 && cash player >= stack.card.cost then prop.class.canBuy else prop.class.cantBuy
+          , if player.buys > 0 && cash player >= stack.card.cost && stack.count > 0 then prop.class.canBuy else prop.class.cantBuy
           ]
         ]
         [ renderCard (\_ -> Just $ PlayGame $ Purchase playerIndex player stack) player stack.card ]
