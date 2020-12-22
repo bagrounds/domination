@@ -33,6 +33,7 @@ main ul {
   display: inline-block;
   padding: 1px;
   vertical-align: top;
+  width: 6em;
 }
 .card, .deck, .discard {
   display: inline-block;
