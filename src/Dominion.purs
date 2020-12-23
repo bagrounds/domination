@@ -45,6 +45,8 @@ import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Random (randomInt)
 
+import Comm as Comm
+
 type GameState =
   { turn :: Int
   , phase :: Phase
@@ -248,7 +250,9 @@ drawCards n p = do
 drawCard :: forall m. MonadEffect m => Player -> m Player
 drawCard player = do
   deck <- if null player.deck
-    then shuffle player.discard
+    then do
+      liftEffect $ Comm.log $ "Ran out of cards while drawing. Time to shuffle for player: " <> show player
+      shuffle player.discard
     else pure player.deck
   let discarded = if null player.deck
     then []
@@ -334,13 +338,15 @@ workersVillage = action { name = "Worker's Village", cost = 4, cards = 1, action
 cleanup :: forall m. MonadEffect m => Player -> m Player
 cleanup player = do
   let discard' = player.discard <> player.atPlay <> player.hand <> player.toDiscard <> player.buying
-  let shouldShuffle = length player.deck < 5
-  let discard'' = if shouldShuffle then [] else discard'
-  shuffled <- shuffle discard'
-  let deck' = if shouldShuffle then player.deck <> shuffled else player.deck
-  let hand' = take 5 deck'
-  let deck'' = drop 5 deck'
-  pure player { deck = deck'', hand = hand', discard = discard'', atPlay = [], buying = [], toDiscard = [], buys = 1, actions = 1 }
+  let player' = player { discard = discard'
+    , atPlay = []
+    , hand = []
+    , toDiscard = []
+    , buying = []
+    , actions = 1
+    , buys = 1
+    }
+  drawCards 5 player'
 
 shuffle :: forall a m . MonadEffect m => Eq a => Array a -> m (Array a)
 shuffle array = fst <$> shuffle' (Tuple [] array)
