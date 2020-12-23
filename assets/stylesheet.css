@@ -141,7 +141,6 @@ main ul {
   background: lightgreen;
 }
 .active {
-  border: 0.1em solid blue;
   background-color: white;
   color: black;
 }
@@ -156,13 +155,12 @@ button {
 .next-phase {
   background-color: white;
   font-weight: bold;
-  border: 0.2em solid blue;
   width: 13em;
+  border-color: black;
 }
 .waiting .next-phase {
   background-color: darkgray;
   font-weight: normal;
-  border-color: black;
 }
 .card-treasure:not(:empty) {
   background: yellow;
