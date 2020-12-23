@@ -43,6 +43,7 @@ type AppState =
   , receivedAnswer :: String
   , message :: String
   , localDescription :: String
+  , gameOn :: Boolean
   , gameState :: GameState
   , text :: String
   }
@@ -56,6 +57,7 @@ newApp =
   , receivedAnswer: ""
   , message: ""
   , localDescription: ""
+  , gameOn: false
   , gameState: newGame
   , text: ""
   }
@@ -69,11 +71,11 @@ component = H.mkComponent { eval, initialState, render } where
   initialState = const newApp
 
 render :: forall b. AppState -> HTML b AppAction
-render state = HH.main_
+render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , HH.h1 [] [ HH.text "Creator" ]
   , HH.button [ HE.onClick \_ -> Just MakeOffer ] [ HH.text "MakeOffer" ]
-  , HH.text state.localDescription
+  , HH.textarea [ HP.value state.localDescription ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner's answer here"
@@ -89,7 +91,7 @@ render state = HH.main_
     , HE.onValueInput $ Just <<< WriteOffer
     ]
   , HH.button [ HE.onClick \_ -> Just MakeAnswer ] [ HH.text "Join" ]
-  , HH.text state.answer
+  , HH.textarea [ HP.value state.answer ]
   , HH.h1 [] [ HH.text "Chat" ]
   , HH.input
     [ HP.type_ HP.InputText
@@ -100,11 +102,13 @@ render state = HH.main_
     ]
   , HH.button [ HE.onClick \_ -> Just SendMessage ] [ HH.text "Send" ]
   , HH.div_ $ (\m -> HH.p [] [ HH.text m ]) <$> (take 5 state.messages)
-  , HH.h1 [] [ HH.text "Domination" ]
   , HH.button [ HE.onClick \_ -> Just $ PlayGame NewGame ] [ HH.text "New Game" ]
+  ] <> (if state.gameOn || true then [ renderGame state ] else [])
+
+renderGame :: forall b. AppState -> HTML b AppAction
+renderGame state = HH.div_
+  [ HH.h1 [] [ HH.text "Domination" ]
   , HH.div_ $ renderPlayers state.gameState
-  , HH.div_ [ HH.h2 [] [ HH.text "Game State" ] ]
-  , HH.div_ [ HH.text $ show state ]
   ]
 
 renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a AppAction)
@@ -352,19 +356,19 @@ autoAdvance = do
         Just newGameState -> const Nothing <$> modify_ \state ->
           state { gameState = newGameState }
 
-handleAction :: forall m. MonadState AppState m
-  => MonadAff m
-  => MonadEffect m
-  => AppAction -> m Unit
-handleAction action = do
-  handleAction' action
-  untilJust autoAdvance
-
 handleAction' :: forall m. MonadState AppState m
   => MonadAff m
   => MonadEffect m
   => AppAction -> m Unit
-handleAction' = case _ of
+handleAction' action = do
+  handleAction action
+  untilJust autoAdvance
+
+handleAction :: forall m. MonadState AppState m
+  => MonadAff m
+  => MonadEffect m
+  => AppAction -> m Unit
+handleAction = case _ of
   MakeOffer -> do
     ld <- liftAff $ makeAff $ Comm.create Right
     H.modify_ _ { localDescription = ld }
@@ -398,6 +402,7 @@ handleAction' = case _ of
           H.modify_ \state -> state { messages = remoteMessage : state.messages }
   PlayGame gameAction -> do
     handleGameAction gameAction
+    untilJust autoAdvance
     s <- H.get
     sendMessage $ writeMessage $ GameStateMessage s.gameState
   where
@@ -406,7 +411,7 @@ handleAction' = case _ of
       case gameAction of
         NewGame -> do
           gameState <- setup newGame
-          H.modify_ _{ gameState = gameState }
+          H.modify_ _{ gameOn = true, gameState = gameState }
         NextPhase playerIndex -> do
           state <- H.get
           maybeNewGameState <- nextPhase playerIndex state.gameState

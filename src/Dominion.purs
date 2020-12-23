@@ -134,10 +134,12 @@ nextPhase playerIndex state =
     else do
       let phase' = next state.phase
       let turn' = if state.phase == CleanupPhase
-        then (state.turn + 1) `mod` (length state.players)
+        then nextPlayer state
         else state.turn
       players' <- (if state.phase == CleanupPhase
-          then sequence $ (\i p -> if i == playerIndex then cleanup' p else pure p) `mapWithIndex` state.players
+          then sequence $
+            mapWithIndex (\i p -> if i == playerIndex then cleanup p else pure p)
+            state.players
           else pure state.players)
       pure $ Just state { phase = phase', turn = turn', players = players' }
 
@@ -148,22 +150,6 @@ setup gameState = do
 
 nextPlayer :: GameState -> Int
 nextPlayer state = (state.turn + 1) `mod` (length state.players)
-
-nextPhase' :: Int -> GameState -> Maybe GameState
-nextPhase' playerIndex state =
-    if playerIndex == state.turn
-    then Just $ state
-      { phase = next state.phase
-      , turn =
-        if state.phase == CleanupPhase
-        then nextPlayer state
-        else state.turn
-      , players =
-          if state.phase == CleanupPhase
-          then mapWithIndex (\i p -> if i == playerIndex then cleanup p else p) state.players
-          else state.players
-      }
-    else Nothing
 
 purchase :: Int -> Player -> Stack -> GameState -> Maybe GameState
 purchase playerIndex player stack state =
@@ -345,8 +331,8 @@ monument = action { types = [Action, Victory], name = "Monument", cost = 4, trea
 workersVillage :: Card
 workersVillage = action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
 
-cleanup' :: forall m. MonadEffect m => Player -> m Player
-cleanup' player = do
+cleanup :: forall m. MonadEffect m => Player -> m Player
+cleanup player = do
   let discard' = player.discard <> player.atPlay <> player.hand <> player.toDiscard <> player.buying
   let shouldShuffle = length player.deck < 5
   let discard'' = if shouldShuffle then [] else discard'
@@ -355,18 +341,6 @@ cleanup' player = do
   let hand' = take 5 deck'
   let deck'' = drop 5 deck'
   pure player { deck = deck'', hand = hand', discard = discard'', atPlay = [], buying = [], toDiscard = [], buys = 1, actions = 1 }
-
-cleanup :: Player -> Player
-cleanup player = let
-  discard' = player.discard <> player.atPlay <> player.hand <> player.toDiscard <> player.buying
-  shouldShuffle = length player.deck < 5
-  discard'' = if shouldShuffle then [] else discard'
-  -- shuffled <- shuffle discard'
-  -- let deck' = if shouldShuffle then player.deck <> shuffled else player.deck
-  deck' = if shouldShuffle then player.deck <> discard' else player.deck
-  hand' = take 5 deck'
-  deck'' = drop 5 deck' in
-  player { deck = deck'', hand = hand', discard = discard'', atPlay = [], buying = [], toDiscard = [], buys = 1, actions = 1 }
 
 shuffle :: forall a m . MonadEffect m => Eq a => Array a -> m (Array a)
 shuffle array = fst <$> shuffle' (Tuple [] array)
