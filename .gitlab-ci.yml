@@ -8,7 +8,7 @@
     "script": ["npm run deploy"],
     "environment": "pages",
     "artifacts": {
-      "paths": ["dist"]
+      "paths": ["public"]
     },
     "only": ["master"]
   }
