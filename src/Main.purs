@@ -215,7 +215,7 @@ renderPlayer state playerIndex player = HH.div
           [ HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ "$" <> (show ((cash player) :: Int)) ]
           , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
           ]
-        : renderSupply playerIndex player state
+        : [ HH.ul_ (renderSupply playerIndex player state) ]
   , HH.button
     [ HP.class_ (cssClass.nextPhase), HE.onClick \_ -> Just $ PlayGame $ NextPhase playerIndex ]
     [ HH.text if state.turn == playerIndex
