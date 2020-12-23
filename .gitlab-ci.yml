@@ -1,0 +1,15 @@
+{
+  "image": "node:14",
+  "stages": [
+    "deploy"
+  ],
+  "pages": {
+    "stage": "deploy",
+    "script": ["npm run bundle"],
+    "environment": "pages",
+    "artifacts": {
+      "paths": ["dist"]
+    },
+    "only": ["master"]
+  }
+}
