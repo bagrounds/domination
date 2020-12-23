@@ -17,6 +17,7 @@ You can edit this file as you like.
   , "argonaut"
   , "argonaut-generic"
   , "random"
+  , "monad-loops"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

@@ -31,22 +31,52 @@ main ul {
 }
 .stack {
   display: inline-block;
-  padding: 1px;
   vertical-align: top;
   width: 6em;
+  height: 9.4em;
+}
+.stack {
+  position: relative;
+  z-index: 0;
+}
+.card {
+  z-index: 1;
+}
+.stack-count {
+  position: absolute;
+  top: 4.2em;
+  left: 0.1em;
+  width: 1.6em;
+  height: 1.5em;
+  line-height: 1.5em;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: center;
+  font-size: 16pt;
+  color: gray;
+  border-radius: 1em;
+  background-color: black;
+  opacity: 0.5;
+  z-index: 1000;
+}
+.stack .card,.action-card {
+  position absolute;
 }
 .card, .deck, .discard {
   display: inline-block;
-  border-radius: 0.6em;
   vertical-align: top;
   overflow: hidden;
   display: inline-block;
   text-color: inherit;
   width: 6em;
-  height: 10em;
+  height: 9.2em;
+  padding: 0;
+}
+.supply {
+  padding: 0.7em;
 }
 .supply, .hand, .play, .buying {
-  padding: 2px;
+  border-radius: 0.6em;
   border: 1px solid white;
   min-height: 9em;
 }
@@ -61,12 +91,15 @@ main ul {
   margin: 1em;
 }
 .card-text {
-  vertical-align: top;
   height: 1.1em;
 }
 .card-name {
-  min-height: 2.1em;
+  min-height: 2.2em;
   font-weight: bold;
+}
+.hand-info {
+  display: inline-block;
+  width: 6em;
 }
 .action-card {
   display: inline-block;
@@ -108,7 +141,28 @@ main ul {
   background: lightgreen;
 }
 .active {
-    background-color: teal;
+  border: 0.1em solid blue;
+  background-color: white;
+  color: black;
+}
+.active.waiting {
+  border: 3px solid darkgray;
+  background-color: darkgray;
+}
+button {
+  padding: 0.5em;
+  border-radius: 0.6em;
+}
+.next-phase {
+  background-color: white;
+  font-weight: bold;
+  border: 0.2em solid blue;
+  width: 13em;
+}
+.waiting .next-phase {
+  background-color: darkgray;
+  font-weight: normal;
+  border-color: black;
 }
 .card-treasure:not(:empty) {
   background: yellow;

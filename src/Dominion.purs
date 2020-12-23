@@ -20,6 +20,11 @@ module Dominion
   , isTreasure
   , isVictory
   , setup
+  , hasActions
+  , actionCardsInHand
+  , numActionCardsInHand
+  , hasActionCardsInHand
+  , nextPlayer
   ) where
 
 import Prelude
@@ -141,6 +146,8 @@ setup gameState = do
   players <- traverse (drawCards 5) gameState.players
   pure gameState { players = players }
 
+nextPlayer :: GameState -> Int
+nextPlayer state = (state.turn + 1) `mod` (length state.players)
 
 nextPhase' :: Int -> GameState -> Maybe GameState
 nextPhase' playerIndex state =
@@ -149,7 +156,7 @@ nextPhase' playerIndex state =
       { phase = next state.phase
       , turn =
         if state.phase == CleanupPhase
-        then (state.turn + 1) `mod` (length state.players)
+        then nextPlayer state
         else state.turn
       , players =
           if state.phase == CleanupPhase
@@ -191,6 +198,18 @@ isTreasure :: Card -> Boolean
 isTreasure = contains Treasure <<< _.types
 isVictory :: Card -> Boolean
 isVictory = contains Victory <<< _.types
+
+hasActions :: Player -> Boolean
+hasActions = (_ > 0) <<< _.actions
+
+actionCardsInHand :: Player -> Array Card
+actionCardsInHand = filter isAction <<< _.hand
+
+numActionCardsInHand :: Player -> Int
+numActionCardsInHand = length <<< actionCardsInHand
+
+hasActionCardsInHand :: Player -> Boolean
+hasActionCardsInHand = (_ > 0) <<< numActionCardsInHand
 
 cash :: Player -> Int
 cash player = (value player.atPlay)
