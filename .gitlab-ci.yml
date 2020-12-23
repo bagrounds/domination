@@ -5,7 +5,7 @@
   ],
   "pages": {
     "stage": "deploy",
-    "script": ["npm run bundle"],
+    "script": ["npm run deploy"],
     "environment": "pages",
     "artifacts": {
       "paths": ["dist"]
