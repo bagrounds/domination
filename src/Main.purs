@@ -12,6 +12,7 @@ import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array (intercalate, mapWithIndex, take, (:), filter, (!!))
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
@@ -34,6 +35,7 @@ import Halogen.VDom.Driver (runUI)
 import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
 import Web.UIEvent.MouseEvent (MouseEvent)
+import Storage as Storage
 
 type AppState =
   { chatInputMessage :: String
@@ -103,6 +105,7 @@ render state = HH.main_ $
   , HH.button [ HE.onClick \_ -> Just SendMessage ] [ HH.text "Send" ]
   , HH.div_ $ (\m -> HH.p [] [ HH.text m ]) <$> (take 5 state.messages)
   , HH.button [ HE.onClick \_ -> Just $ PlayGame NewGame ] [ HH.text "New Game" ]
+  , HH.button [ HE.onClick \_ -> Just $ LoadGame ] [ HH.text "Load Game" ]
   ] <> (if state.gameOn || true then [ renderGame state ] else [])
 
 renderGame :: forall b. AppState -> HTML b AppAction
@@ -309,6 +312,7 @@ data AppAction = MakeOffer
   | SendMessage
   | WriteMessage String
   | ReceiveMessage Event
+  | LoadGame
   | PlayGame GameAction
 
 data GameAction = NewGame
@@ -323,7 +327,7 @@ instance encodeJsonMessage :: EncodeJson Message where
 instance decodeJsonMessage :: DecodeJson Message where
   decodeJson = genericDecodeJson
 readMessage :: String -> Either String Message
-readMessage = decodeJson <=< jsonParser
+readMessage = lmap show <<< decodeJson <=< jsonParser
 writeMessage :: Message -> String
 writeMessage = stringify <<< encodeJson
 
@@ -400,11 +404,17 @@ handleAction = case _ of
         ChatMessage message -> do
           let remoteMessage = "<- " <> message
           H.modify_ \state -> state { messages = remoteMessage : state.messages }
+  LoadGame -> do
+    mbGameState <- Storage.load "game_state"
+    case mbGameState of
+      Left e -> liftEffect $ Comm.log e
+      Right gameState -> H.modify_ _ { gameState = gameState }
   PlayGame gameAction -> do
     handleGameAction gameAction
     untilJust autoAdvance
     s <- H.get
     sendMessage $ writeMessage $ GameStateMessage s.gameState
+    Storage.save "game_state" s.gameState
   where
     sendMessage = liftEffect <<< Comm.say
     handleGameAction gameAction =
