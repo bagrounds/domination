@@ -67,12 +67,10 @@ exports.join = offer => right => callback => join(offer, right, callback)
 window.join = join
 exports.windowLocalDescription = () => window.localDescription
 
-exports.storeItem = ({ right, left, unit }) => k => v => {
-  try {
-    localStorage.setItem(k, v)
-    return right(unit)
-  } catch (e) {
-    return left(e.toString())
-  }
+exports.copyToClipboard = id => () => {
+  const element = document.getElementById(id)
+  element.select()
+  element.setSelectionRange(0, 99999)
+  document.execCommand("copy")
 }
 

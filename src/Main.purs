@@ -85,8 +85,9 @@ render state = HH.main_ $
     ]
   , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , HH.h1 [] [ HH.text "Creator" ]
-  , HH.button [ HE.onClick \_ -> Just MakeOffer ] [ HH.text "MakeOffer" ]
-  , HH.textarea [ HP.disabled true, HP.value state.localDescription ]
+  , HH.button [ HE.onClick \_ -> Just MakeOffer ] [ HH.text "Make Offer" ]
+  , HH.textarea [ HP.id_ "offer-text", HP.value state.localDescription ]
+  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text" ] [ HH.text "Copy Offer" ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner's answer here"
@@ -102,7 +103,8 @@ render state = HH.main_ $
     , HE.onValueInput $ Just <<< WriteOffer
     ]
   , HH.button [ HE.onClick \_ -> Just MakeAnswer ] [ HH.text "Join" ]
-  , HH.textarea [ HP.disabled true, HP.value state.answer ]
+  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text" ] [ HH.text "Copy Answer" ]
+  , HH.textarea [ HP.id_ "answer-text", HP.value state.answer ]
   , HH.h1 [] [ HH.text "Chat" ]
   , HH.input
     [ HP.type_ HP.InputText
@@ -314,6 +316,7 @@ renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ PlayGame $ Play playerIndex cardIndex) player card
 
 data AppAction = MakeOffer
+  | CopyToClipboard String
   | WriteUsername String
   | WriteOffer String
   | MakeAnswer
@@ -383,6 +386,7 @@ handleAction :: forall m. MonadState AppState m
   => MonadEffect m
   => AppAction -> m Unit
 handleAction = case _ of
+  CopyToClipboard id -> liftEffect $ Comm.copyToClipboard id
   MakeOffer -> do
     ld <- liftAff $ makeAff $ Comm.create Right
     H.modify_ _ { localDescription = ld }
