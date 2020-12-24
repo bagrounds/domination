@@ -195,8 +195,7 @@ renderStack playerIndex player stack =
 
 renderPlayers :: forall a. GameState -> Array (HTML a AppAction)
 renderPlayers state =
-  [ HH.p [] [ HH.text $ "Turn: Player " <> show state.turn ]
-  ] <> renderPlayer state `mapWithIndex` state.players
+  renderPlayer state `mapWithIndex` state.players
 
 --playerStats :: GameState -> Int -> Player -> String
 playerStats state playerIndex player = HH.li
@@ -218,7 +217,7 @@ renderPlayer state playerIndex player = HH.div
     then [ HP.class_ cssClass.waiting ]
     else []
   )
-  [ HH.ul [ HP.class_ cssClass.stats ] (playerStats state `mapWithIndex` state.players)
+  [ HH.h2 [] [ HH.text $ "Player " <> show playerIndex ]
   , HH.ul
       [ HP.classes $
         [ cssClass.supply
@@ -244,9 +243,10 @@ renderPlayer state playerIndex player = HH.div
         CleanupPhase -> "Complete Turn"
       else "Waiting for Player " <> show state.turn
     ]
-  , renderHand player playerIndex state
+  , HH.ul [ HP.class_ cssClass.stats ] (playerStats state `mapWithIndex` state.players)
   , HH.ul [ HP.class_ cssClass.play ] (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])] : (renderCard (const Nothing) player <$> player.atPlay))
   , HH.ul [ HP.class_ cssClass.buying ] (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])] : (renderCard (const Nothing) player <$> player.buying))
+  , renderHand player playerIndex state
   ]
 
 renderHand :: forall a. Player -> Int -> GameState -> HTML a AppAction

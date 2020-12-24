@@ -13,6 +13,12 @@ body {
   position: absolute;
   display: table;
 }
+h1 {
+  font-size: 20pt;
+}
+h2 {
+  font-size: 18pt;
+}
 a {
   text-decoration: none;
   color: inherit;
@@ -78,7 +84,27 @@ main ul {
 .supply, .hand, .play, .buying {
   border-radius: 0.6em;
   border: 1px solid white;
+  min-height: 11em;
+}
+.play, .buying {
+  display: inline-block;
+  overflow: hidden;
   min-height: 9em;
+}
+.buying .card-text,
+.play .card-text {
+  font-size: 9pt;
+}
+.buying .card,
+.play .card {
+  font-size: 9pt;
+}
+
+.play {
+    width: 69%;
+}
+.buying {
+    width: 29%;
 }
 .deck {
   width: 4em;
@@ -155,7 +181,7 @@ button {
 .next-phase {
   background-color: white;
   font-weight: bold;
-  width: 13em;
+  width: 54%;
   border-color: black;
 }
 .waiting .next-phase {
