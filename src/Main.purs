@@ -38,7 +38,8 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 import Storage as Storage
 
 type AppState =
-  { chatInputMessage :: String
+  { username :: String
+  , chatInputMessage :: String
   , messages :: Array String
   , offer :: String
   , answer :: String
@@ -52,7 +53,8 @@ type AppState =
 
 newApp :: AppState
 newApp =
-  { chatInputMessage: ""
+  { username: "Fred"
+  , chatInputMessage: ""
   , messages: []
   , offer: ""
   , answer: ""
@@ -74,10 +76,17 @@ component = H.mkComponent { eval, initialState, render } where
 
 render :: forall b. AppState -> HTML b AppAction
 render state = HH.main_ $
-  [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
+  [ HH.input
+    [ HP.type_ HP.InputText
+    , HP.value state.username
+    , HP.placeholder "username"
+    , HP.required true
+    , HE.onValueInput $ Just <<< WriteUsername
+    ]
+  , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , HH.h1 [] [ HH.text "Creator" ]
   , HH.button [ HE.onClick \_ -> Just MakeOffer ] [ HH.text "MakeOffer" ]
-  , HH.textarea [ HP.value state.localDescription ]
+  , HH.textarea [ HP.disabled true, HP.value state.localDescription ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner's answer here"
@@ -93,7 +102,7 @@ render state = HH.main_ $
     , HE.onValueInput $ Just <<< WriteOffer
     ]
   , HH.button [ HE.onClick \_ -> Just MakeAnswer ] [ HH.text "Join" ]
-  , HH.textarea [ HP.value state.answer ]
+  , HH.textarea [ HP.disabled true, HP.value state.answer ]
   , HH.h1 [] [ HH.text "Chat" ]
   , HH.input
     [ HP.type_ HP.InputText
@@ -305,6 +314,7 @@ renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ PlayGame $ Play playerIndex cardIndex) player card
 
 data AppAction = MakeOffer
+  | WriteUsername String
   | WriteOffer String
   | MakeAnswer
   | WriteAnswer String
@@ -384,6 +394,8 @@ handleAction = case _ of
     H.modify_ \state -> state { answer = ld }
   WriteAnswer rd -> do
     H.modify_ \state -> state { receivedAnswer = rd }
+  WriteUsername username -> do
+    H.modify_ \state -> state { username = username }
   AcceptAnswer -> do
     s <- H.get
     liftEffect $ Comm.gotAnswer s.receivedAnswer
