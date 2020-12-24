@@ -212,42 +212,46 @@ playerStats state playerIndex player = HH.li
   ]
 
 renderPlayer :: forall a. GameState -> Int -> Player -> HTML a AppAction
-renderPlayer state playerIndex player = HH.div
-  ( if state.turn /= playerIndex
-    then [ HP.class_ cssClass.waiting ]
-    else []
-  )
-  [ HH.h2 [] [ HH.text $ "Player " <> show playerIndex ]
-  , HH.ul
-      [ HP.classes $
-        [ cssClass.supply
-        , if state.turn == playerIndex && state.phase == BuyPhase
-          then cssClass.active
-          else cssClass.inactive
-        ] <> if player.buys < 1
-          then [ cssClass.waiting ]
-          else []
-      ]
-      $ HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])]
-        : HH.ul_
-          [ HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ "$" <> (show ((cash player) :: Int)) ]
-          , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
+renderPlayer state playerIndex player =
+  let mbCurrentPlayer = state.players !! state.turn in
+  case mbCurrentPlayer of
+    Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ] -- should never happen
+    Just currentPlayer -> HH.div
+      ( if state.turn /= playerIndex
+        then [ HP.class_ cssClass.waiting ]
+        else []
+      )
+      [ HH.h2 [] [ HH.text $ "Player " <> show playerIndex ]
+      , HH.ul
+          [ HP.classes $
+            [ cssClass.supply
+            , if state.turn == playerIndex && state.phase == BuyPhase
+              then cssClass.active
+              else cssClass.inactive
+            ] <> if player.buys < 1
+              then [ cssClass.waiting ]
+              else []
           ]
-        : [ HH.ul_ (renderSupply playerIndex player state) ]
-  , HH.button
-    [ HP.class_ (cssClass.nextPhase), HE.onClick \_ -> Just $ PlayGame $ NextPhase playerIndex ]
-    [ HH.text if state.turn == playerIndex
-      then case state.phase of
-        ActionPhase -> "Complete Action Phase"
-        BuyPhase -> "Complete Buy Phase"
-        CleanupPhase -> "Complete Turn"
-      else "Waiting for Player " <> show state.turn
-    ]
-  , HH.ul [ HP.class_ cssClass.stats ] (playerStats state `mapWithIndex` state.players)
-  , HH.ul [ HP.class_ cssClass.play ] (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])] : (renderCard (const Nothing) player <$> player.atPlay))
-  , HH.ul [ HP.class_ cssClass.buying ] (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])] : (renderCard (const Nothing) player <$> player.buying))
-  , renderHand player playerIndex state
-  ]
+          $ HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])]
+            : HH.ul_
+              [ HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ "$" <> (show ((cash player) :: Int)) ]
+              , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
+              ]
+            : [ HH.ul_ (renderSupply playerIndex player state) ]
+      , HH.button
+        [ HP.class_ (cssClass.nextPhase), HE.onClick \_ -> Just $ PlayGame $ NextPhase playerIndex ]
+        [ HH.text if state.turn == playerIndex
+          then case state.phase of
+            ActionPhase -> "Complete Action Phase"
+            BuyPhase -> "Complete Buy Phase"
+            CleanupPhase -> "Complete Turn"
+          else "Waiting for Player " <> show state.turn
+        ]
+      , HH.ul [ HP.class_ cssClass.stats ] (playerStats state `mapWithIndex` state.players)
+      , HH.ul [ HP.class_ cssClass.play ] (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])] : (renderCard (const Nothing) currentPlayer <$> currentPlayer.atPlay))
+      , HH.ul [ HP.class_ cssClass.buying ] (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])] : (renderCard (const Nothing) currentPlayer <$> currentPlayer.buying))
+      , renderHand player playerIndex state
+      ]
 
 renderHand :: forall a. Player -> Int -> GameState -> HTML a AppAction
 renderHand player playerIndex state = HH.ul
