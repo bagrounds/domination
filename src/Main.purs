@@ -61,7 +61,7 @@ newApp =
   , message: ""
   , localDescription: ""
   , gameOn: false
-  , gameState: newGame
+  , gameState: newGame 3
   , text: ""
   }
 
@@ -83,18 +83,32 @@ render state = HH.main_ $
     , HE.onValueInput $ Just <<< WriteUsername
     ]
   , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
+
   , HH.h1 [] [ HH.text "Creator" ]
-  , HH.button [ HE.onClick \_ -> Just MakeOffer ] [ HH.text "Make Offer" ]
+  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 1 ] [ HH.text "Make Offer" ]
   , HH.textarea [ HP.placeholder "offer will appear here", HP.id_ "offer-text", HP.value state.localDescription ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text" ] [ HH.text "Copy Offer" ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner's answer here"
     , HP.required true
-    , HE.onValueInput $ Just <<< WriteAnswer
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just AcceptAnswer else Nothing
+    , HE.onValueInput $ Just <<< (WriteAnswer 1)
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 1 else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just AcceptAnswer ] [ HH.text "Accept Answer" ]
+  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 1 ] [ HH.text "Accept Answer 1" ]
+
+  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 2 ] [ HH.text "Make Offer 2" ]
+  , HH.textarea [ HP.placeholder "offer will 2 appear here", HP.id_ "offer-text-2", HP.value state.localDescription ]
+  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text-2" ] [ HH.text "Copy Offer 2" ]
+  , HH.input
+    [ HP.type_ HP.InputText
+    , HP.placeholder "put joiner 2's answer here"
+    , HP.required true
+    , HE.onValueInput $ Just <<< (WriteAnswer 2)
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 2 else Nothing
+    ]
+  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 2 ] [ HH.text "Accept Answer 2" ]
+
   , HH.h1 [] [ HH.text "Joiner" ]
   , HH.input
     [ HP.type_ HP.InputText
@@ -106,6 +120,19 @@ render state = HH.main_ $
   , HH.button [ HE.onClick \_ -> Just AcceptOffer ] [ HH.text "Accept Offer" ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text" ] [ HH.text "Copy Answer" ]
   , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text", HP.value state.answer ]
+
+  , HH.h1 [] [ HH.text "Joiner 2" ]
+  , HH.input
+    [ HP.type_ HP.InputText
+    , HP.placeholder "put creator's offer here"
+    , HP.required true
+    , HE.onValueInput $ Just <<< WriteOffer
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just AcceptOffer else Nothing
+    ]
+  , HH.button [ HE.onClick \_ -> Just AcceptOffer ] [ HH.text "Accept Offer" ]
+  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text-2" ] [ HH.text "Copy Answer" ]
+  , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text-2", HP.value state.answer ]
+
   , HH.h1 [] [ HH.text "Chat" ]
   , HH.input
     [ HP.type_ HP.InputText
@@ -320,13 +347,13 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a AppAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ PlayGame $ Play playerIndex cardIndex) player card
 
-data AppAction = MakeOffer
+data AppAction = MakeOffer Int
   | CopyToClipboard String
   | WriteUsername String
   | WriteOffer String
   | AcceptOffer
-  | WriteAnswer String
-  | AcceptAnswer
+  | WriteAnswer Int String
+  | AcceptAnswer Int
   | SendMessage
   | WriteMessage String
   | ReceiveMessage Event
@@ -384,8 +411,8 @@ handleAction :: forall m. MonadState AppState m
   => AppAction -> m Unit
 handleAction = case _ of
   CopyToClipboard id -> liftEffect $ Comm.copyToClipboard id
-  MakeOffer -> do
-    ld <- liftAff $ makeAff $ Comm.create Right
+  MakeOffer i -> do
+    ld <- liftAff $ makeAff $ Comm.create i Right
     H.modify_ _ { localDescription = ld }
   WriteOffer rd -> do
     H.modify_ \state -> state { offer = rd }
@@ -393,13 +420,13 @@ handleAction = case _ of
     s <- H.get
     ld <- liftAff $ makeAff $ Comm.join s.offer Right
     H.modify_ \state -> state { answer = ld }
-  WriteAnswer rd -> do
+  WriteAnswer _ rd -> do
     H.modify_ \state -> state { receivedAnswer = rd }
   WriteUsername username -> do
     H.modify_ \state -> state { username = username }
-  AcceptAnswer -> do
+  AcceptAnswer i -> do
     s <- H.get
-    liftEffect $ Comm.gotAnswer s.receivedAnswer
+    liftEffect $ Comm.gotAnswer i s.receivedAnswer
     H.modify_ _ { chatInputMessage = "PING" }
   WriteMessage s -> do
     H.modify_ \state -> state { chatInputMessage = s }
@@ -442,7 +469,7 @@ handleAction = case _ of
     handleGameAction gameAction =
       case gameAction of
         NewGame -> do
-          gameState <- setup newGame
+          gameState <- setup (newGame 3)
           H.modify_ _{ gameOn = true, gameState = gameState }
         NextPhase playerIndex -> do
           state <- H.get

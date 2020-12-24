@@ -83,12 +83,12 @@ next ActionPhase = BuyPhase
 next BuyPhase = CleanupPhase
 next CleanupPhase = ActionPhase
 
-newGame :: GameState
-newGame =
+newGame :: Int -> GameState
+newGame i =
   { turn: 0
   , phase: ActionPhase
   , text: ""
-  , players: [newPlayer, newPlayer]
+  , players: replicate i newPlayer
   , supply:
     [ { card: copper, count: 50 }
     , { card: silver, count: 50 }
