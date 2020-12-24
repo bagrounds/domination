@@ -2,7 +2,6 @@ module Main where
 
 import Prelude
 
-import Comm as Comm
 import Control.Monad.State.Class (class MonadState, gets, modify_)
 import Control.Monad.Loops (untilJust)
 import Data.Argonaut.Core (stringify)
@@ -17,8 +16,7 @@ import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..), fst, snd)
-import Dominion (Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup, value, nextPlayer)
+import Dominion (Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup)
 import Effect (Effect)
 import Effect.Aff (makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -30,11 +28,12 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
 import Web.UIEvent.MouseEvent (MouseEvent)
+
+import Comm as Comm
 import Storage as Storage
 
 type AppState =
@@ -53,7 +52,7 @@ type AppState =
 
 newApp :: AppState
 newApp =
-  { username: "Fred"
+  { username: ""
   , chatInputMessage: ""
   , messages: []
   , offer: ""
@@ -79,32 +78,34 @@ render state = HH.main_ $
   [ HH.input
     [ HP.type_ HP.InputText
     , HP.value state.username
-    , HP.placeholder "username"
+    , HP.placeholder "username (unused)"
     , HP.required true
     , HE.onValueInput $ Just <<< WriteUsername
     ]
   , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , HH.h1 [] [ HH.text "Creator" ]
   , HH.button [ HE.onClick \_ -> Just MakeOffer ] [ HH.text "Make Offer" ]
-  , HH.textarea [ HP.id_ "offer-text", HP.value state.localDescription ]
+  , HH.textarea [ HP.placeholder "offer will appear here", HP.id_ "offer-text", HP.value state.localDescription ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text" ] [ HH.text "Copy Offer" ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner's answer here"
     , HP.required true
     , HE.onValueInput $ Just <<< WriteAnswer
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just AcceptAnswer else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just AcceptAnswer ] [ HH.text "Got Answer" ]
+  , HH.button [ HE.onClick \_ -> Just AcceptAnswer ] [ HH.text "Accept Answer" ]
   , HH.h1 [] [ HH.text "Joiner" ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put creator's offer here"
     , HP.required true
     , HE.onValueInput $ Just <<< WriteOffer
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just AcceptOffer else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just MakeAnswer ] [ HH.text "Join" ]
+  , HH.button [ HE.onClick \_ -> Just AcceptOffer ] [ HH.text "Accept Offer" ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text" ] [ HH.text "Copy Answer" ]
-  , HH.textarea [ HP.id_ "answer-text", HP.value state.answer ]
+  , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text", HP.value state.answer ]
   , HH.h1 [] [ HH.text "Chat" ]
   , HH.input
     [ HP.type_ HP.InputText
@@ -319,7 +320,7 @@ data AppAction = MakeOffer
   | CopyToClipboard String
   | WriteUsername String
   | WriteOffer String
-  | MakeAnswer
+  | AcceptOffer
   | WriteAnswer String
   | AcceptAnswer
   | SendMessage
@@ -373,14 +374,6 @@ autoAdvance = do
         Just newGameState -> const Nothing <$> modify_ \state ->
           state { gameState = newGameState }
 
-handleAction' :: forall m. MonadState AppState m
-  => MonadAff m
-  => MonadEffect m
-  => AppAction -> m Unit
-handleAction' action = do
-  handleAction action
-  untilJust autoAdvance
-
 handleAction :: forall m. MonadState AppState m
   => MonadAff m
   => MonadEffect m
@@ -392,7 +385,7 @@ handleAction = case _ of
     H.modify_ _ { localDescription = ld }
   WriteOffer rd -> do
     H.modify_ \state -> state { offer = rd }
-  MakeAnswer -> do
+  AcceptOffer -> do
     s <- H.get
     ld <- liftAff $ makeAff $ Comm.join s.offer Right
     H.modify_ \state -> state { answer = ld }
@@ -403,13 +396,10 @@ handleAction = case _ of
   AcceptAnswer -> do
     s <- H.get
     liftEffect $ Comm.gotAnswer s.receivedAnswer
+    H.modify_ _ { chatInputMessage = "PING" }
   WriteMessage s -> do
     H.modify_ \state -> state { chatInputMessage = s }
-  SendMessage -> do
-    s <- H.get
-    sendMessage $ writeMessage $ ChatMessage s.chatInputMessage
-    let localMessage = "-> " <> s.chatInputMessage
-    H.modify_ \state -> state { messages = localMessage : state.messages, chatInputMessage = "" }
+  SendMessage -> sendChatMessage
   ReceiveMessage customEvent -> do
     let msg = readMessage $ Comm.detail customEvent
     case msg of
@@ -420,6 +410,11 @@ handleAction = case _ of
         ChatMessage message -> do
           let remoteMessage = "<- " <> message
           H.modify_ \state -> state { messages = remoteMessage : state.messages }
+          if message == "PING"
+            then do
+              H.modify_ _ { chatInputMessage = "PONG" }
+              sendChatMessage
+            else pure unit
   LoadGame -> do
     mbGameState <- Storage.load "game_state"
     case mbGameState of
@@ -432,7 +427,14 @@ handleAction = case _ of
     sendMessage $ writeMessage $ GameStateMessage s.gameState
     Storage.save "game_state" s.gameState
   where
+    sendChatMessage = do
+      s <- H.get
+      sendMessage $ writeMessage $ ChatMessage s.chatInputMessage
+      let localMessage = "-> " <> s.chatInputMessage
+      H.modify_ \state -> state { messages = localMessage : state.messages, chatInputMessage = "" }
+
     sendMessage = liftEffect <<< Comm.say
+
     handleGameAction gameAction =
       case gameAction of
         NewGame -> do
