@@ -119,10 +119,21 @@ let additions =
 
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8/packages.dhall sha256:0e95ec11604dc8afc1b129c4d405dcc17290ce56d7d0665a0ff15617e32bbf03
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20201222/packages.dhall sha256:620d0e4090cf1216b3bcbe7dd070b981a9f5578c38e810bbd71ece1794bfe13b
 
 let overrides = {=}
 
-let additions = {=}
+let additions =
+  { web-storage =
+      { dependencies =
+          [ "web-events"
+          , "nullable"
+          ]
+      , repo =
+          "https://github.com/purescript-web/purescript-web-storage.git"
+      , version =
+          "v3.0.0"
+      }
+  }
 
 in  upstream // overrides // additions
