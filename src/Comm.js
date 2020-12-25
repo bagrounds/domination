@@ -43,7 +43,7 @@ exports.create = i => right => callback => {
     }
   }
   window.gotAnswer = i => answer => () => {
-    console.log("Initializing ...");
+    console.log(`gotAnswer(${i})`)
     peerConn[i].setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
   }
   return canceller("create")

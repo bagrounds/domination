@@ -15,12 +15,14 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Dominion (Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup)
 import Effect (Effect)
 import Effect.Aff (makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Console as Console
 import Halogen (Component)
 import Halogen as H
 import Halogen.Aff as HA
@@ -38,30 +40,34 @@ import Storage as Storage
 
 type AppState =
   { username :: String
+  , players :: Int
+  , playerIndex :: Int
   , chatInputMessage :: String
   , messages :: Array String
   , offer :: String
   , answer :: String
-  , receivedAnswer :: String
+  , receivedAnswer :: Array String
   , message :: String
   , localDescription :: String
   , gameOn :: Boolean
-  , gameState :: GameState
+  , gameState :: Maybe GameState
   , text :: String
   }
 
 newApp :: AppState
 newApp =
   { username: ""
+  , players: 1
+  , playerIndex: 0
   , chatInputMessage: ""
   , messages: []
   , offer: ""
   , answer: ""
-  , receivedAnswer: ""
+  , receivedAnswer: []
   , message: ""
   , localDescription: ""
   , gameOn: false
-  , gameState: newGame 3
+  , gameState: Nothing
   , text: ""
   }
 
@@ -85,29 +91,29 @@ render state = HH.main_ $
   , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
 
   , HH.h1 [] [ HH.text "Creator" ]
-  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 1 ] [ HH.text "Make Offer" ]
+  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 0 ] [ HH.text "Make Offer" ]
   , HH.textarea [ HP.placeholder "offer will appear here", HP.id_ "offer-text", HP.value state.localDescription ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text" ] [ HH.text "Copy Offer" ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner's answer here"
     , HP.required true
-    , HE.onValueInput $ Just <<< (WriteAnswer 1)
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 1 else Nothing
+    , HE.onValueInput $ Just <<< (WriteAnswer 0)
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 0 else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 1 ] [ HH.text "Accept Answer 1" ]
+  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 0 ] [ HH.text "Accept Answer 1" ]
 
-  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 2 ] [ HH.text "Make Offer 2" ]
+  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 1 ] [ HH.text "Make Offer 2" ]
   , HH.textarea [ HP.placeholder "offer will 2 appear here", HP.id_ "offer-text-2", HP.value state.localDescription ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text-2" ] [ HH.text "Copy Offer 2" ]
   , HH.input
     [ HP.type_ HP.InputText
     , HP.placeholder "put joiner 2's answer here"
     , HP.required true
-    , HE.onValueInput $ Just <<< (WriteAnswer 2)
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 2 else Nothing
+    , HE.onValueInput $ Just <<< (WriteAnswer 1)
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 1 else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 2 ] [ HH.text "Accept Answer 2" ]
+  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 1 ] [ HH.text "Accept Answer 2" ]
 
   , HH.h1 [] [ HH.text "Joiner" ]
   , HH.input
@@ -115,9 +121,9 @@ render state = HH.main_ $
     , HP.placeholder "put creator's offer here"
     , HP.required true
     , HE.onValueInput $ Just <<< WriteOffer
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just AcceptOffer else Nothing
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptOffer 0 else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just AcceptOffer ] [ HH.text "Accept Offer" ]
+  , HH.button [ HE.onClick \_ -> Just $ AcceptOffer 0 ] [ HH.text "Accept Offer" ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text" ] [ HH.text "Copy Answer" ]
   , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text", HP.value state.answer ]
 
@@ -127,9 +133,9 @@ render state = HH.main_ $
     , HP.placeholder "put creator's offer here"
     , HP.required true
     , HE.onValueInput $ Just <<< WriteOffer
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just AcceptOffer else Nothing
+    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptOffer 1 else Nothing
     ]
-  , HH.button [ HE.onClick \_ -> Just AcceptOffer ] [ HH.text "Accept Offer" ]
+  , HH.button [ HE.onClick \_ -> Just $ AcceptOffer 1 ] [ HH.text "Accept Offer" ]
   , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text-2" ] [ HH.text "Copy Answer" ]
   , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text-2", HP.value state.answer ]
 
@@ -148,10 +154,12 @@ render state = HH.main_ $
   ] <> (if state.gameOn || true then [ renderGame state ] else [])
 
 renderGame :: forall b. AppState -> HTML b AppAction
-renderGame state = HH.div_
-  [ HH.h1 [] [ HH.text "Domination" ]
-  , HH.div_ $ renderPlayers state.gameState
-  ]
+renderGame state = case state.gameState of
+  Nothing -> HH.div_ []
+  Just gameState -> HH.div_
+    [ HH.h1 [] [ HH.text "Domination" ]
+    , HH.div_ $ renderPlayers state.playerIndex gameState
+    ]
 
 renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a AppAction)
 renderSupply playerIndex player state =
@@ -220,9 +228,11 @@ renderStack playerIndex player stack =
       ]
     ]
 
-renderPlayers :: forall a. GameState -> Array (HTML a AppAction)
-renderPlayers state =
-  renderPlayer state `mapWithIndex` state.players
+renderPlayers :: forall a. Int -> GameState -> Array (HTML a AppAction)
+renderPlayers i state =
+  case state.players !! i of
+    Nothing -> []
+    Just player -> [ renderPlayer state i player ]
 
 --playerStats :: GameState -> Int -> Player -> String
 playerStats state playerIndex player = HH.li
@@ -351,7 +361,7 @@ data AppAction = MakeOffer Int
   | CopyToClipboard String
   | WriteUsername String
   | WriteOffer String
-  | AcceptOffer
+  | AcceptOffer Int
   | WriteAnswer Int String
   | AcceptAnswer Int
   | SendMessage
@@ -364,6 +374,10 @@ data GameAction = NewGame
   | NextPhase Int
   | Play Int Int
   | Purchase Int Player Stack
+
+derive instance genericGameAction :: Generic GameAction _
+instance showGameAction :: Show GameAction where
+  show = genericShow
 
 data Message = ChatMessage String | GameStateMessage GameState
 derive instance genericMessage :: Generic Message _
@@ -381,29 +395,37 @@ autoAdvance :: forall m.
   MonadState AppState m =>
   m (Maybe Unit)
 autoAdvance = do
-  gameState <- gets _.gameState
-  liftEffect $ Comm.log $ "autoAdvance? from " <> show gameState.phase
-  let currentPlayer = gameState.players !! gameState.turn
-  case currentPlayer of
-    Nothing -> pure $ Just unit -- TODO: return an error
-    Just player ->
-      case gameState.phase of
-        ActionPhase -> if hasActions player && hasActionCardsInHand player
-          then pure $ Just unit
-          else advancePhase
-        BuyPhase -> if player.buys > 0
-          then pure $ Just unit
-          else advancePhase
-        CleanupPhase -> advancePhase
+  state <- H.get
+  let mbGameState = state.gameState
+  case mbGameState of
+    Nothing -> Just <$> liftEffect (Console.error "cannot auto advance without game state!")
+    Just gameState -> do
+      liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
+      case gameState.players !! gameState.turn of
+        Nothing -> pure $ Just unit -- TODO: return an error
+        Just player -> case gameState.phase of
+          ActionPhase -> if hasActions player && hasActionCardsInHand player
+            then pure $ Just unit
+            else advancePhase
+          BuyPhase -> if player.buys > 0
+            then pure $ Just unit
+            else advancePhase
+          CleanupPhase -> advancePhase
   where
+    advancePhase :: MonadEffect m =>
+      MonadState AppState m =>
+      m (Maybe Unit)
     advancePhase = do
-      gameState <- gets _.gameState
-      liftEffect $ Comm.log $ "advancing from " <> show gameState.phase
-      mbNewState <- nextPhase gameState.turn gameState
-      case mbNewState of
-        Nothing -> pure $ Just unit
-        Just newGameState -> const Nothing <$> modify_ \state ->
-          state { gameState = newGameState }
+      state <- H.get
+      case state.gameState of
+        Nothing -> Just <$> liftEffect (Console.error "no game state!")
+        Just gameState -> do
+          liftEffect $ Comm.log $ "advancing from " <> show gameState.phase
+          mbNewState <- nextPhase gameState.turn gameState
+          case mbNewState of
+            Nothing -> pure (Just unit)
+            Just newGameState -> const Nothing <$> modify_ \state ->
+              state { gameState = Just newGameState }
 
 handleAction :: forall m. MonadState AppState m
   => MonadAff m
@@ -416,18 +438,23 @@ handleAction = case _ of
     H.modify_ _ { localDescription = ld }
   WriteOffer rd -> do
     H.modify_ \state -> state { offer = rd }
-  AcceptOffer -> do
+  AcceptOffer i -> do
     s <- H.get
     ld <- liftAff $ makeAff $ Comm.join s.offer Right
-    H.modify_ \state -> state { answer = ld }
+    H.modify_ \state -> state { answer = ld, playerIndex = i + 1 }
   WriteAnswer _ rd -> do
-    H.modify_ \state -> state { receivedAnswer = rd }
+    H.modify_ \state -> state { receivedAnswer = state.receivedAnswer <> [ rd ]}
   WriteUsername username -> do
     H.modify_ \state -> state { username = username }
   AcceptAnswer i -> do
     s <- H.get
-    liftEffect $ Comm.gotAnswer i s.receivedAnswer
-    H.modify_ _ { chatInputMessage = "PING" }
+    let ra = s.receivedAnswer !! i
+    case ra of
+      Nothing -> liftEffect $ Console.error $ "Cannot accept answer (" <> show i <> ") of (" <> show ((length s.receivedAnswer) :: Int) <> ")"
+
+      Just answer -> do
+        liftEffect $ Comm.gotAnswer i answer
+        H.modify_ \state -> state { chatInputMessage = "PING", players = state.players + 1 }
   WriteMessage s -> do
     H.modify_ \state -> state { chatInputMessage = s }
   SendMessage -> sendChatMessage
@@ -437,7 +464,7 @@ handleAction = case _ of
       Left e -> liftEffect $ Comm.log e
       Right mt -> case mt of
         GameStateMessage gs -> do
-          H.modify_ \state -> state { gameState = gs, messages = "(incoming game state)" : state.messages }
+          H.modify_ \state -> state { gameState = Just gs, messages = "(incoming game state)" : state.messages }
         ChatMessage message -> do
           let remoteMessage = "<- " <> message
           H.modify_ \state -> state { messages = remoteMessage : state.messages }
@@ -450,13 +477,17 @@ handleAction = case _ of
     mbGameState <- Storage.load "game_state"
     case mbGameState of
       Left e -> liftEffect $ Comm.log e
-      Right gameState -> H.modify_ _ { gameState = gameState }
+      Right gameState -> H.modify_ _ { gameState = Just gameState }
   PlayGame gameAction -> do
     handleGameAction gameAction
     untilJust autoAdvance
     s <- H.get
-    sendMessage $ writeMessage $ GameStateMessage s.gameState
-    Storage.save "game_state" s.gameState
+    let mbGameState = s.gameState
+    case mbGameState of
+      Nothing -> liftEffect $ Console.error $ "Cannot Play " <> show gameAction <> " without game state!"
+      Just gameState -> do
+        sendMessage $ writeMessage $ GameStateMessage gameState
+        Storage.save "game_state" gameState
   where
     sendChatMessage = do
       s <- H.get
@@ -469,24 +500,35 @@ handleAction = case _ of
     handleGameAction gameAction =
       case gameAction of
         NewGame -> do
-          gameState <- setup (newGame 3)
-          H.modify_ _{ gameOn = true, gameState = gameState }
+          numPlayers <- H.gets _.players
+          gameState <- setup (newGame numPlayers)
+          H.modify_ _{ gameOn = true, gameState = Just gameState }
         NextPhase playerIndex -> do
           state <- H.get
-          maybeNewGameState <- nextPhase playerIndex state.gameState
-          H.modify_ \state ->
-            case maybeNewGameState of
-              Nothing -> state { text = "Error: not your turn!" }
-              Just gameState -> state { gameState = gameState }
+          case state.gameState of
+            Nothing -> pure $ unit
+            Just gameState -> do
+              maybeNewGameState <- nextPhase playerIndex gameState
+              H.modify_ \state ->
+                case maybeNewGameState of
+                  Nothing -> state { text = "Error: not your turn!" }
+                  Just gameState -> state { gameState = Just gameState }
         Play player card -> do
           state <- H.get
-          maybeNewGameState <- play player card state.gameState
-          case maybeNewGameState of
-            Nothing -> H.modify_ \state -> state { text = "Error" }
-            Just gameState -> H.modify_ \state -> state { gameState = gameState }
+          case state.gameState of
+            Nothing -> pure unit
+            Just gameState -> do
+              maybeNewGameState <- play player card gameState
+              case maybeNewGameState of
+                Nothing -> H.modify_ \state -> state { text = "Error" }
+                Just gameState -> H.modify_ \state -> state { gameState = Just gameState }
 
-        Purchase playerIndex player stack -> H.modify_ \state ->
-          case purchase playerIndex player stack state.gameState of
-            Nothing -> state { text = "Error trying to buy card!" }
-            Just gameState -> state { gameState = gameState, text = "good" }
+        Purchase playerIndex player stack -> do
+          state <- H.get
+          case state.gameState of
+            Nothing -> pure unit
+            Just gameState -> H.modify_ \state ->
+              case purchase playerIndex player stack gameState of
+                Nothing -> state { text = "Error trying to buy card!" }
+                Just gameState -> state { gameState = Just gameState, text = "good" }
 
