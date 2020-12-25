@@ -6,6 +6,9 @@ module Dominion
   , Card
   , CardType
   , Stack
+  , Attack
+  , Target
+  , Outcome
   , newGame
   , next
   , cleanup
@@ -29,10 +32,10 @@ module Dominion
 
 import Prelude
 
-import Data.Array (takeWhile, notElem, take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
+import Data.Array (elem, findIndex, takeWhile, notElem, take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
 import Data.Foldable (class Foldable, foldr, any, null)
 import Data.Traversable (traverse, sequence)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -68,7 +71,7 @@ instance encodeJsonPhase :: EncodeJson Phase where
 instance decodeJsonPhase :: DecodeJson Phase where
   decodeJson a = genericDecodeJson a
 
-data CardType = Action | Treasure | Victory | Curse
+data CardType = Action | Treasure | Victory | Curse | AttackCard
 
 derive instance genericCardType :: Generic CardType _
 derive instance eqCardType :: Eq CardType
@@ -98,6 +101,7 @@ newGame i =
     , { card: duchy, count: 8 }
     , { card: province, count: 8 }
     , { card: colony, count: 8 }
+    , { card: curse, count: 10 * (i - 1) }
     , { card: greatHall, count: 8 }
     , { card: village, count: 10 }
     , { card: woodCutter, count: 10 }
@@ -109,6 +113,7 @@ newGame i =
     , { card: laboratory, count: 10 }
     , { card: market, count: 10 }
     , { card: harem, count: 8 }
+    , { card: witch, count: 10 }
     ]
   }
 
@@ -214,12 +219,40 @@ play player cardIndex state =
   else case (state.players !! player) of
       Nothing -> pure Nothing
       Just player' -> do
-        (player'' :: Maybe Player) <- play' player' cardIndex
-        pure $ case player'' of
-          Nothing -> Nothing
-          Just player''' -> (\p -> state { players = p })
-            <$> (updateAt player player''' state.players)
+        let mbCard = player'.hand !! cardIndex
+        case mbCard of
+          Nothing -> pure Nothing
+          Just card -> do
+            (player'' :: Maybe Player) <- play' player' cardIndex
+            pure $ case player'' of
+              Nothing -> Nothing
+              Just player''' -> do
+                let state' = applyEffects state player card
+                (\p -> state' { players = p }) <$> (updateAt player player''' state'.players)
     where
+      applyEffects :: GameState -> Int -> Card -> GameState
+      applyEffects state playerIndex card = do
+        foldr (\effect state -> applyEffectToTargets playerIndex effect state) state card.effects
+
+      applyEffectToTargets :: Int -> Attack -> GameState -> GameState
+      applyEffectToTargets attackerIndex { target, outcome } state =
+        foldr (\i state -> fromMaybe state $ applyEffectToTarget outcome i state) state (targetIndices target attackerIndex state)
+
+      applyEffectToTarget :: Outcome -> Int -> GameState -> Maybe GameState
+      applyEffectToTarget (Gain card) targetIndex state = do
+        target :: Player <- state.players !! targetIndex
+        stackIndex <- findIndex (\x -> x.card == card) state.supply
+        stack <- state.supply !! stackIndex
+        let count' = if stack.count > 0 then stack.count - 1 else stack.count
+        let stack' = stack { count = count' }
+        supply' <- updateAt stackIndex stack' state.supply
+        let target' = if stack.count > 0 then target { discard = stack.card : target.discard } else target
+        players' <- updateAt targetIndex target' state.players
+        pure (state { players = players', supply = supply' })
+
+      targetIndices EveryoneElse attackerIndex state = (_ /= attackerIndex) `filter` indices state.players
+      targetIndices Everyone attackerIndex state = indices state.players
+
       play' :: Player -> Int -> m (Maybe Player)
       play' p i =
         case (do
@@ -267,6 +300,12 @@ drawCard player = do
       d' = drop 1 d
       in player { hand = h', deck = d' }
 
+dropIndex :: forall a. Int -> Array a -> Array a
+dropIndex i xs =
+  let prefix = take i xs in
+  let suffix = drop (i + 1) xs in
+  prefix <> suffix
+
 newPlayer :: Player
 newPlayer =
   { deck: []
@@ -288,16 +327,19 @@ type Card =
   , buys :: Int
   , cards :: Int
   , actions :: Int
+  , effects :: Array Attack
   }
 
 card :: Card
-card = { types: [], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0 }
+card = { types: [], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0, effects: [] }
 treasure :: Card
 treasure = card { types = [Treasure] }
 victory :: Card
 victory = card { types = [Victory] }
 action :: Card
 action = card { types = [Action] }
+actionAttack :: Card
+actionAttack = card { types = [ Action, AttackCard ] }
 copper :: Card
 copper = treasure { name = "Copper", treasure = 1 }
 silver :: Card
@@ -338,6 +380,28 @@ monument :: Card
 monument = action { types = [Action, Victory], name = "Monument", cost = 4, treasure = 2, victoryPoints = 1 }
 workersVillage :: Card
 workersVillage = action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
+witch :: Card
+witch = actionAttack { name = "Witch", cost = 5, cards = 2, effects = [{ target: EveryoneElse, outcome: Gain curse } ] }
+
+type Attack = { target :: Target, outcome :: Outcome }
+data Target = Everyone | EveryoneElse
+derive instance genericTarget :: Generic Target _
+derive instance eqTarget :: Eq Target
+instance showTarget :: Show Target where
+  show = genericShow
+instance encodeJsonTarget :: EncodeJson Target where
+  encodeJson a = genericEncodeJson a
+instance decodeJsonTarget :: DecodeJson Target where
+  decodeJson a = genericDecodeJson a
+
+data Outcome = Gain Card
+derive instance genericOutcome :: Generic Outcome _
+derive instance eqOutcome :: Eq Outcome
+instance showOutcome :: Show Outcome where show x = genericShow x
+instance encodeJsonOutcome :: EncodeJson Outcome where
+  encodeJson a = genericEncodeJson a
+instance decodeJsonOutcome :: DecodeJson Outcome where
+  decodeJson a = genericDecodeJson a
 
 cleanup :: forall m. MonadEffect m => Player -> m Player
 cleanup player = do
@@ -360,9 +424,7 @@ shuffle array = fst <$> shuffle' (Tuple [] array)
     shuffle' (Tuple shuffled unshuffled) = do
       i <- liftEffect $ randomInt 0 (length unshuffled - 1)
       let randomElement = take 1 $ drop i unshuffled
-      let unshuffledPrefix = take i unshuffled
-      let unshuffledSuffix = drop (i + 1) unshuffled
-      let unshuffledRemainder = unshuffledPrefix <> unshuffledSuffix
+      let unshuffledRemainder = dropIndex i unshuffled
       shuffle' (Tuple (randomElement <> shuffled) unshuffledRemainder)
 
 allCards :: Player -> Array Card
@@ -371,3 +433,5 @@ allCards player = player.hand <> player.deck <> player.atPlay <> player.discard 
 score :: Player -> Int
 score player = foldr (+) 0 $ map _.victoryPoints (allCards player)
 
+indices :: forall a. Array a -> Array Int
+indices xs = fst <$> mapWithIndex Tuple xs

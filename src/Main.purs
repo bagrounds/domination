@@ -201,7 +201,16 @@ renderCard onClick player card = HH.div
           , HH.li [ HP.classes [ cssClass.cardText, cssClass.cardActions ] ] [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
           , HH.li [ HP.classes [ cssClass.cardText, cssClass.cardBuys ] ] [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
           , HH.li [ HP.classes [ cssClass.cardText, cssClass.cardTreasure ] ] [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
-          , HH.li [ HP.classes [ cssClass.cardText, cssClass.cardVictoryPoints ] ] [ HH.text (if card.victoryPoints > 0 then " +" <> show card.victoryPoints <> " VP" else "") ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardVictoryPoints ] ]
+            [ HH.text
+              ( if card.victoryPoints > 0
+                then " +" <> show card.victoryPoints <> " VP"
+                else if card.victoryPoints < 0
+                  then show card.victoryPoints
+                  else ""
+              )
+            ]
           , HH.li
             [ HP.classes [ cssClass.cardText, cssClass.cardCost ] ]
             [ HH.text $ "Cost $" <> show card.cost ]
