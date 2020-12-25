@@ -68,7 +68,7 @@ instance encodeJsonPhase :: EncodeJson Phase where
 instance decodeJsonPhase :: DecodeJson Phase where
   decodeJson a = genericDecodeJson a
 
-data CardType = Action | Treasure | Victory
+data CardType = Action | Treasure | Victory | Curse
 
 derive instance genericCardType :: Generic CardType _
 derive instance eqCardType :: Eq CardType
@@ -290,12 +290,14 @@ type Card =
   , actions :: Int
   }
 
+card :: Card
+card = { types: [], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0 }
 treasure :: Card
-treasure = { types: [Treasure], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0 }
+treasure = card { types = [Treasure] }
 victory :: Card
-victory = treasure { types = [Victory] }
+victory = card { types = [Victory] }
 action :: Card
-action = treasure { types = [Action] }
+action = card { types = [Action] }
 copper :: Card
 copper = treasure { name = "Copper", treasure = 1 }
 silver :: Card
@@ -312,6 +314,8 @@ province :: Card
 province = victory { name = "Province", cost = 8, victoryPoints = 6 }
 colony :: Card
 colony = victory { name = "Colony", cost = 11, victoryPoints = 10 }
+curse :: Card
+curse = card { types = [Curse], name = "Curse", victoryPoints = -1 }
 greatHall :: Card
 greatHall = victory { types = [Action, Victory], name = "Great Hall", cost = 3, cards = 1, actions = 1, victoryPoints = 1 }
 village :: Card
