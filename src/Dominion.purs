@@ -32,23 +32,21 @@ module Dominion
 
 import Prelude
 
-import Data.Array (elem, findIndex, takeWhile, notElem, take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
-import Data.Foldable (class Foldable, foldr, any, null)
-import Data.Traversable (traverse, sequence)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Tuple (Tuple(..), fst)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Comm as Comm
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
-
+import Data.Array (elem, findIndex, takeWhile, notElem, take, drop, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
+import Data.Foldable (class Foldable, foldr, any, null, foldM)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Traversable (class Traversable, traverse, sequence)
+import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Random (randomInt)
-
-import Comm as Comm
 
 type GameState =
   { turn :: Int
@@ -114,6 +112,7 @@ newGame i =
     , { card: market, count: 10 }
     , { card: harem, count: 8 }
     , { card: witch, count: 10 }
+    , { card: councilRoom, count: 10 }
     ]
   }
 
@@ -224,22 +223,23 @@ play player cardIndex state =
           Nothing -> pure Nothing
           Just card -> do
             (player'' :: Maybe Player) <- play' player' cardIndex
-            pure $ case player'' of
-              Nothing -> Nothing
+            case player'' of
+              Nothing -> pure Nothing
               Just player''' -> do
-                let state' = applyEffects state player card
-                (\p -> state' { players = p }) <$> (updateAt player player''' state'.players)
+                state' :: GameState <- applyEffects state player card
+                let (maybePlayers :: Maybe (Array Player)) = updateAt player player''' state'.players
+                pure $ map (\p -> state' { players = p }) maybePlayers
     where
-      applyEffects :: GameState -> Int -> Card -> GameState
-      applyEffects state playerIndex card = do
-        foldr (\effect state -> applyEffectToTargets playerIndex effect state) state card.effects
+      applyEffects :: GameState -> Int -> Card -> m GameState
+      applyEffects state playerIndex card =
+        foldM (\state effect -> applyEffectToTargets playerIndex effect state) state card.effects
 
-      applyEffectToTargets :: Int -> Attack -> GameState -> GameState
+      applyEffectToTargets :: Int -> Attack -> GameState -> m GameState
       applyEffectToTargets attackerIndex { target, outcome } state =
-        foldr (\i state -> fromMaybe state $ applyEffectToTarget outcome i state) state (targetIndices target attackerIndex state)
+        foldM (\state i -> (fromMaybe state) <$> (applyEffectToTarget outcome i state)) state (targetIndices target attackerIndex state)
 
-      applyEffectToTarget :: Outcome -> Int -> GameState -> Maybe GameState
-      applyEffectToTarget (Gain card) targetIndex state = do
+      applyEffectToTarget :: forall m. MonadEffect m => Outcome -> Int -> GameState -> m (Maybe GameState)
+      applyEffectToTarget (Gain card) targetIndex state = pure do
         target :: Player <- state.players !! targetIndex
         stackIndex <- findIndex (\x -> x.card == card) state.supply
         stack <- state.supply !! stackIndex
@@ -249,6 +249,15 @@ play player cardIndex state =
         let target' = if stack.count > 0 then target { discard = stack.card : target.discard } else target
         players' <- updateAt targetIndex target' state.players
         pure (state { players = players', supply = supply' })
+      applyEffectToTarget (Draw n) targetIndex state = do
+        let (mbTarget :: Maybe Player) = state.players !! targetIndex
+        case mbTarget of
+          Nothing -> pure Nothing
+          Just target -> do
+            target' <- drawCards n target
+            let players = state.players
+            let players' = mapWithIndex (\i p -> if i == targetIndex then target' else p) state.players
+            pure $ Just state { players = players' }
 
       targetIndices EveryoneElse attackerIndex state = (_ /= attackerIndex) `filter` indices state.players
       targetIndices Everyone attackerIndex state = indices state.players
@@ -382,6 +391,8 @@ workersVillage :: Card
 workersVillage = action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
 witch :: Card
 witch = actionAttack { name = "Witch", cost = 5, cards = 2, effects = [{ target: EveryoneElse, outcome: Gain curse } ] }
+councilRoom :: Card
+councilRoom = action { name = "Council Room", cost = 5, cards = 4, buys = 1, effects = [{ target: EveryoneElse, outcome: Draw 1 }] }
 
 type Attack = { target :: Target, outcome :: Outcome }
 data Target = Everyone | EveryoneElse
@@ -394,7 +405,7 @@ instance encodeJsonTarget :: EncodeJson Target where
 instance decodeJsonTarget :: DecodeJson Target where
   decodeJson a = genericDecodeJson a
 
-data Outcome = Gain Card
+data Outcome = Gain Card | Draw Int
 derive instance genericOutcome :: Generic Outcome _
 derive instance eqOutcome :: Eq Outcome
 instance showOutcome :: Show Outcome where show x = genericShow x
