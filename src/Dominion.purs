@@ -6,9 +6,9 @@ module Dominion
   , Card
   , CardType
   , Stack
-  , Attack
+  , Special
   , Target
-  , Outcome
+  , Command
   , newGame
   , next
   , cleanup
@@ -69,7 +69,7 @@ instance encodeJsonPhase :: EncodeJson Phase where
 instance decodeJsonPhase :: DecodeJson Phase where
   decodeJson a = genericDecodeJson a
 
-data CardType = Action | Treasure | Victory | Curse | AttackCard
+data CardType = Action | Treasure | Victory | Curse | Attack
 
 derive instance genericCardType :: Generic CardType _
 derive instance eqCardType :: Eq CardType
@@ -226,19 +226,19 @@ play player cardIndex state =
             case player'' of
               Nothing -> pure Nothing
               Just player''' -> do
-                state' :: GameState <- applyEffects state player card
+                state' :: GameState <- applySpecials state player card
                 let (maybePlayers :: Maybe (Array Player)) = updateAt player player''' state'.players
                 pure $ map (\p -> state' { players = p }) maybePlayers
     where
-      applyEffects :: GameState -> Int -> Card -> m GameState
-      applyEffects state playerIndex card =
-        foldM (\state effect -> applyEffectToTargets playerIndex effect state) state card.effects
+      applySpecials :: GameState -> Int -> Card -> m GameState
+      applySpecials state playerIndex card =
+        foldM (\state effect -> applyEffectToTargets playerIndex effect state) state card.specials
 
-      applyEffectToTargets :: Int -> Attack -> GameState -> m GameState
-      applyEffectToTargets attackerIndex { target, outcome } state =
-        foldM (\state i -> (fromMaybe state) <$> (applyEffectToTarget outcome i state)) state (targetIndices target attackerIndex state)
+      applyEffectToTargets :: Int -> Special -> GameState -> m GameState
+      applyEffectToTargets attackerIndex { target, command } state =
+        foldM (\state i -> (fromMaybe state) <$> (applyEffectToTarget command i state)) state (targetIndices target attackerIndex state)
 
-      applyEffectToTarget :: forall m. MonadEffect m => Outcome -> Int -> GameState -> m (Maybe GameState)
+      applyEffectToTarget :: forall m. MonadEffect m => Command -> Int -> GameState -> m (Maybe GameState)
       applyEffectToTarget (Gain card) targetIndex state = pure do
         target :: Player <- state.players !! targetIndex
         stackIndex <- findIndex (\x -> x.card == card) state.supply
@@ -336,11 +336,11 @@ type Card =
   , buys :: Int
   , cards :: Int
   , actions :: Int
-  , effects :: Array Attack
+  , specials :: Array Special
   }
 
 card :: Card
-card = { types: [], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0, effects: [] }
+card = { types: [], name: "", cost: 0, victoryPoints: 0, treasure: 0, buys: 0, cards: 0, actions: 0, specials: [] }
 treasure :: Card
 treasure = card { types = [Treasure] }
 victory :: Card
@@ -348,7 +348,7 @@ victory = card { types = [Victory] }
 action :: Card
 action = card { types = [Action] }
 actionAttack :: Card
-actionAttack = card { types = [ Action, AttackCard ] }
+actionAttack = card { types = [ Action, Attack ] }
 copper :: Card
 copper = treasure { name = "Copper", treasure = 1 }
 silver :: Card
@@ -390,11 +390,32 @@ monument = action { types = [Action, Victory], name = "Monument", cost = 4, trea
 workersVillage :: Card
 workersVillage = action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
 witch :: Card
-witch = actionAttack { name = "Witch", cost = 5, cards = 2, effects = [{ target: EveryoneElse, outcome: Gain curse } ] }
+witch = actionAttack
+  { name = "Witch"
+  , cost = 5
+  , cards = 2
+  , specials =
+    [ { target: EveryoneElse
+      , command: Gain curse
+      , description: "Each other player gains a Curse."
+      }
+    ]
+  }
 councilRoom :: Card
-councilRoom = action { name = "Council Room", cost = 5, cards = 4, buys = 1, effects = [{ target: EveryoneElse, outcome: Draw 1 }] }
+councilRoom = action
+  { name = "Council Room"
+  , cost = 5
+  , cards = 4
+  , buys = 1
+  , specials =
+    [ { target: EveryoneElse
+      , command: Draw 1
+      , description: "Each other player draws a card."
+      }
+    ]
+  }
 
-type Attack = { target :: Target, outcome :: Outcome }
+type Special = { target :: Target, command :: Command, description :: String }
 data Target = Everyone | EveryoneElse
 derive instance genericTarget :: Generic Target _
 derive instance eqTarget :: Eq Target
@@ -405,13 +426,13 @@ instance encodeJsonTarget :: EncodeJson Target where
 instance decodeJsonTarget :: DecodeJson Target where
   decodeJson a = genericDecodeJson a
 
-data Outcome = Gain Card | Draw Int
-derive instance genericOutcome :: Generic Outcome _
-derive instance eqOutcome :: Eq Outcome
-instance showOutcome :: Show Outcome where show x = genericShow x
-instance encodeJsonOutcome :: EncodeJson Outcome where
+data Command = Gain Card | Draw Int
+derive instance genericCommand :: Generic Command _
+derive instance eqCommand :: Eq Command
+instance showCommand :: Show Command where show x = genericShow x
+instance encodeJsonCommand :: EncodeJson Command where
   encodeJson a = genericEncodeJson a
-instance decodeJsonOutcome :: DecodeJson Outcome where
+instance decodeJsonCommand :: DecodeJson Command where
   decodeJson a = genericDecodeJson a
 
 cleanup :: forall m. MonadEffect m => Player -> m Player
