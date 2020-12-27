@@ -33,6 +33,7 @@ module Dominion
 import Prelude
 
 import Comm as Comm
+import Control.Apply (lift2)
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
@@ -212,34 +213,33 @@ contains :: forall a f. Eq a => Foldable f => a -> f a -> Boolean
 contains x xs = ((==) x) `any` xs
 
 play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Maybe GameState)
-play player cardIndex state =
-  if player /= state.turn
+play playerIndex cardIndex state =
+  if playerIndex /= state.turn
   then pure Nothing
-  else case (state.players !! player) of
+  else case (state.players !! playerIndex) of
       Nothing -> pure Nothing
       Just player' -> do
-        let mbCard = player'.hand !! cardIndex
-        case mbCard of
+        case player'.hand !! cardIndex of
           Nothing -> pure Nothing
           Just card -> do
             (player'' :: Maybe Player) <- play' player' cardIndex
             case player'' of
               Nothing -> pure Nothing
               Just player''' -> do
-                state' :: GameState <- applySpecials state player card
-                let (maybePlayers :: Maybe (Array Player)) = updateAt player player''' state'.players
-                pure $ map (\p -> state' { players = p }) maybePlayers
+                state' :: GameState <- applySpecials state playerIndex card
+                let maybePlayers = updateAt playerIndex player''' state'.players
+                pure $ map (state' { players = _ }) maybePlayers
     where
       applySpecials :: GameState -> Int -> Card -> m GameState
       applySpecials state playerIndex card =
-        foldM (\state effect -> applyEffectToTargets playerIndex effect state) state card.specials
+        foldM (applyEffectToTargets playerIndex) state card.specials
 
-      applyEffectToTargets :: Int -> Special -> GameState -> m GameState
-      applyEffectToTargets attackerIndex { target, command } state =
-        foldM (\state i -> (fromMaybe state) <$> (applyEffectToTarget command i state)) state (targetIndices target attackerIndex state)
+      applyEffectToTargets :: Int -> GameState -> Special -> m GameState
+      applyEffectToTargets attackerIndex state { target, command } =
+        foldM (\state i -> fromMaybe state <$> applyEffectToTarget command state i) state (targetIndices target attackerIndex state)
 
-      applyEffectToTarget :: forall m. MonadEffect m => Command -> Int -> GameState -> m (Maybe GameState)
-      applyEffectToTarget (Gain card) targetIndex state = pure do
+      applyEffectToTarget :: Command -> GameState -> Int -> m (Maybe GameState)
+      applyEffectToTarget (Gain card) state targetIndex = pure do
         target :: Player <- state.players !! targetIndex
         stackIndex <- findIndex (\x -> x.card == card) state.supply
         stack <- state.supply !! stackIndex
@@ -249,9 +249,8 @@ play player cardIndex state =
         let target' = if stack.count > 0 then target { discard = stack.card : target.discard } else target
         players' <- updateAt targetIndex target' state.players
         pure (state { players = players', supply = supply' })
-      applyEffectToTarget (Draw n) targetIndex state = do
-        let (mbTarget :: Maybe Player) = state.players !! targetIndex
-        case mbTarget of
+      applyEffectToTarget (Draw n) state targetIndex = do
+        case state.players !! targetIndex of
           Nothing -> pure Nothing
           Just target -> do
             target' <- drawCards n target
@@ -259,34 +258,27 @@ play player cardIndex state =
             let players' = mapWithIndex (\i p -> if i == targetIndex then target' else p) state.players
             pure $ Just state { players = players' }
 
+      targetIndices :: Target -> Int -> GameState -> Array Int
       targetIndices EveryoneElse attackerIndex state = (_ /= attackerIndex) `filter` indices state.players
-      targetIndices Everyone attackerIndex state = indices state.players
+      targetIndices Everyone _ state = indices state.players
 
       play' :: Player -> Int -> m (Maybe Player)
-      play' p i =
-        case (do
-          card' <- p.hand !! i
-          hand' <- deleteAt i p.hand
-          pure $ Tuple card' hand') of
+      play' player cardIndex =
+        case lift2 Tuple (player.hand !! cardIndex) (deleteAt cardIndex player.hand) of
           Nothing -> pure Nothing
-          Just (Tuple c h) -> result c h
-          where
-            result :: Card -> Array Card -> m (Maybe Player)
-            result card' hand' = do
-              p' <- drawCards card'.cards p { hand = hand' }
-              let atPlay' = card' : p'.atPlay
-              if not $ ((==) Action) `any` card'.types
-                then pure Nothing
-                else pure $ Just p'
-                  { atPlay = atPlay'
-                  , actions = p.actions + card'.actions - 1
-                  , buys = p.buys + card'.buys
-                  }
+          Just (Tuple card' hand') -> do
+            player' <- drawCards card'.cards player { hand = hand' }
+            let atPlay' = card' : player'.atPlay
+            pure if not isAction card'
+              then Nothing
+              else
+                let actions' = player'.actions + card'.actions - 1 in
+                let buys' = player'.buys + card'.buys in
+                Just player' { atPlay = atPlay', actions = actions', buys = buys' }
 
 drawCards :: forall m. MonadEffect m => Int -> Player -> m Player
-drawCards n p = do
-  if n > 0
-  then drawCards (n - 1) =<< (drawCard p)
+drawCards n p = if n > 0
+  then drawCards (n - 1) =<< drawCard p
   else pure p
 
 drawCard :: forall m. MonadEffect m => Player -> m Player
@@ -302,12 +294,10 @@ drawCard player = do
   pure $ draw (player { deck = deck, discard = discarded })
   where
     draw :: Player -> Player
-    draw player = let
-      h = player.hand
-      d = player.deck
-      h' = take 1 d <> h
-      d' = drop 1 d
-      in player { hand = h', deck = d' }
+    draw player =
+      let hand' = take 1 player.deck <> player.hand in
+      let deck' = drop 1 player.deck in
+      player { hand = hand', deck = deck' }
 
 dropIndex :: forall a. Int -> Array a -> Array a
 dropIndex i xs =
