@@ -1,14 +1,10 @@
 module Comm where
 import Prelude
-import Halogen.Query.EventSource
-import Data.Either
-import Effect.Aff
-import Effect.Aff.Class
-import Effect
-import Effect.Class
+import Data.Either (Either)
+import Effect.Aff (Canceler, Error)
+import Effect (Effect)
 import Web.Event.Event (Event)
 
-foreign import log :: forall a. a -> Effect Unit
 foreign import detail :: Event -> String
 
 foreign import create :: forall a. Int -> (a -> Either Error a) -> (Either Error a -> Effect Unit) -> Effect Canceler

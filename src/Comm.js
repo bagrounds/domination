@@ -6,7 +6,6 @@ const dataChannel = []
 
 const canceller = name => () => console.log(`attempting to cancel ${name}`)
 
-exports.log = x => () => console.log(x);
 exports.detail = customEvent => customEvent.detail
 
 const onmessage = e => {

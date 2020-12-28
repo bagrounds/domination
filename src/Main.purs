@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 
-import Control.Monad.State.Class (class MonadState, gets, modify_)
+import Control.Monad.State.Class (class MonadState, modify_)
 import Control.Monad.Loops (untilJust)
 import Data.Argonaut.Core (stringify)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
@@ -17,7 +17,7 @@ import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Dominion (Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup)
+import Dominion (GameAction(..), Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup)
 import Effect (Effect)
 import Effect.Aff (makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -149,7 +149,7 @@ render state = HH.main_ $
     ]
   , HH.button [ HE.onClick \_ -> Just SendMessage ] [ HH.text "Send" ]
   , HH.div_ $ (\m -> HH.p [] [ HH.text m ]) <$> (take 5 state.messages)
-  , HH.button [ HE.onClick \_ -> Just $ PlayGame NewGame ] [ HH.text "New Game" ]
+  , HH.button [ HE.onClick \_ -> Just $ PlayGame $ NewGame state.players ] [ HH.text "New Game" ]
   , HH.button [ HE.onClick \_ -> Just $ LoadGame ] [ HH.text "Load Game" ]
   ] <> (if state.gameOn || true then [ renderGame state ] else [])
 
@@ -379,15 +379,6 @@ data AppAction = MakeOffer Int
   | LoadGame
   | PlayGame GameAction
 
-data GameAction = NewGame
-  | NextPhase Int
-  | Play Int Int
-  | Purchase Int Player Stack
-
-derive instance genericGameAction :: Generic GameAction _
-instance showGameAction :: Show GameAction where
-  show = genericShow
-
 data Message = ChatMessage String | GameStateMessage GameState
 derive instance genericMessage :: Generic Message _
 instance encodeJsonMessage :: EncodeJson Message where
@@ -429,7 +420,7 @@ autoAdvance = do
       case state.gameState of
         Nothing -> Just <$> liftEffect (Console.error "no game state!")
         Just gameState -> do
-          liftEffect $ Comm.log $ "advancing from " <> show gameState.phase
+          liftEffect $ Console.log $ "advancing from " <> show gameState.phase
           mbNewState <- nextPhase gameState.turn gameState
           case mbNewState of
             Nothing -> pure (Just unit)
@@ -470,7 +461,7 @@ handleAction = case _ of
   ReceiveMessage customEvent -> do
     let msg = readMessage $ Comm.detail customEvent
     case msg of
-      Left e -> liftEffect $ Comm.log e
+      Left e -> liftEffect $ Console.log e
       Right mt -> case mt of
         GameStateMessage gs -> do
           H.modify_ \state -> state { gameState = Just gs, messages = "(incoming game state)" : state.messages }
@@ -485,7 +476,7 @@ handleAction = case _ of
   LoadGame -> do
     mbGameState <- Storage.load "game_state"
     case mbGameState of
-      Left e -> liftEffect $ Comm.log e
+      Left e -> liftEffect $ Console.log e
       Right gameState -> H.modify_ _ { gameState = Just gameState }
   PlayGame gameAction -> do
     handleGameAction gameAction
@@ -506,38 +497,35 @@ handleAction = case _ of
 
     sendMessage = liftEffect <<< Comm.say
 
-    handleGameAction gameAction =
-      case gameAction of
-        NewGame -> do
-          numPlayers <- H.gets _.players
-          gameState <- setup (newGame numPlayers)
-          H.modify_ _{ gameOn = true, gameState = Just gameState }
-        NextPhase playerIndex -> do
-          state <- H.get
-          case state.gameState of
-            Nothing -> pure $ unit
-            Just gameState -> do
-              maybeNewGameState <- nextPhase playerIndex gameState
-              H.modify_ \state ->
-                case maybeNewGameState of
-                  Nothing -> state { text = "Error: not your turn!" }
-                  Just gameState -> state { gameState = Just gameState }
-        Play player card -> do
-          state <- H.get
-          case state.gameState of
-            Nothing -> pure unit
-            Just gameState -> do
-              maybeNewGameState <- play player card gameState
+    handleGameAction = case _ of
+      NewGame n -> do
+        gameState <- setup (newGame n)
+        H.modify_ _{ gameOn = true, gameState = Just gameState }
+      NextPhase playerIndex -> do
+        state <- H.get
+        case state.gameState of
+          Nothing -> pure $ unit
+          Just gameState -> do
+            maybeNewGameState <- nextPhase playerIndex gameState
+            H.modify_ \state ->
               case maybeNewGameState of
-                Nothing -> H.modify_ \state -> state { text = "Error" }
-                Just gameState -> H.modify_ \state -> state { gameState = Just gameState }
-
-        Purchase playerIndex player stack -> do
-          state <- H.get
-          case state.gameState of
-            Nothing -> pure unit
-            Just gameState -> H.modify_ \state ->
-              case purchase playerIndex player stack gameState of
-                Nothing -> state { text = "Error trying to buy card!" }
-                Just gameState -> state { gameState = Just gameState, text = "good" }
+                Nothing -> state { text = "Error: not your turn!" }
+                Just gameState -> state { gameState = Just gameState }
+      Play player card -> do
+        state <- H.get
+        case state.gameState of
+          Nothing -> pure unit
+          Just gameState -> do
+            maybeNewGameState <- play player card gameState
+            case maybeNewGameState of
+              Nothing -> H.modify_ \state -> state { text = "Error" }
+              Just gameState -> H.modify_ \state -> state { gameState = Just gameState }
+      Purchase playerIndex player stack -> do
+        state <- H.get
+        case state.gameState of
+          Nothing -> pure unit
+          Just gameState -> H.modify_ \state ->
+            case purchase playerIndex player stack gameState of
+              Nothing -> state { text = "Error trying to buy card!" }
+              Just gameState -> state { gameState = Just gameState, text = "good" }
 
