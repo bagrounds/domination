@@ -114,6 +114,7 @@ newGame i =
     , { card: harem, count: 8 }
     , { card: witch, count: 10 }
     , { card: councilRoom, count: 10 }
+    , { card: scholar, count: 10 }
     ]
   }
 
@@ -226,9 +227,11 @@ play playerIndex cardIndex state =
             case player'' of
               Nothing -> pure Nothing
               Just player''' -> do
-                state' :: GameState <- applySpecials state playerIndex card
-                let maybePlayers = updateAt playerIndex player''' state'.players
-                pure $ map (state' { players = _ }) maybePlayers
+                case updateAt playerIndex player''' state.players of
+                  Nothing -> pure Nothing
+                  Just players' -> do
+                    let state' = state { players = players' }
+                    Just <$> applySpecials state' playerIndex card
     where
       applySpecials :: GameState -> Int -> Card -> m GameState
       applySpecials state playerIndex card =
@@ -257,10 +260,20 @@ play playerIndex cardIndex state =
             let players = state.players
             let players' = mapWithIndex (\i p -> if i == targetIndex then target' else p) state.players
             pure $ Just state { players = players' }
+      applyEffectToTarget (Discard SelectAll) state targetIndex = do
+        case state.players !! targetIndex of
+          Nothing -> pure Nothing
+          Just target -> do
+            let toDiscard' = target.toDiscard <> target.hand
+            let target' = target { toDiscard = toDiscard', hand = [] }
+            case updateAt targetIndex target' state.players of
+              Nothing -> pure Nothing
+              Just players' -> pure $ Just state { players = players' }
 
       targetIndices :: Target -> Int -> GameState -> Array Int
       targetIndices EveryoneElse attackerIndex state = (_ /= attackerIndex) `filter` indices state.players
       targetIndices Everyone _ state = indices state.players
+      targetIndices Self attackerIndex state = [ attackerIndex ]
 
       play' :: Player -> Int -> m (Maybe Player)
       play' player cardIndex =
@@ -404,9 +417,24 @@ councilRoom = action
       }
     ]
   }
+scholar :: Card
+scholar = action
+  { name = "Scholar"
+  , cost = 5
+  , specials =
+    [ { target: Self
+      , command: Discard SelectAll
+      , description: "Discard your hand."
+      }
+    , { target: Self
+      , command: Draw 7
+      , description: "Draw 7 cards"
+      }
+    ]
+  }
 
 type Special = { target :: Target, command :: Command, description :: String }
-data Target = Everyone | EveryoneElse
+data Target = Self | Everyone | EveryoneElse
 derive instance genericTarget :: Generic Target _
 derive instance eqTarget :: Eq Target
 instance showTarget :: Show Target where
@@ -416,13 +444,22 @@ instance encodeJsonTarget :: EncodeJson Target where
 instance decodeJsonTarget :: DecodeJson Target where
   decodeJson a = genericDecodeJson a
 
-data Command = Gain Card | Draw Int
+data Command = Gain Card | Draw Int | Discard SelectCards
 derive instance genericCommand :: Generic Command _
 derive instance eqCommand :: Eq Command
 instance showCommand :: Show Command where show x = genericShow x
 instance encodeJsonCommand :: EncodeJson Command where
   encodeJson a = genericEncodeJson a
 instance decodeJsonCommand :: DecodeJson Command where
+  decodeJson a = genericDecodeJson a
+
+data SelectCards = SelectAll -- | SelectOne Int | SelectSome (Array Int) | SelectNone
+derive instance genericSelectCards :: Generic SelectCards _
+derive instance eqSelectCards :: Eq SelectCards
+instance showSelectCards :: Show SelectCards where show x = genericShow x
+instance encodeJsonSelectCards :: EncodeJson SelectCards where
+  encodeJson a = genericEncodeJson a
+instance decodeJsonSelectCards :: DecodeJson SelectCards where
   decodeJson a = genericDecodeJson a
 
 cleanup :: forall m. MonadEffect m => Player -> m Player
