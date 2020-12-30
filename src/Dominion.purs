@@ -1,6 +1,5 @@
 module Dominion
-  ( GameAction(..)
-  , GameState(..)
+  ( GameState(..)
   , Supply
   , Stack
   , newGame
@@ -19,8 +18,6 @@ import Prelude
 import Control.Apply (lift2)
 import Data.Array (findIndex, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
 import Data.Foldable (foldM)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse, sequence)
 import Data.Tuple (Tuple(..))
@@ -32,15 +29,6 @@ import Player (Player, actionCardsInHand, allCards, cash, cleanup, drawCards, ha
 import Phase (Phase(..))
 import Phase (Phase(..), next) as Phase
 import CardType (CardType(..))
-
-data GameAction = NewGame Int
-  | NextPhase Int
-  | Play Int Int
-  | Purchase Int Player Stack
-
-derive instance genericGameAction :: Generic GameAction _
-instance showGameAction :: Show GameAction where
-  show = genericShow
 
 type GameState =
   { turn :: Int
