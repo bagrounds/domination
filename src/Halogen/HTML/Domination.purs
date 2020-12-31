@@ -26,6 +26,7 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.HTML.ChoiceTrashUpTo as Trash
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -172,88 +173,10 @@ playerStats state playerIndex player = HH.li
     <> (if state.turn == playerIndex then " | " <> show state.phase else "")
   ]
 
--- BEGIN trash component
-type TrashState = Array (Tuple Card Boolean)
-data TrashAction = ToggleTrash Int | Done
---trashComponent :: forall query m. Player -> Component HTML query Choice.Choice TrashState m
--- trashComponent :: forall query o m. Player -> Component HTML query o Choice.Choice m
-trashComponent player = H.mkComponent { initialState, render, eval }
-  where
-  initialState _ = (\x -> Tuple x false) <$> player.hand
---  render :: forall a. TrashState -> HTML a TrashAction
-  render xs = case Player.firstChoice player of
-    Just (Choice.TrashUpTo n Nothing) -> HH.h2_ $
-      [ HH.text $ "Trash up to " <> show n <> " cards"
-      , HH.button
-        [ HP.class_ cssClass.resolveChoice, HE.onClick \_ -> Just $ Done ]
-        [ HH.text $ "Done trashing cards" ]
-      ]
-      <> renderCardToTrash `mapWithIndex` xs
-    _ -> HH.h2_ [ HH.text "Something has gone terribly wrong!" ]
-  eval = H.mkEval H.defaultEval
-    { handleAction = case _ of
-      ToggleTrash i -> H.modify_ $ mapWithIndex \j (Tuple c b) -> Tuple c (if i == j then not b else b)
-      Done -> (toResolved <$> H.get) >>= H.raise
-    }
-  toResolved :: TrashState -> Choice.Choice
-  toResolved xs = Choice.TrashUpTo 0 (Just $ map snd $ filter fst (mapWithIndex (\i (Tuple _ b) -> (Tuple b i)) xs))
-
-renderCardToTrash :: forall a. Int -> Tuple Card Boolean -> HTML a TrashAction
-renderCardToTrash cardIndex (Tuple card selected) = HH.div
-  (if isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
-  [ HH.div (if isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
-    [ HH.div (if isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
-      [ HH.button
-        [ HE.onClick \_ -> Just (ToggleTrash cardIndex)
-        , HP.classes
-          [ cssClass.card
-          , if selected
-            then cssClass.cantPlay
-            else cssClass.canPlay
-          ]
-        ]
-        [ HH.ul_
-          [ HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardName ] ]
-            [ HH.text $ " " <> card.name ]
-          , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardCards ] ]
-            [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
-          , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardActions ] ]
-            [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
-          , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardBuys ] ]
-            [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
-          , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardTreasure ] ]
-            [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
-          , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardVictoryPoints ] ]
-            [ HH.text
-              ( if card.victoryPoints > 0
-                then " +" <> show card.victoryPoints <> " VP"
-                else if card.victoryPoints < 0
-                  then show card.victoryPoints
-                  else ""
-              )
-            ]
-          , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardCost ] ]
-            [ HH.text $ "Cost $" <> show card.cost ]
-          ]
-        ]
-      ]
-    ]
-  ]
-
--- END trash component
-
-
 --renderPlayer :: forall a. GameState -> Int -> Player -> HTML a GameAction
 renderPlayer state playerIndex player =
   if Player.hasChoices player && playerIndex == choiceTurn state
-  then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (trashComponent player) unit (Just <<< ResolveChoice)) ]
+  then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< ResolveChoice)) ]
   else
   case state.players !! state.turn of
     Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ]
@@ -429,5 +352,7 @@ cssClass =
   , cantPlay: H.ClassName "cant-play"
   , nextPhase: H.ClassName "next-phase"
   , resolveChoice: H.ClassName "resolve-choice"
+  , toTrash: H.ClassName "to-keep"
+  , toKeep: H.ClassName "to-trash"
   }
 

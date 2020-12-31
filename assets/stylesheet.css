@@ -194,6 +194,12 @@ button {
 .supply .can-buy .card {
   background-color: white;
 }
+.to-keep {
+  background-color: white;
+}
+.to-trash {
+  background-color: red;
+}
 .supply .cant-buy .card {
   background-color: darkgray;
 }
