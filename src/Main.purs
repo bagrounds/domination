@@ -153,7 +153,8 @@ render state = HH.main_ $
   , HH.button [ HE.onClick \_ -> Just $ LoadGame ] [ HH.text "Load Game" ]
   ] <> case state.gameState of
     Nothing -> []
-    Just (UpdateState gs) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component (length gs.players) state.playerIndex) (UpdateState gs) (Just <<< UpdateGameState) ]
+    Just (UpdateState gs) ->
+      [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component (length gs.players) state.playerIndex) (UpdateState gs) (Just <<< UpdateGameState) ]
     Just (NewGame n) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component n state.playerIndex) (NewGame n) (Just <<< UpdateGameState) ]
 
 data AppAction = MakeOffer Int

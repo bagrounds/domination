@@ -28,6 +28,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
 import CardType (CardType(..))
+import Choice (Choice)
 
 value :: Array Card -> Int
 value = foldr (+) 0 <<< map _.treasure
@@ -78,7 +79,7 @@ instance encodeJsonTarget :: EncodeJson Target where
 instance decodeJsonTarget :: DecodeJson Target where
   decodeJson = genericDecodeJson
 
-data Command = Gain Card | Draw Int | Discard SelectCards
+data Command = Gain Card | Draw Int | Discard SelectCards | Choose Choice
 derive instance genericCommand :: Generic Command _
 derive instance eqCommand :: Eq Command
 instance showCommand :: Show Command where show x = genericShow x

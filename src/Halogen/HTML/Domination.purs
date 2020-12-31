@@ -12,7 +12,11 @@ import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Dominion (Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup)
+import Data.Symbol (SProxy(..))
+import Data.Tuple
+import Dominion (Player(..), Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup, choiceTurn, resolveChoice)
+import Player as Player
+import Choice as Choice
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
@@ -35,6 +39,7 @@ data GameAction = Receive GameUpdate
   | NextPhase Int
   | Play Int Int
   | Purchase Int Player Stack
+  | ResolveChoice Choice.Choice
 
 derive instance genericGameAction :: Generic GameAction _
 instance showGameAction :: Show GameAction where
@@ -47,11 +52,11 @@ component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   render = renderPlayerN playerIndex
   eval = H.mkEval H.defaultEval
     { initialize = Just $ Receive $ NewGame playerCount
-    , handleAction = handleAction
+    , handleAction = handleAction playerIndex
     , receive = Just <<< Receive
     }
 
-renderPlayerN :: forall b. Int -> GameState -> HTML b GameAction
+--renderPlayerN :: forall b. Int -> GameState -> HTML b GameAction
 renderPlayerN playerIndex state = HH.div_
   [ HH.h1 [] [ HH.text "Domination" ]
   , HH.div_ $ renderPlayers playerIndex state
@@ -128,6 +133,7 @@ renderCard onClick player card = HH.div
     ]
   ]
 
+
 renderStack :: forall a. Int -> Player -> Stack -> HTML a GameAction
 renderStack playerIndex player stack =
   HH.li [ HP.class_ cssClass.stack ]
@@ -147,7 +153,7 @@ renderStack playerIndex player stack =
       ]
     ]
 
-renderPlayers :: forall a. Int -> GameState -> Array (HTML a GameAction)
+--renderPlayers :: forall a. Int -> GameState -> Array (HTML a GameAction)
 renderPlayers i state = case state.players !! i of
   Nothing -> []
   Just player -> [ renderPlayer state i player ]
@@ -166,10 +172,90 @@ playerStats state playerIndex player = HH.li
     <> (if state.turn == playerIndex then " | " <> show state.phase else "")
   ]
 
-renderPlayer :: forall a. GameState -> Int -> Player -> HTML a GameAction
+-- BEGIN trash component
+type TrashState = Array (Tuple Card Boolean)
+data TrashAction = ToggleTrash Int | Done
+--trashComponent :: forall query m. Player -> Component HTML query Choice.Choice TrashState m
+-- trashComponent :: forall query o m. Player -> Component HTML query o Choice.Choice m
+trashComponent player = H.mkComponent { initialState, render, eval }
+  where
+  initialState _ = (\x -> Tuple x false) <$> player.hand
+--  render :: forall a. TrashState -> HTML a TrashAction
+  render xs = case Player.firstChoice player of
+    Just (Choice.TrashUpTo n Nothing) -> HH.h2_ $
+      [ HH.text $ "Trash up to " <> show n <> " cards"
+      , HH.button
+        [ HP.class_ cssClass.resolveChoice, HE.onClick \_ -> Just $ Done ]
+        [ HH.text $ "Done trashing cards" ]
+      ]
+      <> renderCardToTrash `mapWithIndex` xs
+    _ -> HH.h2_ [ HH.text "Something has gone terribly wrong!" ]
+  eval = H.mkEval H.defaultEval
+    { handleAction = case _ of
+      ToggleTrash i -> H.modify_ $ mapWithIndex \j (Tuple c b) -> Tuple c (if i == j then not b else b)
+      Done -> (toResolved <$> H.get) >>= H.raise
+    }
+  toResolved :: TrashState -> Choice.Choice
+  toResolved xs = Choice.TrashUpTo 0 (Just $ map snd $ filter fst (mapWithIndex (\i (Tuple _ b) -> (Tuple b i)) xs))
+
+renderCardToTrash :: forall a. Int -> Tuple Card Boolean -> HTML a TrashAction
+renderCardToTrash cardIndex (Tuple card selected) = HH.div
+  (if isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
+  [ HH.div (if isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
+    [ HH.div (if isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
+      [ HH.button
+        [ HE.onClick \_ -> Just (ToggleTrash cardIndex)
+        , HP.classes
+          [ cssClass.card
+          , if selected
+            then cssClass.cantPlay
+            else cssClass.canPlay
+          ]
+        ]
+        [ HH.ul_
+          [ HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardName ] ]
+            [ HH.text $ " " <> card.name ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardCards ] ]
+            [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardActions ] ]
+            [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardBuys ] ]
+            [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardTreasure ] ]
+            [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardVictoryPoints ] ]
+            [ HH.text
+              ( if card.victoryPoints > 0
+                then " +" <> show card.victoryPoints <> " VP"
+                else if card.victoryPoints < 0
+                  then show card.victoryPoints
+                  else ""
+              )
+            ]
+          , HH.li
+            [ HP.classes [ cssClass.cardText, cssClass.cardCost ] ]
+            [ HH.text $ "Cost $" <> show card.cost ]
+          ]
+        ]
+      ]
+    ]
+  ]
+
+-- END trash component
+
+
+--renderPlayer :: forall a. GameState -> Int -> Player -> HTML a GameAction
 renderPlayer state playerIndex player =
-  let mbCurrentPlayer = state.players !! state.turn in
-  case mbCurrentPlayer of
+  if Player.hasChoices player && playerIndex == choiceTurn state
+  then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (trashComponent player) unit (Just <<< ResolveChoice)) ]
+  else
+  case state.players !! state.turn of
     Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ]
     Just currentPlayer -> HH.div
       ( if state.turn /= playerIndex
@@ -247,8 +333,10 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ Play playerIndex cardIndex) player card
 
-handleAction :: forall m. MonadEffect m => GameAction -> HalogenM GameState GameAction () GameState m Unit
-handleAction = case _ of
+--handleAction :: forall m. MonadEffect m => Int -> GameAction -> HalogenM GameState GameAction () GameState m Unit
+handleAction playerIndex = case _ of
+  ResolveChoice choice -> do
+    H.modify_ \state -> fromMaybe state (resolveChoice playerIndex choice state)
   Receive (NewGame n) -> do
     setup (newGame n) >>= H.put
     untilJust autoAdvance
@@ -340,5 +428,6 @@ cssClass =
   , canPlay: H.ClassName "can-play"
   , cantPlay: H.ClassName "cant-play"
   , nextPhase: H.ClassName "next-phase"
+  , resolveChoice: H.ClassName "resolve-choice"
   }
 

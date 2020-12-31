@@ -8,7 +8,10 @@ module Dominion
   , nextPhase
   , setup
   , nextPlayer
+  , choiceTurn
+  , resolveChoice
   , module Card
+  , module Choice
   , module Player
   , module Phase
   ) where
@@ -16,19 +19,20 @@ module Dominion
 import Prelude
 
 import Control.Apply (lift2)
-import Data.Array (findIndex, filter, length, deleteAt, mapWithIndex, replicate, updateAt, (!!), (:))
+import Data.Array
 import Data.Foldable (foldM)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse, sequence)
-import Data.Tuple (Tuple(..))
+import Data.Tuple
 import Effect.Class (class MonadEffect)
 import Card (Card, Target(..), Command(..), SelectCards(..), Special, card, action, actionAttack, treasure, victory, cost, value, isAction, isTreasure, isVictory)
-import Util (indices)
+import Util
 import Player (Player)
-import Player (Player, actionCardsInHand, allCards, cash, cleanup, drawCards, hasActionCardsInHand, hasActions, numActionCardsInHand, score) as Player
+import Player as Player
 import Phase (Phase(..))
 import Phase (Phase(..), next) as Phase
 import CardType (CardType(..))
+import Choice (Choice(..))
 
 type GameState =
   { turn :: Int
@@ -71,12 +75,14 @@ newGame i =
     , { card: witch, count: 10 }
     , { card: councilRoom, count: 10 }
     , { card: scholar, count: 10 }
+    , { card: chapel, count: 10 }
     ]
   }
 
 nextPhase :: forall m. MonadEffect m => Int -> GameState -> m (Maybe GameState)
 nextPhase playerIndex state =
     if playerIndex /= state.turn
+    || choicesOutstanding state
     then pure Nothing
     else do
       let phase' = Phase.next state.phase
@@ -110,9 +116,15 @@ purchase playerIndex player stack state =
   let supply' = (\s -> if s == stack then stack' else s) <$> state.supply in
   state { players = _, supply = supply' } <$> updateAt playerIndex player' state.players
 
+resolveChoice :: Int -> Choice -> GameState -> Maybe GameState
+resolveChoice playerIndex (TrashUpTo n Nothing) state = Nothing
+resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state =
+  modifyPlayer playerIndex ((Player.modifyHand $ dropIndices cardIndices) >=> Player.dropChoice) state
+
 play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Maybe GameState)
 play playerIndex cardIndex state =
   if playerIndex /= state.turn
+  || choicesOutstanding state
   then pure Nothing
   else case (state.players !! playerIndex) of
   Nothing -> pure Nothing
@@ -160,6 +172,8 @@ play playerIndex cardIndex state =
       let target' = target { toDiscard = toDiscard', hand = [] } in
       updateAt targetIndex target' state.players
       <#> state { players = _ }
+    applyEffectToTarget (Choose choice) state targetIndex = pure
+      $ modifyPlayer targetIndex (Player.gainChoice choice >>> Just) state
 
     targetIndices :: Target -> Int -> GameState -> Array Int
     targetIndices EveryoneElse attackerIndex = filter (_ /= attackerIndex) <<< indices <<< _.players
@@ -180,6 +194,27 @@ play playerIndex cardIndex state =
           , buys = player'.buys + playedCard.buys
           }
 
+choicesOutstanding :: GameState -> Boolean
+choicesOutstanding state = Player.hasChoices `any` state.players
+
+modifyPlayer :: Int -> (Player -> Maybe Player) -> GameState -> Maybe GameState
+modifyPlayer playerIndex modify state = do
+  player <- state.players !! playerIndex
+  player' <- modify player
+  players' <- updateAt playerIndex player' state.players
+  pure state { players = players' }
+
+-- should we return a maybe here in case there are no players?
+-- or should players be a non-empty list?
+choiceTurn :: GameState -> Int
+choiceTurn state =
+  let players' = withIndices state.players in
+  let prefix = takeWhile (fst >>> (_ /= state.turn)) players' in
+  let suffix = dropWhile (fst >>> (_ /= state.turn)) players' in
+  let rotated = suffix <> prefix in
+  let withChoices = (snd >>> Player.hasChoices) `filter` rotated in
+  fromMaybe 0 $ fst <$> (head withChoices)
+
 newPlayer :: Player
 newPlayer =
   { deck: []
@@ -190,6 +225,7 @@ newPlayer =
   , buying: []
   , actions: 1
   , buys: 1
+  , choices: []
   }
 
 copper :: Card
@@ -272,4 +308,16 @@ scholar = action
       }
     ]
   }
+chapel :: Card
+chapel = action
+  { name = "Chapel"
+  , cost = 2
+  , specials =
+    [ { target: Self
+      , command: Choose $ (TrashUpTo 4 Nothing)
+      , description: "Trash up to 4 cards from your hand"
+      }
+    ]
+  }
+
 

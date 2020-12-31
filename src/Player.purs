@@ -1,25 +1,16 @@
-module Player
-  ( Player
-  , cleanup
-  , allCards
-  , score
-  , cash
-  , hasActions
-  , actionCardsInHand
-  , numActionCardsInHand
-  , hasActionCardsInHand
-  , drawCards
-  ) where
+module Player where
 
 import Prelude
 
 import Effect.Console as Console
-import Data.Array (take, drop, filter, length)
+import Data.Array
 import Data.Foldable (foldr, null)
+import Data.Maybe
 import Effect.Class (class MonadEffect, liftEffect)
 
 import Card (Card)
 import Card as Card
+import Choice (Choice)
 import Util (shuffle)
 
 type Player =
@@ -31,7 +22,28 @@ type Player =
   , buying :: Array Card
   , actions :: Int
   , buys :: Int
+  , choices :: Array Choice
   }
+
+hasChoices :: Player -> Boolean
+hasChoices = _.choices >>> not null
+
+firstChoice :: Player -> Maybe Choice
+firstChoice = _.choices >>> head
+
+dropChoice :: Player -> Maybe Player
+dropChoice player =
+  if length player.choices < 1
+  then Nothing
+  else pure player { choices = drop 1 player.choices }
+
+modifyHand :: (Array Card -> Maybe (Array Card)) -> Player -> Maybe Player
+modifyHand f player = do
+  hand' <- f player.hand
+  pure player { hand = hand' }
+
+gainChoice :: Choice -> Player -> Player
+gainChoice choice player = player { choices = choice : player.choices }
 
 hasActions :: Player -> Boolean
 hasActions = (_ > 0) <<< _.actions
