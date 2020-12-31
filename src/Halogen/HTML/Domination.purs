@@ -260,6 +260,8 @@ renderCardInHand player playerIndex cardIndex card =
 handleAction playerIndex = case _ of
   ResolveChoice choice -> do
     H.modify_ \state -> fromMaybe state (resolveChoice playerIndex choice state)
+    untilJust autoAdvance
+    H.get >>= H.raise
   Receive (NewGame n) -> do
     setup (newGame n) >>= H.put
     untilJust autoAdvance

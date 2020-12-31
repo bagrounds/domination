@@ -19,7 +19,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
 type TrashState = Array (Tuple Card Boolean)
-data TrashAction = ToggleTrash Int | Done
+data TrashAction = ToggleTrash Int Int | Done Int
 --trashComponent :: forall query m. Player -> Component HTML query Choice.Choice TrashState m
 -- trashComponent :: forall query o m. Player -> Component HTML query o Choice.Choice m
 component player = H.mkComponent { initialState, render, eval }
@@ -30,26 +30,29 @@ component player = H.mkComponent { initialState, render, eval }
     Just (Choice.TrashUpTo n Nothing) -> HH.h2_ $
       [ HH.text $ "Trash up to " <> show n <> " cards"
       , HH.button
-        [ HP.class_ cssClass.resolveChoice, HE.onClick \_ -> Just $ Done ]
+        [ HP.class_ cssClass.resolveChoice, HE.onClick \_ -> Just $ Done n ]
         [ HH.text $ "Done trashing cards" ]
       ]
-      <> renderCardToTrash `mapWithIndex` xs
+      <> renderCardToTrash n `mapWithIndex` xs
     _ -> HH.h2_ [ HH.text "Something has gone terribly wrong!" ]
   eval = H.mkEval H.defaultEval
     { handleAction = case _ of
-      ToggleTrash i -> H.modify_ $ mapWithIndex \j (Tuple c b) -> Tuple c (if i == j then not b else b)
-      Done -> (toResolved <$> H.get) >>= H.raise
+      ToggleTrash n i -> do
+        xs <- H.get
+        let nSelected = length $ snd `filter` xs
+        H.modify_ $ mapWithIndex \j (Tuple c b) -> Tuple c (if i == j && (b || nSelected < n) then not b else b)
+      Done n -> (toResolved n <$> H.get) >>= H.raise
     }
-  toResolved :: TrashState -> Choice.Choice
-  toResolved xs = Choice.TrashUpTo 0 (Just $ map snd $ filter fst (mapWithIndex (\i (Tuple _ b) -> (Tuple b i)) xs))
+  toResolved :: Int -> TrashState -> Choice.Choice
+  toResolved n xs = Choice.TrashUpTo n (Just $ map snd $ filter fst (mapWithIndex (\i (Tuple _ b) -> (Tuple b i)) xs))
 
-renderCardToTrash :: forall a. Int -> Tuple Card Boolean -> HTML a TrashAction
-renderCardToTrash cardIndex (Tuple card selected) = HH.div
+renderCardToTrash :: forall a. Int -> Int -> Tuple Card Boolean -> HTML a TrashAction
+renderCardToTrash n cardIndex (Tuple card selected) = HH.div
   (if isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
   [ HH.div (if isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
     [ HH.div (if isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
       [ HH.button
-        [ HE.onClick \_ -> Just (ToggleTrash cardIndex)
+        [ HE.onClick \_ -> Just (ToggleTrash n cardIndex)
         , HP.classes
           [ cssClass.card
           , if selected

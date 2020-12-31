@@ -61,6 +61,7 @@ newGame i =
     , { card: province, count: 8 }
     , { card: colony, count: 8 }
     , { card: curse, count: 10 * (i - 1) }
+    , { card: chapel, count: 10 }
     , { card: greatHall, count: 8 }
     , { card: village, count: 10 }
     , { card: woodCutter, count: 10 }
@@ -75,7 +76,6 @@ newGame i =
     , { card: witch, count: 10 }
     , { card: councilRoom, count: 10 }
     , { card: scholar, count: 10 }
-    , { card: chapel, count: 10 }
     ]
   }
 
@@ -119,7 +119,9 @@ purchase playerIndex player stack state =
 resolveChoice :: Int -> Choice -> GameState -> Maybe GameState
 resolveChoice playerIndex (TrashUpTo n Nothing) state = Nothing
 resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state =
-  modifyPlayer playerIndex ((Player.modifyHand $ dropIndices cardIndices) >=> Player.dropChoice) state
+  if length cardIndices > n
+  then Nothing
+  else modifyPlayer playerIndex ((Player.modifyHand $ dropIndices cardIndices) >=> Player.dropChoice) state
 
 play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Maybe GameState)
 play playerIndex cardIndex state =
