@@ -10,7 +10,6 @@ import Data.Tuple
 import Dominion
 import Player as Player
 import Choice as Choice
-import Effect.Aff.Class (class MonadAff)
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
@@ -20,12 +19,11 @@ import Halogen.HTML.Properties as HP
 
 type TrashState = Array (Tuple Card Boolean)
 data TrashAction = ToggleTrash Int Int | Done Int
---trashComponent :: forall query m. Player -> Component HTML query Choice.Choice TrashState m
--- trashComponent :: forall query o m. Player -> Component HTML query o Choice.Choice m
+component :: forall query o m. Player -> Component HTML query o Choice.Choice m
 component player = H.mkComponent { initialState, render, eval }
   where
   initialState _ = (\x -> Tuple x false) <$> player.hand
---  render :: forall a. TrashState -> HTML a TrashAction
+  render :: forall a. TrashState -> HTML a TrashAction
   render xs = case Player.firstChoice player of
     Just (Choice.TrashUpTo n Nothing) -> HH.h2_ $
       [ HH.text $ "Trash up to " <> show n <> " cards"

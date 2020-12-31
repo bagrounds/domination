@@ -57,7 +57,13 @@ component playerCount playerIndex = H.mkComponent { initialState, render, eval }
     , receive = Just <<< Receive
     }
 
---renderPlayerN :: forall b. Int -> GameState -> HTML b GameAction
+type TrashUpToComponent t1 t2 t3 =
+  H.ComponentSlot HTML ("TrashUpTo" :: H.Slot t1 Choice.Choice Int | t2) t3 GameAction
+
+renderPlayerN :: forall t1 t2 t3.
+  Int ->
+  GameState ->
+  HTML (TrashUpToComponent t1 t2 t3) GameAction
 renderPlayerN playerIndex state = HH.div_
   [ HH.h1 [] [ HH.text "Domination" ]
   , HH.div_ $ renderPlayers playerIndex state
@@ -154,7 +160,7 @@ renderStack playerIndex player stack =
       ]
     ]
 
---renderPlayers :: forall a. Int -> GameState -> Array (HTML a GameAction)
+renderPlayers :: forall t1 t2 t3. Int -> GameState -> Array (HTML (TrashUpToComponent t1 t2 t3) GameAction)
 renderPlayers i state = case state.players !! i of
   Nothing -> []
   Just player -> [ renderPlayer state i player ]
@@ -173,7 +179,7 @@ playerStats state playerIndex player = HH.li
     <> (if state.turn == playerIndex then " | " <> show state.phase else "")
   ]
 
---renderPlayer :: forall a. GameState -> Int -> Player -> HTML a GameAction
+renderPlayer :: forall t1 t2 t3. GameState -> Int -> Player -> HTML (TrashUpToComponent t1 t2 t3) GameAction
 renderPlayer state playerIndex player =
   if Player.hasChoices player && playerIndex == choiceTurn state
   then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< ResolveChoice)) ]
@@ -256,7 +262,7 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ Play playerIndex cardIndex) player card
 
---handleAction :: forall m. MonadEffect m => Int -> GameAction -> HalogenM GameState GameAction () GameState m Unit
+handleAction :: forall s m. MonadEffect m => Int -> GameAction -> HalogenM GameState GameAction s GameState m Unit
 handleAction playerIndex = case _ of
   ResolveChoice choice -> do
     H.modify_ \state -> fromMaybe state (resolveChoice playerIndex choice state)
