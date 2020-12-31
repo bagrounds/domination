@@ -1,4 +1,4 @@
-module CardType
+module Domination.Data.CardType
   ( CardType(..)
   ) where
 

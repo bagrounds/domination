@@ -1,4 +1,4 @@
-module Choice
+module Domination.Data.Choice
   ( Choice(..)
   ) where
 

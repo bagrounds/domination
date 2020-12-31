@@ -1,4 +1,4 @@
-module Halogen.HTML.ChoiceTrashUpTo
+module Domination.UI.ChoiceTrashUpTo
   ( component
   ) where
 
@@ -7,15 +7,19 @@ import Prelude
 import Data.Array
 import Data.Maybe
 import Data.Tuple
-import Dominion
-import Player as Player
-import Choice as Choice
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+
+import Domination.Data.Card (Card)
+import Domination.Data.Card as Card
+import Domination.Data.GameState as Dom
+import Domination.Data.Player (Player)
+import Domination.Data.Player as Player
+import Domination.Data.Choice as Choice
 
 type TrashState = Array (Tuple Card Boolean)
 data TrashAction = ToggleTrash Int Int | Done Int
@@ -46,9 +50,9 @@ component player = H.mkComponent { initialState, render, eval }
 
 renderCardToTrash :: forall a. Int -> Int -> Tuple Card Boolean -> HTML a TrashAction
 renderCardToTrash n cardIndex (Tuple card selected) = HH.div
-  (if isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
-  [ HH.div (if isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
-    [ HH.div (if isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
+  (if Card.isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
+  [ HH.div (if Card.isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
+    [ HH.div (if Card.isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
       [ HH.button
         [ HE.onClick \_ -> Just (ToggleTrash n cardIndex)
         , HP.classes

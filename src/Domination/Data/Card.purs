@@ -1,4 +1,4 @@
-module Card
+module Domination.Data.Card
   ( Card
   , Special(..)
   , Target(..)
@@ -27,8 +27,8 @@ import Data.Foldable (foldr)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
-import CardType (CardType(..))
-import Choice (Choice)
+import Domination.Data.CardType (CardType(..))
+import Domination.Data.Choice (Choice)
 
 value :: Array Card -> Int
 value = foldr (+) 0 <<< map _.treasure

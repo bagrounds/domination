@@ -1,4 +1,4 @@
-module Dominion
+module Domination.Data.GameState
   ( GameState(..)
   , Supply
   , Stack
@@ -10,10 +10,6 @@ module Dominion
   , nextPlayer
   , choiceTurn
   , resolveChoice
-  , module Card
-  , module Choice
-  , module Player
-  , module Phase
   ) where
 
 import Prelude
@@ -25,14 +21,15 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse, sequence)
 import Data.Tuple
 import Effect.Class (class MonadEffect)
-import Card (Card, Target(..), Command(..), SelectCards(..), Special, card, action, actionAttack, treasure, victory, cost, value, isAction, isTreasure, isVictory)
 import Util
-import Player (Player)
-import Player as Player
-import Phase (Phase(..))
-import Phase (Phase(..), next) as Phase
-import CardType (CardType(..))
-import Choice (Choice(..))
+
+import Domination.Data.Card (Card, Target(..), Command(..), SelectCards(..), Special, card, action, actionAttack, treasure, victory, cost, value, isAction, isTreasure, isVictory)
+import Domination.Data.Player (Player)
+import Domination.Data.Player as Player
+import Domination.Data.Phase (Phase(..))
+import Domination.Data.Phase (Phase(..), next) as Phase
+import Domination.Data.CardType (CardType(..))
+import Domination.Data.Choice (Choice(..))
 
 type GameState =
   { turn :: Int

@@ -1,4 +1,4 @@
-module Phase
+module Domination.Data.Phase
   ( Phase(..)
   , next
   ) where

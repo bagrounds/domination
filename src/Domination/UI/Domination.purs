@@ -1,4 +1,4 @@
-module Halogen.HTML.Domination
+module Domination.UI.Domination
   ( component
   , GameUpdate(..)
   ) where
@@ -14,9 +14,6 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Tuple
-import Dominion (Player(..), Card, GameState, Phase(..), Player, Stack, cash, hasActionCardsInHand, hasActions, isAction, isTreasure, isVictory, newGame, nextPhase, play, purchase, score, setup, choiceTurn, resolveChoice)
-import Player as Player
-import Choice as Choice
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
@@ -26,9 +23,18 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.HTML.ChoiceTrashUpTo as Trash
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
+
+import Domination.Data.Card (Card)
+import Domination.Data.Card as Card
+import Domination.Data.GameState (GameState, Stack)
+import Domination.Data.GameState as Dom
+import Domination.Data.Phase (Phase(..))
+import Domination.Data.Player (Player)
+import Domination.Data.Player as Player
+import Domination.Data.Choice as Choice
+import Domination.UI.ChoiceTrashUpTo as Trash
 
 data GameUpdate = UpdateState GameState | NewGame Int
 
@@ -49,7 +55,7 @@ instance showGameAction :: Show GameAction where
 component :: forall query m. MonadAff m => Int -> Int -> Component HTML query GameUpdate GameState m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
-  initialState _ = newGame playerCount
+  initialState _ = Dom.newGame playerCount
   render = renderPlayerN playerIndex
   eval = H.mkEval H.defaultEval
     { initialize = Just $ Receive $ NewGame playerCount
@@ -93,14 +99,14 @@ renderDiscard player = HH.button
 
 renderCard :: forall a. (MouseEvent -> Maybe GameAction) -> Player -> Card -> HTML a GameAction
 renderCard onClick player card = HH.div
-  (if isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
-  [ HH.div (if isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
-    [ HH.div (if isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
+  (if Card.isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
+  [ HH.div (if Card.isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
+    [ HH.div (if Card.isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
       [ HH.button
         [ HE.onClick onClick
         , HP.classes
           [ cssClass.card
-          , if player.actions > 0 && isAction card
+          , if player.actions > 0 && Card.isAction card
             then cssClass.canPlay
             else cssClass.cantPlay
           ]
@@ -151,7 +157,7 @@ renderStack playerIndex player stack =
       , HH.li
         [ HP.classes
           [ cssClass.stackCard
-          , if player.buys > 0 && cash player >= stack.card.cost && stack.count > 0
+          , if player.buys > 0 && Player.cash player >= stack.card.cost && stack.count > 0
             then cssClass.canBuy
             else cssClass.cantBuy
           ]
@@ -170,18 +176,18 @@ playerStats state playerIndex player = HH.li
   [ HP.class_ cssClass.stat ]
   [ HH.text $ "Player " <> show playerIndex
     <> ": Actions: " <> show player.actions
-    <> "/" <> show (length (isAction `filter` player.hand) :: Int)
-    <> " | $" <> show (cash player)
+    <> "/" <> show (length (Card.isAction `filter` player.hand) :: Int)
+    <> " | $" <> show (Player.cash player)
     <> " | Buys: " <> show player.buys
     <> " | Play: " <> (intercalate ", " (_.name <$> player.atPlay))
     <> " | Buying: " <> (intercalate ", " (_.name <$> player.buying))
-    <> " | VP: " <> show (score player)
+    <> " | VP: " <> show (Player.score player)
     <> (if state.turn == playerIndex then " | " <> show state.phase else "")
   ]
 
 renderPlayer :: forall t1 t2 t3. GameState -> Int -> Player -> HTML (TrashUpToComponent t1 t2 t3) GameAction
 renderPlayer state playerIndex player =
-  if Player.hasChoices player && playerIndex == choiceTurn state
+  if Player.hasChoices player && playerIndex == Dom.choiceTurn state
   then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< ResolveChoice)) ]
   else
   case state.players !! state.turn of
@@ -206,7 +212,7 @@ renderPlayer state playerIndex player =
             : HH.ul_
               [ HH.li
                 [ HP.class_ cssClass.handInfo ]
-                [ HH.text $ "$" <> (show ((cash player) :: Int)) ]
+                [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
               , HH.li
                 [ HP.class_ cssClass.handInfo ]
                 [ HH.text $ (show $ player.buys) <> " Buys" ]
@@ -242,7 +248,7 @@ renderHand player playerIndex state = HH.ul
     , if state.turn == playerIndex && state.phase == ActionPhase
       then cssClass.active
       else cssClass.inactive
-    ] <> if player.actions < 1 || (length $ isAction `filter` player.hand) < 1
+    ] <> if player.actions < 1 || (length $ Card.isAction `filter` player.hand) < 1
       then [ cssClass.waiting ]
       else []
   ] $
@@ -250,7 +256,7 @@ renderHand player playerIndex state = HH.ul
   , HH.li_
     [ HH.ul_
       [ HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.actions) <> " Actions" ]
-      , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ "$" <> (show ((cash player) :: Int)) ]
+      , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
       , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
       ]
     ]
@@ -265,24 +271,24 @@ renderCardInHand player playerIndex cardIndex card =
 handleAction :: forall s m. MonadEffect m => Int -> GameAction -> HalogenM GameState GameAction s GameState m Unit
 handleAction playerIndex = case _ of
   ResolveChoice choice -> do
-    H.modify_ \state -> fromMaybe state (resolveChoice playerIndex choice state)
+    H.modify_ \state -> fromMaybe state (Dom.resolveChoice playerIndex choice state)
     untilJust autoAdvance
     H.get >>= H.raise
   Receive (NewGame n) -> do
-    setup (newGame n) >>= H.put
+    Dom.setup (Dom.newGame n) >>= H.put
     untilJust autoAdvance
     H.get >>= H.raise
   Receive (UpdateState gs) -> H.put gs
   NextPhase playerIndex -> do
     gameState <- H.get
-    maybeNewGameState <- nextPhase playerIndex gameState
+    maybeNewGameState <- Dom.nextPhase playerIndex gameState
     H.modify_ \oldGameState ->
       fromMaybe oldGameState { text = "Error: not your turn!" } maybeNewGameState
     untilJust autoAdvance
     H.get >>= H.raise
   Play player card -> do
     gameState <- H.get
-    maybeNewGameState <- play player card gameState
+    maybeNewGameState <- Dom.play player card gameState
     case maybeNewGameState of
       Nothing -> H.modify_ \state -> state { text = "Error" }
       Just newGameState -> H.put newGameState
@@ -291,7 +297,7 @@ handleAction playerIndex = case _ of
   Purchase playerIndex player stack -> do
     gameState <- H.get
     H.modify_ \oldGameState ->
-        case purchase playerIndex player stack gameState of
+        case Dom.purchase playerIndex player stack gameState of
           Nothing -> oldGameState { text = "Error trying to buy card!" }
           Just newGameState -> newGameState
     untilJust autoAdvance
@@ -304,7 +310,7 @@ autoAdvance = do
   case gameState.players !! gameState.turn of
     Nothing -> pure $ Just unit -- TODO: return an error
     Just player -> case gameState.phase of
-      ActionPhase -> if hasActions player && hasActionCardsInHand player
+      ActionPhase -> if Player.hasActions player && Player.hasActionCardsInHand player
         then pure $ Just unit
         else advancePhase
       BuyPhase -> if player.buys > 0
@@ -316,7 +322,7 @@ autoAdvance = do
     advancePhase = do
       gameState <- H.get
       liftEffect $ Console.log $ "advancing from " <> show gameState.phase
-      mbNewState <- nextPhase gameState.turn gameState
+      mbNewState <- Dom.nextPhase gameState.turn gameState
       case mbNewState of
         Nothing -> pure (Just unit)
         Just newGameState -> const Nothing <$> H.put newGameState

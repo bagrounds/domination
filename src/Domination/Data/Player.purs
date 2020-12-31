@@ -1,4 +1,4 @@
-module Player where
+module Domination.Data.Player where
 
 import Prelude
 
@@ -8,9 +8,9 @@ import Data.Foldable (foldr, null)
 import Data.Maybe
 import Effect.Class (class MonadEffect, liftEffect)
 
-import Card (Card)
-import Card as Card
-import Choice (Choice)
+import Domination.Data.Card (Card)
+import Domination.Data.Card as Card
+import Domination.Data.Choice (Choice)
 import Util (shuffle)
 
 type Player =

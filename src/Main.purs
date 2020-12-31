@@ -16,7 +16,6 @@ import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
-import Dominion (GameState)
 import Effect (Effect)
 import Effect.Aff (makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -33,10 +32,11 @@ import Halogen.VDom.Driver (runUI)
 import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
 
-import Comm as Comm
+import FFI as FFI
 import Storage as Storage
-import Halogen.HTML.Domination (GameUpdate(..))
-import Halogen.HTML.Domination as Domination
+import Domination.UI.Domination (GameUpdate(..))
+import Domination.UI.Domination as Domination
+import Domination.Data.GameState (GameState)
 
 type AppState =
   { username :: String
@@ -187,15 +187,15 @@ handleAction :: forall m. MonadState AppState m
   => MonadEffect m
   => AppAction -> m Unit
 handleAction = case _ of
-  CopyToClipboard id -> liftEffect $ Comm.copyToClipboard id
+  CopyToClipboard id -> liftEffect $ FFI.copyToClipboard id
   MakeOffer i -> do
-    ld <- liftAff $ makeAff $ Comm.create i Right
+    ld <- liftAff $ makeAff $ FFI.create i Right
     H.modify_ _ { localDescription = ld }
   WriteOffer rd -> do
     H.modify_ \state -> state { offer = rd }
   AcceptOffer i -> do
     s <- H.get
-    ld <- liftAff $ makeAff $ Comm.join s.offer Right
+    ld <- liftAff $ makeAff $ FFI.join s.offer Right
     H.modify_ \state -> state { answer = ld, playerIndex = i + 1 }
   WriteAnswer _ rd -> do
     H.modify_ \state -> state { receivedAnswer = state.receivedAnswer <> [ rd ]}
@@ -208,13 +208,13 @@ handleAction = case _ of
       Nothing -> liftEffect $ Console.error $ "Cannot accept answer (" <> show i <> ") of (" <> show ((length s.receivedAnswer) :: Int) <> ")"
 
       Just answer -> do
-        liftEffect $ Comm.gotAnswer i answer
+        liftEffect $ FFI.gotAnswer i answer
         H.modify_ \state -> state { chatInputMessage = "PING", players = state.players + 1 }
   WriteMessage s -> do
     H.modify_ \state -> state { chatInputMessage = s }
   SendMessage -> sendChatMessage
   ReceiveMessage customEvent -> do
-    let msg = readMessage $ Comm.detail customEvent
+    let msg = readMessage $ FFI.detail customEvent
     case msg of
       Left e -> liftEffect $ Console.log e
       Right mt -> case mt of
@@ -249,6 +249,6 @@ handleAction = case _ of
       let localMessage = "-> " <> s.chatInputMessage
       H.modify_ \state -> state { messages = localMessage : state.messages, chatInputMessage = "" }
 
-    sendMessage = liftEffect <<< Comm.say
+    sendMessage = liftEffect <<< FFI.say
 
 

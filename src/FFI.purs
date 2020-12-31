@@ -1,4 +1,4 @@
-module Comm where
+module FFI where
 import Prelude
 import Data.Either (Either)
 import Effect.Aff (Canceler, Error)
