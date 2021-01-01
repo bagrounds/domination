@@ -6,6 +6,7 @@ module Domination.UI.Domination
 import Prelude
 
 import Data.Array (filter, (!!), (:))
+import Data.Either (Either(..))
 import Data.Foldable (intercalate, length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
@@ -22,7 +23,8 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
-import Effect.Class (class MonadEffect)
+import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Console as Console
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
@@ -268,6 +270,10 @@ handleAction = case _ of
   MakePlay play -> playAndReport play
   where
     playAndReport play = do
-      Dom.makeAutoPlay play
-      H.get >>= H.raise
+      result <- Dom.makeAutoPlay play
+      case result of
+        Left e -> do
+          liftEffect $ Console.error e
+          H.get >>= H.raise
+        Right _ -> H.get >>= H.raise
 
