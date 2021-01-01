@@ -2,34 +2,109 @@ module Domination.Data.GameState
   ( GameState(..)
   , Supply
   , Stack
+  , Play(..)
+  , makeAutoPlay
+  , makePlay
   , newGame
-  , play
-  , purchase
-  , nextPhase
-  , setup
-  , nextPlayer
   , choiceTurn
-  , resolveChoice
   ) where
 
 import Prelude
 
-import Control.Apply (lift2)
-import Data.Array
-import Data.Foldable (foldM)
+import Control.Monad.Loops (untilJust)
+import Control.Monad.State (class MonadState, get, modify_, put)
+import Data.Array (dropWhile, filter, findIndex, head, takeWhile, updateAt, (!!), (:))
+import Data.Foldable (any, foldM, length)
+import Data.FunctorWithIndex (mapWithIndex)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Lens.Fold (preview)
+import Data.Lens.Index (ix)
+import Data.Lens.Lens (Lens')
+import Data.Lens.Record (prop)
+import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse, sequence)
-import Data.Tuple
-import Effect.Class (class MonadEffect)
-import Util
-
-import Domination.Data.Card (Card, Target(..), Command(..), SelectCards(..), Special, card, action, actionAttack, treasure, victory, cost, value, isAction, isTreasure, isVictory)
-import Domination.Data.Player (Player)
-import Domination.Data.Player as Player
-import Domination.Data.Phase (Phase(..))
-import Domination.Data.Phase (Phase(..), next) as Phase
+import Data.Tuple (fst, snd)
+import Data.Unfoldable (replicate)
+import Domination.Data.Card (Card, Command(..), SelectCards(..), Special, Target(..), action, actionAttack, card, treasure, victory)
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
+import Domination.Data.Phase (Phase(..))
+import Domination.Data.Phase as Phase
+import Domination.Data.Player (Player, _hand)
+import Domination.Data.Player as Player
+import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Console as Console
+import Util (dropIndices, indices, withIndices)
+
+data Play
+  = NewGame Int
+  | EndPhase Int
+  | PlayCard Int Int
+  | Purchase Int Player Stack
+  | ResolveChoice Int Choice
+
+derive instance genericPlay :: Generic Play _
+instance showPlay :: Show Play where
+  show = genericShow
+
+makeAutoPlay :: forall m. MonadEffect m => MonadState GameState m => Play -> m Unit
+makeAutoPlay = makePlay >=> const autoAdvance
+
+makePlay :: forall m. MonadEffect m => MonadState GameState m => Play -> m Unit
+makePlay = case _ of
+  NewGame n -> (setup (newGame n) <#> (fromMaybe (newGame n))) >>= put
+  EndPhase playerIndex -> do
+    gameState <- get
+    maybeNewGameState <- nextPhase playerIndex gameState
+    modify_ \oldGameState ->
+      fromMaybe oldGameState { text = "Error: not your turn!" } maybeNewGameState
+  PlayCard playerIndex card -> do
+    gameState <- get
+    maybeNewGameState <- play playerIndex card gameState
+    case maybeNewGameState of
+      Nothing -> modify_ \state -> state { text = "Error" }
+      Just newGameState -> put newGameState
+  Purchase playerIndex player stack -> do
+    gameState <- get
+    modify_ \oldGameState ->
+        case purchase playerIndex player stack gameState of
+          Nothing -> oldGameState { text = "Error trying to buy card!" }
+          Just newGameState -> newGameState
+  ResolveChoice playerIndex choice ->
+    modify_ \state -> fromMaybe state (resolveChoice playerIndex choice state)
+
+currentPlayer :: GameState -> Maybe Player
+currentPlayer state = state.players !! state.turn
+
+autoAdvance :: forall m. MonadEffect m => MonadState GameState m => m Unit
+autoAdvance = untilJust autoAdvance'
+  where
+  autoAdvance' :: m (Maybe Unit)
+  autoAdvance' = do
+    gameState <- get
+    liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
+    case currentPlayer gameState of
+      Nothing -> pure $ Just unit -- TODO: return an error
+      Just player -> case gameState.phase of
+        ActionPhase -> if Player.hasActions player && Player.hasActionCardsInHand player
+          then pure $ Just unit
+          else advancePhase
+        BuyPhase -> if player.buys > 0
+          then pure $ Just unit
+          else advancePhase
+        CleanupPhase -> advancePhase
+    where
+      advancePhase :: m (Maybe Unit)
+      advancePhase = do
+        gameState <- get
+        liftEffect $ Console.log $ "advancing from " <> show gameState.phase
+        mbNewState <- nextPhase gameState.turn gameState
+        case mbNewState of
+          Nothing -> pure (Just unit)
+          Just newGameState -> const Nothing <$> put newGameState
 
 type GameState =
   { turn :: Int
@@ -86,15 +161,19 @@ nextPhase playerIndex state =
       let turn' = if state.phase == CleanupPhase
         then nextPlayer state
         else state.turn
-      players' <- (if state.phase == CleanupPhase
+      mbPlayers' :: (Array (Maybe Player)) <- (if state.phase == CleanupPhase
           then sequence $
-            mapWithIndex (\i p -> if i == playerIndex then Player.cleanup p else pure p)
+            mapWithIndex (\i p -> if i == playerIndex then Player.cleanup p else pure $ Just p)
             state.players
-          else pure state.players)
-      pure $ Just state { phase = phase', turn = turn', players = players' }
+          else pure $ (Just <$> state.players))
+      pure $ (sequence mbPlayers') <#> state { phase = phase', turn = turn', players = _ }
 
-setup :: forall m. MonadEffect m => GameState -> m GameState
-setup gameState = gameState { players = _ } <$> traverse (Player.drawCards 5) gameState.players
+setup :: forall m. MonadEffect m => GameState -> m (Maybe GameState)
+setup gameState = do
+  let (x :: Array (m (Maybe Player))) = (Player.drawCards 5) <$> gameState.players
+  x' :: Array (Maybe Player) <- sequence x
+  let (x'' :: Maybe (Array Player)) = sequence x'
+  pure $ gameState { players = _ } <$> x''
 
 nextPlayer :: GameState -> Int
 nextPlayer state = (state.turn + 1) `mod` (length state.players)
@@ -118,40 +197,56 @@ resolveChoice playerIndex (TrashUpTo n Nothing) state = Nothing
 resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state =
   if length cardIndices > n
   then Nothing
-  else modifyPlayer playerIndex ((Player.modifyHand $ dropIndices cardIndices) >=> Player.dropChoice) state
+  else maybeModifyPlayer playerIndex ((Player.dropCards cardIndices) >=> Player.dropChoice) state
+
+_players :: Lens' GameState (Array Player)
+_players = prop (SProxy :: SProxy "players")
+
+_player :: Int -> Traversal' GameState Player
+_player i = _players <<< (ix i)
+
+getPlayer :: Int -> GameState -> Maybe Player
+getPlayer i = preview (_player i)
+
+_supply :: Lens' GameState (Array Stack)
+_supply = prop (SProxy :: SProxy "supply")
+
+_stack :: Int -> Traversal' GameState Stack
+_stack i = _supply <<< (ix i)
+
+getStack :: Int -> GameState -> Maybe Stack
+getStack i = preview (_stack i)
 
 play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Maybe GameState)
-play playerIndex cardIndex state =
-  if playerIndex /= state.turn
-  || choicesOutstanding state
+play playerIndex cardIndex originalState =
+  if playerIndex /= originalState.turn
+  || choicesOutstanding originalState
   then pure Nothing
-  else case (state.players !! playerIndex) of
+  else case getPlayer playerIndex originalState of
   Nothing -> pure Nothing
-  Just player' -> case player'.hand !! cardIndex of
+  Just player' -> case Player.cardI cardIndex player' of
     Nothing -> pure Nothing
     Just card -> do
-      player'' <- play' player' cardIndex
+      player'' <- Player.play cardIndex player'
       case player'' of
         Nothing -> pure Nothing
-        Just player''' -> case updateAt playerIndex player''' state.players of
+        Just player''' -> case updateAt playerIndex player''' originalState.players of
           Nothing -> pure Nothing
-          Just players' ->
-            let state' = state { players = players' } in
-            Just <$> applySpecials state' playerIndex card
+          Just players' -> Just <$> applySpecials originalState { players = players' } card
     where
-    applySpecials :: GameState -> Int -> Card -> m GameState
-    applySpecials state playerIndex card =
+    applySpecials :: GameState -> Card -> m GameState
+    applySpecials state card =
       foldM (applyEffectToTargets playerIndex) state card.specials
 
     applyEffectToTargets :: Int -> GameState -> Special -> m GameState
     applyEffectToTargets attackerIndex state { target, command } =
-      foldM (\state i -> fromMaybe state <$> applyEffectToTarget command state i) state (targetIndices target attackerIndex state)
+      foldM (\state' i -> fromMaybe state' <$> applyEffectToTarget command state' i) state (targetIndices target attackerIndex state)
 
     applyEffectToTarget :: Command -> GameState -> Int -> m (Maybe GameState)
     applyEffectToTarget (Gain card) state targetIndex = pure do
-      target <- state.players !! targetIndex
+      target <- getPlayer targetIndex state
       stackIndex <- findIndex (\x -> x.card == card) state.supply
-      stack <- state.supply !! stackIndex
+      stack <- getStack stackIndex state
       let count' = if stack.count > 0 then stack.count - 1 else stack.count
       let stack' = stack { count = count' }
       supply' <- updateAt stackIndex stack' state.supply
@@ -159,49 +254,36 @@ play playerIndex cardIndex state =
       players' <- updateAt targetIndex target' state.players
       pure (state { players = players', supply = supply' })
     applyEffectToTarget (Draw n) state targetIndex =
-      case state.players !! targetIndex of
+      case getPlayer targetIndex state of
       Nothing -> pure Nothing
-      Just target -> Player.drawCards n target
-        <#> \target' -> updateAt targetIndex target' state.players
-        <#> state { players = _ }
+      Just target -> do
+        x :: Maybe Player <- Player.drawCards n target
+        let (x' :: Maybe (Array Player) ) = x >>= \target' -> updateAt targetIndex target' state.players
+        pure $ x' <#> state { players = _ }
     applyEffectToTarget (Discard SelectAll) state targetIndex = pure
-      $ state.players !! targetIndex
+      $ getPlayer targetIndex state
       >>= \target ->
       let toDiscard' = target.toDiscard <> target.hand in
       let target' = target { toDiscard = toDiscard', hand = [] } in
       updateAt targetIndex target' state.players
       <#> state { players = _ }
     applyEffectToTarget (Choose choice) state targetIndex = pure
-      $ modifyPlayer targetIndex (Player.gainChoice choice >>> Just) state
+      $ maybeModifyPlayer targetIndex (Player.gainChoice choice >>> Just) state
 
     targetIndices :: Target -> Int -> GameState -> Array Int
     targetIndices EveryoneElse attackerIndex = filter (_ /= attackerIndex) <<< indices <<< _.players
     targetIndices Everyone _ = indices <<< _.players
     targetIndices Self attackerIndex = const [ attackerIndex ]
 
-    play' :: Player -> Int -> m (Maybe Player)
-    play' player cardIndex =
-      case lift2 Tuple (player.hand !! cardIndex) (deleteAt cardIndex player.hand) of
-      Nothing -> pure Nothing
-      Just (Tuple playedCard hand') -> do
-        player' <- Player.drawCards playedCard.cards player { hand = hand' }
-        pure if not isAction playedCard
-        then Nothing
-        else Just player'
-          { atPlay = playedCard : player'.atPlay
-          , actions = player'.actions + playedCard.actions - 1
-          , buys = player'.buys + playedCard.buys
-          }
 
 choicesOutstanding :: GameState -> Boolean
 choicesOutstanding state = Player.hasChoices `any` state.players
 
-modifyPlayer :: Int -> (Player -> Maybe Player) -> GameState -> Maybe GameState
-modifyPlayer playerIndex modify state = do
-  player <- state.players !! playerIndex
-  player' <- modify player
-  players' <- updateAt playerIndex player' state.players
-  pure state { players = players' }
+maybeModifyPlayer :: Int -> (Player -> Maybe Player) -> GameState -> Maybe GameState
+maybeModifyPlayer i = traverseOf (_player i)
+
+maybeModifyPlayerHand :: Int -> (Array Card -> Maybe (Array Card)) -> GameState -> Maybe GameState
+maybeModifyPlayerHand i = traverseOf (_player i <<< _hand)
 
 -- should we return a maybe here in case there are no players?
 -- or should players be a non-empty list?

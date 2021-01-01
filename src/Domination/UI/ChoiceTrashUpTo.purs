@@ -4,22 +4,23 @@ module Domination.UI.ChoiceTrashUpTo
 
 import Prelude
 
-import Data.Array
-import Data.Maybe
-import Data.Tuple
+import Data.Array (filter)
+import Data.Foldable (length)
+import Data.FunctorWithIndex (mapWithIndex)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), fst, snd)
+import Domination.Data.Card (Card)
+import Domination.Data.Card as Card
+import Domination.Data.Choice as Choice
+import Domination.Data.Player (Player)
+import Domination.Data.Player as Player
+import Domination.UI.Css as Css
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-
-import Domination.Data.Card (Card)
-import Domination.Data.Card as Card
-import Domination.Data.GameState as Dom
-import Domination.Data.Player (Player)
-import Domination.Data.Player as Player
-import Domination.Data.Choice as Choice
 
 type TrashState = Array (Tuple Card Boolean)
 data TrashAction = ToggleTrash Int Int | Done Int
@@ -32,7 +33,7 @@ component player = H.mkComponent { initialState, render, eval }
     Just (Choice.TrashUpTo n Nothing) -> HH.h2_ $
       [ HH.text $ "Trash up to " <> show n <> " cards"
       , HH.button
-        [ HP.class_ cssClass.resolveChoice, HE.onClick \_ -> Just $ Done n ]
+        [ HP.class_ Css.resolveChoice, HE.onClick \_ -> Just $ Done n ]
         [ HH.text $ "Done trashing cards" ]
       ]
       <> renderCardToTrash n `mapWithIndex` xs
@@ -50,36 +51,36 @@ component player = H.mkComponent { initialState, render, eval }
 
 renderCardToTrash :: forall a. Int -> Int -> Tuple Card Boolean -> HTML a TrashAction
 renderCardToTrash n cardIndex (Tuple card selected) = HH.div
-  (if Card.isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
-  [ HH.div (if Card.isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
-    [ HH.div (if Card.isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
+  (if Card.isTreasure card then [ HP.class_ Css.treasureCard ] else [ HP.class_ Css.noTreasureCard ])
+  [ HH.div (if Card.isVictory card then [ HP.class_ Css.victoryCard ] else [ HP.class_ Css.noVictoryCard ])
+    [ HH.div (if Card.isAction card then [ HP.class_ Css.actionCard ] else [ HP.class_ Css.noActionCard ])
       [ HH.button
         [ HE.onClick \_ -> Just (ToggleTrash n cardIndex)
         , HP.classes
-          [ cssClass.card
+          [ Css.card
           , if selected
-            then cssClass.toTrash
-            else cssClass.toKeep
+            then Css.toTrash
+            else Css.toKeep
           ]
         ]
         [ HH.ul_
           [ HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardName ] ]
+            [ HP.classes [ Css.cardText, Css.cardName ] ]
             [ HH.text $ " " <> card.name ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardCards ] ]
+            [ HP.classes [ Css.cardText, Css.cardCards ] ]
             [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardActions ] ]
+            [ HP.classes [ Css.cardText, Css.cardActions ] ]
             [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardBuys ] ]
+            [ HP.classes [ Css.cardText, Css.cardBuys ] ]
             [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardTreasure ] ]
+            [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
             [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardVictoryPoints ] ]
+            [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
             [ HH.text
               ( if card.victoryPoints > 0
                 then " +" <> show card.victoryPoints <> " VP"
@@ -89,54 +90,11 @@ renderCardToTrash n cardIndex (Tuple card selected) = HH.div
               )
             ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardCost ] ]
+            [ HP.classes [ Css.cardText, Css.cardCost ] ]
             [ HH.text $ "Cost $" <> show card.cost ]
           ]
         ]
       ]
     ]
   ]
-
-cssClass =
-  { stats: H.ClassName "stats"
-  , stat: H.ClassName "stat"
-  , supply: H.ClassName "supply"
-  , hand: H.ClassName "hand"
-  , handInfo: H.ClassName "hand-info"
-  , handInfoArea: H.ClassName "hand-info-area"
-  , play: H.ClassName "play"
-  , buying: H.ClassName "buying"
-  , deckArea: H.ClassName "deck-area"
-  , deck: H.ClassName "deck"
-  , discard: H.ClassName "discard"
-  , card: H.ClassName "card"
-  , actionCard: H.ClassName "action-card"
-  , noActionCard: H.ClassName "no-action-card"
-  , treasureCard: H.ClassName "treasure-card"
-  , noTreasureCard: H.ClassName "no-treasure-card"
-  , victoryCard: H.ClassName "victory-card"
-  , noVictoryCard: H.ClassName "no-victory-card"
-  , cardName: H.ClassName "card-name"
-  , cardCards: H.ClassName "card-cards"
-  , cardActions: H.ClassName "card-actions"
-  , cardBuys: H.ClassName "card-buys"
-  , cardTreasure: H.ClassName "card-treasure"
-  , cardVictoryPoints: H.ClassName "card-victory-points"
-  , cardCost: H.ClassName "card-cost"
-  , cardText: H.ClassName "card-text"
-  , stack: H.ClassName "stack"
-  , stackCard: H.ClassName "stack-card"
-  , stackCount: H.ClassName "stack-count"
-  , active: H.ClassName "active"
-  , waiting: H.ClassName "waiting"
-  , inactive: H.ClassName "inactive"
-  , canBuy: H.ClassName "can-buy"
-  , cantBuy: H.ClassName "cant-buy"
-  , canPlay: H.ClassName "can-play"
-  , cantPlay: H.ClassName "cant-play"
-  , nextPhase: H.ClassName "next-phase"
-  , resolveChoice: H.ClassName "resolve-choice"
-  , toTrash: H.ClassName "to-trash"
-  , toKeep: H.ClassName "to-keep"
-  }
 

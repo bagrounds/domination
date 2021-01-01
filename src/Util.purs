@@ -2,9 +2,11 @@ module Util where
 
 import Prelude
 
-import Data.Array
-import Data.Maybe
-import Data.Tuple
+import Data.Array (drop, filter, length, nub, take, zip)
+import Data.Foldable (any, notElem)
+import Data.FunctorWithIndex (mapWithIndex)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Random (randomInt)
 
@@ -15,14 +17,14 @@ withIndices :: forall a. Array a -> Array (Tuple Int a)
 withIndices xs = zip (indices xs) xs
 
 dropIndices :: forall a. Array Int -> Array a -> Maybe (Array a)
-dropIndices indices xs =
-  if length indices > length xs
-  || length (nub indices) /= length indices
-  || (_ < 0) `any` indices
-  || (_ >= length xs) `any` indices
+dropIndices is xs =
+  if length is > length xs
+  || length (nub is) /= length is
+  || (_ < 0) `any` is
+  || (_ >= length xs) `any` is
   then Nothing
   else Just $ snd <$>
-  (fst >>> flip notElem indices) `filter` withIndices xs
+  (fst >>> flip notElem is) `filter` withIndices xs
 
 shuffle :: forall a m . MonadEffect m => Eq a => Array a -> m (Array a)
 shuffle array = fst <$> shuffle' (Tuple [] array)
@@ -37,3 +39,4 @@ shuffle array = fst <$> shuffle' (Tuple [] array)
 
 indices :: forall a. Array a -> Array Int
 indices xs = fst <$> mapWithIndex Tuple xs
+

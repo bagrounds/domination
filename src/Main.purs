@@ -9,19 +9,23 @@ import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Argonaut.Parser (jsonParser)
-import Data.Array (take, (:), (!!))
+import Data.Array (take, (!!), (:))
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
+import Domination.Data.GameState (GameState)
+import Domination.UI.Domination (GameUpdate(..))
+import Domination.UI.Domination as Domination
 import Effect (Effect)
 import Effect.Aff (makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
-import Halogen (Component)
+import FFI as FFI
+import Halogen (Component, ComponentSlot, Slot)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML (HTML)
@@ -29,14 +33,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Storage as Storage
 import Web.Event.Event (EventType(..), Event)
 import Web.UIEvent.KeyboardEvent as KE
-
-import FFI as FFI
-import Storage as Storage
-import Domination.UI.Domination (GameUpdate(..))
-import Domination.UI.Domination as Domination
-import Domination.Data.GameState (GameState)
 
 type AppState =
   { username :: String
@@ -79,7 +78,10 @@ component = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval (H.defaultEval { handleAction = handleAction })
   initialState = const newApp
 
---render :: forall b. AppState -> HTML b AppAction
+type DominationComponent o c m =
+  ComponentSlot HTML ("Domination" :: Slot o GameState Int | c) m AppAction
+
+render :: forall o c m. MonadEffect m => AppState -> HTML (DominationComponent o c m) AppAction
 render state = HH.main_ $
   [ HH.input
     [ HP.type_ HP.InputText
@@ -155,7 +157,7 @@ render state = HH.main_ $
     Nothing -> []
     Just (UpdateState gs) ->
       [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component (length gs.players) state.playerIndex) (UpdateState gs) (Just <<< UpdateGameState) ]
-    Just (NewGame n) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component n state.playerIndex) (NewGame n) (Just <<< UpdateGameState) ]
+    Just (MakeNewGame n) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component n state.playerIndex) (MakeNewGame n) (Just <<< UpdateGameState) ]
 
 data AppAction = MakeOffer Int
   | CopyToClipboard String
@@ -234,21 +236,20 @@ handleAction = case _ of
       Left e -> liftEffect $ Console.log e
       Right gameState -> do
         H.modify_ _ { gameState = Just $ UpdateState gameState }
-        sendMessage $ writeMessage $ GameStateMessage gameState
+        sendMessage $ GameStateMessage gameState
   StartNewGame -> do
     state <- H.get
-    H.modify_ _ { gameState = Just $ NewGame state.players }
+    H.modify_ _ { gameState = Just $ MakeNewGame state.players }
   UpdateGameState gameState -> do
     s <- H.modify_ _ { gameState = Just $ UpdateState gameState }
-    sendMessage $ writeMessage $ GameStateMessage gameState
+    sendMessage $ GameStateMessage gameState
     Storage.save "game_state" gameState
   where
     sendChatMessage = do
       s <- H.get
-      sendMessage $ writeMessage $ ChatMessage s.chatInputMessage
+      sendMessage $ ChatMessage s.chatInputMessage
       let localMessage = "-> " <> s.chatInputMessage
       H.modify_ \state -> state { messages = localMessage : state.messages, chatInputMessage = "" }
 
-    sendMessage = liftEffect <<< FFI.say
-
+    sendMessage = liftEffect <<< FFI.say <<< writeMessage
 

@@ -1,85 +1,134 @@
-"use strict";
+'use strict'
 
-var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection
-const peerConn = []
-const dataChannel = []
+// polyfill
 
-const canceller = name => () => console.log(`attempting to cancel ${name}`)
+const RTCPeerConnection
+  = window.RTCPeerConnection
+  || webkitRTCPeerConnection
+  || mozRTCPeerConnection
 
-exports.detail = customEvent => customEvent.detail
+// constants
 
-const onmessage = e => {
-  console.log('onmessage:', e.data)
-  document.querySelector('#msg').dispatchEvent(new CustomEvent('msg', { detail: e.data }))
+const RTC_PEER_CONNECTION_CONFIG = {
+  iceServers: [{ urls: ['stun:stun.l.google.com:19302']}]
 }
-const creatorOnmessage = i => e => {
-  console.log(`creatorOnmessage(${i}):`, e.data)
-  document.querySelector('#msg').dispatchEvent(new CustomEvent('msg', { detail: e.data }))
-  dataChannel.filter((x, j) => i != j).forEach((dc, j) => {
-    console.log(`creatorOnMessage - sending to dc${j}`)
-    dc.send(e.data)
-  })
-}
-const onopen = e => {
-  console.log('onopen(', e, ')')
-  window.say = msg => dataChannel.forEach(dc => dc.send(msg))
-}
-exports.create = i => right => callback => {
-  peerConn[i] = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
-  dataChannel[i] = peerConn[i].createDataChannel(`dc ${i}`);
-  dataChannel[i].onmessage = creatorOnmessage(i)
-  dataChannel[i].onopen = onopen
-  peerConn[i].createOffer({})
-    .then((desc) => peerConn[i].setLocalDescription(desc))
-    .then(() => {})
-    .catch((err) => console.error(err))
+const MESSAGE_EVENT_TARGET = '#msg'
 
-  peerConn[i].onicecandidate = (e) => {
-    console.log('onicecandidate(', e, ')');
-    if (e.candidate == null) {
-      const localDescription = JSON.stringify(peerConn[i].localDescription)
-      callback(right(localDescription))()
-    }
-  }
-  window.gotAnswer = i => answer => () => {
-    console.log(`gotAnswer(${i})`)
-    peerConn[i].setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
-  }
-  return canceller("create")
-}
-exports.gotAnswer = answer => window.gotAnswer(answer)
-exports.say = message => () => window.say && window.say(message)
+// TODO: do not use global mutable state
 
-function join(offer, right, callback) {
-  peerConn[0] = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
-  peerConn[0].ondatachannel = e => {
-    dataChannel[0] = e.channel;
-    dataChannel[0].onopen = onopen
-    dataChannel[0].onmessage = onmessage
-  };
+const peerConnections = []
+const dataChannels = []
 
-  peerConn[0].onicecandidate = (e) => {
-    console.log('onicecandidate(', e, ')');
-    if (e.candidate == null) {
-      callback(right(JSON.stringify(peerConn[0].localDescription)))()
-    }
-  };
-
-  var offerDesc = new RTCSessionDescription(JSON.parse(offer));
-  peerConn[0].setRemoteDescription(offerDesc);
-  peerConn[0].createAnswer({})
-    .then((answerDesc) => peerConn[0].setLocalDescription(answerDesc))
-    .catch((err) => console.warn("Couldn't create answer"));
-  return canceller('join')
-}
-exports.join = offer => right => callback => join(offer, right, callback)
-window.join = join
-exports.windowLocalDescription = () => window.localDescription
+// exports
 
 exports.copyToClipboard = id => () => {
   const element = document.getElementById(id)
+
   element.select()
+
   element.setSelectionRange(0, 99999)
-  document.execCommand("copy")
+
+  document.execCommand('copy')
 }
+
+exports.create = i => right => callback => {
+  const peerConnection = new RTCPeerConnection(RTC_PEER_CONNECTION_CONFIG)
+  peerConnections[i] = peerConnection
+
+  const dataChannel = peerConnection.createDataChannel(`dc ${i}`)
+  dataChannels[i] = dataChannel
+
+  dataChannel.onmessage = event => {
+    logInfo(`(create)dataChannels[${i}].onmessage: `, event)
+    broadcastEvent(event)
+
+    dataChannels
+      .filter((x, j) => i != j)
+      .forEach((channel, j) => {
+        logInfo(`(create)dataChannels[${j}].send: `, event)
+        channel.send(event.data)
+      })
+  }
+
+  dataChannel.onopen = onopen
+
+  peerConnection.createOffer({})
+    .then(description => peerConnection.setLocalDescription(description))
+    .catch(error => logError(`(create)createOffer >>> peerConnections[${i}].setLocalDescription failed with error: `, error))
+
+  peerConnection.onicecandidate = event => {
+    logInfo(`(create)peerConnections[${i}].onicecandidate: `, event)
+    if (event.candidate == null) {
+      callback(right(JSON.stringify(peerConnection.localDescription)))()
+    }
+  }
+
+  window.gotAnswer = i => answer => () => {
+    logInfo(`gotAnswer(${i})(${answer})`)
+    peerConnection.setRemoteDescription(remoteDescription(answer))
+  }
+
+  return canceller('create')
+}
+
+exports.detail = customEvent => customEvent.detail
+
+exports.gotAnswer = answer => window.gotAnswer(answer)
+
+exports.join = offer => right => callback => {
+  const peerConnection = new RTCPeerConnection(RTC_PEER_CONNECTION_CONFIG)
+  peerConnections[0] = peerConnection
+
+  peerConnection.ondatachannel = event => {
+    const dataChannel = event.channel
+    dataChannels[0] = dataChannel
+
+    dataChannel.onopen = onopen
+
+    dataChannel.onmessage = event => {
+      logInfo('(join)dataChannels[0].onmessage: ', event)
+      broadcastEvent(event)
+    }
+  }
+
+  peerConnection.onicecandidate = event => {
+    logInfo('(join)peerConnections[0].onicecandidate: ', event)
+    if (event.candidate == null) {
+      callback(right(JSON.stringify(peerConnection.localDescription)))()
+    }
+  }
+
+  peerConnection.setRemoteDescription(remoteDescription(offer))
+
+  peerConnection.createAnswer({})
+    .then(description => peerConnection.setLocalDescription(description))
+    .catch(error => logError('(join)createAnswer >>> peerConnections[0].setLocalDescription failed with error: ', error))
+
+  return canceller('join')
+}
+
+exports.say = message => () => window.say && window.say(message)
+
+// helpers
+
+const broadcastEvent = event => document
+  .querySelector(MESSAGE_EVENT_TARGET)
+  .dispatchEvent(customEvent(event.data))
+
+const canceller = name => () => logInfo(`cancel(${name})`)
+
+const customEvent = detail => new CustomEvent('msg', { detail })
+
+const log = level => (...args) => console[level]('FFI: ', ...args)
+
+const logInfo = (...args) => log('log')(...args)
+
+const logError = (...args) => log('error')(...args)
+
+const onopen = event => {
+  logInfo('onopen: ', event)
+  window.say = message => dataChannels.forEach(channel => channel.send(message))
+}
+
+const remoteDescription = description => new RTCSessionDescription(JSON.parse(description))
 

@@ -5,18 +5,24 @@ module Domination.UI.Domination
 
 import Prelude
 
-import Control.Monad.State.Class (class MonadState)
-import Control.Monad.Loops (untilJust)
-import Data.Array (intercalate, mapWithIndex, (:), filter, (!!))
-import Data.Foldable (length)
+import Data.Array (filter, (!!), (:))
+import Data.Foldable (intercalate, length)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
-import Data.Tuple
-import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console as Console
+import Domination.Data.Card (Card)
+import Domination.Data.Card as Card
+import Domination.Data.Choice as Choice
+import Domination.Data.GameState (GameState, Stack, Play(..))
+import Domination.Data.GameState as Dom
+import Domination.Data.Phase (Phase(..))
+import Domination.Data.Player (Player)
+import Domination.Data.Player as Player
+import Domination.UI.ChoiceTrashUpTo as Trash
+import Domination.UI.Css as Css
+import Effect.Class (class MonadEffect)
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
@@ -26,40 +32,26 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-import Domination.Data.Card (Card)
-import Domination.Data.Card as Card
-import Domination.Data.GameState (GameState, Stack)
-import Domination.Data.GameState as Dom
-import Domination.Data.Phase (Phase(..))
-import Domination.Data.Player (Player)
-import Domination.Data.Player as Player
-import Domination.Data.Choice as Choice
-import Domination.UI.ChoiceTrashUpTo as Trash
-
-data GameUpdate = UpdateState GameState | NewGame Int
+data GameUpdate = UpdateState GameState | MakeNewGame Int
 
 derive instance genericGameUpdate :: Generic GameUpdate _
 instance showGameUpdate :: Show GameUpdate where
   show = genericShow
 
-data GameAction = Receive GameUpdate
-  | NextPhase Int
-  | Play Int Int
-  | Purchase Int Player Stack
-  | ResolveChoice Choice.Choice
+data GameAction = Receive GameUpdate | MakePlay Play
 
 derive instance genericGameAction :: Generic GameAction _
 instance showGameAction :: Show GameAction where
   show = genericShow
 
-component :: forall query m. MonadAff m => Int -> Int -> Component HTML query GameUpdate GameState m
+component :: forall query m. MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameState m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
   initialState _ = Dom.newGame playerCount
   render = renderPlayerN playerIndex
   eval = H.mkEval H.defaultEval
-    { initialize = Just $ Receive $ NewGame playerCount
-    , handleAction = handleAction playerIndex
+    { initialize = Just $ Receive $ MakeNewGame playerCount
+    , handleAction = handleAction
     , receive = Just <<< Receive
     }
 
@@ -81,7 +73,7 @@ renderSupply playerIndex player state =
 
 renderDeck :: forall a. Player -> HTML a GameAction
 renderDeck player = HH.button
-  [ HE.onClick (const Nothing), HP.class_ cssClass.deck ]
+  [ HE.onClick (const Nothing), HP.class_ Css.deck ]
   [ HH.ul_
     [ HH.li [] [ HH.text "Discard" ]
     , HH.li [] [ HH.text $ show ((length player.discard) :: Int) ]
@@ -90,7 +82,7 @@ renderDeck player = HH.button
 
 renderDiscard :: forall a. Player -> HTML a GameAction
 renderDiscard player = HH.button
-  [ HE.onClick (const Nothing), HP.class_ cssClass.discard ]
+  [ HE.onClick (const Nothing), HP.class_ Css.discard ]
   [ HH.ul_
     [ HH.li [] [ HH.text "Deck" ]
     , HH.li [] [ HH.text $ show ((length player.deck) :: Int) ]
@@ -99,36 +91,36 @@ renderDiscard player = HH.button
 
 renderCard :: forall a. (MouseEvent -> Maybe GameAction) -> Player -> Card -> HTML a GameAction
 renderCard onClick player card = HH.div
-  (if Card.isTreasure card then [ HP.class_ cssClass.treasureCard ] else [ HP.class_ cssClass.noTreasureCard ])
-  [ HH.div (if Card.isVictory card then [ HP.class_ cssClass.victoryCard ] else [ HP.class_ cssClass.noVictoryCard ])
-    [ HH.div (if Card.isAction card then [ HP.class_ cssClass.actionCard ] else [ HP.class_ cssClass.noActionCard ])
+  (if Card.isTreasure card then [ HP.class_ Css.treasureCard ] else [ HP.class_ Css.noTreasureCard ])
+  [ HH.div (if Card.isVictory card then [ HP.class_ Css.victoryCard ] else [ HP.class_ Css.noVictoryCard ])
+    [ HH.div (if Card.isAction card then [ HP.class_ Css.actionCard ] else [ HP.class_ Css.noActionCard ])
       [ HH.button
         [ HE.onClick onClick
         , HP.classes
-          [ cssClass.card
+          [ Css.card
           , if player.actions > 0 && Card.isAction card
-            then cssClass.canPlay
-            else cssClass.cantPlay
+            then Css.canPlay
+            else Css.cantPlay
           ]
         ]
         [ HH.ul_
           [ HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardName ] ]
+            [ HP.classes [ Css.cardText, Css.cardName ] ]
             [ HH.text $ " " <> card.name ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardCards ] ]
+            [ HP.classes [ Css.cardText, Css.cardCards ] ]
             [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardActions ] ]
+            [ HP.classes [ Css.cardText, Css.cardActions ] ]
             [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardBuys ] ]
+            [ HP.classes [ Css.cardText, Css.cardBuys ] ]
             [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardTreasure ] ]
+            [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
             [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardVictoryPoints ] ]
+            [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
             [ HH.text
               ( if card.victoryPoints > 0
                 then " +" <> show card.victoryPoints <> " VP"
@@ -138,7 +130,7 @@ renderCard onClick player card = HH.div
               )
             ]
           , HH.li
-            [ HP.classes [ cssClass.cardText, cssClass.cardCost ] ]
+            [ HP.classes [ Css.cardText, Css.cardCost ] ]
             [ HH.text $ "Cost $" <> show card.cost ]
           ]
         ]
@@ -149,20 +141,20 @@ renderCard onClick player card = HH.div
 
 renderStack :: forall a. Int -> Player -> Stack -> HTML a GameAction
 renderStack playerIndex player stack =
-  HH.li [ HP.class_ cssClass.stack ]
+  HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
       [ HH.li
-        [ HP.class_ cssClass.stackCount ]
+        [ HP.class_ Css.stackCount ]
         [ HH.text $ show stack.count ]
       , HH.li
         [ HP.classes
-          [ cssClass.stackCard
+          [ Css.stackCard
           , if player.buys > 0 && Player.cash player >= stack.card.cost && stack.count > 0
-            then cssClass.canBuy
-            else cssClass.cantBuy
+            then Css.canBuy
+            else Css.cantBuy
           ]
         ]
-        [ renderCard (\_ -> Just $ Purchase playerIndex player stack) player stack.card ]
+        [ renderCard (\_ -> Just $ MakePlay $ Purchase playerIndex player stack) player stack.card ]
       ]
     ]
 
@@ -173,7 +165,7 @@ renderPlayers i state = case state.players !! i of
 
 playerStats :: forall a. GameState -> Int -> Player -> (HTML a GameAction)
 playerStats state playerIndex player = HH.li
-  [ HP.class_ cssClass.stat ]
+  [ HP.class_ Css.stat ]
   [ HH.text $ "Player " <> show playerIndex
     <> ": Actions: " <> show player.actions
     <> "/" <> show (length (Card.isAction `filter` player.hand) :: Int)
@@ -188,38 +180,38 @@ playerStats state playerIndex player = HH.li
 renderPlayer :: forall t1 t2 t3. GameState -> Int -> Player -> HTML (TrashUpToComponent t1 t2 t3) GameAction
 renderPlayer state playerIndex player =
   if Player.hasChoices player && playerIndex == Dom.choiceTurn state
-  then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< ResolveChoice)) ]
+  then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
   else
   case state.players !! state.turn of
     Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ]
     Just currentPlayer -> HH.div
       ( if state.turn /= playerIndex
-        then [ HP.class_ cssClass.waiting ]
+        then [ HP.class_ Css.waiting ]
         else []
       )
       [ HH.h2 [] [ HH.text $ "Player " <> show playerIndex ]
       , HH.ul
           [ HP.classes $
-            [ cssClass.supply
+            [ Css.supply
             , if state.turn == playerIndex && state.phase == BuyPhase
-              then cssClass.active
-              else cssClass.inactive
+              then Css.active
+              else Css.inactive
             ] <> if player.buys < 1
-              then [ cssClass.waiting ]
+              then [ Css.waiting ]
               else []
           ]
           $ HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])]
             : HH.ul_
               [ HH.li
-                [ HP.class_ cssClass.handInfo ]
+                [ HP.class_ Css.handInfo ]
                 [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
               , HH.li
-                [ HP.class_ cssClass.handInfo ]
+                [ HP.class_ Css.handInfo ]
                 [ HH.text $ (show $ player.buys) <> " Buys" ]
               ]
             : [ HH.ul_ (renderSupply playerIndex player state) ]
       , HH.button
-        [ HP.class_ (cssClass.nextPhase), HE.onClick \_ -> Just $ NextPhase playerIndex ]
+        [ HP.class_ (Css.nextPhase), HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex ]
         [ HH.text if state.turn == playerIndex
           then case state.phase of
             ActionPhase -> "Complete Action Phase"
@@ -228,14 +220,14 @@ renderPlayer state playerIndex player =
           else "Waiting for Player " <> show state.turn
         ]
       , HH.ul
-        [ HP.class_ cssClass.stats ]
+        [ HP.class_ Css.stats ]
         (playerStats state `mapWithIndex` state.players)
       , HH.ul
-        [ HP.class_ cssClass.play ]
+        [ HP.class_ Css.play ]
         (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])]
         : (renderCard (const Nothing) currentPlayer <$> currentPlayer.atPlay))
       , HH.ul
-        [ HP.class_ cssClass.buying ]
+        [ HP.class_ Css.buying ]
         (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])]
         : (renderCard (const Nothing) currentPlayer <$> currentPlayer.buying))
       , renderHand player playerIndex state
@@ -244,20 +236,20 @@ renderPlayer state playerIndex player =
 renderHand :: forall a. Player -> Int -> GameState -> HTML a GameAction
 renderHand player playerIndex state = HH.ul
   [ HP.classes $
-    [ cssClass.hand
+    [ Css.hand
     , if state.turn == playerIndex && state.phase == ActionPhase
-      then cssClass.active
-      else cssClass.inactive
+      then Css.active
+      else Css.inactive
     ] <> if player.actions < 1 || (length $ Card.isAction `filter` player.hand) < 1
-      then [ cssClass.waiting ]
+      then [ Css.waiting ]
       else []
   ] $
   [ HH.li_ [ HH.h3 [] [ HH.text $ "Hand" ] ]
   , HH.li_
     [ HH.ul_
-      [ HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.actions) <> " Actions" ]
-      , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
-      , HH.li [ HP.class_ cssClass.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
+      [ HH.li [ HP.class_ Css.handInfo ] [ HH.text $ (show $ player.actions) <> " Actions" ]
+      , HH.li [ HP.class_ Css.handInfo ] [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
+      , HH.li [ HP.class_ Css.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
       ]
     ]
   , renderDiscard player
@@ -266,107 +258,16 @@ renderHand player playerIndex state = HH.ul
 
 renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
-  renderCard (\_ -> Just $ Play playerIndex cardIndex) player card
+  renderCard (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex) player card
 
-handleAction :: forall s m. MonadEffect m => Int -> GameAction -> HalogenM GameState GameAction s GameState m Unit
-handleAction playerIndex = case _ of
-  ResolveChoice choice -> do
-    H.modify_ \state -> fromMaybe state (Dom.resolveChoice playerIndex choice state)
-    untilJust autoAdvance
-    H.get >>= H.raise
-  Receive (NewGame n) -> do
-    Dom.setup (Dom.newGame n) >>= H.put
-    untilJust autoAdvance
-    H.get >>= H.raise
-  Receive (UpdateState gs) -> H.put gs
-  NextPhase playerIndex -> do
-    gameState <- H.get
-    maybeNewGameState <- Dom.nextPhase playerIndex gameState
-    H.modify_ \oldGameState ->
-      fromMaybe oldGameState { text = "Error: not your turn!" } maybeNewGameState
-    untilJust autoAdvance
-    H.get >>= H.raise
-  Play player card -> do
-    gameState <- H.get
-    maybeNewGameState <- Dom.play player card gameState
-    case maybeNewGameState of
-      Nothing -> H.modify_ \state -> state { text = "Error" }
-      Just newGameState -> H.put newGameState
-    untilJust autoAdvance
-    H.get >>= H.raise
-  Purchase playerIndex player stack -> do
-    gameState <- H.get
-    H.modify_ \oldGameState ->
-        case Dom.purchase playerIndex player stack gameState of
-          Nothing -> oldGameState { text = "Error trying to buy card!" }
-          Just newGameState -> newGameState
-    untilJust autoAdvance
-    H.get >>= H.raise
-
-autoAdvance :: forall m. MonadEffect m => MonadState GameState m => m (Maybe Unit)
-autoAdvance = do
-  gameState <- H.get
-  liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
-  case gameState.players !! gameState.turn of
-    Nothing -> pure $ Just unit -- TODO: return an error
-    Just player -> case gameState.phase of
-      ActionPhase -> if Player.hasActions player && Player.hasActionCardsInHand player
-        then pure $ Just unit
-        else advancePhase
-      BuyPhase -> if player.buys > 0
-        then pure $ Just unit
-        else advancePhase
-      CleanupPhase -> advancePhase
+handleAction :: forall s m. MonadEffect m => GameAction -> HalogenM GameState GameAction s GameState m Unit
+handleAction = case _ of
+  Receive update -> case update of
+    MakeNewGame n -> playAndReport $ NewGame n
+    UpdateState gs -> H.put gs
+  MakePlay play -> playAndReport play
   where
-    advancePhase :: m (Maybe Unit)
-    advancePhase = do
-      gameState <- H.get
-      liftEffect $ Console.log $ "advancing from " <> show gameState.phase
-      mbNewState <- Dom.nextPhase gameState.turn gameState
-      case mbNewState of
-        Nothing -> pure (Just unit)
-        Just newGameState -> const Nothing <$> H.put newGameState
-
-cssClass =
-  { stats: H.ClassName "stats"
-  , stat: H.ClassName "stat"
-  , supply: H.ClassName "supply"
-  , hand: H.ClassName "hand"
-  , handInfo: H.ClassName "hand-info"
-  , handInfoArea: H.ClassName "hand-info-area"
-  , play: H.ClassName "play"
-  , buying: H.ClassName "buying"
-  , deckArea: H.ClassName "deck-area"
-  , deck: H.ClassName "deck"
-  , discard: H.ClassName "discard"
-  , card: H.ClassName "card"
-  , actionCard: H.ClassName "action-card"
-  , noActionCard: H.ClassName "no-action-card"
-  , treasureCard: H.ClassName "treasure-card"
-  , noTreasureCard: H.ClassName "no-treasure-card"
-  , victoryCard: H.ClassName "victory-card"
-  , noVictoryCard: H.ClassName "no-victory-card"
-  , cardName: H.ClassName "card-name"
-  , cardCards: H.ClassName "card-cards"
-  , cardActions: H.ClassName "card-actions"
-  , cardBuys: H.ClassName "card-buys"
-  , cardTreasure: H.ClassName "card-treasure"
-  , cardVictoryPoints: H.ClassName "card-victory-points"
-  , cardCost: H.ClassName "card-cost"
-  , cardText: H.ClassName "card-text"
-  , stack: H.ClassName "stack"
-  , stackCard: H.ClassName "stack-card"
-  , stackCount: H.ClassName "stack-count"
-  , active: H.ClassName "active"
-  , waiting: H.ClassName "waiting"
-  , inactive: H.ClassName "inactive"
-  , canBuy: H.ClassName "can-buy"
-  , cantBuy: H.ClassName "cant-buy"
-  , canPlay: H.ClassName "can-play"
-  , cantPlay: H.ClassName "cant-play"
-  , nextPhase: H.ClassName "next-phase"
-  , resolveChoice: H.ClassName "resolve-choice"
-  , toTrash: H.ClassName "to-keep"
-  , toKeep: H.ClassName "to-trash"
-  }
+    playAndReport play = do
+      Dom.makeAutoPlay play
+      H.get >>= H.raise
 

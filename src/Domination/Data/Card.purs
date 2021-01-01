@@ -22,11 +22,9 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
-import Data.Array (elem)
-import Data.Foldable (foldr)
+import Data.Foldable (elem, foldr)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
 
