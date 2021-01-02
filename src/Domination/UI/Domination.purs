@@ -16,11 +16,13 @@ import Data.Symbol (SProxy(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice as Choice
-import Domination.Data.GameState (GameState, Stack, Play(..))
+import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
 import Domination.Data.Phase (Phase(..))
+import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
+import Domination.Data.Stack (Stack)
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Effect.Class (class MonadEffect, liftEffect)
@@ -139,7 +141,6 @@ renderCard onClick player card = HH.div
       ]
     ]
   ]
-
 
 renderStack :: forall a. Int -> Player -> Stack -> HTML a GameAction
 renderStack playerIndex player stack =

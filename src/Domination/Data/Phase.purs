@@ -1,7 +1,4 @@
-module Domination.Data.Phase
-  ( Phase(..)
-  , next
-  ) where
+module Domination.Data.Phase where
 
 import Prelude
 
@@ -12,15 +9,20 @@ import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
-data Phase = ActionPhase | BuyPhase | CleanupPhase
+data Phase
+  = ActionPhase
+  | BuyPhase
+  | CleanupPhase
 
 derive instance genericPhase :: Generic Phase _
 derive instance eqPhase :: Eq Phase
-instance showPhase :: Show Phase where show = genericShow
+
+instance showPhase :: Show Phase where
+  show = genericShow
 instance encodeJsonPhase :: EncodeJson Phase where
-  encodeJson a = genericEncodeJson a
+  encodeJson = genericEncodeJson
 instance decodeJsonPhase :: DecodeJson Phase where
-  decodeJson a = genericDecodeJson a
+  decodeJson = genericDecodeJson
 
 next :: Phase -> Phase
 next ActionPhase = BuyPhase

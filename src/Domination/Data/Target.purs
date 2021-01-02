@@ -1,4 +1,4 @@
-module Domination.Data.CardType where
+module Domination.Data.Target where
 
 import Prelude
 
@@ -9,20 +9,18 @@ import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
-data CardType
-  = Action
-  | Treasure
-  | Victory
-  | Curse
-  | Attack
+data Target
+  = Self
+  | Everyone
+  | EveryoneElse
 
-derive instance genericCardType :: Generic CardType _
-derive instance eqCardType :: Eq CardType
+derive instance genericTarget :: Generic Target _
+derive instance eqTarget :: Eq Target
 
-instance showCardType :: Show CardType where
+instance showTarget :: Show Target where
   show = genericShow
-instance encodeJsonCardType :: EncodeJson CardType where
+instance encodeJsonTarget :: EncodeJson Target where
   encodeJson = genericEncodeJson
-instance decodeJsonCardType :: DecodeJson CardType where
+instance decodeJsonTarget :: DecodeJson Target where
   decodeJson = genericDecodeJson
 

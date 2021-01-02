@@ -2,9 +2,13 @@ module Util where
 
 import Prelude
 
-import Data.Array (drop, filter, length, nub, take, zip)
+import Data.Array (deleteAt, drop, filter, length, nub, take, zip, (!!), (:))
 import Data.Foldable (any, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
+import Data.Lens.Getter (view)
+import Data.Lens.Lens (Lens')
+import Data.Lens.Setter (over, set)
+import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -39,4 +43,36 @@ shuffle array = fst <$> shuffle' (Tuple [] array)
 
 indices :: forall a. Array a -> Array Int
 indices xs = fst <$> mapWithIndex Tuple xs
+
+justIf :: forall a. (a -> Boolean) -> a -> Maybe a
+justIf f x = if f x then Just x else Nothing
+
+type ArrayLens' s a = Lens' s (Array a)
+
+dropNthOf :: forall s a. Int -> ArrayLens' s a -> s -> Maybe s
+dropNthOf n lens = traverseOf lens $ deleteAt n
+
+dropFirstOf :: forall s a. ArrayLens' s a -> s -> Maybe s
+dropFirstOf = dropNthOf 0
+
+prependTo :: forall s a. a -> ArrayLens' s a -> s -> s
+prependTo x lens = over lens (x : _)
+
+nthOf :: forall s a. Int -> ArrayLens' s a -> s -> Maybe a
+nthOf i lens = view lens >>> (_ !! i)
+
+firstOf :: forall s a. ArrayLens' s a -> s -> Maybe a
+firstOf = nthOf 0
+
+moveOne :: forall s a . ArrayLens' s a -> ArrayLens' s a -> s -> Maybe s
+moveOne lens1 lens2 s = do
+  x <- firstOf lens1 s
+  let s' = prependTo x lens2 s
+  dropFirstOf lens1 s'
+
+moveAll :: forall s a . ArrayLens' s a -> ArrayLens' s a -> s -> s
+moveAll lens1 lens2 s =
+  let from = view lens1 s in
+  let s' = over lens2 (from <> _) s in
+  set lens1 [] s'
 
