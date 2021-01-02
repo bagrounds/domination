@@ -2,7 +2,6 @@ module Main where
 
 import Prelude
 
-import Control.Monad.State.Class (class MonadState)
 import Data.Argonaut.Core (stringify)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
@@ -32,6 +31,7 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Storage as Storage
 import Web.Event.Event (EventType(..), Event)
@@ -71,9 +71,9 @@ newApp =
   }
 
 main :: Effect Unit
-main = HA.runHalogenAff (runUI component unit =<< HA.awaitBody)
+main = HA.runHalogenAff (runUI component (MakeNewGame 1) =<< HA.awaitBody)
 
-component :: forall m a b c. MonadAff m => Component HTML a b c m
+component :: forall m s o query. MonadAff m => Component HTML query o s m
 component = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval (H.defaultEval { handleAction = handleAction })
   initialState = const newApp
@@ -184,10 +184,7 @@ readMessage = lmap show <<< decodeJson <=< jsonParser
 writeMessage :: Message -> String
 writeMessage = stringify <<< encodeJson
 
-handleAction :: forall m. MonadState AppState m
-  => MonadAff m
-  => MonadEffect m
-  => AppAction -> m Unit
+handleAction :: forall slots output m. MonadAff m => AppAction -> HalogenM AppState AppAction slots output m Unit
 handleAction = case _ of
   CopyToClipboard id -> liftEffect $ FFI.copyToClipboard id
   MakeOffer i -> do

@@ -9,10 +9,12 @@ module Domination.Data.GameState
 
 import Prelude
 
+import Control.Monad.Error.Class (class MonadError)
+import Control.Monad.Except.Trans (runExceptT, throwError)
 import Control.Monad.Loops (untilJust)
 import Control.Monad.State (class MonadState, get, put)
 import Data.Array (dropWhile, filter, findIndex, head, takeWhile, updateAt, (!!), (:))
-import Data.Either (Either(..), hush, note)
+import Data.Either (Either(..), note)
 import Data.Foldable (any, foldM, length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Fold (preview)
@@ -113,75 +115,75 @@ newGame i =
   }
 
 makeAutoPlay :: forall m. MonadEffect m => MonadState GameState m => Play -> m (Either String Unit)
-makeAutoPlay = makePlay >=> const autoAdvance
+makeAutoPlay p = runExceptT $ makeAutoPlay' p
 
-makePlay :: forall m. MonadEffect m => MonadState GameState m => Play -> m (Either String Unit)
+makeAutoPlay' :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => Play -> m Unit
+makeAutoPlay' = makePlay >=> const autoAdvance
+
+makePlay :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => Play -> m Unit
 makePlay p = case p of
   NewGame n -> do
     eState <- setup (newGame n)
     case eState of
-      Left e -> pure $ Left e
+      Left e -> throwError e
       Right state -> do
         put state
-        pure $ Right unit
+        pure unit
   EndPhase playerIndex -> do
     gameState <- get
     maybeNewGameState <- nextPhase playerIndex gameState
     case maybeNewGameState of
-      Left e -> pure $ Left e
+      Left e -> throwError e
       Right state -> do
         put state
-        pure $ Right unit
+        pure unit
   PlayCard playerIndex card -> do
     gameState <- get
     maybeNewGameState <- play playerIndex card gameState
     case maybeNewGameState of
-      Left e -> pure $ Left e
-      Right newGameState -> put newGameState <#> const Right unit
+      Left e -> throwError e
+      Right newGameState -> put newGameState <#> const unit
   Purchase playerIndex player stack -> do
     gameState <- get
     let maybeNewGameState = purchase playerIndex player stack gameState
-    case note (errorMessage "makePlay" p) maybeNewGameState  of
-      Left e -> pure $ Left e
-      Right newGameState -> put newGameState <#> const Right unit
+    case note ("failed to make purchase") maybeNewGameState  of
+      Left e -> throwError e
+      Right newGameState -> put newGameState <#> const unit
   ResolveChoice playerIndex choice -> do
     state <- get
     let maybeNewGameState = resolveChoice playerIndex choice state
-    case note (errorMessage "makePlay" p) maybeNewGameState  of
-      Left e -> pure $ Left e
-      Right newGameState -> put newGameState <#> const Right unit
-
-errorMessage :: forall a. Show a => String -> a -> String
-errorMessage name x = name <> " " <> (show x) <> " failed mysteriously"
+    case note ("failed to resolve choice") maybeNewGameState  of
+      Left e -> throwError e
+      Right newGameState -> put newGameState <#> const unit
 
 currentPlayer :: GameState -> Maybe Player
 currentPlayer state = state.players !! state.turn
 
-autoAdvance :: forall m. MonadEffect m => MonadState GameState m => m (Either String Unit)
+autoAdvance :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => m Unit
 autoAdvance = untilJust autoAdvance'
   where
-  autoAdvance' :: m (Maybe (Either String Unit))
+  autoAdvance' :: m (Maybe Unit)
   autoAdvance' = do
     gameState <- get
     liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
     case currentPlayer gameState of
-      Nothing -> pure $ Just $ Left "Something went wrong" -- TODO: return an error
+      Nothing -> throwError "Something went wrong" -- TODO: return an error
       Just player -> case gameState.phase of
         ActionPhase -> if Player.hasActions player && Player.hasActionCardsInHand player
-          then pure $ Just $ Right unit
+          then pure $ Just unit
           else advancePhase
         BuyPhase -> if player.buys > 0
-          then pure $ Just $ Right unit
+          then pure $ Just unit
           else advancePhase
         CleanupPhase -> advancePhase
     where
-      advancePhase :: m (Maybe (Either String Unit))
+      advancePhase :: m (Maybe Unit)
       advancePhase = do
         gameState <- get
         liftEffect $ Console.log $ "advancing from " <> show gameState.phase
         mbNewState <- nextPhase gameState.turn gameState
         case mbNewState of
-          Left e -> pure (Just $ Left e)
+          Left e -> throwError e
           Right newGameState -> const Nothing <$> put newGameState
 
 nextPhase :: forall m. MonadEffect m => Int -> GameState -> m (Either String GameState)
@@ -236,10 +238,11 @@ resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state =
 play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Either String GameState)
 play playerIndex cardIndex originalState =
   if playerIndex /= originalState.turn
-  || choicesOutstanding originalState
-  then pure $ Left "bad error message"
+  then pure $ Left "error: play: not your turn!"
+  else if choicesOutstanding originalState
+  then pure $ Left "error: play: choices outstanding!"
   else case getPlayer playerIndex originalState of
-  Nothing -> pure $ Left "bad error message"
+  Nothing -> pure $ Left "error: play: bad error message"
   Just player' -> case Player.cardI cardIndex player' of
     Nothing -> pure $ Left "bad error message"
     Just card -> do

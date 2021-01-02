@@ -13,7 +13,7 @@ import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..))
@@ -133,12 +133,10 @@ drawCard player = do
     then []
     else player.discard
   let player' = player { deck = deck, discard = discarded }
-  pure if null deck
-  then Right $ player'
-  else draw player'
+  pure $ Right $ drawIfPossible player'
 
-draw :: Player -> Either String Player
-draw p = note ("error drawing card for " <> show p) <<< moveOne _deck _hand $ p
+drawIfPossible :: Player -> Player
+drawIfPossible p = fromMaybe p $ moveOne _deck _hand $ p
 
 cleanup :: forall m. MonadEffect m => Player -> m (Either String Player)
 cleanup player = drawCards 5 player
