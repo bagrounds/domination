@@ -9,24 +9,24 @@ module Domination.Data.GameState
 
 import Prelude
 
-import Control.Monad.Error.Class (class MonadError)
-import Control.Monad.Except.Trans (runExceptT, throwError)
+import Control.Monad.Error.Class (class MonadError, throwError)
+import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Loops (untilJust)
-import Control.Monad.State (class MonadState, get, put)
-import Data.Array (dropWhile, filter, findIndex, head, takeWhile, updateAt, (!!), (:))
-import Data.Either (Either(..), note)
+import Control.Monad.State (class MonadState, get)
+import Data.Array (dropWhile, filter, findIndex, head, takeWhile, updateAt, (:))
+import Data.Either (Either)
 import Data.Foldable (any, foldM, length)
-import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Fold (preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', prism')
 import Data.Lens.Record (prop)
+import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (sequence)
+import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
 import Data.Unfoldable (replicate)
 import Domination.Data.Card (Card, Command(..), Special)
@@ -40,10 +40,11 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
+import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
-import Util (indices, justIf, withIndices)
+import Util (assert, fromJust, indices, justIf, modifyM_, moveAll, prependTo, withIndices)
 
 type GameState =
   { turn :: Int
@@ -72,11 +73,32 @@ _stack i = _supply <<< (ix i)
 _ofPhase :: Phase -> Prism' GameState GameState
 _ofPhase phase = prism' identity $ justIf ((==) phase <<< _.phase)
 
-getPlayer :: Int -> GameState -> Maybe Player
-getPlayer i = preview (_player i)
+getPlayer :: forall m. MonadError String m => Int -> GameState -> m Player
+getPlayer i = fromJust "cannot get player!" <<< preview (_player i)
 
-getStack :: Int -> GameState -> Maybe Stack
-getStack i = preview (_stack i)
+updatePlayer :: forall m. MonadError String m => Int -> Player -> GameState -> m GameState
+updatePlayer i player state = fromJust "cannot update player!"
+  $ updateAt i player state.players <#> flip (set _players) state
+
+updateStack :: forall m. MonadError String m => Int -> Stack -> GameState -> m GameState
+updateStack i stack state = fromJust "cannot update stack!"
+  $ updateAt i stack state.supply <#> flip (set _supply) state
+
+modifyStack :: forall m. MonadError String m => Int -> (Stack -> Stack) -> GameState -> m GameState
+modifyStack i f state = getStack i state <#> f >>= flip (updateStack i) state
+
+modifyPlayer :: forall m. MonadError String m => Int -> (Player -> Player) -> GameState -> m GameState
+modifyPlayer i f state = getPlayer i state <#> f >>= flip (updatePlayer i) state
+
+modifyPlayerM :: forall m. MonadError String m => Int -> (Player -> m Player) -> GameState -> m GameState
+modifyPlayerM i f state = getPlayer i state >>= f >>= flip (updatePlayer i) state
+
+getStack :: forall m. MonadError String m => Int -> GameState -> m Stack
+getStack i = fromJust "cannot get stack!" <<< preview (_stack i)
+
+indexOfStack :: forall m. MonadError String m => Card -> GameState -> m Int
+indexOfStack card state = fromJust "card not in supply!"
+  $ findIndex (\x -> x.card == card) state.supply
 
 type Supply = Array Stack
 
@@ -115,49 +137,18 @@ newGame i =
   }
 
 makeAutoPlay :: forall m. MonadEffect m => MonadState GameState m => Play -> m (Either String Unit)
-makeAutoPlay p = runExceptT $ makeAutoPlay' p
-
-makeAutoPlay' :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => Play -> m Unit
-makeAutoPlay' = makePlay >=> const autoAdvance
+makeAutoPlay = (makePlay >=> const autoAdvance) >>> runExceptT
 
 makePlay :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => Play -> m Unit
-makePlay p = case p of
-  NewGame n -> do
-    eState <- setup (newGame n)
-    case eState of
-      Left e -> throwError e
-      Right state -> do
-        put state
-        pure unit
-  EndPhase playerIndex -> do
-    gameState <- get
-    maybeNewGameState <- nextPhase playerIndex gameState
-    case maybeNewGameState of
-      Left e -> throwError e
-      Right state -> do
-        put state
-        pure unit
-  PlayCard playerIndex card -> do
-    gameState <- get
-    maybeNewGameState <- play playerIndex card gameState
-    case maybeNewGameState of
-      Left e -> throwError e
-      Right newGameState -> put newGameState <#> const unit
-  Purchase playerIndex player stack -> do
-    gameState <- get
-    let maybeNewGameState = purchase playerIndex player stack gameState
-    case note ("failed to make purchase") maybeNewGameState  of
-      Left e -> throwError e
-      Right newGameState -> put newGameState <#> const unit
-  ResolveChoice playerIndex choice -> do
-    state <- get
-    let maybeNewGameState = resolveChoice playerIndex choice state
-    case note ("failed to resolve choice") maybeNewGameState  of
-      Left e -> throwError e
-      Right newGameState -> put newGameState <#> const unit
+makePlay p = modifyM_ case p of
+  NewGame n -> const $ setup (newGame n)
+  EndPhase playerIndex -> nextPhase playerIndex
+  PlayCard playerIndex card -> play playerIndex card
+  Purchase playerIndex player stack -> purchase playerIndex stack
+  ResolveChoice playerIndex choice -> resolveChoice playerIndex choice
 
-currentPlayer :: GameState -> Maybe Player
-currentPlayer state = state.players !! state.turn
+getCurrentPlayer :: forall m. MonadError String m => GameState -> m Player
+getCurrentPlayer state = getPlayer state.turn state
 
 autoAdvance :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => m Unit
 autoAdvance = untilJust autoAdvance'
@@ -166,133 +157,122 @@ autoAdvance = untilJust autoAdvance'
   autoAdvance' = do
     gameState <- get
     liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
-    case currentPlayer gameState of
-      Nothing -> throwError "Something went wrong" -- TODO: return an error
-      Just player -> case gameState.phase of
-        ActionPhase -> if Player.hasActions player && Player.hasActionCardsInHand player
-          then pure $ Just unit
-          else advancePhase
-        BuyPhase -> if player.buys > 0
-          then pure $ Just unit
-          else advancePhase
-        CleanupPhase -> advancePhase
+    player <- getCurrentPlayer gameState
+    case gameState.phase of
+      ActionPhase ->
+        if Player.hasActions player
+        && Player.hasActionCardsInHand player
+        then pure $ Just unit
+        else advancePhase <#> const Nothing
+      BuyPhase ->
+        if player.buys > 0
+        then pure $ Just unit
+        else advancePhase <#> const Nothing
+      CleanupPhase ->
+        advancePhase <#> const Nothing
     where
-      advancePhase :: m (Maybe Unit)
-      advancePhase = do
-        gameState <- get
-        liftEffect $ Console.log $ "advancing from " <> show gameState.phase
-        mbNewState <- nextPhase gameState.turn gameState
-        case mbNewState of
-          Left e -> throwError e
-          Right newGameState -> const Nothing <$> put newGameState
+      advancePhase :: m Unit
+      advancePhase = modifyM_ \s -> nextPhase s.turn s
 
-nextPhase :: forall m. MonadEffect m => Int -> GameState -> m (Either String GameState)
-nextPhase playerIndex state =
-    if playerIndex /= state.turn
-    then pure $ Left $ "error: not your turn! (nextPhase " <> show playerIndex <> " " <> show state <> ")"
-    else if choicesOutstanding state
-    then pure $ Left $ "error: choices need to be maide! (nextPhase" <> show playerIndex <> " " <> show state <> ")"
-    else do
-      let phase' = Phase.next state.phase
-      let turn' = if state.phase == CleanupPhase
-        then nextPlayer state
-        else state.turn
-      mbPlayers' :: (Array (Either String Player)) <- (if state.phase == CleanupPhase
-          then sequence $
-            mapWithIndex (\i p -> if i == playerIndex then Player.cleanup p else pure $ Right p)
-            state.players
-          else pure $ (Right <$> state.players))
-      pure $ (sequence mbPlayers') <#> state { phase = phase', turn = turn', players = _ }
+nextPhase
+  :: forall m
+  . MonadError String m
+  => MonadEffect m
+  => Int
+  -> GameState
+  -> m GameState
+nextPhase playerIndex state = do
+    assertTurn playerIndex state
+    assertChoicesResolved state
+    let phase' = Phase.next state.phase
+    let turn' = if state.phase == CleanupPhase
+      then nextPlayer state
+      else state.turn
+    let f = if state.phase == CleanupPhase then Player.cleanup else pure
+    state' <- modifyPlayerM playerIndex f state
+    pure state' { phase = phase', turn = turn' }
 
-setup :: forall m. MonadEffect m => GameState -> m (Either String GameState)
-setup gameState = do
-  let (x :: Array (m (Either String Player))) = (Player.drawCards 5) <$> gameState.players
-  x' :: Array (Either String Player) <- sequence x
-  let (x'' :: Either String (Array Player)) = sequence x'
-  pure $ gameState { players = _ } <$> x''
+setup :: forall m. MonadError String m => MonadEffect m => GameState -> m GameState
+setup gameState = flip (set _players) gameState <$> traverse (Player.drawCards 5) gameState.players
 
 nextPlayer :: GameState -> Int
 nextPlayer state = (state.turn + 1) `mod` (length state.players)
 
-purchase :: Int -> Player -> Stack -> GameState -> Maybe GameState
-purchase playerIndex player stack state =
-  if playerIndex /= state.turn
-  || state.phase /= BuyPhase
-  || player.buys < 1
-  || stack.count < 1
-  || Player.cash player < stack.card.cost
-  then Nothing
-  else
-  let player' = player { buying = stack.card : player.buying, buys = player.buys - 1 } in
-  let stack' = stack { count = stack.count - 1 } in
-  let supply' = (\s -> if s == stack then stack' else s) <$> state.supply in
-  state { players = _, supply = supply' } <$> updateAt playerIndex player' state.players
+assertPhase :: forall m. MonadError String m => Phase -> GameState -> m Unit
+assertPhase expected { phase } = assert
+  ("Expected: " <> show expected <> "; Actual: " <> show phase)
+  $ phase == expected
 
-resolveChoice :: Int -> Choice -> GameState -> Maybe GameState
-resolveChoice playerIndex (TrashUpTo n Nothing) state = Nothing
+purchase :: forall m. MonadError String m => Int -> Stack -> GameState -> m GameState
+purchase playerIndex stack state = do
+  assertTurn playerIndex state
+  assertPhase BuyPhase state
+  player <- getPlayer playerIndex state
+  Player.assertHasBuys player
+  Stack.assertNotEmpty stack
+  Player.assertHasCash stack.card.cost player
+  let player' = player { buying = stack.card : player.buying, buys = player.buys - 1 }
+  let stack' = stack { count = stack.count - 1 }
+  let supply = (\s -> if s == stack then stack' else s) <$> state.supply
+  state' <- updatePlayer playerIndex player' state
+  pure state' { supply = supply }
+
+resolveChoice :: forall m. MonadError String m => Int -> Choice -> GameState -> m GameState
+resolveChoice playerIndex (TrashUpTo n Nothing) state = throwError "this is an unresolved choice!"
 resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state =
   if length cardIndices > n
-  then Nothing
-  else maybeModifyPlayer playerIndex ((Player.dropCards cardIndices) >=> Player.dropChoice) state
+  then throwError "cannot trash more indices than cards in hand!"
+  else fromJust "failed to trash cards!" $
+    maybeModifyPlayer playerIndex ((Player.dropCards cardIndices) >=> Player.dropChoice) state
 
-play :: forall m. MonadEffect m => Int -> Int -> GameState -> m (Either String GameState)
-play playerIndex cardIndex originalState =
-  if playerIndex /= originalState.turn
-  then pure $ Left "error: play: not your turn!"
-  else if choicesOutstanding originalState
-  then pure $ Left "error: play: choices outstanding!"
-  else case getPlayer playerIndex originalState of
-  Nothing -> pure $ Left "error: play: bad error message"
-  Just player' -> case Player.cardI cardIndex player' of
-    Nothing -> pure $ Left "bad error message"
-    Just card -> do
-      player'' <- Player.play cardIndex player'
-      case player'' of
-        Left e -> pure $ Left e
-        Right player''' -> case updateAt playerIndex player''' originalState.players of
-          Nothing -> pure $ Left "bad error message"
-          Just players' -> applySpecials originalState { players = players' } card
-    where
-    applySpecials :: GameState -> Card -> m (Either String GameState)
-    applySpecials state card =
-      foldM (\s c -> case s of
-        Left e -> pure $ Left e
-        Right s' -> applyEffectToTargets playerIndex s' c) (Right state) card.specials
+assertTurn :: forall m. MonadError String m => Int -> GameState -> m Unit
+assertTurn playerIndex state =
+  assert "not your turn!" (playerIndex == state.turn)
 
-    applyEffectToTargets :: Int -> GameState -> Special -> m (Either String GameState)
-    applyEffectToTargets attackerIndex state { target, command } =
-      foldM (\(state' :: Either String GameState) (i :: Int) ->
-              case state' of
-                   Left e -> pure $ Left e
-                   Right s -> applyEffectToTarget command i s) (Right state) (targetIndices target attackerIndex state)
+assertChoicesResolved :: forall m. MonadError String m => GameState -> m Unit
+assertChoicesResolved state =
+  assert "error: play: choices outstanding!" (not choicesOutstanding state)
 
-    applyEffectToTarget :: Command -> Int -> GameState -> m (Either String GameState)
-    applyEffectToTarget (Gain card) targetIndex state = pure $ note "bad error message" $ do
-      target <- getPlayer targetIndex state
-      stackIndex <- findIndex (\x -> x.card == card) state.supply
+play :: forall m. MonadError String m => MonadEffect m => Int -> Int -> GameState -> m GameState
+play playerIndex cardIndex originalState = do
+  assertTurn playerIndex originalState
+  assertChoicesResolved originalState
+  player <- getPlayer playerIndex originalState
+  Player.assertHasActions player
+  card <- Player.getCard cardIndex player
+  player' <- Player.play cardIndex player
+  state' <- updatePlayer playerIndex player' originalState
+  applySpecialsToTargets card state'
+  where
+    applySpecialsToTargets :: Card -> GameState -> m GameState
+    applySpecialsToTargets { specials } state =
+      foldM (applySpecialToTargets playerIndex) state specials
+
+    applySpecialToTargets :: Int -> GameState -> Special -> m GameState
+    applySpecialToTargets attackerIndex state { target, command } =
+      foldM (flip $ applySpecialToTarget command) state $ targetIndices target attackerIndex state
+
+    applySpecialToTarget :: Command -> Int -> GameState -> m GameState
+    applySpecialToTarget (Gain card) targetIndex state = do
+      stackIndex <- indexOfStack card state
       stack <- getStack stackIndex state
-      let count' = if stack.count > 0 then stack.count - 1 else stack.count
-      let stack' = stack { count = count' }
-      supply' <- updateAt stackIndex stack' state.supply
-      let target' = if stack.count > 0 then target { discard = stack.card : target.discard } else target
-      players' <- updateAt targetIndex target' state.players
-      pure (state { players = players', supply = supply' })
-    applyEffectToTarget (Draw n) targetIndex state =
-      case getPlayer targetIndex state of
-      Nothing -> pure $ Left "bad error message"
-      Just target -> do
-        x :: Either String Player <- Player.drawCards n target
-        let (x' :: Either String (Array Player) ) = x >>= \target' -> note "failed to update" $ updateAt targetIndex target' state.players
-        pure $ x' <#> state { players = _ }
-    applyEffectToTarget (Discard SelectAll) targetIndex state = pure $ (note "bad error message")
-      $ getPlayer targetIndex state
-      >>= \target ->
-      let toDiscard' = target.toDiscard <> target.hand in
-      let target' = target { toDiscard = toDiscard', hand = [] } in
-      updateAt targetIndex target' state.players
-      <#> state { players = _ }
-    applyEffectToTarget (Choose choice) targetIndex state = pure $ (note "bad error messsage")
-      $ maybeModifyPlayer targetIndex (Player.gainChoice choice >>> Just) state
+      let stackUpdate = if stack.count > 0
+        then over Stack._count (_ - 1)
+        else identity
+      state' <- modifyStack stackIndex stackUpdate state
+      let playerUpdate = if stack.count > 0
+        then prependTo stack.card Player._discard
+        else identity
+      modifyPlayer targetIndex playerUpdate state'
+
+    applySpecialToTarget (Draw n) targetIndex state =
+      modifyPlayerM targetIndex (Player.drawCards n) state
+
+    applySpecialToTarget (Discard SelectAll) targetIndex state =
+      modifyPlayer targetIndex (moveAll Player._hand Player._toDiscard) state
+
+    applySpecialToTarget (Choose choice) targetIndex state =
+      modifyPlayer targetIndex (Player.gainChoice choice) state
 
     targetIndices :: Target -> Int -> GameState -> Array Int
     targetIndices EveryoneElse attackerIndex = filter (_ /= attackerIndex) <<< indices <<< _.players

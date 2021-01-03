@@ -2,6 +2,8 @@ module Util where
 
 import Prelude
 
+import Control.Monad.Error.Class (class MonadError, throwError)
+import Control.Monad.State.Class (class MonadState, get, put)
 import Data.Array (deleteAt, drop, filter, length, nub, take, zip, (!!), (:))
 import Data.Foldable (any, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
@@ -47,6 +49,14 @@ indices xs = fst <$> mapWithIndex Tuple xs
 justIf :: forall a. (a -> Boolean) -> a -> Maybe a
 justIf f x = if f x then Just x else Nothing
 
+assert :: forall e m. MonadError e m => e -> Boolean -> m Unit
+assert e b = if b then pure unit else throwError e
+
+fromJust :: forall e m a. MonadError e m => e -> Maybe a -> m a
+fromJust e = case _ of
+  Nothing -> throwError e
+  Just a -> pure a
+
 type ArrayLens' s a = Lens' s (Array a)
 
 dropNthOf :: forall s a. Int -> ArrayLens' s a -> s -> Maybe s
@@ -75,4 +85,7 @@ moveAll lens1 lens2 s =
   let from = view lens1 s in
   let s' = over lens2 (from <> _) s in
   set lens1 [] s'
+
+modifyM_ :: forall s m. MonadState s m => (s -> m s) -> m Unit
+modifyM_ f = get >>= f >>= put
 

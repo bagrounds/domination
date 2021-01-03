@@ -2,9 +2,8 @@ module Domination.Data.Player where
 
 import Prelude
 
-import Control.Apply (lift2)
+import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (deleteAt, filter, (!!), (:))
-import Data.Either (Either(..), note)
 import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
@@ -15,14 +14,12 @@ import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (sequence)
-import Data.Tuple (Tuple(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
-import Util (dropIndices, moveOne, shuffle)
+import Util (assert, dropIndices, fromJust, moveOne, shuffle)
 
 type Player =
   { deck :: Array Card
@@ -58,8 +55,8 @@ _choices = prop (SProxy :: SProxy "choices")
 _cardInHand :: Int -> Traversal' Player Card
 _cardInHand i = _hand <<< ix i
 
-cardI :: Int -> Player -> Maybe Card
-cardI i = preview $ _cardInHand i
+getCard :: forall m. MonadError String m => Int -> Player -> m Card
+getCard i player = fromJust "cannot get card!" $ preview (_cardInHand i) player
 
 getHand :: Player -> Array Card
 getHand = view _hand
@@ -79,19 +76,20 @@ dropCards = maybeModifyHand <<< dropIndices
 hasChoices :: Player -> Boolean
 hasChoices = _.choices >>> not null
 
-play :: forall m. MonadEffect m => Int -> Player -> m (Either String Player)
-play cardIndex player =
-  case lift2 Tuple (player.hand !! cardIndex) (deleteAt cardIndex player.hand) of
-  Nothing -> pure $ Left $ "error play " <> show cardIndex <> " " <> show player
-  Just (Tuple playedCard hand') -> do
-    mbPlayer' <- drawCards playedCard.cards player { hand = hand' }
-    pure if not Card.isAction playedCard
-    then Left $ "error play " <> show (Tuple playedCard hand')
-    else mbPlayer' <#> \player' -> player'
-      { atPlay = playedCard : player'.atPlay
-      , actions = player'.actions + playedCard.actions - 1
-      , buys = player'.buys + playedCard.buys
-      }
+play :: forall m. MonadError String m => MonadEffect m => Int -> Player -> m Player
+play cardIndex player = do
+  playedCard <- getCard cardIndex player
+  hand' <- case (deleteAt cardIndex player.hand) of
+    Nothing -> throwError "cannot delete card index from hand"
+    Just h -> pure h
+  player' :: Player <- (drawCards playedCard.cards (player { hand = hand' }))
+  if not Card.isAction playedCard
+  then throwError $ "cannot play non-action card"
+  else pure player'
+    { atPlay = playedCard : player'.atPlay
+    , actions = player'.actions + playedCard.actions - 1
+    , buys = player'.buys + playedCard.buys
+    }
 
 firstChoice :: Player -> Maybe Choice
 firstChoice = firstOf traversed <<< view _choices
@@ -113,16 +111,12 @@ cash player = (Card.value player.atPlay)
   + (Card.value $ Card.isTreasure `filter` player.hand)
   - (Card.cost player.buying)
 
-drawCards :: forall m. MonadEffect m => Int -> Player -> m (Either String Player)
+drawCards :: forall m. MonadError String m => MonadEffect m => Int -> Player -> m Player
 drawCards n p = if n > 0
-  then do
-    mp :: Either String  Player <- drawCard p
-    let (mmmp :: Either String (m (Either String Player))) = drawCards (n - 1) <$> mp
-    mmp'' <- sequence mmmp
-    pure $ join mmp''
-  else pure $ Right p
+  then drawCard p >>= drawCards (n - 1)
+  else pure p
 
-drawCard :: forall m. MonadEffect m => Player -> m (Either String Player)
+drawCard :: forall m. MonadError String m => MonadEffect m => Player -> m Player
 drawCard player = do
   deck <- if null player.deck
     then do
@@ -133,12 +127,17 @@ drawCard player = do
     then []
     else player.discard
   let player' = player { deck = deck, discard = discarded }
-  pure $ Right $ drawIfPossible player'
+  pure $ drawIfPossible player'
 
 drawIfPossible :: Player -> Player
 drawIfPossible p = fromMaybe p $ moveOne _deck _hand $ p
 
-cleanup :: forall m. MonadEffect m => Player -> m (Either String Player)
+cleanup
+  :: forall m
+  . MonadError String m
+  => MonadEffect m
+  => Player
+  -> m Player
 cleanup player = drawCards 5 player
   { discard = player.discard
     <> player.atPlay
@@ -158,4 +157,13 @@ allCards player = player.hand <> player.deck <> player.atPlay <> player.discard 
 
 score :: Player -> Int
 score player = foldr (+) 0 $ map _.victoryPoints (allCards player)
+
+assertHasBuys :: forall m. MonadError String m => Player -> m Unit
+assertHasBuys { buys } = assert "no buys!" (buys > 0)
+
+assertHasActions :: forall m. MonadError String m => Player -> m Unit
+assertHasActions { actions } = assert "no actions!" (actions > 0)
+
+assertHasCash :: forall m. MonadError String m => Int -> Player -> m Unit
+assertHasCash i player = assert "not enough treasure!" $ cash player >= i
 
