@@ -79,7 +79,7 @@ main ul {
   padding: 0;
 }
 .supply {
-  padding: 0.7em;
+  padding: 0.8em;
 }
 .supply, .hand, .play, .buying {
   border-radius: 0.6em;
@@ -127,40 +127,64 @@ main ul {
   display: inline-block;
   width: 6em;
 }
-.action-card {
+.curse-card {
   display: inline-block;
   border-radius: 0.6em;
-  border: 1px solid red;
-  background-color: red;
+  border: 2px solid magenta;
+  background-color: magenta;
 }
-.no-action-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 1px solid black;
-  background-color: black;
-}
-.victory-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid lightgreen;
-  background-color: lightgreen;
-}
-.no-victory-card {
+.no-curse-card {
   display: inline-block;
   border-radius: 0.6em;
   border: 2px solid black;
   background-color: black;
 }
+.attack-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 2px solid red;
+  background-color: red;
+}
+.no-attack-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 2px solid black;
+  background-color: black;
+}
+.action-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 2px solid blue;
+  background-color: blue;
+}
+.no-action-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 2px solid black;
+  background-color: black;
+}
+.victory-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 3px solid lightgreen;
+  background-color: lightgreen;
+}
+.no-victory-card {
+  display: inline-block;
+  border-radius: 0.6em;
+  border: 3px solid black;
+  background-color: black;
+}
 .treasure-card {
   display: inline-block;
   border-radius: 0.6em;
-  border: 3px solid yellow;
+  border: 4px solid yellow;
   background-color: yellow;
 }
 .no-treasure-card {
   display: inline-block;
   border-radius: 0.6em;
-  border: 3px solid black;
+  border: 4px solid black;
   background-color: black;
 }
 .card-victory-points:not(:empty) {
@@ -175,7 +199,7 @@ main ul {
   background-color: darkgray;
 }
 button {
-  padding: 0.5em;
+  padding: 0.6em;
   border-radius: 0.6em;
 }
 .next-phase {

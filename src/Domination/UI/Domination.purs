@@ -15,6 +15,7 @@ import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
+import Domination.Data.CardType as CardType
 import Domination.Data.Choice as Choice
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
@@ -97,7 +98,15 @@ renderCard :: forall a. (MouseEvent -> Maybe GameAction) -> Player -> Card -> HT
 renderCard onClick player card = HH.div
   (if Card.isTreasure card then [ HP.class_ Css.treasureCard ] else [ HP.class_ Css.noTreasureCard ])
   [ HH.div (if Card.isVictory card then [ HP.class_ Css.victoryCard ] else [ HP.class_ Css.noVictoryCard ])
-    [ HH.div (if Card.isAction card then [ HP.class_ Css.actionCard ] else [ HP.class_ Css.noActionCard ])
+    [ HH.div
+      ( if Card.hasType CardType.Attack card
+        then [ HP.class_ Css.attackCard ]
+        else if Card.hasType CardType.Action card
+        then [ HP.class_ Css.actionCard ]
+        else if Card.hasType CardType.Curse card
+        then [ HP.class_ Css.curseCard ]
+        else [ HP.class_ Css.noActionCard ]
+      )
       [ HH.button
         [ HE.onClick onClick
         , HP.classes
@@ -170,10 +179,9 @@ playerStats :: forall a. GameState -> Int -> Player -> (HTML a GameAction)
 playerStats state playerIndex player = HH.li
   [ HP.class_ Css.stat ]
   [ HH.text $ "Player " <> show playerIndex
-    <> ": Actions: " <> show player.actions
-    <> "/" <> show (length (Card.isAction `filter` player.hand) :: Int)
-    <> " | $" <> show (Player.cash player)
+    <> " | Actions: " <> show player.actions
     <> " | Buys: " <> show player.buys
+    <> " | $" <> show (Player.cash player)
     <> " | VP: " <> show (Player.score player)
     <> (if state.turn == playerIndex then " | " <> show state.phase else "")
   ]
