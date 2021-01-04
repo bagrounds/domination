@@ -174,8 +174,6 @@ playerStats state playerIndex player = HH.li
     <> "/" <> show (length (Card.isAction `filter` player.hand) :: Int)
     <> " | $" <> show (Player.cash player)
     <> " | Buys: " <> show player.buys
-    <> " | Play: " <> (intercalate ", " (_.name <$> player.atPlay))
-    <> " | Buying: " <> (intercalate ", " (_.name <$> player.buying))
     <> " | VP: " <> show (Player.score player)
     <> (if state.turn == playerIndex then " | " <> show state.phase else "")
   ]
