@@ -5,17 +5,15 @@ module Domination.UI.Domination
 
 import Prelude
 
-import Data.Array (filter, (!!), (:))
+import Data.Array (filter, length, (!!), (:))
 import Data.Either (Either(..))
-import Data.Foldable (intercalate, length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Data.Card (Card)
-import Domination.Data.Card as Card
-import Domination.Data.CardType as CardType
+import Domination.Data.Card (isAction, value) as Card
 import Domination.Data.Choice as Choice
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
@@ -24,6 +22,7 @@ import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Stack (Stack)
+import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
@@ -96,61 +95,14 @@ renderDiscard player = HH.button
   ]
 
 renderCard :: forall a. (MouseEvent -> Maybe GameAction) -> Player -> Card -> HTML a GameAction
-renderCard onClick player card = HH.div
-  (if Card.isTreasure card then [ HP.class_ Css.treasureCard ] else [ HP.class_ Css.noTreasureCard ])
-  [ HH.div (if Card.isVictory card then [ HP.class_ Css.victoryCard ] else [ HP.class_ Css.noVictoryCard ])
-    [ HH.div
-      ( if Card.hasType CardType.Attack card
-        then [ HP.class_ Css.attackCard ]
-        else if Card.hasType CardType.Action card
-        then [ HP.class_ Css.actionCard ]
-        else if Card.hasType CardType.Curse card
-        then [ HP.class_ Css.curseCard ]
-        else [ HP.class_ Css.noActionCard ]
-      )
-      [ HH.button
-        [ HE.onClick onClick
-        , HP.classes
-          [ Css.card
-          , if player.actions > 0 && Card.isAction card
-            then Css.canPlay
-            else Css.cantPlay
-          ]
-        ]
-        [ HH.ul_
-          [ HH.li
-            [ HP.classes [ Css.cardText, Css.cardName ] ]
-            [ HH.text $ " " <> card.name ]
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardCards ] ]
-            [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardActions ] ]
-            [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardBuys ] ]
-            [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
-            [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
-            [ HH.text
-              ( if card.victoryPoints > 0
-                then " +" <> show card.victoryPoints <> " VP"
-                else if card.victoryPoints < 0
-                  then show card.victoryPoints
-                  else ""
-              )
-            ]
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardCost ] ]
-            [ HH.text $ "Cost $" <> show card.cost ]
-          ]
-        ]
-      ]
+renderCard onClick player card =
+  Card.render onClick extraClasses card
+  where
+    extraClasses = [
+      if player.actions > 0 && Card.isAction card
+      then Css.canPlay
+      else Css.cantPlay
     ]
-  ]
 
 renderStack :: forall a. Int -> Player -> Int -> Stack -> HTML a GameAction
 renderStack playerIndex player stackIndex stack =
