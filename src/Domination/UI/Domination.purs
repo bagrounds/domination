@@ -181,9 +181,14 @@ playerStats state playerIndex player = HH.li
   [ HH.text $ "Player " <> show playerIndex
     <> " | Actions: " <> show player.actions
     <> " | Buys: " <> show player.buys
-    <> " | $" <> show (Player.cash player)
+    <> " | $"
+    <> if state.turn == playerIndex && state.phase == BuyPhase
+       then show (Player.cash player)
+       else if state.turn == playerIndex
+       then show (Card.value player.atPlay)
+       else "_"
     <> " | VP: " <> show (Player.score player)
-    <> (if state.turn == playerIndex then " | " <> show state.phase else "")
+    <> (if state.turn == playerIndex then " | " <> renderText state.phase else "")
   ]
 
 renderPlayer :: forall t1 t2 t3. GameState -> Int -> Player -> HTML (TrashUpToComponent t1 t2 t3) GameAction
@@ -226,7 +231,7 @@ renderPlayer state playerIndex player =
             ActionPhase -> "Complete Action Phase"
             BuyPhase -> "Complete Buy Phase"
             CleanupPhase -> "Complete Turn"
-          else "Waiting for Player " <> show state.turn
+          else "Waiting for Player " <> show state.turn <> " | " <> renderText state.phase
         ]
       , HH.ul
         [ HP.class_ Css.stats ]
@@ -283,4 +288,12 @@ handleAction = case _ of
           liftEffect $ Console.error e
           H.get >>= H.raise
         Right _ -> H.get >>= H.raise
+
+class RenderText a where
+  renderText :: a -> String
+
+instance phaseRenderText :: RenderText Phase where
+  renderText ActionPhase = "Action Phase"
+  renderText BuyPhase = "Buy Phase"
+  renderText CleanupPhase = "Cleanup Phase"
 
