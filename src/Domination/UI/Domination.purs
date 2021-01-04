@@ -73,7 +73,7 @@ renderPlayerN playerIndex state = HH.div_
 
 renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a GameAction)
 renderSupply playerIndex player state =
-  renderStack playerIndex player <$> state.supply
+  renderStack playerIndex player `mapWithIndex` state.supply
 
 renderDeck :: forall a. Player -> HTML a GameAction
 renderDeck player = HH.button
@@ -142,8 +142,8 @@ renderCard onClick player card = HH.div
     ]
   ]
 
-renderStack :: forall a. Int -> Player -> Stack -> HTML a GameAction
-renderStack playerIndex player stack =
+renderStack :: forall a. Int -> Player -> Int -> Stack -> HTML a GameAction
+renderStack playerIndex player stackIndex stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
       [ HH.li
@@ -157,7 +157,7 @@ renderStack playerIndex player stack =
             else Css.cantBuy
           ]
         ]
-        [ renderCard (\_ -> Just $ MakePlay $ Purchase playerIndex player stack) player stack.card ]
+        [ renderCard (\_ -> Just $ MakePlay $ Purchase playerIndex stackIndex) player stack.card ]
       ]
     ]
 

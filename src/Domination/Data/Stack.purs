@@ -7,7 +7,7 @@ import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Symbol (SProxy(..))
 import Domination.Data.Card (Card)
-import Util (assert)
+import Util (assert, decOver)
 
 type Stack =
   { card :: Card
@@ -19,6 +19,9 @@ _card = prop (SProxy :: SProxy "card")
 _count :: Lens' Stack Int
 _count = prop (SProxy :: SProxy "count")
 
-assertNotEmpty :: forall m. MonadError String m => Stack -> m Unit
-assertNotEmpty stack = assert "stack is empty!" $ stack.count > 0
+take :: Stack -> Stack
+take = decOver _count
+
+assertNotEmpty :: forall m. MonadError String m => Stack -> m Stack
+assertNotEmpty = assert "stack is empty!" (_.count >>> (_ > 0))
 

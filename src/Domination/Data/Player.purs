@@ -19,7 +19,7 @@ import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
-import Util (assert, dropIndices, fromJust, moveOne, shuffle)
+import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, shuffle)
 
 type Player =
   { deck :: Array Card
@@ -56,7 +56,7 @@ _cardInHand :: Int -> Traversal' Player Card
 _cardInHand i = _hand <<< ix i
 
 getCard :: forall m. MonadError String m => Int -> Player -> m Card
-getCard i player = fromJust "cannot get card!" $ preview (_cardInHand i) player
+getCard i = fromJust "cannot get card!" <<< preview (_cardInHand i)
 
 getHand :: Player -> Array Card
 getHand = view _hand
@@ -99,6 +99,9 @@ dropChoice = traverseOf _choices $ deleteAt 0
 
 gainChoice :: Choice -> Player -> Player
 gainChoice choice = over _choices $ (choice : _)
+
+purchase :: Card -> Player -> Player
+purchase card = decOver _buys >>> prependOver _buying card
 
 hasActions :: Player -> Boolean
 hasActions = (_ > 0) <<< _.actions
@@ -158,12 +161,12 @@ allCards player = player.hand <> player.deck <> player.atPlay <> player.discard 
 score :: Player -> Int
 score player = foldr (+) 0 $ map _.victoryPoints (allCards player)
 
-assertHasBuys :: forall m. MonadError String m => Player -> m Unit
-assertHasBuys { buys } = assert "no buys!" (buys > 0)
+assertHasBuys :: forall m. MonadError String m => Player -> m Player
+assertHasBuys = assert "no buys!" (_.buys >>> (_ > 0))
 
-assertHasActions :: forall m. MonadError String m => Player -> m Unit
-assertHasActions { actions } = assert "no actions!" (actions > 0)
+assertHasActions :: forall m. MonadError String m => Player -> m Player
+assertHasActions = assert "no actions!" (_.actions >>> (_ > 0))
 
-assertHasCash :: forall m. MonadError String m => Int -> Player -> m Unit
-assertHasCash i player = assert "not enough treasure!" $ cash player >= i
+assertHasCash :: forall m. MonadError String m => Int -> Player -> m Player
+assertHasCash i = assert "not enough treasure!" $ cash >>> (_ >= i)
 

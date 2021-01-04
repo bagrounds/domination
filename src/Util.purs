@@ -9,7 +9,7 @@ import Data.Foldable (any, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens')
-import Data.Lens.Setter (over, set)
+import Data.Lens.Setter (Setter, Setter', over, set, subOver)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
@@ -49,8 +49,8 @@ indices xs = fst <$> mapWithIndex Tuple xs
 justIf :: forall a. (a -> Boolean) -> a -> Maybe a
 justIf f x = if f x then Just x else Nothing
 
-assert :: forall e m. MonadError e m => e -> Boolean -> m Unit
-assert e b = if b then pure unit else throwError e
+assert :: forall e m a. MonadError e m => e -> (a -> Boolean) -> a -> m a
+assert e p x = if p x then pure x else throwError e
 
 fromJust :: forall e m a. MonadError e m => e -> Maybe a -> m a
 fromJust e = case _ of
@@ -65,8 +65,11 @@ dropNthOf n lens = traverseOf lens $ deleteAt n
 dropFirstOf :: forall s a. ArrayLens' s a -> s -> Maybe s
 dropFirstOf = dropNthOf 0
 
-prependTo :: forall s a. a -> ArrayLens' s a -> s -> s
-prependTo x lens = over lens (x : _)
+prependOver :: forall s a. ArrayLens' s a -> a -> s -> s
+prependOver lens x = over lens (x : _)
+
+decOver :: forall s. Setter' s Int -> s -> s
+decOver = flip subOver 1
 
 nthOf :: forall s a. Int -> ArrayLens' s a -> s -> Maybe a
 nthOf i lens = view lens >>> (_ !! i)
@@ -77,7 +80,7 @@ firstOf = nthOf 0
 moveOne :: forall s a . ArrayLens' s a -> ArrayLens' s a -> s -> Maybe s
 moveOne lens1 lens2 s = do
   x <- firstOf lens1 s
-  let s' = prependTo x lens2 s
+  let s' = prependOver lens2 x s
   dropFirstOf lens1 s'
 
 moveAll :: forall s a . ArrayLens' s a -> ArrayLens' s a -> s -> s

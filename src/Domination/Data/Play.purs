@@ -5,14 +5,12 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Domination.Data.Choice (Choice)
-import Domination.Data.Player (Player)
-import Domination.Data.Stack (Stack)
 
 data Play
   = NewGame Int
   | EndPhase Int
   | PlayCard Int Int
-  | Purchase Int Player Stack
+  | Purchase Int Int
   | ResolveChoice Int Choice
 
 derive instance genericPlay :: Generic Play _
