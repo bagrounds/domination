@@ -9,9 +9,6 @@ const RTCPeerConnection
 
 // constants
 
-const RTC_PEER_CONNECTION_CONFIG = {
-  iceServers: [{ urls: ['stun:stun.l.google.com:19302']}]
-}
 const MESSAGE_EVENT_TARGET = '#msg'
 
 // TODO: do not use global mutable state
@@ -32,41 +29,42 @@ exports.copyToClipboard = id => () => {
 }
 
 exports.create = i => right => callback => {
-  const peerConnection = new RTCPeerConnection(RTC_PEER_CONNECTION_CONFIG)
-  peerConnections[i] = peerConnection
+  newPeerConnection(i).then(peerConnection => {
+    peerConnections[i] = peerConnection
 
-  const dataChannel = peerConnection.createDataChannel(`dc ${i}`)
-  dataChannels[i] = dataChannel
+    const dataChannel = peerConnection.createDataChannel(`dc ${i}`)
+    dataChannels[i] = dataChannel
 
-  dataChannel.onmessage = event => {
-    logInfo(`(create)dataChannels[${i}].onmessage: `, event)
-    broadcastEvent(event)
+    dataChannel.onmessage = event => {
+      logInfo(`(create)dataChannels[${i}].onmessage: `, event)
+      broadcastEvent(event)
 
-    dataChannels
-      .filter((x, j) => i != j)
-      .forEach((channel, j) => {
-        logInfo(`(create)dataChannels[${j}].send: `, event)
-        channel.send(event.data)
-      })
-  }
-
-  dataChannel.onopen = onopen
-
-  peerConnection.createOffer({})
-    .then(description => peerConnection.setLocalDescription(description))
-    .catch(error => logError(`(create)createOffer >>> peerConnections[${i}].setLocalDescription failed with error: `, error))
-
-  peerConnection.onicecandidate = event => {
-    logInfo(`(create)peerConnections[${i}].onicecandidate: `, event)
-    if (event.candidate == null) {
-      callback(right(JSON.stringify(peerConnection.localDescription)))()
+      dataChannels
+        .filter((x, j) => i != j)
+        .forEach((channel, j) => {
+          logInfo(`(create)dataChannels[${j}].send: `, event)
+          channel.send(event.data)
+        })
     }
-  }
 
-  window.gotAnswer = i => answer => () => {
-    logInfo(`gotAnswer(${i})(${answer})`)
-    peerConnection.setRemoteDescription(remoteDescription(answer))
-  }
+    dataChannel.onopen = onopen
+
+    peerConnection.createOffer({})
+      .then(description => peerConnection.setLocalDescription(description))
+      .catch(error => logError(`(create)createOffer >>> peerConnections[${i}].setLocalDescription failed with error: `, error))
+
+    peerConnection.onicecandidate = event => {
+      logInfo(`(create)peerConnections[${i}].onicecandidate: `, event)
+      if (event.candidate == null) {
+        callback(right(JSON.stringify(peerConnection.localDescription)))()
+      }
+    }
+
+    window.gotAnswer = i => answer => () => {
+      logInfo(`gotAnswer(${i})(${answer})`)
+      peerConnection.setRemoteDescription(remoteDescription(answer))
+    }
+  })
 
   return canceller('create')
 }
@@ -76,33 +74,36 @@ exports.detail = customEvent => customEvent.detail
 exports.gotAnswer = answer => window.gotAnswer(answer)
 
 exports.join = offer => right => callback => {
-  const peerConnection = new RTCPeerConnection(RTC_PEER_CONNECTION_CONFIG)
-  peerConnections[0] = peerConnection
+  const i = 0
+  newPeerConnection(i).then(peerConnection => {
+    peerConnections[i] = peerConnection
 
-  peerConnection.ondatachannel = event => {
-    const dataChannel = event.channel
-    dataChannels[0] = dataChannel
+    peerConnection.ondatachannel = event => {
+      const dataChannel = event.channel
+      dataChannels[i] = dataChannel
 
-    dataChannel.onopen = onopen
+      dataChannel.onopen = onopen
 
-    dataChannel.onmessage = event => {
-      logInfo('(join)dataChannels[0].onmessage: ', event)
-      broadcastEvent(event)
+      dataChannel.onmessage = event => {
+        logInfo(`(join)dataChannels[${i}].onmessage: `, event)
+        broadcastEvent(event)
+      }
     }
-  }
 
-  peerConnection.onicecandidate = event => {
-    logInfo('(join)peerConnections[0].onicecandidate: ', event)
-    if (event.candidate == null) {
-      callback(right(JSON.stringify(peerConnection.localDescription)))()
+    peerConnection.onicecandidate = event => {
+      logInfo(`(join)peerConnections[${i}].onicecandidate: `, event)
+      if (event.candidate == null) {
+        callback(right(JSON.stringify(peerConnection.localDescription)))()
+      }
     }
-  }
 
-  peerConnection.setRemoteDescription(remoteDescription(offer))
+    logInfo(`gotOffer(${i})(${offer})`)
+    peerConnection.setRemoteDescription(remoteDescription(offer))
 
-  peerConnection.createAnswer({})
-    .then(description => peerConnection.setLocalDescription(description))
-    .catch(error => logError('(join)createAnswer >>> peerConnections[0].setLocalDescription failed with error: ', error))
+    peerConnection.createAnswer({})
+      .then(description => peerConnection.setLocalDescription(description))
+      .catch(error => logError(`(join)createAnswer >>> peerConnections[${i}].setLocalDescription failed with error: `, error))
+  })
 
   return canceller('join')
 }
@@ -132,3 +133,112 @@ const onopen = event => {
 
 const remoteDescription = description => new RTCSessionDescription(JSON.parse(description))
 
+const newPeerConnection = label => {
+  const getCert = localStorage.cert
+    ? () => loadCert()
+    : () => RTCPeerConnection.generateCertificate({
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: 'SHA-256',
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1])
+      }).then(cert => saveCert(cert).then(() => cert))
+
+  return getCert().then(cert => {
+    localStorage.cert = JSON.stringify(cert)
+    logInfo('returned cert:', cert)
+    logInfo('returned cert (stringified):', JSON.stringify(cert))
+    const peerConnection = new RTCPeerConnection(
+      { bundlePolicy: "balanced"
+      , certificates: [cert]
+      // , iceCandidatePoolSize:
+      , iceServers: [{ urls: ['stun:stun.l.google.com:19302']}]
+      // , iceTransportPolicy:
+      // , peerIdentity:
+      // , rtcpMuxPolicy:
+      }
+    )
+
+    peerConnection.addEventListener("signalingstatechange", event => {
+      const state = peerConnection.signalingState
+      logInfo(`(${label})signalingstatechange(state: ${state}): `, event)
+    })
+
+    peerConnection.addEventListener("iceconnectionstatechange", event => {
+      const state = peerConnection.iceConnectionState
+      logInfo(`(${label})iceconnectionstatechange(state: ${state}): `, event)
+      if (state === "failed") {
+        logInfo("meager attempt to fix failed connection...")
+        /* possibly reconfigure the connection in some way here */
+        /* then request ICE restart */
+        peerConnection.restartIce()
+      }
+    })
+
+    peerConnection.addEventListener('icecandidate', event => {
+      logInfo(`(${label})icecandidate: `, event)
+    })
+
+    peerConnection.addEventListener('connectionstatechange', event => {
+      const state = peerConnection.connectionState
+      logInfo(`(${label})connectionstatechange(state: ${state}): `, event)
+    })
+
+    return peerConnection
+  })
+}
+
+const OBJECT_STORE = "MyObjectStore"
+const DB_NAME = "db"
+const indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB || window.shimIndexedDB
+
+const saveCert = cert => new Promise((resolve, reject) => {
+  const open = indexedDB.open(DB_NAME, 1)
+
+  // Create the schema
+  open.onupgradeneeded = () => {
+    const db = open.result
+    const store = db.createObjectStore(OBJECT_STORE, { keyPath: "id" })
+  }
+
+  open.onsuccess = () => {
+    // Start a new transaction
+    const db = open.result
+    const tx = db.transaction(OBJECT_STORE, "readwrite")
+    const store = tx.objectStore(OBJECT_STORE)
+
+    store.put({ id: 1, cert })
+
+    tx.oncomplete = () => {
+      db.close()
+      localStorage.cert = true
+      resolve()
+    }
+  }
+})
+
+const loadCert = () => new Promise((resolve, reject) => {
+  const open = indexedDB.open(DB_NAME, 1)
+
+  // Create the schema
+  open.onupgradeneeded = () => {
+    const db = open.result
+    const store = db.createObjectStore(OBJECT_STORE, {keyPath: "id"})
+  }
+
+  open.onsuccess = () => {
+    // Start a new transaction
+    const db = open.result
+    const tx = db.transaction(OBJECT_STORE, "readwrite")
+    const store = tx.objectStore(OBJECT_STORE)
+
+    const query = store.get(1)
+
+    query.onsuccess = () => {
+      tx.oncomplete = () => {
+        logInfo("transaction complete")
+        db.close()
+        resolve(query.result.cert)
+      }
+    }
+  }
+})
