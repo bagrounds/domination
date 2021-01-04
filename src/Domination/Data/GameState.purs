@@ -13,16 +13,16 @@ import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Loops (untilJust)
 import Control.Monad.State (class MonadState, get)
-import Data.Array (dropWhile, filter, findIndex, head, takeWhile, updateAt)
+import Data.Array (dropWhile, filter, findIndex, head, length, takeWhile, updateAt)
 import Data.Either (Either)
-import Data.Foldable (any, foldM, length)
+import Data.Foldable (any, foldM)
 import Data.Lens.Fold (preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', prism')
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set)
+import Data.Lens.Setter (appendOver, over, set)
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
@@ -44,7 +44,7 @@ import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
-import Util (assert, fromJust, indices, justIf, modifyM_, moveAll, prependOver, withIndices)
+import Util (assert, dropIndices, fromJust, indices, justIf, modifyM_, moveAll, prependOver, takeIndices, withIndices)
 
 type GameState =
   { turn :: Int
@@ -128,6 +128,7 @@ newGame i =
     , { card: monument, count: 8 }
     , { card: smithy, count: 10 }
     , { card: workersVillage, count: 10 }
+    , { card: militia, count: 10 }
     , { card: bazaar, count: 10 }
     , { card: festival, count: 10 }
     , { card: laboratory, count: 10 }
@@ -246,13 +247,31 @@ overStackM assertion stackIndex state =
   assertion =<< getStack stackIndex state
 
 resolveChoice :: forall m. MonadError String m => Int -> Choice -> GameState -> m GameState
-resolveChoice playerIndex (TrashUpTo n Nothing) state = throwError "this is an unresolved choice!"
+resolveChoice playerIndex (TrashUpTo n Nothing) state =
+  throwError "this is an unresolved choice!"
 resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state
   | length cardIndices > n = throwError "cannot trash more indices than cards in hand!"
   | otherwise = fromJust "failed to trash cards!" $
     maybeModifyPlayer playerIndex playerUpdate state
     where
       playerUpdate = Player.dropCards cardIndices >=> Player.dropChoice
+resolveChoice playerIndex (DiscardDownTo n Nothing) state =
+  throwError "this is an unresolved choice!"
+resolveChoice playerIndex (DiscardDownTo n (Just cardIndices)) state = do
+  hand :: Array Card <- fromJust "" $ preview (_player playerIndex <<< Player._hand) state
+  if length hand - length cardIndices > 3
+    then throwError "must discard down to 3!"
+    else if length hand < length cardIndices
+    then throwError "cannot discard more cards than you have"
+    else if length hand < 3 && length cardIndices > 0
+    then throwError "only discard down to 3!"
+    else pure unit
+  discarded :: Array Card <- fromJust "failed discard indices from hand" $ takeIndices cardIndices hand
+  hand' :: Array Card <- fromJust "failed to drop card indices from hand" $ dropIndices cardIndices hand
+  let (state' :: GameState) = set (_player playerIndex <<< Player._hand) hand' state
+  let (state'' :: GameState) = appendOver (_player playerIndex <<< Player._discard) discarded state'
+  fromJust "failed to modify player"
+    $ maybeModifyPlayer playerIndex Player.dropChoice state''
 
 assertTurn :: forall m. MonadError String m => Int -> GameState -> m GameState
 assertTurn playerIndex = assert "not your turn!" $ (playerIndex == _) <<< _.turn
@@ -427,6 +446,18 @@ chapel = Card.action
     [ { target: Self
       , command: Choose $ (TrashUpTo 4 Nothing)
       , description: "Trash up to 4 cards from your hand"
+      }
+    ]
+  }
+militia :: Card
+militia = Card.actionAttack
+  { name = "Militia"
+  , cost = 4
+  , treasure = 2
+  , specials =
+    [ { target: EveryoneElse
+      , command: Choose $ (DiscardDownTo 3 Nothing)
+      , description: "Discard down to 3 cards"
       }
     ]
   }

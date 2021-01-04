@@ -11,7 +11,7 @@ import Data.Foldable (intercalate, length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
@@ -24,6 +24,7 @@ import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Stack (Stack)
+import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Effect.Class (class MonadEffect, liftEffect)
@@ -60,13 +61,13 @@ component playerCount playerIndex = H.mkComponent { initialState, render, eval }
     , receive = Just <<< Receive
     }
 
-type TrashUpToComponent t1 t2 t3 =
-  H.ComponentSlot HTML ("TrashUpTo" :: H.Slot t1 Choice.Choice Int | t2) t3 GameAction
+type ChildComponents t1 t2 t3 =
+  H.ComponentSlot HTML ("DiscardDownTo" :: H.Slot t1 Choice.Choice Int, "TrashUpTo" :: H.Slot t1 Choice.Choice Int | t2) t3 GameAction
 
 renderPlayerN :: forall t1 t2 t3.
   Int ->
   GameState ->
-  HTML (TrashUpToComponent t1 t2 t3) GameAction
+  HTML (ChildComponents t1 t2 t3) GameAction
 renderPlayerN playerIndex state = HH.div_
   [ HH.h1 [] [ HH.text "Domination" ]
   , HH.div_ $ renderPlayers playerIndex state
@@ -170,7 +171,7 @@ renderStack playerIndex player stackIndex stack =
       ]
     ]
 
-renderPlayers :: forall t1 t2 t3. Int -> GameState -> Array (HTML (TrashUpToComponent t1 t2 t3) GameAction)
+renderPlayers :: forall t1 t2 t3. Int -> GameState -> Array (HTML (ChildComponents t1 t2 t3) GameAction)
 renderPlayers i state = case state.players !! i of
   Nothing -> []
   Just player -> [ renderPlayer state i player ]
@@ -191,10 +192,21 @@ playerStats state playerIndex player = HH.li
     <> (if state.turn == playerIndex then " | " <> renderText state.phase else "")
   ]
 
-renderPlayer :: forall t1 t2 t3. GameState -> Int -> Player -> HTML (TrashUpToComponent t1 t2 t3) GameAction
+renderPlayer
+  :: forall t1 t2 t3
+  . GameState
+  -> Int
+  -> Player
+  -> HTML (ChildComponents t1 t2 t3) GameAction
 renderPlayer state playerIndex player =
   if Player.hasChoices player && playerIndex == Dom.choiceTurn state
-  then HH.div_ [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
+  then fromMaybe (HH.div_ []) $
+    let choice = (Player.firstChoice player) in
+    choice <#> case _ of
+      Choice.TrashUpTo _ _ -> HH.div_
+        [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
+      Choice.DiscardDownTo _ _ -> HH.div_
+        [ (HH.slot (SProxy :: SProxy "DiscardDownTo") 1 (Discard.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
   else
   case state.players !! state.turn of
     Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ]

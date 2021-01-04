@@ -10,7 +10,9 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 
-data Choice = TrashUpTo Int (Maybe (Array Int))
+data Choice
+  = TrashUpTo Int (Maybe (Array Int))
+  | DiscardDownTo Int (Maybe (Array Int))
 
 derive instance genericChoice :: Generic Choice _
 derive instance eqChoice :: Eq Choice

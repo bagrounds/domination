@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.State.Class (class MonadState, get, put)
 import Data.Array (deleteAt, drop, filter, length, nub, take, zip, (!!), (:))
-import Data.Foldable (any, notElem)
+import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens')
@@ -31,6 +31,16 @@ dropIndices is xs =
   then Nothing
   else Just $ snd <$>
   (fst >>> flip notElem is) `filter` withIndices xs
+
+takeIndices :: forall a. Array Int -> Array a -> Maybe (Array a)
+takeIndices is xs =
+  if length is > length xs
+  || length (nub is) /= length is
+  || (_ < 0) `any` is
+  || (_ >= length xs) `any` is
+  then Nothing
+  else Just $ snd <$>
+  (fst >>> flip elem is) `filter` withIndices xs
 
 shuffle :: forall a m . MonadEffect m => Eq a => Array a -> m (Array a)
 shuffle array = fst <$> shuffle' (Tuple [] array)
