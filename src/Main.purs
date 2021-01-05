@@ -15,7 +15,7 @@ import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
 import Data.Int (fromString, toNumber)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Data.GameState (GameState)
 import Domination.UI.Domination (GameUpdate(..))
@@ -37,6 +37,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Storage as Storage
+import Util (randomElement)
 import Web.Event.Event (Event, EventType(..), preventDefault)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, toEvent)
 import Web.UIEvent.KeyboardEvent as KE
@@ -60,9 +61,9 @@ type AppState =
   , roomCode :: String
   }
 
-newApp :: Bugout -> AppState
-newApp bugout =
-  { username: "lurker"
+newApp :: Bugout -> String -> AppState
+newApp bugout emoji =
+  { username: emoji <> "lurker" <> emoji
   , players: 1
   , playerIndex: 0
   , chatInputMessage: ""
@@ -82,11 +83,15 @@ newApp bugout =
 globalRoomCode :: String
 globalRoomCode = "global"
 
+emojis :: Array String
+emojis = ["😄","😃","😀","😊","☺","😉","😍","😘","😚","😗","😙","😜","😝","😛","😳","😁","😔","😌","😒","😞","😣","😢","😂","😭","😪","😥","😰","😅","😓","😩","😫","😨","😱","😠","😡","😤","😖","😆","😋","😷","😎","😴","😵","😲","😟","😦","😧","😈","👿","😮","😬","😐","😕","😯","😶","😇","😏","😑","👲","👳","👮","👷","💂","👶","👦","👧","👨","👩","👴","👵","👱","👼","👸","😺","😸","😻","😽","😼","🙀","😿","😹","😾"]
+
 main :: Effect Unit
 main =  HA.runHalogenAff $ do
   body <- HA.awaitBody
+  emoji <- fromMaybe ":)" <$> randomElement emojis
   bugout :: Bugout <- makeAff $ FFI.makeBugout globalRoomCode Left Right
-  let (initialState :: AppState) = newApp bugout
+  let (initialState :: AppState) = newApp bugout emoji
   runUI (component initialState) (MakeNewGame 1) body
 
 component :: forall m s query o. MonadAff m => AppState -> Component HTML query o s m

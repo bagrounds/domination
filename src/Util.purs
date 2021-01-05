@@ -49,9 +49,14 @@ shuffle array = fst <$> shuffle' (Tuple [] array)
     shuffle' (Tuple shuffled []) = pure $ (Tuple shuffled [])
     shuffle' (Tuple shuffled unshuffled) = do
       i <- liftEffect $ randomInt 0 (length unshuffled - 1)
-      let randomElement = take 1 $ drop i unshuffled
+      let randomElement' = take 1 $ drop i unshuffled
       let unshuffledRemainder = dropIndex i unshuffled
-      shuffle' (Tuple (randomElement <> shuffled) unshuffledRemainder)
+      shuffle' (Tuple (randomElement' <> shuffled) unshuffledRemainder)
+
+randomElement :: forall a m . MonadEffect m => Array a -> m (Maybe a)
+randomElement xs = do
+  i <- liftEffect $ randomInt 0 (length xs - 1)
+  pure $ xs !! i
 
 indices :: forall a. Array a -> Array Int
 indices xs = fst <$> mapWithIndex Tuple xs
