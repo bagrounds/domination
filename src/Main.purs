@@ -13,6 +13,7 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.Generic.Rep (class Generic)
+import Data.Int (fromString)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Data.GameState (GameState)
@@ -90,56 +91,63 @@ render state = HH.main_ $
     , HP.required true
     , HE.onValueInput $ Just <<< WriteUsername
     ]
+  , HH.input
+    [ HP.type_ HP.InputText
+    , HP.value $ show state.playerIndex
+    , HP.placeholder "player index (0, 1, 2, ...)"
+    , HP.required true
+    , HE.onValueInput $ Just <<< WritePlayerIndex
+    ]
   , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
 
-  , HH.h1 [] [ HH.text "Creator" ]
-  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 0 ] [ HH.text "Make Offer" ]
-  , HH.textarea [ HP.placeholder "offer will appear here", HP.id_ "offer-text", HP.value state.localDescription ]
-  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text" ] [ HH.text "Copy Offer" ]
-  , HH.input
-    [ HP.type_ HP.InputText
-    , HP.placeholder "put joiner's answer here"
-    , HP.required true
-    , HE.onValueInput $ Just <<< (WriteAnswer 0)
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 0 else Nothing
-    ]
-  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 0 ] [ HH.text "Accept Answer 1" ]
-
-  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 1 ] [ HH.text "Make Offer 2" ]
-  , HH.textarea [ HP.placeholder "offer will 2 appear here", HP.id_ "offer-text-2", HP.value state.localDescription ]
-  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text-2" ] [ HH.text "Copy Offer 2" ]
-  , HH.input
-    [ HP.type_ HP.InputText
-    , HP.placeholder "put joiner 2's answer here"
-    , HP.required true
-    , HE.onValueInput $ Just <<< (WriteAnswer 1)
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 1 else Nothing
-    ]
-  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 1 ] [ HH.text "Accept Answer 2" ]
-
-  , HH.h1 [] [ HH.text "Joiner" ]
-  , HH.input
-    [ HP.type_ HP.InputText
-    , HP.placeholder "put creator's offer here"
-    , HP.required true
-    , HE.onValueInput $ Just <<< WriteOffer
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptOffer 0 else Nothing
-    ]
-  , HH.button [ HE.onClick \_ -> Just $ AcceptOffer 0 ] [ HH.text "Accept Offer" ]
-  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text" ] [ HH.text "Copy Answer" ]
-  , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text", HP.value state.answer ]
-
-  , HH.h1 [] [ HH.text "Joiner 2" ]
-  , HH.input
-    [ HP.type_ HP.InputText
-    , HP.placeholder "put creator's offer here"
-    , HP.required true
-    , HE.onValueInput $ Just <<< WriteOffer
-    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptOffer 1 else Nothing
-    ]
-  , HH.button [ HE.onClick \_ -> Just $ AcceptOffer 1 ] [ HH.text "Accept Offer" ]
-  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text-2" ] [ HH.text "Copy Answer" ]
-  , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text-2", HP.value state.answer ]
+--  , HH.h1 [] [ HH.text "Creator" ]
+--  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 0 ] [ HH.text "Make Offer" ]
+--  , HH.textarea [ HP.placeholder "offer will appear here", HP.id_ "offer-text", HP.value state.localDescription ]
+--  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text" ] [ HH.text "Copy Offer" ]
+--  , HH.input
+--    [ HP.type_ HP.InputText
+--    , HP.placeholder "put joiner's answer here"
+--    , HP.required true
+--    , HE.onValueInput $ Just <<< (WriteAnswer 0)
+--    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 0 else Nothing
+--    ]
+--  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 0 ] [ HH.text "Accept Answer 1" ]
+--
+--  , HH.button [ HE.onClick \_ -> Just $ MakeOffer 1 ] [ HH.text "Make Offer 2" ]
+--  , HH.textarea [ HP.placeholder "offer will 2 appear here", HP.id_ "offer-text-2", HP.value state.localDescription ]
+--  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "offer-text-2" ] [ HH.text "Copy Offer 2" ]
+--  , HH.input
+--    [ HP.type_ HP.InputText
+--    , HP.placeholder "put joiner 2's answer here"
+--    , HP.required true
+--    , HE.onValueInput $ Just <<< (WriteAnswer 1)
+--    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptAnswer 1 else Nothing
+--    ]
+--  , HH.button [ HE.onClick \_ -> Just $ AcceptAnswer 1 ] [ HH.text "Accept Answer 2" ]
+--
+--  , HH.h1 [] [ HH.text "Joiner" ]
+--  , HH.input
+--    [ HP.type_ HP.InputText
+--    , HP.placeholder "put creator's offer here"
+--    , HP.required true
+--    , HE.onValueInput $ Just <<< WriteOffer
+--    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptOffer 0 else Nothing
+--    ]
+--  , HH.button [ HE.onClick \_ -> Just $ AcceptOffer 0 ] [ HH.text "Accept Offer" ]
+--  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text" ] [ HH.text "Copy Answer" ]
+--  , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text", HP.value state.answer ]
+--
+--  , HH.h1 [] [ HH.text "Joiner 2" ]
+--  , HH.input
+--    [ HP.type_ HP.InputText
+--    , HP.placeholder "put creator's offer here"
+--    , HP.required true
+--    , HE.onValueInput $ Just <<< WriteOffer
+--    , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just $ AcceptOffer 1 else Nothing
+--    ]
+--  , HH.button [ HE.onClick \_ -> Just $ AcceptOffer 1 ] [ HH.text "Accept Offer" ]
+--  , HH.button [ HE.onClick \_ -> Just $ CopyToClipboard "answer-text-2" ] [ HH.text "Copy Answer" ]
+--  , HH.textarea [ HP.placeholder "answer will appear here", HP.id_ "answer-text-2", HP.value state.answer ]
 
   , HH.h1 [] [ HH.text "Chat" ]
   , HH.input
@@ -152,6 +160,13 @@ render state = HH.main_ $
   , HH.button [ HE.onClick \_ -> Just SendMessage ] [ HH.text "Send" ]
   , HH.div_ $ (\m -> HH.p [] [ HH.text m ]) <$> (take 5 state.messages)
   , HH.button [ HE.onClick \_ -> Just $ StartNewGame ] [ HH.text "New Game" ]
+  , HH.input
+    [ HP.type_ HP.InputText
+    , HP.value $ show state.playerIndex
+    , HP.placeholder "how many players?"
+    , HP.required true
+    , HE.onValueInput $ Just <<< WritePlayerCount
+    ]
   , HH.button [ HE.onClick \_ -> Just $ LoadGame ] [ HH.text "Load Game" ]
   ] <> case state.gameState of
     Nothing -> []
@@ -162,6 +177,8 @@ render state = HH.main_ $
 data AppAction = MakeOffer Int
   | CopyToClipboard String
   | WriteUsername String
+  | WritePlayerIndex String
+  | WritePlayerCount String
   | WriteOffer String
   | AcceptOffer Int
   | WriteAnswer Int String
@@ -200,6 +217,14 @@ handleAction = case _ of
     H.modify_ \state -> state { receivedAnswer = state.receivedAnswer <> [ rd ]}
   WriteUsername username -> do
     H.modify_ \state -> state { username = username }
+  WritePlayerIndex playerIndexString ->
+    case fromString playerIndexString of
+      Just playerIndex -> H.modify_ _{ playerIndex = playerIndex }
+      Nothing -> pure unit
+  WritePlayerCount playerCountString ->
+    case fromString playerCountString of
+      Just players -> H.modify_ _{ players = players }
+      Nothing -> pure unit
   AcceptAnswer i -> do
     s <- H.get
     let ra = s.receivedAnswer !! i

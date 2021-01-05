@@ -108,7 +108,7 @@ exports.join = offer => right => callback => {
   return canceller('join')
 }
 
-exports.say = message => () => window.say && window.say(message)
+// exports.say = message => () => window.say && window.say(message)
 
 // helpers
 
@@ -242,3 +242,38 @@ const loadCert = () => new Promise((resolve, reject) => {
     }
   }
 })
+
+// bugout experiment
+const Bugout = require('bugout')
+const addresses = []
+
+const b = new Bugout("df794d36-4f00-11eb-8f07-afe9939a8116")
+
+const address = b.address()
+
+logInfo("address:", address)
+
+const bsend = message => {
+  logInfo("sending message: ", message)
+}
+
+b.on("connections", function(c) {
+  logInfo("connections:", c)
+  if (c == 0) {
+    logInfo("ready")
+    window.bsend = bsend
+  }
+})
+
+b.on("message", (address, event) => {
+  logInfo("receiving message:", address, msg)
+  broadcastEvent(event)
+})
+b.on("rpc", (address, call, args) => logInfo("rpc:", address, call, args))
+b.on("seen", address => {
+  logInfo("seen:", address)
+  addresses.push(address)
+})
+
+exports.say = data => () => addresses.forEach(address => b.send(address, { data }))
+
