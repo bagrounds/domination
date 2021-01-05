@@ -1,5 +1,7 @@
 'use strict'
 
+const Bugout = require('bugout')
+
 // polyfill
 
 const RTCPeerConnection
@@ -244,7 +246,6 @@ const loadCert = () => new Promise((resolve, reject) => {
 })
 
 // bugout experiment
-const Bugout = require('bugout')
 const addresses = []
 
 const b = new Bugout("df794d36-4f00-11eb-8f07-afe9939a8116")
