@@ -1,7 +1,5 @@
 'use strict'
 
-const Bugout = require('bugout')
-
 // polyfill
 
 const RTCPeerConnection
