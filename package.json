@@ -7,7 +7,7 @@
     "clean": "rm -rf .cache dist public",
     "build": "spago build",
     "bundle": "spago bundle-app --main Main --to dist/app.js",
-    "deploy": "npm ci && npm run bundle && cp assets/stylesheet.css dist/ && cp node_modules/bugout/docs/bugout.min.js ./dist/ && cp assets/prod-index.html dist/index.html && mv dist public",
+    "deploy": "npm ci && npm run bundle && cp assets/stylesheet.css dist/ && cp assets/bugout.min.js ./dist/ && cp assets/prod-index.html dist/index.html && mv dist public",
     "hot-reload": "./scripts/hot-reload",
     "run": "spago run",
     "test": "echo \"Error: no test specified\" && exit 1"

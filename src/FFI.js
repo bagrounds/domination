@@ -114,7 +114,7 @@ exports.join = offer => right => callback => {
 
 const broadcastEvent = event => document
   .querySelector(MESSAGE_EVENT_TARGET)
-  .dispatchEvent(customEvent(event.data))
+  .dispatchEvent(customEvent(event))
 
 const canceller = name => () => logInfo(`cancel(${name})`)
 
@@ -243,36 +243,29 @@ const loadCert = () => new Promise((resolve, reject) => {
   }
 })
 
-// bugout experiment
-const addresses = []
+exports.makeBugout = roomCode => left => right => callback => () => {
+  const bugout = new Bugout(roomCode)
+  var fresh = true
 
-const b = new Bugout("df794d36-4f00-11eb-8f07-afe9939a8116")
+  bugout.on("connections", count => {
+    if (count == 0 && fresh) {
+      fresh = false
+      callback(right(bugout))()
+    }
+    broadcastEvent(JSON.stringify({ tag: "ConnectionsMessage", values: [ count ] }))
+  })
 
-const address = b.address()
+  bugout.on("message", (address, message) => {
+    logInfo("receiving message:", address, message)
+    address === bugout.address() || broadcastEvent(message)
+  })
 
-logInfo("address:", address)
-
-const bsend = message => {
-  logInfo("sending message: ", message)
+  bugout.on("seen", address => {
+    broadcastEvent(JSON.stringify({ tag: "SeenMessage", values: [ address ] }))
+  })
 }
 
-b.on("connections", function(c) {
-  logInfo("connections:", c)
-  if (c == 0) {
-    logInfo("ready")
-    window.bsend = bsend
-  }
-})
+exports.address = bugout => () => bugout.address()
 
-b.on("message", (address, event) => {
-  logInfo("receiving message:", address, msg)
-  broadcastEvent(event)
-})
-b.on("rpc", (address, call, args) => logInfo("rpc:", address, call, args))
-b.on("seen", address => {
-  logInfo("seen:", address)
-  addresses.push(address)
-})
-
-exports.say = data => () => addresses.forEach(address => b.send(address, { data }))
+exports.send = bugout => message => () => bugout.send(message)
 

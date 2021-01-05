@@ -20,6 +20,19 @@ foreign import join
   :: forall a
   . String
   -> (a -> Either Error a)
-  -> ((Either Error a -> Effect Unit) -> Effect Canceler)
-foreign import say :: String -> Effect Unit
+  -> (Either Error a -> Effect Unit)
+  -> Effect Canceler
 
+foreign import data Bugout :: Type
+
+foreign import makeBugout
+  :: forall a
+  . String
+  -> (a -> Either Error a)
+  -> (a -> Either Error a)
+  -> (Either Error Bugout -> Effect Unit)
+  -> Effect Canceler
+
+foreign import send :: Bugout -> String -> Effect Unit
+
+foreign import address :: Bugout -> Effect String
