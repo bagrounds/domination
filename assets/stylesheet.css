@@ -35,6 +35,16 @@ main ul {
   margin: 0 auto;
   list-style-type: none;
 }
+.incrementer {
+  display: inline-block;
+  margin: 0 auto;
+  width: 8em;
+}
+.incrementer input {
+  height: 2em;
+  width: 2em;
+  text-align: center;
+}
 .stack {
   display: inline-block;
   vertical-align: top;
@@ -190,8 +200,8 @@ main ul {
   color: black;
 }
 .active.waiting {
-  border: 3px solid darkgray;
-  background-color: darkgray;
+  border: 3px solid dimgray;
+  background-color: dimgray;
 }
 button {
   padding: 0.6em;
@@ -204,14 +214,11 @@ button {
   border-color: black;
 }
 .waiting .next-phase {
-  background-color: darkgray;
+  background-color: dimgray;
   font-weight: normal;
 }
 .card-treasure:not(:empty) {
   background: yellow;
-}
-.supply .can-buy .card {
-  background-color: white;
 }
 .to-keep {
   background-color: white;
@@ -219,14 +226,23 @@ button {
 .to-trash {
   background-color: red;
 }
-.supply .cant-buy .card {
-  background-color: darkgray;
-}
-.hand .can-play.card {
+.hand.active .can-play.card {
   background-color: white;
 }
+.hand.inactive .can-play.card {
+  background-color: lightgray;
+}
 .hand .cant-play.card {
-  background-color: darkgray;
+  background-color: dimgray;
+}
+.supply.active .can-buy .card {
+  background-color: white;
+}
+.supply.inactive  .can-buy .card {
+  background-color: lightgray;
+}
+.supply .cant-buy .card {
+  background-color: dimgray;
 }
 .stats {
   margin: 0.2em;

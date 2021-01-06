@@ -131,7 +131,7 @@ renderPlayers i state = case state.players !! i of
 playerStats :: forall a. GameState -> Int -> Player -> (HTML a GameAction)
 playerStats state playerIndex player = HH.li
   [ HP.class_ Css.stat ]
-  [ HH.text $ "Player " <> show playerIndex
+  [ HH.text $ "Player " <> show (playerIndex + 1)
     <> " | Actions: " <> show player.actions
     <> " | Buys: " <> show player.buys
     <> " | $"
@@ -167,7 +167,7 @@ renderPlayer state playerIndex player =
         then [ HP.class_ Css.waiting ]
         else []
       )
-      [ HH.h2 [] [ HH.text $ "Player " <> show playerIndex ]
+      [ HH.h2 [] [ HH.text $ "Player " <> show (playerIndex + 1) ]
       , HH.ul
           [ HP.classes $
             [ Css.supply

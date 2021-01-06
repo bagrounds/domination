@@ -18,6 +18,7 @@ import Data.Int (fromString, toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Data.GameState (GameState)
+import Domination.UI.Css as Css
 import Domination.UI.Domination (GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Effect (Effect)
@@ -30,7 +31,7 @@ import FFI as FFI
 import Halogen (Component, ComponentSlot, Slot)
 import Halogen as H
 import Halogen.Aff as HA
-import Halogen.HTML (HTML)
+import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -105,6 +106,39 @@ type DominationComponent o c m =
 preventTyping :: forall x. HP.IProp (onKeyDown :: KeyboardEvent | x) AppAction
 preventTyping = HE.onKeyDown \e -> Just $ PreventDefault (toEvent e)
 
+incrementer :: forall w. Maybe Int -> Maybe Int -> Int -> (Int -> AppAction) -> HTML w AppAction
+incrementer mbMin mbMax value setValue = HH.div
+  [ HP.class_ $ Css.incrementer ]
+  [ HH.button
+    [ HE.onClick \_ -> case mbMin of
+      Just min ->
+        if value <= min
+        then Just $ setValue min
+        else Just $ setValue (value - 1)
+      Nothing -> Just $ setValue (value - 1)
+    ] [ HH.text "-" ]
+  , HH.input $
+    [ HP.value $ show value
+    , HP.required true
+    , preventTyping
+    ]
+    <> case mbMin of
+      Just min -> [ HP.min $ toNumber min ]
+      Nothing -> []
+    <> case mbMin of
+      Just max -> [ HP.max $ toNumber max ]
+      Nothing -> []
+  , HH.button
+    [ HE.onClick $ \_ -> case mbMax of
+      Just max ->
+        if value >= max
+        then Just $ setValue max
+        else Just $ setValue (value + 1)
+      Nothing -> Just $ setValue (value + 1)
+    ]
+    [ HH.text "+" ]
+  ]
+
 render :: forall o c m. MonadEffect m => AppState -> HTML (DominationComponent o c m) AppAction
 render state = HH.main_ $
   [ HH.input
@@ -114,16 +148,16 @@ render state = HH.main_ $
     , HP.required true
     , HE.onValueInput $ Just <<< WriteUsername
     ]
-  , HH.input
-    [ HP.type_ HP.InputNumber
-    , HP.min 0.0
-    , HP.max $ (toNumber $ state.players - 1)
-    , HP.value $ show state.playerIndex
-    , HP.placeholder "player index (0, 1, 2, ...)"
-    , HP.required true
-    , HE.onValueInput $ Just <<< WritePlayerIndex
-    , preventTyping
-    ]
+--  , HH.input
+--    [ HP.type_ HP.InputNumber
+--    , HP.min 0.0
+--    , HP.max $ (toNumber $ state.players - 1)
+--    , HP.value $ show state.playerIndex
+--    , HP.placeholder "player index (0, 1, 2, ...)"
+--    , HP.required true
+--    , HE.onValueInput $ Just <<< WritePlayerIndex
+--    , preventTyping
+--    ]
   , HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
 
 --  , HH.h1 [] [ HH.text "Creator" ]
@@ -185,17 +219,11 @@ render state = HH.main_ $
     ]
   , HH.button [ HE.onClick \_ -> Just SendMessage ] [ HH.text "Send" ]
   , HH.div_ $ (\m -> HH.p [] [ HH.text m ]) <$> (take 5 state.messages)
-  , HH.button [ HE.onClick \_ -> Just $ StartNewGame ] [ HH.text "New Game" ]
-  , HH.label_ [ HH.text "players:" ]
-  , HH.input
-    [ HP.type_ HP.InputNumber
-    , HP.min 1.0
-    , HP.value $ show state.players
-    , HP.placeholder "how many players?"
-    , HP.required true
-    , HE.onValueInput $ Just <<< WritePlayerCount
-    , preventTyping
-    ]
+  , HH.label_ [ HH.text "Players" ]
+  , incrementer (Just 1) Nothing state.players WritePlayerCount
+  , HH.label_ [ HH.text "Player #" ]
+  , incrementer (Just 1) Nothing (state.playerIndex + 1) ((_ - 1) >>> WritePlayerIndex)
+  , HH.button [ HE.onClick \_ -> Just $ StartNewGame ] [ HH.text $ "Start New " <> show state.players <> " Player Game as Player " <> show (state.playerIndex + 1) ]
   , HH.button [ HE.onClick \_ -> Just $ LoadGame ] [ HH.text "Load Game" ]
   ] <> case state.gameState of
     Nothing -> []
@@ -206,8 +234,8 @@ render state = HH.main_ $
 data AppAction = MakeOffer Int
   | CopyToClipboard String
   | WriteUsername String
-  | WritePlayerIndex String
-  | WritePlayerCount String
+  | WritePlayerIndex Int
+  | WritePlayerCount Int
   | WriteOffer String
   | AcceptOffer Int
   | WriteAnswer Int String
@@ -253,20 +281,22 @@ handleAction = case _ of
     H.modify_ \state -> state { receivedAnswer = state.receivedAnswer <> [ rd ]}
   WriteUsername username -> do
     H.modify_ \state -> state { username = username }
-  WritePlayerIndex playerIndexString ->
-    case fromString playerIndexString of
-      Just playerIndex ->
-        if playerIndex > 0
-        then H.modify_ _{ playerIndex = playerIndex }
-        else H.modify_ \s -> s { playerIndex = 0 }
-      Nothing -> pure unit
-  WritePlayerCount playerCountString ->
-    case fromString playerCountString of
-      Just players ->
-        if players > 1
-        then H.modify_ _{ players = players }
-        else H.modify_ \s -> s { players = 1 }
-      Nothing -> pure unit
+  WritePlayerIndex playerIndex -> do
+    state <- H.get
+    if playerIndex > 0
+    then H.modify_ _{ playerIndex = playerIndex }
+    else H.modify_ \s -> s { playerIndex = 0 }
+    if playerIndex >= state.players
+    then H.modify_ _{ players = playerIndex + 1 }
+    else pure unit
+  WritePlayerCount players -> do
+      state <- H.get
+      if players > 1
+      then H.modify_ _{ players = players }
+      else H.modify_ \s -> s { players = 1 }
+      if players <= state.playerIndex
+      then H.modify_ _{ playerIndex = players - 1 }
+      else pure unit
   AcceptAnswer i -> do
     s <- H.get
     let ra = s.receivedAnswer !! i
@@ -305,6 +335,7 @@ handleAction = case _ of
         sendMessage $ GameStateMessage gameState
   StartNewGame -> do
     state <- H.get
+    liftEffect $ Console.log $ "MakeNewGame " <> show state.players
     H.modify_ _ { gameState = Just $ MakeNewGame state.players }
   UpdateGameState gameState -> do
     s <- H.modify_ _ { gameState = Just $ UpdateState gameState }

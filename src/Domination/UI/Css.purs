@@ -47,3 +47,5 @@ resolveChoice = ClassName "resolve-choice"
 toTrash = ClassName "to-trash"
 toKeep = ClassName "to-keep"
 
+incrementer = ClassName "incrementer"
+
