@@ -313,7 +313,7 @@ handleAction = case _ of
             ConnectionsMessage count ->
               H.modify_ \state -> state { connectionCount = count }
             GameStateMessage gs -> do
-              H.modify_ \state -> state { gameState = Just $ UpdateState gs, messages = mt : state.messages }
+              H.modify_ \state -> state { gameState = Just $ UpdateState gs }
             ChatMessage { message, username } -> do
               H.modify_ \state -> state { messages = mt : state.messages }
               if message == "PING"
