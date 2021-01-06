@@ -156,10 +156,16 @@ cleanup player = drawCards 5 player
   }
 
 allCards :: Player -> Array Card
-allCards player = player.hand <> player.deck <> player.atPlay <> player.discard <> player.toDiscard <> player.buying
+allCards player
+  = player.hand
+  <> player.deck
+  <> player.atPlay
+  <> player.discard
+  <> player.toDiscard
+  <> player.buying
 
 score :: Player -> Int
-score player = foldr (+) 0 $ map _.victoryPoints (allCards player)
+score player = foldr (+) 0 $ _.victoryPoints <$> (allCards player)
 
 assertHasBuys :: forall m. MonadError String m => Player -> m Player
 assertHasBuys = assert "no buys!" (_.buys >>> (_ > 0))

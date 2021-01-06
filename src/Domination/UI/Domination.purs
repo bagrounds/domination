@@ -136,11 +136,14 @@ playerStats state playerIndex player = HH.li
     <> " | Actions: " <> show player.actions
     <> " | Buys: " <> show player.buys
     <> " | $"
-    <> if state.turn == playerIndex && state.phase == BuyPhase
-       then show (Player.cash player)
-       else if state.turn == playerIndex
-       then show (Card.value player.atPlay)
-       else "_"
+    <>
+    ( if state.turn == playerIndex
+      && state.phase == BuyPhase
+      then show (Player.cash player)
+      else if state.turn == playerIndex
+      then show (Card.value player.atPlay)
+      else "_"
+    )
     <> " | VP: " <> show (Player.score player)
     <> (if state.turn == playerIndex then " | " <> Phase.renderText state.phase else "")
   ]
