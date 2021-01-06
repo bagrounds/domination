@@ -31,6 +31,44 @@ main {
   text-align: center;
   vertical-align: middle;
 }
+.container {
+  display: inline-block;
+  margin: 0 auto;
+}
+.chat-history {
+  text-align: left;
+  color: black;
+  border-radius: 0.5em;
+  background-color: darkgray;
+  min-height: 5em;
+  max-height: 5em;
+  overflow-y: scroll;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.chat-message .username {
+}
+.chat-message .message {
+}
+.chat-form {
+  overflow: hidden;
+}
+.chat-form input {
+  width: 100%;
+  height: 2.5em;
+  border-radius: 0.5em;
+}
+.chat-form span {
+  display: block;
+  overflow: hidden;
+}
+.chat-form button {
+  height: 2.5em;
+  float: right;
+}
+.chat-form input, .chat-form button {
+  box-sizing: border-box;
+}
 main ul {
   margin: 0 auto;
   list-style-type: none;

@@ -4,7 +4,14 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.State.Class (class MonadState, get, put)
+import Data.Argonaut (stringify)
+import Data.Argonaut.Decode (decodeJson)
+import Data.Argonaut.Decode.Class (class DecodeJson)
+import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
+import Data.Argonaut.Parser (jsonParser)
 import Data.Array (deleteAt, drop, filter, length, nub, take, zip, (!!), (:))
+import Data.Bifunctor (lmap)
+import Data.Either (Either)
 import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
@@ -15,6 +22,9 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Random (randomInt)
+
+class RenderText a where
+  renderText :: a -> String
 
 dropIndex :: forall a. Int -> Array a -> Array a
 dropIndex i xs = take i xs <> drop (i + 1) xs
@@ -106,4 +116,10 @@ moveAll lens1 lens2 s =
 
 modifyM_ :: forall s m. MonadState s m => (s -> m s) -> m Unit
 modifyM_ f = get >>= f >>= put
+
+readJson :: forall a. DecodeJson a => String -> Either String a
+readJson = lmap show <<< decodeJson <=< jsonParser
+
+writeJson :: forall a. EncodeJson a => a -> String
+writeJson = stringify <<< encodeJson
 

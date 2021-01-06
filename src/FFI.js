@@ -112,9 +112,15 @@ exports.join = offer => right => callback => {
 
 // helpers
 
-const broadcastEvent = event => document
-  .querySelector(MESSAGE_EVENT_TARGET)
-  .dispatchEvent(customEvent(event))
+const broadcastEvent = event => {
+  const eventTarget = document.querySelector(MESSAGE_EVENT_TARGET)
+  if (eventTarget) {
+    eventTarget.dispatchEvent(customEvent(event))
+  }
+  else {
+    logError(`${MESSAGE_EVENT_TARGET} undefined, cannot dispatch event: `, event)
+  }
+}
 
 const canceller = name => () => logInfo(`cancel(${name})`)
 
@@ -243,6 +249,9 @@ const loadCert = () => new Promise((resolve, reject) => {
   }
 })
 
+const prepareMessage = (tag, values) =>
+  JSON.stringify({ id: "LOCAL", message: { tag, values } })
+
 exports.makeBugout = roomCode => left => right => callback => () => {
   const bugout = new Bugout(roomCode)
   var fresh = true
@@ -252,7 +261,9 @@ exports.makeBugout = roomCode => left => right => callback => () => {
       fresh = false
       callback(right(bugout))()
     }
-    broadcastEvent(JSON.stringify({ tag: "ConnectionsMessage", values: [ count ] }))
+    const message = prepareMessage("ConnectionsMessage", [ count ])
+    logInfo("seen message: ", message)
+    broadcastEvent(message)
   })
 
   bugout.on("message", (address, message) => {
@@ -261,11 +272,40 @@ exports.makeBugout = roomCode => left => right => callback => () => {
   })
 
   bugout.on("seen", address => {
-    broadcastEvent(JSON.stringify({ tag: "SeenMessage", values: [ address ] }))
+    const message = prepareMessage("SeenMessage", [ address ])
+    logInfo("seen message: ", message)
+    broadcastEvent(message)
   })
 }
 
 exports.address = bugout => () => bugout.address()
 
-exports.send = bugout => message => () => bugout.send(message)
+exports.send = bugout => message => () => {
+  logInfo("sending message: ", message)
+  bugout.send(message)
+}
 
+// https://stackoverflow.com/a/8809472
+exports.genUuid = () => { // Public Domain/MIT
+  var d = new Date().getTime()
+
+  // Time in microseconds since page-load or 0 if unsupported
+  var d2 = (performance && performance.now && (performance.now() * 1000)) || 0
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    .replace(/[xy]/g, c => {
+      // random number between 0 and 16
+      var r = Math.random() * 16
+
+      if(d > 0){
+        // Use timestamp until depleted
+        r = (d + r) % 16 | 0
+        d = Math.floor(d / 16)
+      } else {
+        // Use microseconds since page-load if supported
+        r = (d2 + r) % 16 | 0
+        d2 = Math.floor(d2 / 16)
+      }
+      return (c === 'x' ? r : (r & 0x3 | 0x8))
+        .toString(16)
+    })
+}

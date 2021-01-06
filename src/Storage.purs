@@ -14,6 +14,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (log, logShow)
+import Util (readJson)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (clear, getItem, removeItem, setItem)
@@ -42,9 +43,6 @@ load key = liftEffect $ do
   pure $ case item of
     Nothing -> Left "Error retrieving item from storage"
     Just x -> readJson x
-
-readJson :: forall a. DecodeJson a => String -> Either String a
-readJson = lmap show <<< decodeJson <=< jsonParser
 
 example :: forall m. MonadEffect m => m Unit
 example = liftEffect do

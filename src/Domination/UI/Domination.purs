@@ -26,6 +26,7 @@ import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
+import Domination.UI.Phase as Phase
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
 import Halogen (Component)
@@ -141,7 +142,7 @@ playerStats state playerIndex player = HH.li
        then show (Card.value player.atPlay)
        else "_"
     <> " | VP: " <> show (Player.score player)
-    <> (if state.turn == playerIndex then " | " <> renderText state.phase else "")
+    <> (if state.turn == playerIndex then " | " <> Phase.renderText state.phase else "")
   ]
 
 renderPlayer
@@ -195,7 +196,7 @@ renderPlayer state playerIndex player =
             ActionPhase -> "Complete Action Phase"
             BuyPhase -> "Complete Buy Phase"
             CleanupPhase -> "Complete Turn"
-          else "Waiting for Player " <> show state.turn <> " | " <> renderText state.phase
+          else "Waiting for Player " <> show state.turn <> " | " <> Phase.renderText state.phase
         ]
       , HH.ul
         [ HP.class_ Css.stats ]
@@ -252,12 +253,4 @@ handleAction = case _ of
           liftEffect $ Console.error e
           H.get >>= H.raise
         Right _ -> H.get >>= H.raise
-
-class RenderText a where
-  renderText :: a -> String
-
-instance phaseRenderText :: RenderText Phase where
-  renderText ActionPhase = "Action Phase"
-  renderText BuyPhase = "Buy Phase"
-  renderText CleanupPhase = "Cleanup Phase"
 

@@ -36,3 +36,6 @@ foreign import makeBugout
 foreign import send :: Bugout -> String -> Effect Unit
 
 foreign import address :: Bugout -> Effect String
+
+foreign import genUuid :: Effect String
+
