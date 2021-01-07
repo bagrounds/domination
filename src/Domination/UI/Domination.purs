@@ -199,7 +199,7 @@ renderPlayer state playerIndex player =
             ActionPhase -> "Complete Action Phase"
             BuyPhase -> "Complete Buy Phase"
             CleanupPhase -> "Complete Turn"
-          else "Waiting for Player " <> show state.turn <> " | " <> Phase.renderText state.phase
+          else "Waiting for Player " <> show (state.turn + 1) <> " | " <> Phase.renderText state.phase
         ]
       , HH.ul
         [ HP.class_ Css.stats ]
