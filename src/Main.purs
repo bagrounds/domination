@@ -119,7 +119,7 @@ main =  HA.runHalogenAff $ do
 
   bugout :: Bugout <- makeAff $ FFI.makeBugout globalRoomCode Left Right
   let (initialState :: AppState) = newApp bugout username uuid usernameMap
-  runUI (component initialState) (MakeNewGame 1) body
+  runUI (component initialState) (MakeNewGame { playerCount: 1, playerIndex: 0 }) body
 
 component :: forall m s query o. MonadAff m => AppState -> Component HTML query o s m
 component state = H.mkComponent { eval, initialState, render } where
@@ -223,9 +223,9 @@ render state = HH.main_ $
     ]
   ] <> case state.gameState of
     Nothing -> []
-    Just (UpdateState gs) ->
-      [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component (length gs.players) state.playerIndex) (UpdateState gs) (Just <<< UpdateGameState) ]
-    Just (MakeNewGame n) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component n state.playerIndex) (MakeNewGame n) (Just <<< UpdateGameState) ]
+    Just (UpdateState as) ->
+      [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component state.players state.playerIndex) (UpdateState as) (Just <<< UpdateGameState) ]
+    Just (MakeNewGame { playerCount, playerIndex }) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component playerCount playerIndex) (MakeNewGame { playerCount, playerIndex }) (Just <<< UpdateGameState) ]
 
 data AppAction = MakeOffer Int
   | CopyToClipboard String
@@ -269,6 +269,11 @@ handleAction = case _ of
     H.modify_ \state -> state { username = username, usernameMap = um }
   WritePlayerIndex playerIndex -> do
     state <- H.get
+    liftEffect $ Console.log
+      $ "updating playerIndex from "
+      <> show state.playerIndex
+      <> " -> "
+      <> show playerIndex
     if playerIndex > 0
     then H.modify_ _{ playerIndex = playerIndex }
     else H.modify_ \s -> s { playerIndex = 0 }
@@ -308,12 +313,14 @@ handleAction = case _ of
 
               liftEffect $ Console.log $ "username incoming "
               liftEffect $ Console.log $ "username map: " <> show usernameMap
-            SeenMessage address ->
+            SeenMessage address -> do
               liftEffect $ Console.log $ "I see you: " <> address
+              { username, id } <- H.get
+              sendMessage $ UsernameMessage { username, id }
             ConnectionsMessage count ->
               H.modify_ \state -> state { connectionCount = count }
             GameStateMessage gs -> do
-              H.modify_ \state -> state { gameState = Just $ UpdateState gs }
+              H.modify_ \state -> state { gameState = Just $ UpdateState { state: gs, playerIndex: state.playerIndex } }
             ChatMessage { message, username } -> do
               H.modify_ \state -> state { messages = mt : state.messages }
               if message == "PING"
@@ -326,14 +333,14 @@ handleAction = case _ of
     case mbGameState of
       Left e -> liftEffect $ Console.log e
       Right gameState -> do
-        H.modify_ _ { gameState = Just $ UpdateState gameState }
+        H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
         sendMessage $ GameStateMessage gameState
   StartNewGame -> do
     state <- H.get
     liftEffect $ Console.log $ "MakeNewGame " <> show state.players
-    H.modify_ _ { gameState = Just $ MakeNewGame state.players }
+    H.modify_ _ { gameState = Just $ MakeNewGame { playerCount: state.players, playerIndex: state.playerIndex } }
   UpdateGameState gameState -> do
-    s <- H.modify_ _ { gameState = Just $ UpdateState gameState }
+    H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
     sendMessage $ GameStateMessage gameState
     Storage.save "game_state" gameState
   where

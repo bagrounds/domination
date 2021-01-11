@@ -1,6 +1,7 @@
 module Domination.UI.Domination
   ( component
   , GameUpdate(..)
+  , ComponentState(..)
   ) where
 
 import Prelude
@@ -38,7 +39,9 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-data GameUpdate = UpdateState GameState | MakeNewGame Int
+data GameUpdate
+  = UpdateState ComponentState
+  | MakeNewGame { playerCount :: Int, playerIndex :: Int }
 
 derive instance genericGameUpdate :: Generic GameUpdate _
 instance showGameUpdate :: Show GameUpdate where
@@ -50,13 +53,15 @@ derive instance genericGameAction :: Generic GameAction _
 instance showGameAction :: Show GameAction where
   show = genericShow
 
+type ComponentState = { playerIndex :: Int, state :: GameState }
+
 component :: forall query m. MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameState m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
-  initialState _ = Dom.newGame playerCount
-  render = renderPlayerN playerIndex
+  initialState _ = { playerIndex, state: Dom.newGame playerCount }
+  render = renderPlayerN
   eval = H.mkEval H.defaultEval
-    { initialize = Just $ Receive $ MakeNewGame playerCount
+    { initialize = Just $ Receive $ MakeNewGame { playerCount, playerIndex }
     , handleAction = handleAction
     , receive = Just <<< Receive
     }
@@ -65,16 +70,15 @@ type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML ("DiscardDownTo" :: H.Slot t1 Choice.Choice Int, "TrashUpTo" :: H.Slot t1 Choice.Choice Int | t2) t3 GameAction
 
 renderPlayerN :: forall t1 t2 t3.
-  Int ->
-  GameState ->
+  ComponentState ->
   HTML (ChildComponents t1 t2 t3) GameAction
-renderPlayerN playerIndex state = HH.div_
+renderPlayerN cs@{ playerIndex, state } = HH.div_
   [ HH.h1 [] [ HH.text "Domination" ]
-  , HH.div_ $ renderPlayers playerIndex state
+  , HH.div_ $ renderPlayers cs
   ]
 
-renderSupply :: forall a. Int -> Player -> GameState -> Array (HTML a GameAction)
-renderSupply playerIndex player state =
+renderSupply :: forall a. Player -> ComponentState -> Array (HTML a GameAction)
+renderSupply player { playerIndex, state } =
   renderStack playerIndex player `mapWithIndex` state.supply
 
 renderDeck :: forall a. Player -> HTML a GameAction
@@ -124,13 +128,14 @@ renderStack playerIndex player stackIndex stack =
       ]
     ]
 
-renderPlayers :: forall t1 t2 t3. Int -> GameState -> Array (HTML (ChildComponents t1 t2 t3) GameAction)
-renderPlayers i state = case state.players !! i of
-  Nothing -> []
-  Just player -> [ renderPlayer state i player ]
+renderPlayers :: forall t1 t2 t3. ComponentState -> Array (HTML (ChildComponents t1 t2 t3) GameAction)
+renderPlayers cs@{ playerIndex, state } =
+  case state.players !! playerIndex of
+    Nothing -> []
+    Just player -> [ renderPlayer cs player ]
 
-playerStats :: forall a. GameState -> Int -> Player -> (HTML a GameAction)
-playerStats state playerIndex player = HH.li
+playerStats :: forall a. ComponentState -> Int -> Player -> (HTML a GameAction)
+playerStats { state, playerIndex: me } playerIndex player = HH.li
   [ HP.class_ Css.stat ]
   [ HH.text $ "Player " <> show (playerIndex + 1)
     <> " | Actions: " <> show player.actions
@@ -150,11 +155,10 @@ playerStats state playerIndex player = HH.li
 
 renderPlayer
   :: forall t1 t2 t3
-  . GameState
-  -> Int
+  . ComponentState
   -> Player
   -> HTML (ChildComponents t1 t2 t3) GameAction
-renderPlayer state playerIndex player =
+renderPlayer cs@{ state, playerIndex } player =
   if Player.hasChoices player && playerIndex == Dom.choiceTurn state
   then fromMaybe (HH.div_ []) $
     let choice = (Player.firstChoice player) in
@@ -167,7 +171,7 @@ renderPlayer state playerIndex player =
   case state.players !! state.turn of
     Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ]
     Just currentPlayer -> HH.div
-      ( if state.turn /= playerIndex
+      ( if state.turn /= playerIndex || Dom.choicesOutstanding state
         then [ HP.class_ Css.waiting ]
         else []
       )
@@ -191,19 +195,23 @@ renderPlayer state playerIndex player =
                 [ HP.class_ Css.handInfo ]
                 [ HH.text $ (show $ player.buys) <> " Buys" ]
               ]
-            : [ HH.ul_ (renderSupply playerIndex player state) ]
+            : [ HH.ul_ (renderSupply player cs) ]
       , HH.button
         [ HP.class_ (Css.nextPhase), HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex ]
         [ HH.text if state.turn == playerIndex
-          then case state.phase of
-            ActionPhase -> "Complete Action Phase"
-            BuyPhase -> "Complete Buy Phase"
-            CleanupPhase -> "Complete Turn"
+          then if Dom.choicesOutstanding state
+            then "Waiting for Player "
+              <> show (Dom.choiceTurn state + 1)
+              <> " to Choose"
+            else case state.phase of
+              ActionPhase -> "Complete Action Phase"
+              BuyPhase -> "Complete Buy Phase"
+              CleanupPhase -> "Complete Turn"
           else "Waiting for Player " <> show (state.turn + 1) <> " | " <> Phase.renderText state.phase
         ]
       , HH.ul
         [ HP.class_ Css.stats ]
-        (playerStats state `mapWithIndex` state.players)
+        (playerStats cs `mapWithIndex` state.players)
       , HH.ul
         [ HP.class_ Css.play ]
         (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])]
@@ -212,11 +220,11 @@ renderPlayer state playerIndex player =
         [ HP.class_ Css.buying ]
         (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])]
         : (renderCard (const Nothing) currentPlayer <$> currentPlayer.buying))
-      , renderHand player playerIndex state
+      , renderHand player cs
       ]
 
-renderHand :: forall a. Player -> Int -> GameState -> HTML a GameAction
-renderHand player playerIndex state = HH.ul
+renderHand :: forall a. Player -> ComponentState -> HTML a GameAction
+renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
     , if state.turn == playerIndex && state.phase == ActionPhase
@@ -242,18 +250,24 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex) player card
 
-handleAction :: forall s m. MonadEffect m => GameAction -> HalogenM GameState GameAction s GameState m Unit
-handleAction = case _ of
-  Receive update -> case update of
-    MakeNewGame n -> playAndReport $ NewGame n
-    UpdateState gs -> H.put gs
-  MakePlay play -> playAndReport play
+handleAction :: forall s m. MonadEffect m => GameAction -> HalogenM ComponentState GameAction s GameState m Unit
+handleAction gameAction = do
+  { state } <- H.get
+  case gameAction of
+    Receive update -> case update of
+      MakeNewGame { playerCount, playerIndex } -> do
+        H.modify_ _ { playerIndex = playerIndex }
+        playAndReport (NewGame playerCount) state
+      UpdateState gs -> H.put gs
+    MakePlay play -> playAndReport play state
   where
-    playAndReport play = do
-      result <- Dom.makeAutoPlay play
+    playAndReport play s = do
+      result <- Dom.makeAutoPlay play s
       case result of
         Left e -> do
           liftEffect $ Console.error e
-          H.get >>= H.raise
-        Right _ -> H.get >>= H.raise
+          H.gets _.state >>= H.raise
+        Right gs -> do
+          H.modify_ _ { state = gs }
+          H.raise gs
 

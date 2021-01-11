@@ -5,6 +5,7 @@ module Domination.Data.GameState
   , makePlay
   , newGame
   , choiceTurn
+  , choicesOutstanding
   ) where
 
 import Prelude
@@ -14,7 +15,7 @@ import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Loops (untilJust)
 import Control.Monad.State (class MonadState, get)
 import Data.Array (dropWhile, filter, findIndex, head, length, takeWhile, updateAt)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold (preview)
 import Data.Lens.Getter (view)
@@ -140,11 +141,17 @@ newGame i =
     ]
   }
 
-makeAutoPlay :: forall m. MonadEffect m => MonadState GameState m => Play -> m (Either String Unit)
-makeAutoPlay = (makePlay >=> const autoAdvance) >>> runExceptT
+makeAutoPlay :: forall m. MonadEffect m => Play -> GameState -> m (Either String GameState)
+makeAutoPlay p s = runExceptT $ do
+  state <- makePlay p s
+  eNextState <- runExceptT $ autoAdvance state
+  pure case eNextState of
+    Left e -> state
+    Right nextState -> nextState
 
-makePlay :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => Play -> m Unit
-makePlay p = modifyM_ case p of
+makePlay :: forall m. MonadError String m => MonadEffect m =>
+  Play -> GameState -> m GameState
+makePlay = case _ of
   NewGame n -> const $ setup (newGame n)
   EndPhase playerIndex -> nextPhase playerIndex
   PlayCard playerIndex card -> play playerIndex card
@@ -154,29 +161,26 @@ makePlay p = modifyM_ case p of
 getCurrentPlayer :: forall m. MonadError String m => GameState -> m Player
 getCurrentPlayer state = getPlayer state.turn state
 
-autoAdvance :: forall m. MonadError String m => MonadEffect m => MonadState GameState m => m Unit
-autoAdvance = untilJust autoAdvance'
-  where
-  autoAdvance' :: m (Maybe Unit)
-  autoAdvance' = do
-    gameState <- get
+autoAdvance :: forall m. MonadError String m => MonadEffect m =>
+  GameState -> m GameState
+autoAdvance gameState = do
     liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
     player <- getCurrentPlayer gameState
     case gameState.phase of
       ActionPhase ->
         if Player.hasActions player
         && Player.hasActionCardsInHand player
-        then pure $ Just unit
-        else advancePhase <#> const Nothing
+        then pure gameState
+        else advancePhase >>= autoAdvance
       BuyPhase ->
         if player.buys > 0
-        then pure $ Just unit
-        else advancePhase <#> const Nothing
+        then pure gameState
+        else advancePhase >>= autoAdvance
       CleanupPhase ->
-        advancePhase <#> const Nothing
+        advancePhase >>= autoAdvance
     where
-      advancePhase :: m Unit
-      advancePhase = modifyM_ \s -> nextPhase s.turn s
+      advancePhase :: m GameState
+      advancePhase = nextPhase gameState.turn gameState
 
 nextPhase
   :: forall m
@@ -187,7 +191,7 @@ nextPhase
   -> m GameState
 nextPhase playerIndex state =
   assertTurn playerIndex state
-    -- >>= assertChoicesResolved
+    >>= assertChoicesResolved
     >>= modifyPlayerM playerIndex playerUpdate
     <$> nextPlayer >>> over _phase Phase.next
   where
