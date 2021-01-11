@@ -264,10 +264,6 @@ handleAction gameAction = do
     playAndReport play s = do
       result <- Dom.makeAutoPlay play s
       case result of
-        Left e -> do
-          liftEffect $ Console.error e
-          H.gets _.state >>= H.raise
-        Right gs -> do
-          H.modify_ _ { state = gs }
-          H.raise gs
+        Left e -> liftEffect $ Console.error e
+        Right gs -> H.modify _ { state = gs } >>= _.state >>> H.raise
 
