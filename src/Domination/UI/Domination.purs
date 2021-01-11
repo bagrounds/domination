@@ -2,6 +2,7 @@ module Domination.UI.Domination
   ( component
   , GameUpdate(..)
   , ComponentState(..)
+  , GameEvent(..)
   ) where
 
 import Prelude
@@ -39,6 +40,10 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
+data GameEvent
+  = NewState GameState
+  | PlayMade Play
+
 data GameUpdate
   = UpdateState ComponentState
   | MakeNewGame { playerCount :: Int, playerIndex :: Int }
@@ -55,7 +60,7 @@ instance showGameAction :: Show GameAction where
 
 type ComponentState = { playerIndex :: Int, state :: GameState }
 
-component :: forall query m. MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameState m
+component :: forall query m. MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameEvent m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
   initialState _ = { playerIndex, state: Dom.newGame playerCount }
@@ -250,7 +255,7 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex) player card
 
-handleAction :: forall s m. MonadEffect m => GameAction -> HalogenM ComponentState GameAction s GameState m Unit
+handleAction :: forall s m. MonadEffect m => GameAction -> HalogenM ComponentState GameAction s GameEvent m Unit
 handleAction gameAction = do
   { state } <- H.get
   case gameAction of
@@ -265,5 +270,7 @@ handleAction gameAction = do
       result <- Dom.makeAutoPlay play s
       case result of
         Left e -> liftEffect $ Console.error e
-        Right gs -> H.modify _ { state = gs } >>= _.state >>> H.raise
+        Right gs -> do
+          H.raise $ PlayMade play
+          H.modify _ { state = gs } >>= _.state >>> NewState >>> H.raise
 

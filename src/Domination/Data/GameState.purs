@@ -1,12 +1,4 @@
-module Domination.Data.GameState
-  ( GameState(..)
-  , Supply
-  , makeAutoPlay
-  , makePlay
-  , newGame
-  , choiceTurn
-  , choicesOutstanding
-  ) where
+module Domination.Data.GameState where
 
 import Prelude
 

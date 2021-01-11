@@ -8,10 +8,19 @@ import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Argonaut.Parser (jsonParser)
+import Data.Array (length)
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
+import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
+import Data.Lens.Fold (preview, traverseOf_)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState)
+import Domination.Data.GameState as GameState
+import Domination.Data.Play (Play(..))
+import Domination.Data.Player as Player
+import Domination.UI.Phase as Phase
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
@@ -26,6 +35,7 @@ data Message
   = ChatMessage { username :: String, message :: String }
   | UsernameMessage { username :: String, id :: String }
   | GameStateMessage GameState
+  | PlayMadeMessage { play :: Play, player :: Int, state :: GameState }
   | SeenMessage String
   | ConnectionsMessage Int
 
@@ -71,3 +81,40 @@ renderHtml (UsernameMessage { username, id }) =
     , HH.span [ HH.class_ $ ClassName "username" ] [ HH.text $ show id ]
     , HH.text ")"
     ]
+renderHtml (PlayMadeMessage { play, player, state }) =
+  case play' of
+    Nothing -> HH.span [] []
+    Just text -> HH.div
+      [ HH.class_ $ ClassName "play-made-message" ]
+      [ HH.text $ "Player " <> show (player + 1) <> " "
+      , HH.span [ HH.class_ $ ClassName "play-made" ] [ HH.text text ]
+      ]
+  where
+      play' :: Maybe String
+      play' = case play of
+        NewGame n -> Just $
+          "created a new " <> show n <> " player game"
+        EndPhase playerIndex -> Nothing
+        PlayCard playerIndex cardIndex -> Just $
+          "played: " <> getPlayerCardName playerIndex state cardIndex
+        Purchase playerIndex stackIndex -> Just $
+          "purchased: " <> card
+          where
+            card = case preview (GameState._stack stackIndex) state of
+              Nothing -> "???"
+              Just stack -> stack.card.name
+        ResolveChoice playerIndex choice -> Just $
+          case choice of
+            TrashUpTo n (Just cardIndices) ->
+              "trashed: "
+              <> intercalate ", " (getPlayerCardName playerIndex state <$> cardIndices)
+            TrashUpTo n Nothing -> "unresolved choice?"
+            DiscardDownTo n (Just cardIndices) ->
+              "discarded: "
+              <> intercalate ", " (getPlayerCardName playerIndex state <$> cardIndices)
+            DiscardDownTo n Nothing -> "unresolved choice?"
+
+
+getPlayerCardName :: Int -> GameState -> Int -> String
+getPlayerCardName playerIndex state cardIndex =
+  fromMaybe "???" $ _.name <$> preview (GameState._player playerIndex <<< Player._cardInHand cardIndex) state

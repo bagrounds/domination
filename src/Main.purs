@@ -12,8 +12,9 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Data.GameState (GameState)
+import Domination.Data.GameState as GameState
 import Domination.UI.Css as Css
-import Domination.UI.Domination (GameUpdate(..))
+import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Effect (Effect)
 import Effect.Aff (makeAff)
@@ -127,7 +128,7 @@ component state = H.mkComponent { eval, initialState, render } where
   initialState _ = state
 
 type DominationComponent o c m =
-  ComponentSlot HTML ("Domination" :: Slot o GameState Int | c) m AppAction
+  ComponentSlot HTML ("Domination" :: Slot o GameEvent Int | c) m AppAction
 
 preventTyping :: forall x. HP.IProp (onKeyDown :: KeyboardEvent | x) AppAction
 preventTyping = HE.onKeyDown \e -> Just $ PreventDefault (toEvent e)
@@ -218,14 +219,25 @@ render state = HH.main_ $
     , incrementer (Just 1) Nothing (state.playerIndex + 1) ((_ - 1) >>> WritePlayerIndex)
     ]
   , HH.div_
-    [ HH.button [ HE.onClick \_ -> Just $ StartNewGame ] [ HH.text $ "Start New " <> show state.players <> " Player Game as Player " <> show (state.playerIndex + 1) ]
-    , HH.button [ HE.onClick \_ -> Just $ LoadGame ] [ HH.text "Load Game" ]
+    [ HH.button
+      [ HE.onClick \_ -> Just $ StartNewGame ]
+      [ HH.text $ "Start New " <> show state.players <> " Player Game as Player " <> show (state.playerIndex + 1) ]
+    , HH.button
+      [ HE.onClick \_ -> Just $ LoadGame ]
+      [ HH.text "Load Game" ]
     ]
   ] <> case state.gameState of
     Nothing -> []
-    Just (UpdateState as) ->
-      [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component state.players state.playerIndex) (UpdateState as) (Just <<< UpdateGameState) ]
-    Just (MakeNewGame { playerCount, playerIndex }) -> [ HH.slot (SProxy :: SProxy "Domination") 0 (Domination.component playerCount playerIndex) (MakeNewGame { playerCount, playerIndex }) (Just <<< UpdateGameState) ]
+    Just x ->
+      [ HH.slot
+        (SProxy :: SProxy "Domination")
+        0
+        case x of
+          UpdateState as -> (Domination.component state.players state.playerIndex)
+          MakeNewGame { playerCount, playerIndex } -> Domination.component playerCount playerIndex
+        x
+        (Just <<< UpdateGameState)
+      ]
 
 data AppAction = MakeOffer Int
   | CopyToClipboard String
@@ -241,7 +253,7 @@ data AppAction = MakeOffer Int
   | ReceiveMessage Event
   | LoadGame
   | StartNewGame
-  | UpdateGameState GameState
+  | UpdateGameState GameEvent
   | PreventDefault Event
 
 handleAction :: forall slots output m. MonadAff m => AppAction -> HalogenM AppState AppAction slots output m Unit
@@ -328,6 +340,8 @@ handleAction = case _ of
                   H.modify_ _ { chatInputMessage = "PONG" }
                   sendChatMessage
                 else pure unit
+            PlayMadeMessage _ -> do
+              H.modify_ \state -> state { messages = mt : state.messages }
   LoadGame -> do
     mbGameState <- Storage.load "game_state"
     case mbGameState of
@@ -339,10 +353,23 @@ handleAction = case _ of
     state <- H.get
     liftEffect $ Console.log $ "MakeNewGame " <> show state.players
     H.modify_ _ { gameState = Just $ MakeNewGame { playerCount: state.players, playerIndex: state.playerIndex } }
-  UpdateGameState gameState -> do
-    H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
-    sendMessage $ GameStateMessage gameState
-    Storage.save "game_state" gameState
+  UpdateGameState event -> case event of
+    NewState gameState -> do
+      H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
+      sendMessage $ GameStateMessage gameState
+      Storage.save "game_state" gameState
+    PlayMade play -> do
+      s <- H.get
+      case s.gameState of
+        Just (UpdateState { state, playerIndex }) -> do
+          let message = PlayMadeMessage { play, player: playerIndex, state }
+          sendMessage message
+          H.modify_ \state -> state { messages = message : state.messages }
+        Just (MakeNewGame { playerCount, playerIndex }) -> do
+          let message = PlayMadeMessage { play, player: playerIndex, state: GameState.newGame playerCount }
+          H.modify_ \state -> state { messages = message : state.messages }
+        Nothing -> pure unit
+      liftEffect $ Console.log $ "PlayMade: " <> show play
   where
     sendChatMessage = do
       s <- H.get
@@ -351,6 +378,7 @@ handleAction = case _ of
       H.modify_ \state -> state { messages = message : state.messages, chatInputMessage = "" }
 
     sendMessage message = do
+      liftEffect $ Console.log "Main: sending message"
       bugout <- gets _.bugout
       id :: String <- H.gets _.id
       let package = { id, message }
