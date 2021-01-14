@@ -2,25 +2,19 @@ module Message where
 
 import Prelude
 
-import Data.Argonaut (stringify)
-import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
-import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
+import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
-import Data.Argonaut.Parser (jsonParser)
-import Data.Array (length)
-import Data.Bifunctor (lmap)
-import Data.Either (Either)
 import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
-import Data.Lens.Fold (preview, traverseOf_)
+import Data.Lens.Fold (preview)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
-import Domination.UI.Phase as Phase
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
