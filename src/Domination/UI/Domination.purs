@@ -261,16 +261,23 @@ handleAction gameAction = do
   case gameAction of
     Receive update -> case update of
       MakeNewGame { playerCount, playerIndex } -> do
+        liftEffect $ Console.log $ "Domination: MakeNewGame"
         H.modify_ _ { playerIndex = playerIndex }
         playAndReport (NewGame playerCount) state
-      UpdateState gs -> H.put gs
-    MakePlay play -> playAndReport play state
+      UpdateState cs -> do
+        liftEffect $ Console.log $ "Domination: UpdateState"
+        H.put cs
+    MakePlay play -> do
+        liftEffect $ Console.log $ "Domination: MakePlay"
+        playAndReport play state
   where
     playAndReport play s = do
       result <- Dom.makeAutoPlay play s
       case result of
         Left e -> liftEffect $ Console.error e
         Right gs -> do
-          H.raise $ PlayMade play
           H.modify _ { state = gs } >>= _.state >>> NewState >>> H.raise
+          case play of
+            EndPhase _ -> pure unit
+            _ -> H.raise $ PlayMade play
 

@@ -123,7 +123,7 @@ drawCard :: forall m. MonadError String m => MonadEffect m => Player -> m Player
 drawCard player = do
   deck <- if null player.deck
     then do
-      liftEffect $ Console.log $ "Ran out of cards while drawing. Time to shuffle for player: " <> show player
+      liftEffect $ Console.log $ "Ran out of cards while drawing. Time to shuffle for player"
       shuffle player.discard
     else pure player.deck
   let discarded = if null player.deck

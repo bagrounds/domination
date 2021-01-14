@@ -262,18 +262,15 @@ exports.makeBugout = roomCode => left => right => callback => () => {
       callback(right(bugout))()
     }
     const message = prepareMessage("ConnectionsMessage", [ count ])
-    logInfo("seen message: ", message)
     broadcastEvent(message)
   })
 
   bugout.on("message", (address, message) => {
-    logInfo("receiving message:", address, message)
     address === bugout.address() || broadcastEvent(message)
   })
 
   bugout.on("seen", address => {
     const message = prepareMessage("SeenMessage", [ address ])
-    logInfo("seen message: ", message)
     broadcastEvent(message)
   })
 }
@@ -281,7 +278,6 @@ exports.makeBugout = roomCode => left => right => callback => () => {
 exports.address = bugout => () => bugout.address()
 
 exports.send = bugout => message => () => {
-  logInfo("sending message: ", message)
   bugout.send(message)
 }
 

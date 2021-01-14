@@ -17,7 +17,7 @@ import Domination.UI.Css as Css
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Effect (Effect)
-import Effect.Aff (makeAff)
+import Effect.Aff (makeAff, throwError)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
@@ -228,14 +228,14 @@ render state = HH.main_ $
     ]
   ] <> case state.gameState of
     Nothing -> []
-    Just x ->
+    Just gameUpdate ->
       [ HH.slot
         (SProxy :: SProxy "Domination")
         0
-        case x of
-          UpdateState as -> (Domination.component state.players state.playerIndex)
+        case gameUpdate of
+          UpdateState { state, playerIndex } -> (Domination.component (length state.players) playerIndex)
           MakeNewGame { playerCount, playerIndex } -> Domination.component playerCount playerIndex
-        x
+        gameUpdate
         (Just <<< UpdateGameState)
       ]
 
@@ -331,8 +331,6 @@ handleAction = case _ of
               sendMessage $ UsernameMessage { username, id }
             ConnectionsMessage count ->
               H.modify_ \state -> state { connectionCount = count }
-            GameStateMessage gs -> do
-              H.modify_ \state -> state { gameState = Just $ UpdateState { state: gs, playerIndex: state.playerIndex } }
             ChatMessage { message, username } -> do
               H.modify_ \state -> state { messages = mt : state.messages }
               if message == "PING"
@@ -340,7 +338,11 @@ handleAction = case _ of
                   H.modify_ _ { chatInputMessage = "PONG" }
                   sendChatMessage
                 else pure unit
+            GameStateMessage gs -> do
+              liftEffect $ Console.log $ "Receive GameStateMessage"
+              H.modify_ \state -> state { gameState = Just $ UpdateState { state: gs, playerIndex: state.playerIndex } }
             PlayMadeMessage _ -> do
+              liftEffect $ Console.log $ "Receive PlayMadeMessage"
               H.modify_ \state -> state { messages = mt : state.messages }
   LoadGame -> do
     mbGameState <- Storage.load "game_state"
@@ -351,13 +353,14 @@ handleAction = case _ of
         sendMessage $ GameStateMessage gameState
   StartNewGame -> do
     state <- H.get
-    liftEffect $ Console.log $ "MakeNewGame " <> show state.players
+    liftEffect $ Console.log $ "StartNewGame"
     H.modify_ _ { gameState = Just $ MakeNewGame { playerCount: state.players, playerIndex: state.playerIndex } }
   UpdateGameState event -> case event of
     NewState gameState -> do
       H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
       sendMessage $ GameStateMessage gameState
       Storage.save "game_state" gameState
+      liftEffect $ Console.log $ "NewState"
     PlayMade play -> do
       s <- H.get
       case s.gameState of
@@ -365,9 +368,9 @@ handleAction = case _ of
           let message = PlayMadeMessage { play, player: playerIndex, state }
           sendMessage message
           H.modify_ \state -> state { messages = message : state.messages }
-        Just (MakeNewGame { playerCount, playerIndex }) -> do
-          let message = PlayMadeMessage { play, player: playerIndex, state: GameState.newGame playerCount }
-          H.modify_ \state -> state { messages = message : state.messages }
+          liftEffect $ Console.log $ "UpdateState" <> show play
+        Just (MakeNewGame { playerCount, playerIndex }) ->
+          liftEffect $ Console.error "I didn't realize this could happen!"
         Nothing -> pure unit
       liftEffect $ Console.log $ "PlayMade: " <> show play
   where
