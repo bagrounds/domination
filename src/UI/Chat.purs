@@ -14,7 +14,7 @@ import Message (Message(..))
 import Message as Message
 import Web.UIEvent.KeyboardEvent as KE
 
-type ChatState r =
+type State r =
   { usernames :: HashMap String String
   , messages :: Array Message
   , chatInputMessage :: String
@@ -22,7 +22,7 @@ type ChatState r =
   }
 
 type RenderInput a r =
-  { state :: ChatState r
+  { state :: State r
   , onInput :: String -> a
   , sendEvent :: a
   }

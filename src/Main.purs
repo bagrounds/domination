@@ -20,6 +20,7 @@ import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
+import Domination.UI.UsernameInput as UsernameInput
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_, makeAff)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -195,14 +196,7 @@ render
   => AppState -> HTML (DominationComponent o c m String) AppAction
 render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
-  , HH.label_ [ HH.text "Username: " ]
-  , HH.input
-    [ HP.type_ HP.InputText
-    , HP.value state.username
-    , HP.placeholder usernameKey
-    , HP.required true
-    , HE.onValueInput $ Just <<< WriteUsername
-    ]
+  , UsernameInput.render { onInput: WriteUsername, state }
   , HH.h1 [] [ HH.text $ show state.connectionCount <> " Users Connected" ]
   , Chat.render
     { sendEvent: SendMessage
@@ -257,7 +251,7 @@ data AppAction
   | PreventDefault Event
 
 handleAction
-  :: forall slots output m a
+  :: forall slots output m
   . Storage m
   => Log m
   => MonadEffect m
