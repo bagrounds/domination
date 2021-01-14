@@ -4,8 +4,6 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Control.Monad.Loops (untilJust)
-import Control.Monad.State (class MonadState, get)
 import Data.Array (dropWhile, filter, findIndex, head, length, takeWhile, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
@@ -35,9 +33,8 @@ import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console as Console
-import Util (assert, dropIndices, fromJust, indices, justIf, modifyM_, moveAll, prependOver, takeIndices, withIndices)
+import Effect.Class (class MonadEffect)
+import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, prependOver, takeIndices, withIndices)
 
 type GameState =
   { turn :: Int
@@ -156,7 +153,6 @@ getCurrentPlayer state = getPlayer state.turn state
 autoAdvance :: forall m. MonadError String m => MonadEffect m =>
   GameState -> m GameState
 autoAdvance gameState = do
-    liftEffect (Console.log $ "autoAdvance? from " <> show gameState.phase)
     player <- getCurrentPlayer gameState
     case gameState.phase of
       ActionPhase ->

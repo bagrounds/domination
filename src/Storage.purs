@@ -6,14 +6,12 @@ module Storage
 import Prelude
 
 import Data.Argonaut.Core (stringify)
-import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
-import Data.Argonaut.Parser (jsonParser)
-import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Domination.Capability.Log (class Log, log)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console (log, logShow)
 import Util (readJson)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
@@ -44,17 +42,17 @@ load key = liftEffect $ do
     Nothing -> Left "Error retrieving item from storage"
     Just x -> readJson x
 
-example :: forall m. MonadEffect m => m Unit
-example = liftEffect do
-  w <- window
-  s <- localStorage w
-  setItem "this-is-my-key" "Here is my value." s
-  v <- getItem "this-is-my-key" s
-  logShow v
+example :: forall m. MonadEffect m => Log m => m Unit
+example = do
+  w <- liftEffect window
+  s <- liftEffect $ localStorage w
+  liftEffect $ setItem "this-is-my-key" "Here is my value." s
+  v <- liftEffect $ getItem "this-is-my-key" s
+  log $ show v
 
-  removeItem "this-is-my-key" s
-  v' <- getItem "this-is-my-key" s
+  liftEffect $ removeItem "this-is-my-key" s
+  v' <- liftEffect $ getItem "this-is-my-key" s
   log "It is gone!"
-  logShow v'
+  log $ show v'
 
-  clear s
+  liftEffect $ clear s

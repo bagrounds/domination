@@ -18,7 +18,6 @@ import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console as Console
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, shuffle)
 
 type Player =
@@ -123,7 +122,6 @@ drawCard :: forall m. MonadError String m => MonadEffect m => Player -> m Player
 drawCard player = do
   deck <- if null player.deck
     then do
-      liftEffect $ Console.log $ "Ran out of cards while drawing. Time to shuffle for player"
       shuffle player.discard
     else pure player.deck
   let discarded = if null player.deck

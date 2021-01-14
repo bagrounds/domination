@@ -14,6 +14,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
+import Domination.Capability.Log (class Log, error, log)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (isAction, value) as Card
 import Domination.Data.Choice as Choice
@@ -29,8 +30,7 @@ import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console as Console
+import Effect.Class (class MonadEffect)
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
@@ -60,7 +60,7 @@ instance showGameAction :: Show GameAction where
 
 type ComponentState = { playerIndex :: Int, state :: GameState }
 
-component :: forall query m. MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameEvent m
+component :: forall query m. Log m => MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameEvent m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
   initialState _ = { playerIndex, state: Dom.newGame playerCount }
@@ -255,26 +255,26 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex) player card
 
-handleAction :: forall s m. MonadEffect m => GameAction -> HalogenM ComponentState GameAction s GameEvent m Unit
+handleAction :: forall s m. Log m => MonadEffect m => GameAction -> HalogenM ComponentState GameAction s GameEvent m Unit
 handleAction gameAction = do
   { state } <- H.get
   case gameAction of
     Receive update -> case update of
       MakeNewGame { playerCount, playerIndex } -> do
-        liftEffect $ Console.log $ "Domination: MakeNewGame"
+        log "Domination: MakeNewGame"
         H.modify_ _ { playerIndex = playerIndex }
         playAndReport (NewGame playerCount) state
       UpdateState cs -> do
-        liftEffect $ Console.log $ "Domination: UpdateState"
+        log "Domination: UpdateState"
         H.put cs
     MakePlay play -> do
-        liftEffect $ Console.log $ "Domination: MakePlay"
+        log "Domination: MakePlay"
         playAndReport play state
   where
     playAndReport play s = do
       result <- Dom.makeAutoPlay play s
       case result of
-        Left e -> liftEffect $ Console.error e
+        Left e -> error e
         Right gs -> do
           H.modify _ { state = gs } >>= _.state >>> NewState >>> H.raise
           case play of
