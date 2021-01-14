@@ -29,7 +29,7 @@ data Message
   = ChatMessage { username :: String, message :: String }
   | UsernameMessage { username :: String, id :: String }
   | GameStateMessage GameState
-  | PlayMadeMessage { play :: Play, player :: Int, state :: GameState }
+  | PlayMadeMessage { play :: Play, playerIndex :: Int, state :: GameState }
   | SeenMessage String
   | ConnectionsMessage Int
 
@@ -75,7 +75,7 @@ renderHtml (UsernameMessage { username, id }) =
     , HH.span [ HH.class_ $ ClassName "username" ] [ HH.text $ show id ]
     , HH.text ")"
     ]
-renderHtml (PlayMadeMessage { play, player, state }) =
+renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
   case play' of
     Nothing -> HH.span [] []
     Just text -> HH.div

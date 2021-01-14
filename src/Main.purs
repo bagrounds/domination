@@ -3,23 +3,25 @@ module Main where
 import Prelude
 
 import Control.Monad.State.Class (gets)
-import Data.Array (take, (:))
+import Data.Array (take)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Int (toNumber)
+import Data.Lens.Lens (Lens')
+import Data.Lens.Record (prop)
+import Data.Lens.Setter (over, set)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Log (class Log, error, log, runLogM)
-import Domination.Capability.Storage (class Storage, StorageM(..), load, runStorageM, save)
+import Domination.Capability.Storage (class Storage, load, runStorageM, save)
 import Domination.UI.Css as Css
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_, makeAff)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI (Bugout)
 import FFI as FFI
@@ -32,9 +34,9 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
-import Message (Message(..))
+import Message (Message(..), Envelope)
 import Message as Message
-import Util (randomElement, readJson, writeJson)
+import Util (prependOver, randomElement, readJson, writeJson)
 import Web.Event.Event (Event, EventType(..), preventDefault)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, toEvent)
 import Web.UIEvent.KeyboardEvent as KE
@@ -43,27 +45,44 @@ type AppState =
   { connectionCount :: Int
   , id :: String
   , username :: String
-  , usernameMap :: HashMap String String
-  , players :: Int
+  , usernames :: HashMap String String
+  , playerCount :: Int
   , playerIndex :: Int
   , chatInputMessage :: String
   , messages :: Array Message
   , message :: String
   , localDescription :: String
   , gameOn :: Boolean
-  , gameState :: Maybe Domination.GameUpdate
+  , gameState :: Maybe GameUpdate
   , text :: String
   , bugout :: Bugout
   , roomCode :: String
   }
 
+_gameState :: Lens' AppState (Maybe GameUpdate)
+_gameState = prop (SProxy :: SProxy "gameState")
+_messages :: Lens' AppState (Array Message)
+_messages = prop (SProxy :: SProxy "messages")
+_playerIndex :: Lens' AppState Int
+_playerIndex = prop (SProxy :: SProxy "playerIndex")
+_playerCount :: Lens' AppState Int
+_playerCount = prop (SProxy :: SProxy "playerCount")
+_chatInputMessage :: Lens' AppState String
+_chatInputMessage = prop (SProxy :: SProxy "chatInputMessage")
+_connectionCount :: Lens' AppState Int
+_connectionCount = prop (SProxy :: SProxy "connectionCount")
+_usernames :: Lens' AppState (HashMap String String)
+_usernames = prop (SProxy :: SProxy "usernames")
+_username :: Lens' AppState String
+_username = prop (SProxy :: SProxy "username")
+
 newApp :: Bugout -> String -> String -> HashMap String String -> AppState
-newApp bugout username uuid usernameMap =
+newApp bugout username uuid usernames =
   { connectionCount: 0
   , id: uuid
   , username: username
-  , usernameMap
-  , players: 1
+  , usernames
+  , playerCount: 1
   , playerIndex: 0
   , chatInputMessage: ""
   , messages: []
@@ -89,7 +108,7 @@ emojis :: Array String
 emojis = ["😄","😃","😀","😊","☺","😉","😍","😘","😚","😗","😙","😜","😝","😛","😳","😁","😔","😌","😒","😞","😣","😢","😂","😭","😪","😥","😰","😅","😓","😩","😫","😨","😱","😠","😡","😤","😖","😆","😋","😷","😎","😴","😵","😲","😟","😦","😧","😈","👿","😮","😬","😐","😕","😯","😶","😇","😏","😑","👲","👳","👮","👷","💂","👶","👦","👧","👨","👩","👴","👵","👱","👼","👸","😺","😸","😻","😽","😼","🙀","😿","😹","😾"]
 
 main :: Effect Unit
-main =  launchAff_ $ do
+main = launchAff_ $ do
   eUuid <- runStorageM $ load uuidKey
   eUsername <- runStorageM $ load usernameKey
   uuid <- case eUuid of
@@ -109,10 +128,10 @@ main =  launchAff_ $ do
       pure $ emoji <> "lurker" <> emoji
     Right u -> pure u
 
-  let usernameMap = HashMap.insert uuid username HashMap.empty
+  let usernames = HashMap.insert uuid username HashMap.empty
 
   bugout <- makeAff $ FFI.makeBugout globalRoomCode Left Right
-  let initialState = newApp bugout username uuid usernameMap
+  let initialState = newApp bugout username uuid usernames
   runUI (root initialState) (MakeNewGame { playerCount: 1, playerIndex: 0 }) body
 
 root :: forall s query o. AppState -> Component HTML query o s Aff
@@ -128,14 +147,16 @@ component state = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval { handleAction = handleAction }
   initialState _ = state
 
-type DominationComponent o c m =
+type DominationComponent o c m a =
   ComponentSlot HTML ("Domination" :: Slot o GameEvent Int | c) m AppAction
 
-preventTyping :: forall x. HP.IProp (onKeyDown :: KeyboardEvent | x) AppAction
+preventTyping
+  :: forall x a
+  . HP.IProp (onKeyDown :: KeyboardEvent | x) AppAction
 preventTyping = HE.onKeyDown \e -> Just $ PreventDefault (toEvent e)
 
 incrementer
-  :: forall w
+  :: forall w a
   . Maybe Int -> Maybe Int -> Int -> (Int -> AppAction) -> HTML w AppAction
 incrementer mbMin mbMax value setValue = HH.div
   [ HP.class_ $ Css.incrementer ]
@@ -173,7 +194,7 @@ render
   :: forall o c m
   . Log m
   => MonadEffect m
-  => AppState -> HTML (DominationComponent o c m) AppAction
+  => AppState -> HTML (DominationComponent o c m String) AppAction
 render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , HH.label_ [ HH.text "Username: " ]
@@ -194,7 +215,7 @@ render state = HH.main_ $
           ChatMessage { username, message } ->
             ChatMessage
               { username: fromMaybe username
-                $ HashMap.lookup username state.usernameMap
+                $ HashMap.lookup username state.usernames
               , message
               }
           y -> y
@@ -213,7 +234,7 @@ render state = HH.main_ $
           , HP.class_ $ ClassName "chat-input"
           , HP.value state.chatInputMessage
           , HP.required true
-          , HE.onValueInput $ Just <<< WriteMessage
+          , HE.onValueInput $ Just <<< (Write _chatInputMessage)
           , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just SendMessage else Nothing
           ]
         ]
@@ -222,7 +243,7 @@ render state = HH.main_ $
   , HH.div
     [ HP.class_ $ ClassName "container" ]
     [ HH.label_ [ HH.text "Players: " ]
-    , incrementer (Just 1) Nothing state.players WritePlayerCount
+    , incrementer (Just 1) Nothing state.playerCount WritePlayerCount
     ]
   , HH.div
     [ HP.class_ $ ClassName "container" ]
@@ -232,11 +253,8 @@ render state = HH.main_ $
   , HH.div_
     [ HH.button
       [ HE.onClick \_ -> Just $ StartNewGame ]
-      [ HH.text
-        $ "Start New "
-        <> show state.players
-        <> " Player Game as Player "
-        <> show (state.playerIndex + 1)
+      [ HH.text $ "Start New " <> show state.playerCount
+        <> " Player Game as Player " <> show (state.playerIndex + 1)
       ]
     , HH.button
       [ HE.onClick \_ -> Just $ LoadGame ]
@@ -259,10 +277,10 @@ render state = HH.main_ $
 
 data AppAction
   = WriteUsername String
+  | Write (Lens' AppState String) String
   | WritePlayerIndex Int
   | WritePlayerCount Int
   | SendMessage
-  | WriteMessage String
   | ReceiveMessage Event
   | LoadGame
   | StartNewGame
@@ -270,7 +288,7 @@ data AppAction
   | PreventDefault Event
 
 handleAction
-  :: forall slots output m
+  :: forall slots output m a
   . Storage m
   => Log m
   => MonadEffect m
@@ -279,115 +297,99 @@ handleAction = case _ of
   PreventDefault e ->
     liftEffect $ preventDefault e
   WriteUsername username -> do
-    s <- H.get
-    let m = UsernameMessage { username, id: s.id }
+    { id, usernames } <- H.get
     save "username" username
-    sendMessage m
-    let um = HashMap.insert s.id username s.usernameMap
-    H.modify_ \state -> state { username = username, usernameMap = um }
-  WritePlayerIndex playerIndex -> do
-    state <- H.get
+    sendMessage $ UsernameMessage { username, id }
+    H.modify_ $ set _username username
+      <<< over _usernames (HashMap.insert id username)
+  WritePlayerIndex index -> do
+    { playerIndex, playerCount } <- H.get
     log $ "updating playerIndex from "
-      <> show state.playerIndex
-      <> " -> "
-      <> show playerIndex
-    if playerIndex > 0
-    then H.modify_ _{ playerIndex = playerIndex }
-    else H.modify_ \s -> s { playerIndex = 0 }
-    if playerIndex >= state.players
-    then H.modify_ _{ players = playerIndex + 1 }
-    else pure unit
-  WritePlayerCount players -> do
-    state <- H.get
-    if players > 1
-    then H.modify_ _{ players = players }
-    else H.modify_ \s -> s { players = 1 }
-    if players <= state.playerIndex
-    then H.modify_ _{ playerIndex = players - 1 }
-    else pure unit
-  WriteMessage s -> do
-    H.modify_ \state -> state { chatInputMessage = s }
+      <> show playerIndex <> " -> " <> show index
+    H.modify_ $ set _playerIndex (max index 0)
+      <<< set _playerCount (max (index + 1) playerCount)
+  WritePlayerCount count -> do
+    { playerIndex, playerCount } <- H.get
+    log $ "updating playerCount from "
+      <> show playerCount <> " -> " <> show count
+    H.modify_ $ set _playerCount (max count 1)
+      <<< set _playerIndex (min (count - 1) playerIndex)
+  Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
-  ReceiveMessage customEvent -> do
-    let eEnvelope = readJson $ FFI.detail customEvent
-    case eEnvelope of
+  ReceiveMessage customEvent ->
+    case readJson $ FFI.detail customEvent of
       Left e -> log $ "problem receiving message: " <> e
-      Right ({ id, message: msg } :: Message.Envelope) -> do
+      Right ({ message: msg } :: Envelope) -> do
         case msg of
-          UsernameMessage { username, id: i } -> do
-            s <- H.get
-            let usernameMap = HashMap.insert i username s.usernameMap
-            H.put s { usernameMap = usernameMap }
-
-            log $ "username incoming "
-            log $ "username map: " <> show usernameMap
+          UsernameMessage { username, id } -> do
+            log $ "username incoming: " <> username
+            H.modify_ $ over _usernames (HashMap.insert id username)
           SeenMessage address -> do
             log $ "I see you: " <> address
             { username, id } <- H.get
             sendMessage $ UsernameMessage { username, id }
           ConnectionsMessage count ->
-            H.modify_ \state -> state { connectionCount = count }
+            H.modify_ $ set _connectionCount count
           ChatMessage { message, username } -> do
-            H.modify_ \state -> state { messages = msg : state.messages }
+            H.modify_ $ prependOver _messages msg
             if message == "PING"
               then do
-                H.modify_ _ { chatInputMessage = "PONG" }
+                H.modify_ $ set _chatInputMessage "PONG"
                 sendChatMessage
               else pure unit
-          GameStateMessage gs -> do
+          GameStateMessage state -> do
             log "Receive GameStateMessage"
-            H.modify_ \state -> state { gameState = Just $ UpdateState { state: gs, playerIndex: state.playerIndex } }
+            { playerIndex } <- H.get
+            H.modify_ $ set _gameState $ Just
+              $ UpdateState { state, playerIndex }
           PlayMadeMessage _ -> do
-            log $ "Receive PlayMadeMessage"
-            H.modify_ \state -> state { messages = msg : state.messages }
+            log "Receive PlayMadeMessage"
+            H.modify_ $ prependOver _messages msg
   LoadGame -> do
     mbGameState <- load "game_state"
     case mbGameState of
       Left e -> log e
-      Right gameState -> do
-        H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
-        sendMessage $ GameStateMessage gameState
+      Right state -> do
+        { playerIndex } <- H.get
+        H.modify_ $ set _gameState $ Just
+          $ UpdateState { state, playerIndex }
+        sendMessage $ GameStateMessage state
   StartNewGame -> do
-    state <- H.get
     log "StartNewGame"
-    H.modify_ _ { gameState = Just $ MakeNewGame { playerCount: state.players, playerIndex: state.playerIndex } }
+    { playerIndex, playerCount } <- H.get
+    H.modify_ $ set _gameState $ Just
+      $ MakeNewGame { playerCount, playerIndex }
   UpdateGameState event -> case event of
-    NewState gameState -> do
-      H.modify_ \state -> state
-        { gameState = Just
-          $ UpdateState
-            { state: gameState
-            , playerIndex: state.playerIndex
-            }
-        }
-      sendMessage $ GameStateMessage gameState
-      save "game_state" gameState
+    NewState state -> do
+      { playerIndex } <- H.get
+      H.modify_ $ set _gameState $ Just
+        $ UpdateState { state, playerIndex }
+      sendMessage $ GameStateMessage state
+      save "game_state" state
       log $ "NewState"
     PlayMade play -> do
-      s <- H.get
-      case s.gameState of
+      log $ "PlayMade: " <> show play
+      { gameState } <- H.get
+      case gameState of
         Just (UpdateState { state, playerIndex }) -> do
-          let message = PlayMadeMessage { play, player: playerIndex, state }
-          sendMessage message
-          H.modify_ \state -> state { messages = message : state.messages }
           log $ "UpdateState" <> show play
+          let message = PlayMadeMessage { play, playerIndex, state }
+          sendMessage message
+          H.modify_ $ prependOver _messages message
         Just (MakeNewGame { playerCount, playerIndex }) ->
           error "I didn't realize this could happen!"
         Nothing -> pure unit
-      log $ "PlayMade: " <> show play
   where
     sendChatMessage = do
-      s <- H.get
+      { id, chatInputMessage } <- H.get
       let
         message = ChatMessage
-          { username: s.id
-          , message: s.chatInputMessage
+          { username: id
+          , message: chatInputMessage
           }
       sendMessage message
-      H.modify_ \state -> state
-        { messages = message : state.messages
-        , chatInputMessage = ""
-        }
+      H.modify_ $ set _chatInputMessage ""
+        <<< prependOver _messages message
 
     sendMessage message = do
       log "Main: sending message"
