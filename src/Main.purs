@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import Control.Monad.State.Class (gets)
-import Data.Array (take, (!!), (:))
+import Data.Array (take, (:))
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.HashMap (HashMap)
@@ -13,6 +13,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Log (class Log, error, log)
+import Domination.Capability.Storage (class Storage, load, save)
 import Domination.UI.Css as Css
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
@@ -33,7 +34,6 @@ import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (Message(..))
 import Message as Message
-import Storage as Storage
 import Util (randomElement, readJson, writeJson)
 import Web.Event.Event (Event, EventType(..), preventDefault)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, toEvent)
@@ -48,9 +48,6 @@ type AppState =
   , playerIndex :: Int
   , chatInputMessage :: String
   , messages :: Array Message
-  , offer :: String
-  , answer :: String
-  , receivedAnswer :: Array String
   , message :: String
   , localDescription :: String
   , gameOn :: Boolean
@@ -70,9 +67,6 @@ newApp bugout username uuid usernameMap =
   , playerIndex: 0
   , chatInputMessage: ""
   , messages: []
-  , offer: ""
-  , answer: ""
-  , receivedAnswer: []
   , message: ""
   , localDescription: ""
   , gameOn: false
@@ -96,13 +90,13 @@ emojis = ["😄","😃","😀","😊","☺","😉","😍","😘","😚","😗","
 
 main :: Effect Unit
 main =  HA.runHalogenAff $ do
-  eUuid <- liftEffect $ Storage.load uuidKey
-  eUsername :: Either String String <- liftEffect $ Storage.load usernameKey
+  eUuid <- liftAff $ runAppM {} $ load uuidKey
+  eUsername :: Either String String <- liftAff $ runAppM {} $ load usernameKey
   uuid <- case eUuid of
     Left e -> do
       liftAff $ runAppM {} $ log "no existing uuid found, generating a new one"
       uuid <- liftEffect $ FFI.genUuid
-      liftEffect $ Storage.save uuidKey uuid
+      liftAff $ runAppM {} $ save uuidKey uuid
       pure $ show uuid
     Right uuid -> pure uuid
 
@@ -124,7 +118,12 @@ main =  HA.runHalogenAff $ do
 root :: forall s query o. AppState -> Component HTML query o s Aff
 root state = H.hoist (runAppM {}) $ component state
 
-component :: forall m s query o. Log m => MonadAff m => AppState -> Component HTML query o s m
+component
+  :: forall m s query o
+  . Storage m
+  => Log m
+  => MonadEffect m
+  => AppState -> Component HTML query o s m
 component state = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval (H.defaultEval { handleAction = handleAction })
   initialState _ = state
@@ -135,7 +134,9 @@ type DominationComponent o c m =
 preventTyping :: forall x. HP.IProp (onKeyDown :: KeyboardEvent | x) AppAction
 preventTyping = HE.onKeyDown \e -> Just $ PreventDefault (toEvent e)
 
-incrementer :: forall w. Maybe Int -> Maybe Int -> Int -> (Int -> AppAction) -> HTML w AppAction
+incrementer
+  :: forall w
+  . Maybe Int -> Maybe Int -> Int -> (Int -> AppAction) -> HTML w AppAction
 incrementer mbMin mbMax value setValue = HH.div
   [ HP.class_ $ Css.incrementer ]
   [ HH.button
@@ -168,7 +169,11 @@ incrementer mbMin mbMax value setValue = HH.div
     [ HH.text "+" ]
   ]
 
-render :: forall o c m. Log m => MonadEffect m => AppState -> HTML (DominationComponent o c m) AppAction
+render
+  :: forall o c m
+  . Log m
+  => MonadEffect m
+  => AppState -> HTML (DominationComponent o c m) AppAction
 render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , HH.label_ [ HH.text "Username: " ]
@@ -241,15 +246,11 @@ render state = HH.main_ $
         (Just <<< UpdateGameState)
       ]
 
-data AppAction = MakeOffer Int
-  | CopyToClipboard String
+data AppAction
+  = CopyToClipboard String
   | WriteUsername String
   | WritePlayerIndex Int
   | WritePlayerCount Int
-  | WriteOffer String
-  | AcceptOffer Int
-  | WriteAnswer Int String
-  | AcceptAnswer Int
   | SendMessage
   | WriteMessage String
   | ReceiveMessage Event
@@ -258,26 +259,20 @@ data AppAction = MakeOffer Int
   | UpdateGameState GameEvent
   | PreventDefault Event
 
-handleAction :: forall slots output m. Log m => MonadAff m => AppAction -> HalogenM AppState AppAction slots output m Unit
+handleAction
+  :: forall slots output m
+  . Storage m
+  => Log m
+  => MonadEffect m
+  => AppAction -> HalogenM AppState AppAction slots output m Unit
 handleAction = case _ of
   PreventDefault e -> liftEffect $ preventDefault e
   CopyToClipboard id -> liftEffect $ FFI.copyToClipboard id
-  MakeOffer i -> do
-    ld <- liftAff $ makeAff $ FFI.create i Right
-    H.modify_ _ { localDescription = ld }
-  WriteOffer rd -> do
-    H.modify_ \state -> state { offer = rd }
-  AcceptOffer i -> do
-    s <- H.get
-    ld <- liftAff $ makeAff $ FFI.join s.offer Right
-    H.modify_ \state -> state { answer = ld, playerIndex = i + 1 }
-  WriteAnswer _ rd -> do
-    H.modify_ \state -> state { receivedAnswer = state.receivedAnswer <> [ rd ]}
   WriteUsername username -> do
     s <- H.get
     let (m :: Message) = UsernameMessage { username, id: s.id }
 
-    Storage.save "username" username
+    save "username" username
     sendMessage m
     let um = HashMap.insert s.id username s.usernameMap
     H.modify_ \state -> state { username = username, usernameMap = um }
@@ -301,15 +296,6 @@ handleAction = case _ of
       if players <= state.playerIndex
       then H.modify_ _{ playerIndex = players - 1 }
       else pure unit
-  AcceptAnswer i -> do
-    s <- H.get
-    let ra = s.receivedAnswer !! i
-    case ra of
-      Nothing -> error $ "Cannot accept answer (" <> show i <> ") of (" <> show ((length s.receivedAnswer) :: Int) <> ")"
-
-      Just answer -> do
-        liftEffect $ FFI.gotAnswer i answer
-        H.modify_ \state -> state { chatInputMessage = "PING", players = state.players + 1 }
   WriteMessage s -> do
     H.modify_ \state -> state { chatInputMessage = s }
   SendMessage -> sendChatMessage
@@ -346,7 +332,7 @@ handleAction = case _ of
               log $ "Receive PlayMadeMessage"
               H.modify_ \state -> state { messages = mt : state.messages }
   LoadGame -> do
-    mbGameState <- Storage.load "game_state"
+    mbGameState <- load "game_state"
     case mbGameState of
       Left e -> log e
       Right gameState -> do
@@ -360,7 +346,7 @@ handleAction = case _ of
     NewState gameState -> do
       H.modify_ \state -> state { gameState = Just $ UpdateState { state: gameState, playerIndex: state.playerIndex } }
       sendMessage $ GameStateMessage gameState
-      Storage.save "game_state" gameState
+      save "game_state" gameState
       log $ "NewState"
     PlayMade play -> do
       s <- H.get

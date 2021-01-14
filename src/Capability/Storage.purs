@@ -1,46 +1,44 @@
-module Storage
-  ( save
-  , load
-  ) where
+module Domination.Capability.Storage where
 
 import Prelude
 
+import Control.Monad.Trans.Class (lift)
 import Data.Argonaut.Core (stringify)
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Domination.AppM (AppM)
 import Domination.Capability.Log (class Log, log)
 import Effect.Class (class MonadEffect, liftEffect)
+import Halogen.Query.HalogenM (HalogenM)
 import Util (readJson)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (clear, getItem, removeItem, setItem)
 
-save :: forall m a.
-  MonadEffect m =>
-  EncodeJson a =>
-  DecodeJson a =>
-  String -> a -> m Unit
-save key x = liftEffect do
-  w <- window
-  ls <- localStorage w
-  let json = encodeJson x
-  let string = stringify json
-  setItem key string ls
+class Monad m <= Storage m where
+  save :: forall a. EncodeJson a => DecodeJson a => String -> a -> m Unit
+  load :: forall a. EncodeJson a => DecodeJson a => String -> m (Either String a)
 
-load :: forall m a.
-  MonadEffect m =>
-  EncodeJson a =>
-  DecodeJson a =>
-  String -> m (Either String a)
-load key = liftEffect $ do
-  w <- window
-  ls <- localStorage w
-  item <- getItem key ls
-  pure $ case item of
-    Nothing -> Left "Error retrieving item from storage"
-    Just x -> readJson x
+instance storageHalogenM :: Storage m => Storage (HalogenM st act slots msg m) where
+  save key = lift <<< save key
+  load = lift <<< load
+
+instance storageAppM :: Storage AppM where
+  save key x = liftEffect do
+    w <- window
+    ls <- localStorage w
+    let json = encodeJson x
+    let string = stringify json
+    setItem key string ls
+  load key = liftEffect $ do
+    w <- window
+    ls <- localStorage w
+    item <- getItem key ls
+    pure $ case item of
+      Nothing -> Left "Error retrieving item from storage"
+      Just x -> readJson x
 
 example :: forall m. MonadEffect m => Log m => m Unit
 example = do

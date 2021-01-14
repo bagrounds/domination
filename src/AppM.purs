@@ -2,13 +2,11 @@ module Domination.AppM where
 
 import Prelude
 
-import Control.Monad.Reader.Trans (ReaderT(..), runReaderT)
-import Domination.Capability.Log (class Log)
+import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Domination.Env (Env)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console as Console
+import Effect.Class (class MonadEffect)
 
 newtype AppM a = AppM (ReaderT Env Aff a)
 
@@ -22,8 +20,4 @@ derive newtype instance bindAppM :: Bind AppM
 derive newtype instance monadAppM :: Monad AppM
 derive newtype instance monadEffectAppM :: MonadEffect AppM
 derive newtype instance monadAffAppM :: MonadAff AppM
-
-instance logAppM :: Log AppM where
-  log = liftEffect <<< Console.log
-  error = liftEffect <<< Console.error
 
