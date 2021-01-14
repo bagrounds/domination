@@ -3,7 +3,6 @@ module Main where
 import Prelude
 
 import Control.Monad.State.Class (gets)
-import Data.Array (take)
 import Data.Either (Either(..))
 import Data.Foldable (length)
 import Data.HashMap (HashMap)
@@ -17,6 +16,7 @@ import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Log (class Log, error, log, runLogM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
+import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
@@ -35,11 +35,9 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (Message(..), Envelope)
-import Message as Message
 import Util (prependOver, randomElement, readJson, writeJson)
 import Web.Event.Event (Event, EventType(..), preventDefault)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, toEvent)
-import Web.UIEvent.KeyboardEvent as KE
 
 type AppState =
   { connectionCount :: Int
@@ -205,41 +203,12 @@ render state = HH.main_ $
     , HP.required true
     , HE.onValueInput $ Just <<< WriteUsername
     ]
-  , HH.h1 [] [ HH.text $ show state.connectionCount <> " Users in Chat" ]
-  , HH.div_
-    [ HH.div
-      [ HP.class_ $ ClassName "chat-history" ]
-      $
-      ( Message.renderHtml
-        <<< case _ of
-          ChatMessage { username, message } ->
-            ChatMessage
-              { username: fromMaybe username
-                $ HashMap.lookup username state.usernames
-              , message
-              }
-          y -> y
-        <$> take 1000 state.messages
-      )
-    , HH.div
-      [ HP.class_ $ ClassName "chat-form"]
-      [ HH.button
-        [ HE.onClick \_ -> Just SendMessage
-        , HP.class_ $ ClassName "send-chat"
-        ]
-        [ HH.text "Send" ]
-      , HH.span_
-        [ HH.input
-          [ HP.type_ HP.InputText
-          , HP.class_ $ ClassName "chat-input"
-          , HP.value state.chatInputMessage
-          , HP.required true
-          , HE.onValueInput $ Just <<< (Write _chatInputMessage)
-          , HE.onKeyDown \e -> if (KE.key e) == "Enter" then Just SendMessage else Nothing
-          ]
-        ]
-      ]
-    ]
+  , HH.h1 [] [ HH.text $ show state.connectionCount <> " Users Connected" ]
+  , Chat.render
+    { sendEvent: SendMessage
+    , onInput: Write _chatInputMessage
+    , state
+    }
   , HH.div
     [ HP.class_ $ ClassName "container" ]
     [ HH.label_ [ HH.text "Players: " ]
