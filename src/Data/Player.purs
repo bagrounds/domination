@@ -3,7 +3,7 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Data.Array (deleteAt, filter, (!!), (:))
+import Data.Array (deleteAt, filter, (:))
 import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
@@ -14,11 +14,11 @@ import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
+import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
-import Effect.Class (class MonadEffect, liftEffect)
-import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, shuffle)
+import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver)
 
 type Player =
   { deck :: Array Card
@@ -75,7 +75,11 @@ dropCards = maybeModifyHand <<< dropIndices
 hasChoices :: Player -> Boolean
 hasChoices = _.choices >>> not null
 
-play :: forall m. MonadError String m => MonadEffect m => Int -> Player -> m Player
+play
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Int -> Player -> m Player
 play cardIndex player = do
   playedCard <- getCard cardIndex player
   hand' <- case (deleteAt cardIndex player.hand) of
@@ -113,12 +117,20 @@ cash player = (Card.value player.atPlay)
   + (Card.value $ Card.isTreasure `filter` player.hand)
   - (Card.cost player.buying)
 
-drawCards :: forall m. MonadError String m => MonadEffect m => Int -> Player -> m Player
+drawCards
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Int -> Player -> m Player
 drawCards n p = if n > 0
   then drawCard p >>= drawCards (n - 1)
   else pure p
 
-drawCard :: forall m. MonadError String m => MonadEffect m => Player -> m Player
+drawCard
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Player -> m Player
 drawCard player = do
   deck <- if null player.deck
     then do
@@ -136,7 +148,7 @@ drawIfPossible p = fromMaybe p $ moveOne _deck _hand $ p
 cleanup
   :: forall m
   . MonadError String m
-  => MonadEffect m
+  => Random m
   => Player
   -> m Player
 cleanup player = drawCards 5 player

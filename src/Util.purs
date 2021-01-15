@@ -16,12 +16,10 @@ import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens')
-import Data.Lens.Setter (Setter, Setter', over, set, subOver)
+import Data.Lens.Setter (Setter', over, set, subOver)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Random (randomInt)
 
 class RenderText a where
   renderText :: a -> String
@@ -51,22 +49,6 @@ takeIndices is xs =
   then Nothing
   else Just $ snd <$>
   (fst >>> flip elem is) `filter` withIndices xs
-
-shuffle :: forall a m . MonadEffect m => Eq a => Array a -> m (Array a)
-shuffle array = fst <$> shuffle' (Tuple [] array)
-  where
-    shuffle' :: Tuple (Array a) (Array a) -> m (Tuple (Array a) (Array a))
-    shuffle' (Tuple shuffled []) = pure $ (Tuple shuffled [])
-    shuffle' (Tuple shuffled unshuffled) = do
-      i <- liftEffect $ randomInt 0 (length unshuffled - 1)
-      let randomElement' = take 1 $ drop i unshuffled
-      let unshuffledRemainder = dropIndex i unshuffled
-      shuffle' (Tuple (randomElement' <> shuffled) unshuffledRemainder)
-
-randomElement :: forall a m . MonadEffect m => Array a -> m (Maybe a)
-randomElement xs = do
-  i <- liftEffect $ randomInt 0 (length xs - 1)
-  pure $ xs !! i
 
 indices :: forall a. Array a -> Array Int
 indices xs = fst <$> mapWithIndex Tuple xs

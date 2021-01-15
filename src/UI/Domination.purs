@@ -17,6 +17,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Log (class Log, error, log)
+import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (isAction, value) as Card
 import Domination.Data.Choice as Choice
@@ -33,7 +34,6 @@ import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
 import Domination.UI.Util as Util
-import Effect.Class (class MonadEffect)
 import Halogen as H
 import Halogen.Component (ComponentSlot)
 import Halogen.Data.Slot (Slot)
@@ -109,7 +109,11 @@ gameUi newGame loadGame writeCount writeIndex state updateState = HH.div_ $
 type Component o c m a =
   ComponentSlot HTML ("Domination" :: Slot o GameEvent Int | c) m a
 
-component :: forall query m. Log m => MonadEffect m => Int -> Int -> H.Component HTML query GameUpdate GameEvent m
+component
+  :: forall query m
+  . Log m
+  => Random m
+  => Int -> Int -> H.Component HTML query GameUpdate GameEvent m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
   initialState _ = { playerIndex, state: Dom.newGame playerCount }
@@ -304,7 +308,12 @@ renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex) player card
 
-handleAction :: forall s m. Log m => MonadEffect m => GameAction -> HalogenM ComponentState GameAction s GameEvent m Unit
+handleAction ::
+  forall s m
+  . Log m
+  => Random m
+  => GameAction
+  -> HalogenM ComponentState GameAction s GameEvent m Unit
 handleAction gameAction = do
   { state } <- H.get
   case gameAction of

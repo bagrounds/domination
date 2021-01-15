@@ -20,6 +20,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
 import Data.Unfoldable (replicate)
+import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
@@ -33,7 +34,6 @@ import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
-import Effect.Class (class MonadEffect)
 import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, prependOver, takeIndices, withIndices)
 
 type GameState =
@@ -130,7 +130,10 @@ newGame i =
     ]
   }
 
-makeAutoPlay :: forall m. MonadEffect m => Play -> GameState -> m (Either String GameState)
+makeAutoPlay
+  :: forall m
+  . Random m
+  => Play -> GameState -> m (Either String GameState)
 makeAutoPlay p s = runExceptT $ do
   state <- makePlay p s
   eNextState <- runExceptT $ autoAdvance state
@@ -138,8 +141,11 @@ makeAutoPlay p s = runExceptT $ do
     Left e -> state
     Right nextState -> nextState
 
-makePlay :: forall m. MonadError String m => MonadEffect m =>
-  Play -> GameState -> m GameState
+makePlay
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Play -> GameState -> m GameState
 makePlay = case _ of
   NewGame n -> const $ setup (newGame n)
   EndPhase playerIndex -> nextPhase playerIndex
@@ -150,8 +156,11 @@ makePlay = case _ of
 getCurrentPlayer :: forall m. MonadError String m => GameState -> m Player
 getCurrentPlayer state = getPlayer state.turn state
 
-autoAdvance :: forall m. MonadError String m => MonadEffect m =>
-  GameState -> m GameState
+autoAdvance
+  :: forall m
+  . MonadError String m
+  => Random m
+  => GameState -> m GameState
 autoAdvance gameState = do
     player <- getCurrentPlayer gameState
     case gameState.phase of
@@ -173,7 +182,7 @@ autoAdvance gameState = do
 nextPhase
   :: forall m
   . MonadError String m
-  => MonadEffect m
+  => Random m
   => Int
   -> GameState
   -> m GameState
@@ -193,7 +202,11 @@ nextPhase playerIndex state =
         else s.turn
       }
 
-setup :: forall m. MonadError String m => MonadEffect m => GameState -> m GameState
+setup
+  :: forall m
+  . MonadError String m
+  => Random m
+  => GameState -> m GameState
 setup gameState = flip (set _players) gameState
   <$> traverse (Player.drawCards 5) gameState.players
 
@@ -272,7 +285,11 @@ assertChoicesResolved :: forall m. MonadError String m => GameState -> m GameSta
 assertChoicesResolved =
   assert "error: play: choices outstanding!" $ not <<< choicesOutstanding
 
-play :: forall m. MonadError String m => MonadEffect m => Int -> Int -> GameState -> m GameState
+play
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Int -> Int -> GameState -> m GameState
 play playerIndex cardIndex state = do
   player <- getPlayer playerIndex state
   card <- Player.getCard cardIndex player

@@ -11,16 +11,17 @@ import Data.Lens.Setter (over, set)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
+import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create, runBroadcastM)
+import Domination.Capability.GenUuid (genUuid, runGenUuidM)
 import Domination.Capability.Log (class Log, error, log, runLogM)
+import Domination.Capability.Random (class Random, randomElement, runRandomM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
 import Domination.UI.Chat as Chat
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
 import Effect (Effect)
-import Effect.Aff (Aff, launchAff_, makeAff)
-import Effect.Class (class MonadEffect, liftEffect)
-import FFI (Bugout)
+import Effect.Aff (Aff, launchAff_)
 import FFI as FFI
 import Halogen (Component)
 import Halogen as H
@@ -32,8 +33,8 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (Message(..), Envelope)
-import Util (prependOver, randomElement, readJson, writeJson)
-import Web.Event.Event (Event, EventType(..), preventDefault)
+import Util (prependOver, readJson, writeJson)
+import Web.Event.Event (Event, EventType(..))
 
 type AppState =
   { connectionCount :: Int
@@ -42,14 +43,12 @@ type AppState =
   , usernames :: HashMap String String
   , playerCount :: Int
   , playerIndex :: Int
-  , chatInputMessage :: String
-  , messages :: Array Message
   , message :: String
+  , messages :: Array Message
   , localDescription :: String
   , gameOn :: Boolean
   , gameState :: Maybe GameUpdate
-  , text :: String
-  , bugout :: Bugout
+  , broadcaster :: Broadcaster
   , roomCode :: String
   }
 
@@ -61,8 +60,8 @@ _playerIndex :: Lens' AppState Int
 _playerIndex = prop (SProxy :: SProxy "playerIndex")
 _playerCount :: Lens' AppState Int
 _playerCount = prop (SProxy :: SProxy "playerCount")
-_chatInputMessage :: Lens' AppState String
-_chatInputMessage = prop (SProxy :: SProxy "chatInputMessage")
+_message :: Lens' AppState String
+_message = prop (SProxy :: SProxy "message")
 _connectionCount :: Lens' AppState Int
 _connectionCount = prop (SProxy :: SProxy "connectionCount")
 _usernames :: Lens' AppState (HashMap String String)
@@ -70,22 +69,20 @@ _usernames = prop (SProxy :: SProxy "usernames")
 _username :: Lens' AppState String
 _username = prop (SProxy :: SProxy "username")
 
-newApp :: Bugout -> String -> String -> HashMap String String -> AppState
-newApp bugout username uuid usernames =
+newApp :: Broadcaster -> String -> String -> HashMap String String -> AppState
+newApp broadcaster username uuid usernames =
   { connectionCount: 0
   , id: uuid
   , username: username
   , usernames
   , playerCount: 1
   , playerIndex: 0
-  , chatInputMessage: ""
-  , messages: []
   , message: ""
+  , messages: []
   , localDescription: ""
   , gameOn: false
   , gameState: Nothing
-  , text: ""
-  , bugout: bugout
+  , broadcaster: broadcaster
   , roomCode: globalRoomCode
   }
 
@@ -108,7 +105,7 @@ main = launchAff_ $ do
   uuid <- case eUuid of
     Left e -> do
       runLogM $ log "no existing uuid found, generating a new one"
-      uuid <- liftEffect $ FFI.genUuid
+      uuid <- runGenUuidM genUuid
       runStorageM $ save uuidKey uuid
       pure $ show uuid
     Right uuid -> pure uuid
@@ -118,14 +115,14 @@ main = launchAff_ $ do
   username <- case eUsername of
     Left e -> do
       runLogM $ log "no existing username found, using default"
-      emoji <- fromMaybe ":)" <$> randomElement emojis
+      emoji <- fromMaybe ":)" <$> runRandomM (randomElement emojis)
       pure $ emoji <> "lurker" <> emoji
     Right u -> pure u
 
   let usernames = HashMap.insert uuid username HashMap.empty
 
-  bugout <- makeAff $ FFI.makeBugout globalRoomCode Left Right
-  let initialState = newApp bugout username uuid usernames
+  broadcaster <- runBroadcastM $ create globalRoomCode
+  let initialState = newApp broadcaster username uuid usernames
   runUI (root initialState) (MakeNewGame { playerCount: 1, playerIndex: 0 }) body
 
 root :: forall s query o. AppState -> Component HTML query o s Aff
@@ -135,7 +132,8 @@ component
   :: forall m s query o
   . Storage m
   => Log m
-  => MonadEffect m
+  => Random m
+  => Broadcast m
   => AppState -> Component HTML query o s m
 component state = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval { handleAction = handleAction }
@@ -144,7 +142,7 @@ component state = H.mkComponent { eval, initialState, render } where
 render
   :: forall o c m
   . Log m
-  => MonadEffect m
+  => Random m
   => AppState -> HTML (Domination.Component o c m AppAction) AppAction
 render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
@@ -152,7 +150,7 @@ render state = HH.main_ $
   , HH.h1 [] [ HH.text $ show state.connectionCount <> " Users Connected" ]
   , Chat.render
     { sendEvent: SendMessage
-    , onInput: Write _chatInputMessage
+    , onInput: Write _message
     , state
     }
   , Domination.gameUi StartNewGame LoadGame WritePlayerCount WritePlayerIndex state UpdateGameState
@@ -168,17 +166,14 @@ data AppAction
   | LoadGame
   | StartNewGame
   | UpdateGameState GameEvent
-  | PreventDefault Event
 
 handleAction
   :: forall slots output m
   . Storage m
   => Log m
-  => MonadEffect m
+  => Broadcast m
   => AppAction -> HalogenM AppState AppAction slots output m Unit
 handleAction = case _ of
-  PreventDefault e ->
-    liftEffect $ preventDefault e
   WriteUsername username -> do
     { id, usernames } <- H.get
     save "username" username
@@ -217,7 +212,7 @@ handleAction = case _ of
             H.modify_ $ prependOver _messages msg
             if message == "PING"
               then do
-                H.modify_ $ set _chatInputMessage "PONG"
+                H.modify_ $ set _message "PONG"
                 sendChatMessage
               else pure unit
           GameStateMessage state -> do
@@ -264,18 +259,13 @@ handleAction = case _ of
         Nothing -> pure unit
   where
     sendChatMessage = do
-      { id, chatInputMessage } <- H.get
-      let
-        message = ChatMessage
-          { username: id
-          , message: chatInputMessage
-          }
-      sendMessage message
-      H.modify_ $ set _chatInputMessage ""
-        <<< prependOver _messages message
+      { id, message } <- H.get
+      let chat = ChatMessage { username: id, message }
+      sendMessage chat
+      H.modify_ $ set _message "" <<< prependOver _messages chat
 
     sendMessage message = do
       log "Main: sending message"
-      { bugout, id } <- H.get
-      liftEffect $ FFI.send bugout $ writeJson { id, message }
+      { broadcaster, id } <- H.get
+      broadcast broadcaster $ writeJson { id, message }
 
