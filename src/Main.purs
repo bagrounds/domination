@@ -2,12 +2,9 @@ module Main where
 
 import Prelude
 
-import Control.Monad.State.Class (gets)
 import Data.Either (Either(..))
-import Data.Foldable (length)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
-import Data.Int (toNumber)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set)
@@ -17,7 +14,6 @@ import Domination.AppM (runAppM)
 import Domination.Capability.Log (class Log, error, log, runLogM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
 import Domination.UI.Chat as Chat
-import Domination.UI.Css as Css
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
@@ -26,10 +22,10 @@ import Effect.Aff (Aff, launchAff_, makeAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI (Bugout)
 import FFI as FFI
-import Halogen (Component, ComponentSlot, Slot)
+import Halogen (Component)
 import Halogen as H
 import Halogen.Aff as HA
-import Halogen.HTML (ClassName(..), HTML)
+import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -38,7 +34,6 @@ import Halogen.VDom.Driver (runUI)
 import Message (Message(..), Envelope)
 import Util (prependOver, randomElement, readJson, writeJson)
 import Web.Event.Event (Event, EventType(..), preventDefault)
-import Web.UIEvent.KeyboardEvent (KeyboardEvent, toEvent)
 
 type AppState =
   { connectionCount :: Int
@@ -146,54 +141,11 @@ component state = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval { handleAction = handleAction }
   initialState _ = state
 
-type DominationComponent o c m a =
-  ComponentSlot HTML ("Domination" :: Slot o GameEvent Int | c) m AppAction
-
-preventTyping
-  :: forall x a
-  . HP.IProp (onKeyDown :: KeyboardEvent | x) AppAction
-preventTyping = HE.onKeyDown \e -> Just $ PreventDefault (toEvent e)
-
-incrementer
-  :: forall w a
-  . Maybe Int -> Maybe Int -> Int -> (Int -> AppAction) -> HTML w AppAction
-incrementer mbMin mbMax value setValue = HH.div
-  [ HP.class_ $ Css.incrementer ]
-  [ HH.button
-    [ HE.onClick \_ -> case mbMin of
-      Just min ->
-        if value <= min
-        then Just $ setValue min
-        else Just $ setValue (value - 1)
-      Nothing -> Just $ setValue (value - 1)
-    ] [ HH.text "-" ]
-  , HH.input $
-    [ HP.value $ show value
-    , HP.required true
-    , preventTyping
-    ]
-    <> case mbMin of
-      Just min -> [ HP.min $ toNumber min ]
-      Nothing -> []
-    <> case mbMin of
-      Just max -> [ HP.max $ toNumber max ]
-      Nothing -> []
-  , HH.button
-    [ HE.onClick $ \_ -> case mbMax of
-      Just max ->
-        if value >= max
-        then Just $ setValue max
-        else Just $ setValue (value + 1)
-      Nothing -> Just $ setValue (value + 1)
-    ]
-    [ HH.text "+" ]
-  ]
-
 render
   :: forall o c m
   . Log m
   => MonadEffect m
-  => AppState -> HTML (DominationComponent o c m String) AppAction
+  => AppState -> HTML (Domination.Component o c m AppAction) AppAction
 render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , UsernameInput.render { onInput: WriteUsername, state }
@@ -203,40 +155,8 @@ render state = HH.main_ $
     , onInput: Write _chatInputMessage
     , state
     }
-  , HH.div
-    [ HP.class_ $ ClassName "container" ]
-    [ HH.label_ [ HH.text "Players: " ]
-    , incrementer (Just 1) Nothing state.playerCount WritePlayerCount
-    ]
-  , HH.div
-    [ HP.class_ $ ClassName "container" ]
-    [ HH.label_ [ HH.text "Player #: " ]
-    , incrementer (Just 1) Nothing (state.playerIndex + 1) ((_ - 1) >>> WritePlayerIndex)
-    ]
-  , HH.div_
-    [ HH.button
-      [ HE.onClick \_ -> Just $ StartNewGame ]
-      [ HH.text $ "Start New " <> show state.playerCount
-        <> " Player Game as Player " <> show (state.playerIndex + 1)
-      ]
-    , HH.button
-      [ HE.onClick \_ -> Just $ LoadGame ]
-      [ HH.text "Load Game" ]
-    ]
-  ] <> case state.gameState of
-    Nothing -> []
-    Just gameUpdate ->
-      [ HH.slot
-        (SProxy :: SProxy "Domination")
-        0
-        case gameUpdate of
-          UpdateState { state, playerIndex } ->
-            Domination.component (length state.players) playerIndex
-          MakeNewGame { playerCount, playerIndex } ->
-            Domination.component playerCount playerIndex
-        gameUpdate
-        (Just <<< UpdateGameState)
-      ]
+  , Domination.gameUi StartNewGame LoadGame WritePlayerCount WritePlayerIndex state UpdateGameState
+  ]
 
 data AppAction
   = WriteUsername String
@@ -356,8 +276,6 @@ handleAction = case _ of
 
     sendMessage message = do
       log "Main: sending message"
-      bugout <- gets _.bugout
-      id <- H.gets _.id
-      let package = { id, message }
-      liftEffect $ FFI.send bugout $ writeJson package
+      { bugout, id } <- H.get
+      liftEffect $ FFI.send bugout $ writeJson { id, message }
 

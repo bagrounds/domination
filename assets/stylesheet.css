@@ -139,7 +139,9 @@ main ul {
 .play .card {
   font-size: 9pt;
 }
-
+.incrementer input {
+  background-color: white;
+}
 .play {
     width: 69%;
 }

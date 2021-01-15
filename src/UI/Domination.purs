@@ -1,5 +1,7 @@
 module Domination.UI.Domination
-  ( component
+  ( gameUi
+  , component
+  , Component
   , GameUpdate(..)
   , ComponentState(..)
   , GameEvent(..)
@@ -30,9 +32,11 @@ import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
+import Domination.UI.Util as Util
 import Effect.Class (class MonadEffect)
-import Halogen (Component)
 import Halogen as H
+import Halogen.Component (ComponentSlot)
+import Halogen.Data.Slot (Slot)
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -60,7 +64,52 @@ instance showGameAction :: Show GameAction where
 
 type ComponentState = { playerIndex :: Int, state :: GameState }
 
-component :: forall query m. Log m => MonadEffect m => Int -> Int -> Component HTML query GameUpdate GameEvent m
+gameUi newGame loadGame writeCount writeIndex state updateState = HH.div_ $
+  [ Util.incrementer
+    { label: "Players: "
+    , mbMin: (Just 1)
+    , mbMax: Nothing
+    , value: state.playerCount
+    , setValue: writeCount
+    }
+  , Util.incrementer
+    { label: "Player #: "
+    , mbMin: (Just 1)
+    , mbMax: Nothing
+    , value: state.playerIndex + 1
+    , setValue: (_ - 1) >>> writeIndex
+    }
+  , HH.div_
+    [ HH.button
+      [ HE.onClick \_ -> Just $ newGame ]
+      [ HH.text $ "Start New " <> show state.playerCount
+        <> " Player Game as Player " <> show (state.playerIndex + 1)
+      ]
+    , HH.button
+      [ HE.onClick \_ -> Just $ loadGame ]
+      [ HH.text "Load Game" ]
+    ]
+  ] <> maybeGameUi
+  where
+    maybeGameUi = case state.gameState of
+      Nothing -> []
+      Just gameUpdate ->
+        [ HH.slot
+          (SProxy :: SProxy "Domination")
+          0
+          case gameUpdate of
+            UpdateState { state: { players }, playerIndex } ->
+              component (length players) playerIndex
+            MakeNewGame { playerCount, playerIndex } ->
+              component playerCount playerIndex
+          gameUpdate
+          (Just <<< updateState)
+        ]
+
+type Component o c m a =
+  ComponentSlot HTML ("Domination" :: Slot o GameEvent Int | c) m a
+
+component :: forall query m. Log m => MonadEffect m => Int -> Int -> H.Component HTML query GameUpdate GameEvent m
 component playerCount playerIndex = H.mkComponent { initialState, render, eval }
   where
   initialState _ = { playerIndex, state: Dom.newGame playerCount }
