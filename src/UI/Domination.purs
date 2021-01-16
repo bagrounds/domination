@@ -334,8 +334,13 @@ handleAction gameAction = do
       case result of
         Left e -> error e
         Right gs -> do
-          H.modify _ { state = gs } >>= _.state >>> NewState >>> H.raise
           case play of
-            EndPhase _ -> pure unit
-            _ -> H.raise $ PlayMade play
+            EndPhase _ ->
+              pure unit
+            _ ->
+              H.raise $ PlayMade play
+          H.modify _ { state = gs }
+            >>= _.state
+            >>> NewState
+            >>> H.raise
 
