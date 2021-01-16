@@ -28,9 +28,10 @@ type RenderInput a r =
   }
 
 render :: forall s a r. RenderInput a r -> HTML s a
-render { sendEvent, onInput, state  } =
+render { sendEvent, onInput, state } =
   let { usernames, messages, message } = state
-  in HH.div_
+  in HH.div
+  [ HP.class_ $ ClassName "chat" ]
   [ HH.div
     [ HP.class_ $ ClassName "chat-history" ]
     $

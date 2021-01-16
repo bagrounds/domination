@@ -27,21 +27,39 @@ header {
   height: 3em;
 }
 main {
-  display: table-cell;
   text-align: center;
   vertical-align: middle;
+  margin: 0 auto;
+  max-width: 48em;
+  overflow-x: hidden;
+  padding-bottom: 6.5em;
+}
+.content {
 }
 .container {
   display: inline-block;
   margin: 0 auto;
+}
+.chat {
+  position: fixed;
+  bottom: 0;
+  height: 6.5em;
+  width: 100%;
+  max-width: 48em;
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+  z-index: 100;
+  background-color: black;
 }
 .chat-history {
   text-align: left;
   color: black;
   border-radius: 0.5em;
   background-color: darkgray;
-  min-height: 5em;
-  max-height: 5em;
+  min-height: 4em;
+  max-height: 4em;
+  line-height: 1em;
   overflow-y: scroll;
   display: flex;
   flex-direction: column-reverse;
