@@ -1,0 +1,14 @@
+#!/bin/bash
+set -uex
+
+main () (
+  npm ci
+  npm run bundle
+  cp assets/* dist
+  mv dist/prod-index.html dist/index.html
+  rm -r public
+  mv dist public
+)
+
+main
+
