@@ -6,7 +6,7 @@ main () (
   npm run bundle
   cp assets/* dist
   mv dist/prod-index.html dist/index.html
-  rm -r public
+  rm -rf public
   mv dist public
 )
 
