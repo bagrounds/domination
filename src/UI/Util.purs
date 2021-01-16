@@ -57,3 +57,12 @@ incrementer { label, mbMin, mbMax, value, setValue } = HH.div_
     ]
   ]
 
+h1__ :: forall w i. String -> HTML w i
+h1__ text = HH.h1_ [ HH.text text ]
+
+h2__ :: forall w i. String -> HTML w i
+h2__ text = HH.h2_ [ HH.text text ]
+
+h3__ :: forall w i. String -> HTML w i
+h3__ text = HH.h3_ [ HH.text text ]
+

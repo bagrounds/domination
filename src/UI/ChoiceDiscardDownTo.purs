@@ -15,6 +15,7 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
+import Domination.UI.Util (h2__)
 import Halogen (Component)
 import Halogen as H
 import Halogen.HTML (HTML)
@@ -38,14 +39,14 @@ component player = H.mkComponent { initialState, render, eval }
 
   render :: forall a. DiscardState -> HTML a DiscardAction
   render xs = case Player.firstChoice player of
-    Just (Choice.DiscardDownTo n Nothing) -> HH.h2_ $
-      [ HH.text $ "Discard down to " <> show n <> " cards"
+    Just (Choice.DiscardDownTo n Nothing) -> HH.div_ $
+      [ h2__ $ "Discard down to " <> show n <> " cards"
       , HH.button
         [ HP.class_ Css.resolveChoice, HE.onClick \_ -> Just $ Done n ]
         [ HH.text $ "Done discarding cards" ]
       ]
       <> renderCardToDiscard n `mapWithIndex` xs
-    _ -> HH.h2_ [ HH.text "Something has gone terribly wrong!" ]
+    _ -> h2__ "Something has gone terribly wrong!"
 
   eval :: forall a
     . HalogenQ query DiscardAction input a

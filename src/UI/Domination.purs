@@ -33,6 +33,7 @@ import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
+import Domination.UI.Util (h1__, h2__, h3__)
 import Domination.UI.Util as Util
 import Halogen as H
 import Halogen.Component (ComponentSlot)
@@ -131,7 +132,7 @@ renderPlayerN :: forall t1 t2 t3.
   ComponentState ->
   HTML (ChildComponents t1 t2 t3) GameAction
 renderPlayerN cs@{ playerIndex, state } = HH.div_
-  [ HH.h1 [] [ HH.text "Domination" ]
+  [ h1__ "Domination"
   , HH.div_ $ renderPlayers cs
   ]
 
@@ -227,13 +228,13 @@ renderPlayer cs@{ state, playerIndex } player =
         [ (HH.slot (SProxy :: SProxy "DiscardDownTo") 1 (Discard.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
   else
   case state.players !! state.turn of
-    Nothing -> HH.h1_ [ HH.text "Something has gone terribly wrong!" ]
+    Nothing -> h1__ "Something has gone terribly wrong!"
     Just currentPlayer -> HH.div
       ( if state.turn /= playerIndex || Dom.choicesOutstanding state
         then [ HP.class_ Css.waiting ]
         else []
       )
-      [ HH.h2 [] [ HH.text $ "Player " <> show (playerIndex + 1) ]
+      [ h2__ $ "Player " <> show (playerIndex + 1)
       , HH.ul
           [ HP.classes $
             [ Css.supply
@@ -244,7 +245,7 @@ renderPlayer cs@{ state, playerIndex } player =
               then [ Css.waiting ]
               else []
           ]
-          $ HH.li_ [(HH.h3 [] [ HH.text $ "Supply" ])]
+          $ HH.li_ [ h3__ "Supply" ]
             : HH.ul_
               [ HH.li
                 [ HP.class_ Css.handInfo ]
@@ -272,14 +273,19 @@ renderPlayer cs@{ state, playerIndex } player =
         (playerStats cs `mapWithIndex` state.players)
       , HH.ul
         [ HP.class_ Css.play ]
-        (HH.li_ [(HH.h3 [] [ HH.text $ "Play" ])]
+        (HH.li_ [ h3__ "Play" ]
         : (renderCard (const Nothing) currentPlayer <$> currentPlayer.atPlay))
-      , HH.ul
-        [ HP.class_ Css.buying ]
-        (HH.li_ [(HH.h3 [] [ HH.text $ "Buying" ])]
-        : (renderCard (const Nothing) currentPlayer <$> currentPlayer.buying))
+      , renderBuying currentPlayer
       , renderHand player cs
       ]
+
+renderBuying :: forall w. Player -> HTML w GameAction
+renderBuying currentPlayer = HH.ul
+  [ HP.class_ Css.buying ]
+  $ title : cards
+  where
+    title = HH.li_ [ h3__ "Buying" ]
+    cards = renderCard (const Nothing) currentPlayer <$> currentPlayer.buying
 
 renderHand :: forall a. Player -> ComponentState -> HTML a GameAction
 renderHand player { playerIndex, state } = HH.ul
@@ -292,7 +298,7 @@ renderHand player { playerIndex, state } = HH.ul
       then [ Css.waiting ]
       else []
   ] $
-  [ HH.li_ [ HH.h3 [] [ HH.text $ "Hand" ] ]
+  [ HH.li_ [ h3__ "Hand" ]
   , HH.li_
     [ HH.ul_
       [ HH.li [ HP.class_ Css.handInfo ] [ HH.text $ (show $ player.actions) <> " Actions" ]

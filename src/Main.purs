@@ -20,6 +20,7 @@ import Domination.UI.Chat as Chat
 import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
+import Domination.UI.Util (h1__)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import FFI as FFI
@@ -147,7 +148,7 @@ render
 render state = HH.main_ $
   [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
   , UsernameInput.render { onInput: WriteUsername, state }
-  , HH.h1 [] [ HH.text $ show state.connectionCount <> " Users Connected" ]
+  , h1__ $ show state.connectionCount <> " Users Connected"
   , Chat.render
     { sendEvent: SendMessage
     , onInput: Write _message
