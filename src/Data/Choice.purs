@@ -11,8 +11,16 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 
 data Choice
-  = TrashUpTo Int (Maybe (Array Int))
-  | DiscardDownTo Int (Maybe (Array Int))
+  = TrashUpTo
+    { n :: Int
+    , resolution :: (Maybe (Array Int))
+    , attack :: Boolean
+    }
+  | DiscardDownTo
+    { n :: Int
+    , resolution :: (Maybe (Array Int))
+    , attack :: Boolean
+    }
 
 derive instance genericChoice :: Generic Choice _
 derive instance eqChoice :: Eq Choice

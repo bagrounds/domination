@@ -15,6 +15,7 @@ import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
+import Domination.Data.Reaction (Reaction(..))
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
@@ -99,14 +100,18 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
               Just stack -> stack.card.name
         ResolveChoice playerIndex choice -> Just $
           case choice of
-            TrashUpTo n (Just cardIndices) ->
+            TrashUpTo { n, resolution: (Just cardIndices) } ->
               "trashed: "
               <> intercalate ", " (getPlayerCardName playerIndex state <$> cardIndices)
-            TrashUpTo n Nothing -> "unresolved choice?"
-            DiscardDownTo n (Just cardIndices) ->
+            TrashUpTo { n, resolution: Nothing } -> "unresolved choice?"
+            DiscardDownTo { n, resolution: (Just cardIndices) } ->
               "discarded: "
               <> intercalate ", " (getPlayerCardName playerIndex state <$> cardIndices)
-            DiscardDownTo n Nothing -> "unresolved choice?"
+            DiscardDownTo { n, resolution: Nothing } -> "unresolved choice?"
+        React playerIndex reaction -> Just $
+          case reaction of
+            Nothing -> "did not react"
+            Just BlockAttack -> "blocked an attack"
 
 
 getPlayerCardName :: Int -> GameState -> Int -> String

@@ -10,7 +10,7 @@ import Data.FunctorWithIndex (mapWithIndex)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Data.Card (Card)
-import Domination.Data.Choice (Choice)
+import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
@@ -32,15 +32,19 @@ data TrashAction
   = ToggleTrash Int Int
   | Done Int
 
-component :: forall query input m. Player -> Component HTML query input Choice.Choice m
-component player = H.mkComponent { initialState, render, eval }
+component
+  :: forall query input m
+  . Player
+  -> Choice
+  -> Component HTML query input Choice m
+component player choice = H.mkComponent { initialState, render, eval }
   where
   initialState :: forall a. a -> Array (Tuple Card Boolean)
   initialState _ = (\x -> Tuple x false) <$> player.hand
 
   render :: forall a. TrashState -> HTML a TrashAction
   render xs = case Player.firstChoice player of
-    Just (Choice.TrashUpTo n Nothing) -> HH.div_ $
+    Just (TrashUpTo { n, resolution: Nothing }) -> HH.div_ $
       [ h2__ $ "Trash up to " <> show n <> " cards"
       , HH.button
         [ HP.class_ Css.resolveChoice, HE.onClick \_ -> Just $ Done n ]
@@ -66,10 +70,12 @@ component player = H.mkComponent { initialState, render, eval }
       Done n -> (toResolved n <$> H.get) >>= H.raise
     }
 
-  toResolved :: Int -> TrashState -> Choice.Choice
-  toResolved n xs = Choice.TrashUpTo n choice
+  toResolved :: Int -> TrashState -> Choice
+  toResolved n xs = case choice of
+    TrashUpTo x -> TrashUpTo x { n = n, resolution = resolution }
+    y -> y
     where
-      choice = Just
+      resolution = Just
         $ map snd
         $ filter fst
         $ (\i (Tuple _ b) -> (Tuple b i)) `mapWithIndex` xs

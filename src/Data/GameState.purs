@@ -4,17 +4,17 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (dropWhile, filter, findIndex, head, length, takeWhile, updateAt)
+import Data.Array (catMaybes, dropWhile, filter, findIndex, head, length, takeWhile, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
-import Data.Lens.Fold (preview)
+import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', prism')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (appendOver, over, set)
-import Data.Lens.Traversal (Traversal', traverseOf)
+import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -30,6 +30,7 @@ import Domination.Data.Phase as Phase
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
+import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
@@ -60,33 +61,88 @@ _stack i = _supply <<< (ix i)
 _ofPhase :: Phase -> Prism' GameState GameState
 _ofPhase phase = prism' identity $ justIf ((==) phase <<< _.phase)
 
-getPlayer :: forall m. MonadError String m => Int -> GameState -> m Player
+getPlayer
+  :: forall m
+  . MonadError String m
+  => Int
+  -> GameState
+  -> m Player
 getPlayer i = fromJust "cannot get player!" <<< preview (_player i)
 
-updatePlayer :: forall m. MonadError String m => Int -> Player -> GameState -> m GameState
+updatePlayer
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Player
+  -> GameState
+  -> m GameState
 updatePlayer i player state = fromJust "cannot update player!"
   $ updateAt i player state.players <#> flip (set _players) state
 
-updateStack :: forall m. MonadError String m => Int -> Stack -> GameState -> m GameState
+updateStack
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Stack
+  -> GameState
+  -> m GameState
 updateStack i stack state = fromJust "cannot update stack!"
   $ updateAt i stack state.supply <#> flip (set _supply) state
 
-modifyStack :: forall m. MonadError String m => Int -> (Stack -> Stack) -> GameState -> m GameState
-modifyStack i f state = getStack i state <#> f >>= flip (updateStack i) state
+modifyStack
+  :: forall m
+  . MonadError String m
+  => Int
+  -> (Stack -> Stack)
+  -> GameState
+  -> m GameState
+modifyStack i f state =
+  getStack i state <#> f >>= flip (updateStack i) state
 
-modifyPlayer :: forall m. MonadError String m => Int -> (Player -> Player) -> GameState -> m GameState
-modifyPlayer i f state = getPlayer i state <#> f >>= flip (updatePlayer i) state
+modifyPlayer
+  :: forall m
+  . MonadError String m
+  => Int
+  -> (Player -> Player)
+  -> GameState
+  -> m GameState
+modifyPlayer i f state =
+  getPlayer i state <#> f >>= flip (updatePlayer i) state
 
-modifyPlayerM :: forall m. MonadError String m => Int -> (Player -> m Player) -> GameState -> m GameState
-modifyPlayerM i f state = getPlayer i state >>= f >>= flip (updatePlayer i) state
+modifyPlayerM
+  :: forall m
+  . MonadError String m
+  => Int
+  -> (Player -> m Player)
+  -> GameState
+  -> m GameState
+modifyPlayerM i f state =
+  getPlayer i state >>= f >>= flip (updatePlayer i) state
 
-modifyStackM :: forall m. MonadError String m => Int -> (Stack -> m Stack) -> GameState -> m GameState
-modifyStackM i f state = getStack i state >>= f >>= flip (updateStack i) state
+modifyStackM
+  :: forall m
+  . MonadError String m
+  => Int
+  -> (Stack -> m Stack)
+  -> GameState
+  -> m GameState
+modifyStackM i f state =
+  getStack i state >>= f >>= flip (updateStack i) state
 
-getStack :: forall m. MonadError String m => Int -> GameState -> m Stack
+getStack
+  :: forall m
+  . MonadError String m
+  => Int
+  -> GameState
+  -> m Stack
 getStack i = fromJust "cannot get stack!" <<< preview (_stack i)
 
-indexOfStack :: forall m. MonadError String m => Card -> GameState -> m Int
+indexOfStack
+  :: forall m
+  . MonadError String m
+  => Card
+  -> GameState
+  -> m Int
 indexOfStack card state = fromJust "card not in supply!"
   $ findIndex (\x -> x.card == card) state.supply
 
@@ -108,6 +164,7 @@ newGame playerCount =
     , { card: colony, count: victoryCount }
     , { card: curse, count: curseCount }
     , { card: chapel, count: kingdomCount }
+    , { card: moat, count: kingdomCount }
     , { card: greatHall, count: victoryCount }
     , { card: village, count: kingdomCount }
     , { card: woodCutter, count: kingdomCount }
@@ -146,15 +203,22 @@ makePlay
   :: forall m
   . MonadError String m
   => Random m
-  => Play -> GameState -> m GameState
+  => Play
+  -> GameState
+  -> m GameState
 makePlay = case _ of
   NewGame n -> const $ setup (newGame n)
   EndPhase playerIndex -> nextPhase playerIndex
   PlayCard playerIndex card -> play playerIndex card
   Purchase playerIndex stackIndex -> purchase playerIndex stackIndex
   ResolveChoice playerIndex choice -> resolveChoice playerIndex choice
+  React playerIndex reaction -> react playerIndex reaction
 
-getCurrentPlayer :: forall m. MonadError String m => GameState -> m Player
+getCurrentPlayer
+  :: forall m
+  . MonadError String m
+  => GameState
+  -> m Player
 getCurrentPlayer state = getPlayer state.turn state
 
 autoAdvance
@@ -211,7 +275,12 @@ setup
 setup gameState = flip (set _players) gameState
   <$> traverse (Player.drawCards 5) gameState.players
 
-assertPhase :: forall m. MonadError String m => Phase -> GameState -> m GameState
+assertPhase
+  :: forall m
+  . MonadError String m
+  => Phase
+  -> GameState
+  -> m GameState
 assertPhase expected = assert
   ("Expected: " <> show expected)
   (_.phase >>> (_ == expected))
@@ -237,10 +306,19 @@ purchase playerIndex stackIndex =
       modifyPlayer playerIndex (Player.purchase stack.card) state
         >>= modifyStack stackIndex Stack.take
 
-assertPlayerCanAfford :: forall m. MonadError String m => Int -> Int -> GameState -> m GameState
+assertPlayerCanAfford
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Int
+  -> GameState
+  -> m GameState
 assertPlayerCanAfford playerIndex stackIndex state = do
   stack <- getStack stackIndex state
-  modifyPlayerM playerIndex (Player.assertHasCash stack.card.cost) state
+  modifyPlayerM
+    playerIndex
+    (Player.assertHasCash stack.card.cost)
+    state
 
 overStackM
   :: forall m a
@@ -252,19 +330,49 @@ overStackM
 overStackM assertion stackIndex state =
   assertion =<< getStack stackIndex state
 
-resolveChoice :: forall m. MonadError String m => Int -> Choice -> GameState -> m GameState
-resolveChoice playerIndex (TrashUpTo n Nothing) state =
+reaction :: Int -> GameState -> Maybe Reaction
+reaction playerIndex state = do
+  hand <- preview (Player._hand >>> _player playerIndex) state
+  head $ catMaybes (_.reaction <$> hand)
+
+react
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Maybe Reaction
+  -> GameState
+  -> m GameState
+react playerIndex reaction state =
+  case reaction of
+    Nothing ->
+      pure state
+    Just BlockAttack ->
+      fromJust "failed to react!"
+      $ maybeModifyPlayer playerIndex Player.dropChoice state
+
+resolveChoice
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Choice
+  -> GameState
+  -> m GameState
+resolveChoice playerIndex (TrashUpTo { n, resolution: Nothing }) state =
   throwError "this is an unresolved choice!"
-resolveChoice playerIndex (TrashUpTo n (Just cardIndices)) state
-  | length cardIndices > n = throwError "cannot trash more indices than cards in hand!"
-  | otherwise = fromJust "failed to trash cards!" $
-    maybeModifyPlayer playerIndex playerUpdate state
+resolveChoice playerIndex (TrashUpTo { n, resolution: (Just cardIndices) }) state
+  | length cardIndices > n =
+    throwError "cannot trash more indices than cards in hand!"
+  | otherwise =
+    fromJust "failed to trash cards!"
+    $ maybeModifyPlayer playerIndex playerUpdate state
     where
-      playerUpdate = Player.dropCards cardIndices >=> Player.dropChoice
-resolveChoice playerIndex (DiscardDownTo n Nothing) state =
+      playerUpdate =
+        Player.dropCards cardIndices >=> Player.dropChoice
+resolveChoice playerIndex (DiscardDownTo { n, resolution: Nothing }) state =
   throwError "this is an unresolved choice!"
-resolveChoice playerIndex (DiscardDownTo n (Just cardIndices)) state = do
-  hand :: Array Card <- fromJust "" $ preview (_player playerIndex <<< Player._hand) state
+resolveChoice playerIndex (DiscardDownTo { n, resolution: (Just cardIndices) }) state = do
+  hand <- fromJust ""
+    $ preview (_player playerIndex <<< Player._hand) state
   if length hand - length cardIndices > 3
     then throwError "must discard down to 3!"
     else if length hand < length cardIndices
@@ -272,25 +380,43 @@ resolveChoice playerIndex (DiscardDownTo n (Just cardIndices)) state = do
     else if length hand < 3 && length cardIndices > 0
     then throwError "only discard down to 3!"
     else pure unit
-  discarded :: Array Card <- fromJust "failed discard indices from hand" $ takeIndices cardIndices hand
-  hand' :: Array Card <- fromJust "failed to drop card indices from hand" $ dropIndices cardIndices hand
-  let (state' :: GameState) = set (_player playerIndex <<< Player._hand) hand' state
-  let (state'' :: GameState) = appendOver (_player playerIndex <<< Player._discard) discarded state'
+  discarded <- fromJust "failed discard indices from hand"
+    $ takeIndices cardIndices hand
+  hand' <- fromJust "failed to drop card indices from hand"
+    $ dropIndices cardIndices hand
+  let
+    state' = set (_player playerIndex <<< Player._hand) hand' state
+    state'' = appendOver (_player playerIndex <<< Player._discard)
+      discarded state'
   fromJust "failed to modify player"
     $ maybeModifyPlayer playerIndex Player.dropChoice state''
 
-assertTurn :: forall m. MonadError String m => Int -> GameState -> m GameState
-assertTurn playerIndex = assert "not your turn!" $ (playerIndex == _) <<< _.turn
+assertTurn
+  :: forall m
+  . MonadError String m
+  => Int
+  -> GameState
+  -> m GameState
+assertTurn playerIndex = assert "not your turn!"
+  $ (playerIndex == _) <<< _.turn
 
-assertChoicesResolved :: forall m. MonadError String m => GameState -> m GameState
+assertChoicesResolved ::
+  forall m
+  . MonadError String m
+  => GameState
+  -> m GameState
 assertChoicesResolved =
-  assert "error: play: choices outstanding!" $ not <<< choicesOutstanding
+  assert "error: play: choices outstanding!"
+    $ not <<< choicesOutstanding
 
 play
   :: forall m
   . MonadError String m
   => Random m
-  => Int -> Int -> GameState -> m GameState
+  => Int
+  -> Int
+  -> GameState
+  -> m GameState
 play playerIndex cardIndex state = do
   player <- getPlayer playerIndex state
   card <- Player.getCard cardIndex player
@@ -304,9 +430,14 @@ play playerIndex cardIndex state = do
     applySpecialsToTargets card =
       flip (foldM $ applySpecialToTargets playerIndex) card.specials
 
-    applySpecialToTargets :: Int -> GameState -> Special -> m GameState
+    applySpecialToTargets
+      :: Int
+      -> GameState
+      -> Special
+      -> m GameState
     applySpecialToTargets attackerIndex state { target, command } =
-      foldM (flip $ applySpecialToTarget command) state $ targetIndices target attackerIndex state
+      foldM (flip $ applySpecialToTarget command) state
+      $ targetIndices target attackerIndex state
 
     applySpecialToTarget :: Command -> Int -> GameState -> m GameState
     applySpecialToTarget (Gain card) targetIndex state = do
@@ -325,23 +456,35 @@ play playerIndex cardIndex state = do
       modifyPlayerM targetIndex (Player.drawCards n) state
 
     applySpecialToTarget (Discard SelectAll) targetIndex state =
-      modifyPlayer targetIndex (moveAll Player._hand Player._toDiscard) state
+      modifyPlayer
+      targetIndex
+      (moveAll Player._hand Player._toDiscard)
+      state
 
     applySpecialToTarget (Choose choice) targetIndex state =
       modifyPlayer targetIndex (Player.gainChoice choice) state
 
     targetIndices :: Target -> Int -> GameState -> Array Int
-    targetIndices EveryoneElse attackerIndex = filter (_ /= attackerIndex) <<< indices <<< _.players
+    targetIndices EveryoneElse attackerIndex =
+      filter (_ /= attackerIndex) <<< indices <<< _.players
     targetIndices Everyone _ = indices <<< _.players
     targetIndices Self attackerIndex = const [ attackerIndex ]
 
 choicesOutstanding :: GameState -> Boolean
 choicesOutstanding = any Player.hasChoices <<< view _players
 
-maybeModifyPlayer :: Int -> (Player -> Maybe Player) -> GameState -> Maybe GameState
+maybeModifyPlayer
+  :: Int
+  -> (Player -> Maybe Player)
+  -> GameState
+  -> Maybe GameState
 maybeModifyPlayer i = traverseOf (_player i)
 
-maybeModifyPlayerHand :: Int -> (Array Card -> Maybe (Array Card)) -> GameState -> Maybe GameState
+maybeModifyPlayerHand
+  :: Int
+  -> (Array Card -> Maybe (Array Card))
+  -> GameState
+  -> Maybe GameState
 maybeModifyPlayerHand i = traverseOf (Player._hand >>> _player i)
 
 -- should we return a maybe here in case there are no players?
@@ -417,6 +560,7 @@ witch = Card.actionAttack
     [ { target: EveryoneElse
       , command: Gain curse
       , description: "Each other player gains a Curse."
+      , attack: true
       }
     ]
   }
@@ -430,6 +574,7 @@ councilRoom = Card.action
     [ { target: EveryoneElse
       , command: Draw 1
       , description: "Each other player draws a card."
+      , attack: false
       }
     ]
   }
@@ -441,35 +586,51 @@ scholar = Card.action
     [ { target: Self
       , command: Discard SelectAll
       , description: "Discard your hand."
+      , attack: false
       }
     , { target: Self
       , command: Draw 7
       , description: "Draw 7 cards"
+      , attack: false
       }
     ]
   }
 chapel :: Card
-chapel = Card.action
+chapel = let attack = false in
+  Card.action
   { name = "Chapel"
   , cost = 2
   , specials =
     [ { target: Self
-      , command: Choose $ (TrashUpTo 4 Nothing)
+      , command: Choose
+        $ (TrashUpTo { n: 4, resolution: Nothing, attack })
       , description: "Trash up to 4 cards from your hand"
+      , attack
       }
     ]
   }
 militia :: Card
-militia = Card.actionAttack
+militia = let attack = true in
+  Card.actionAttack
   { name = "Militia"
   , cost = 4
   , treasure = 2
   , specials =
     [ { target: EveryoneElse
-      , command: Choose $ (DiscardDownTo 3 Nothing)
+      , command: Choose
+        $ (DiscardDownTo { n: 3, resolution: Nothing, attack })
       , description: "Discard down to 3 cards"
+      , attack
       }
     ]
+  }
+moat :: Card
+moat = let attack = false in
+  Card.reaction
+  { name = "Moat"
+  , cost = 2
+  , cards = 2
+  , reaction = Just BlockAttack
   }
 
 

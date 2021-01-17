@@ -21,6 +21,7 @@ import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (isAction, value) as Card
+import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
@@ -28,6 +29,7 @@ import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
+import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Stack (Stack)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceDiscardDownTo as Discard
@@ -131,8 +133,8 @@ component playerCount playerIndex =
 
 type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML
-  ( "DiscardDownTo" :: H.Slot t1 Choice.Choice Int
-  , "TrashUpTo" :: H.Slot t1 Choice.Choice Int
+  ( "DiscardDownTo" :: H.Slot t1 Choice Int
+  , "TrashUpTo" :: H.Slot t1 Choice Int
   | t2
   ) t3 GameAction
 
@@ -266,73 +268,85 @@ renderPlayer cs@{ state, playerIndex } player =
   if Player.hasChoices player && playerIndex == Dom.choiceTurn state
   then fromMaybe (HH.div_ []) $
     let choice = (Player.firstChoice player) in
-    choice <#> case _ of
-      Choice.TrashUpTo _ _ -> HH.div_
-        [ HH.slot
-          (SProxy :: SProxy "TrashUpTo")
-          0
-          (Trash.component player)
-          unit
-          (Just <<< MakePlay <<< ResolveChoice playerIndex)
-        ]
-      Choice.DiscardDownTo _ _ -> HH.div_
-        [ HH.slot
-          (SProxy :: SProxy "DiscardDownTo")
-          1
-          (Discard.component player)
-          unit
-          (Just <<< MakePlay <<< ResolveChoice playerIndex)
-        ]
-  else
-  case state.players !! state.turn of
-    Nothing -> h1__ "Something has gone terribly wrong!"
-    Just currentPlayer -> HH.div
-      ( if state.turn /= playerIndex || Dom.choicesOutstanding state
-        then [ HP.class_ Css.waiting ]
-        else []
-      )
-      [ h2__ $ "Player " <> show (playerIndex + 1)
-      , HH.ul
-          [ HP.classes $
-            [ Css.supply
-            , if state.turn == playerIndex && state.phase == BuyPhase
-              then Css.active
-              else Css.inactive
-            ] <> if player.buys < 1
-              then [ Css.waiting ]
-              else []
+    case Dom.reaction playerIndex state of
+      Just r ->
+        Just $ HH.div_
+          [ h2__ "Block attack ?"
+          , HH.button
+            [ HE.onClick \_ -> Just $ MakePlay $ React playerIndex (Just BlockAttack) ]
+            [ HH.text "Yes" ]
+          , HH.button
+            [ HE.onClick \_ -> Just $ MakePlay $ React playerIndex Nothing ]
+            [ HH.text "No" ]
           ]
-          $ HH.li_ [ h3__ "Supply" ]
-            : HH.ul_
-              [ HH.li
-                [ HP.class_ Css.handInfo ]
-                [ HH.text $ "$" <> (show $ Player.cash player) ]
-              , HH.li
-                [ HP.class_ Css.handInfo ]
-                [ HH.text $ (show $ player.buys) <> " Buys" ]
+      Nothing ->
+        choice <#> \c -> case c of
+          TrashUpTo _ -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "TrashUpTo")
+              0
+              (Trash.component player c)
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+            ]
+          DiscardDownTo _ -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "DiscardDownTo")
+              1
+              (Discard.component player c)
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+            ]
+      else
+      case state.players !! state.turn of
+        Nothing -> h1__ "Something has gone terribly wrong!"
+        Just currentPlayer -> HH.div
+          ( if state.turn /= playerIndex || Dom.choicesOutstanding state
+            then [ HP.class_ Css.waiting ]
+            else []
+          )
+          [ h2__ $ "Player " <> show (playerIndex + 1)
+          , HH.ul
+              [ HP.classes $
+                [ Css.supply
+                , if state.turn == playerIndex && state.phase == BuyPhase
+                  then Css.active
+                  else Css.inactive
+                ] <> if player.buys < 1
+                  then [ Css.waiting ]
+                  else []
               ]
-            : [ HH.ul_ (renderSupply player cs) ]
-      , HH.button
-        [ HP.class_ (Css.nextPhase)
-        , HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex
-        ]
-        [ HH.text if state.turn == playerIndex
-          then if Dom.choicesOutstanding state
-            then "Waiting for Player "
-              <> show (Dom.choiceTurn state + 1)
-              <> " to Choose"
-            else case state.phase of
-              ActionPhase -> "Complete Action Phase"
-              BuyPhase -> "Complete Buy Phase"
-              CleanupPhase -> "Complete Turn"
-          else "Waiting for Player " <> show (state.turn + 1)
-            <> " | " <> Phase.renderText state.phase
-        ]
-      , renderStats cs
-      , renderAtPlay currentPlayer
-      , renderBuying currentPlayer
-      , renderHand player cs
-      ]
+              $ HH.li_ [ h3__ "Supply" ]
+                : HH.ul_
+                  [ HH.li
+                    [ HP.class_ Css.handInfo ]
+                    [ HH.text $ "$" <> (show $ Player.cash player) ]
+                  , HH.li
+                    [ HP.class_ Css.handInfo ]
+                    [ HH.text $ (show $ player.buys) <> " Buys" ]
+                  ]
+                : [ HH.ul_ (renderSupply player cs) ]
+          , HH.button
+            [ HP.class_ (Css.nextPhase)
+            , HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex
+            ]
+            [ HH.text if state.turn == playerIndex
+              then if Dom.choicesOutstanding state
+                then "Waiting for Player "
+                  <> show (Dom.choiceTurn state + 1)
+                  <> " to Choose"
+                else case state.phase of
+                  ActionPhase -> "Complete Action Phase"
+                  BuyPhase -> "Complete Buy Phase"
+                  CleanupPhase -> "Complete Turn"
+              else "Waiting for Player " <> show (state.turn + 1)
+                <> " | " <> Phase.renderText state.phase
+            ]
+          , renderStats cs
+          , renderAtPlay currentPlayer
+          , renderBuying currentPlayer
+          , renderHand player cs
+          ]
 
 renderStats :: forall w. ComponentState -> HTML w GameAction
 renderStats cs = HH.ul

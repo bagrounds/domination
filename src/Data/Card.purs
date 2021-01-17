@@ -11,11 +11,14 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', is, prism')
+import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
+import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
+import Domination.Data.Reaction (Reaction)
 import Domination.Data.SelectCards (SelectCards)
 import Domination.Data.Target (Target)
 import Util (justIf)
@@ -30,6 +33,7 @@ type Card =
   , cards :: Int
   , actions :: Int
   , specials :: Array Special
+  , reaction :: Maybe Reaction
   }
 
 _types :: Lens' Card (Array CardType)
@@ -50,6 +54,8 @@ _actions :: Lens' Card Int
 _actions = prop (SProxy :: SProxy "actions")
 _specials :: Lens' Card (Array Special)
 _specials = prop (SProxy :: SProxy "specials")
+_reaction :: Traversal' Card Reaction
+_reaction = prop (SProxy :: SProxy "reaction") <<< _Just
 
 _ofType :: CardType -> Prism' Card Card
 _ofType cardType = prism' identity $ justIf $ elem cardType <<< _.types
@@ -65,6 +71,9 @@ isTreasure = hasType Treasure
 
 isVictory :: Card -> Boolean
 isVictory = hasType Victory
+
+isReaction :: Card -> Boolean
+isReaction = hasType Reaction
 
 value :: Array Card -> Int
 value = foldr (+) 0 <<< map _.treasure
@@ -83,6 +92,7 @@ card =
   , cards: 0
   , actions: 0
   , specials: []
+  , reaction: Nothing
   }
 
 treasure :: Card
@@ -97,10 +107,14 @@ action = card { types = [Action] }
 actionAttack :: Card
 actionAttack = card { types = [ Action, Attack ] }
 
+reaction :: Card
+reaction = card { types = [ Reaction ] }
+
 type Special =
   { target :: Target
   , command :: Command
   , description :: String
+  , attack :: Boolean
   }
 
 _target :: Lens' Special Target

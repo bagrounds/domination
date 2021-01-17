@@ -15,6 +15,7 @@ data CardType
   | Victory
   | Curse
   | Attack
+  | Reaction
 
 derive instance genericCardType :: Generic CardType _
 derive instance eqCardType :: Eq CardType
