@@ -22,11 +22,16 @@ render
   -> Card
   -> HTML a b
 render onClick extraClasses card = HH.div
-  (if Card.isTreasure card then [ HP.class_ Css.treasureCard ] else [ HP.class_ Css.noTreasureCard ])
+  ( if Card.isTreasure card
+    then [ HP.class_ Css.treasureCard ]
+    else [ HP.class_ Css.noTreasureCard ]
+  )
   [ HH.div (if Card.isVictory card then [ HP.class_ Css.victoryCard ] else [ HP.class_ Css.noVictoryCard ])
     [ HH.div
       ( if Card.hasType CardType.Attack card
         then [ HP.class_ Css.attackCard ]
+        else if Card.hasType CardType.Reaction card
+        then [ HP.class_ Css.reactionCard ]
         else if Card.hasType CardType.Action card
         then [ HP.class_ Css.actionCard ]
         else if Card.hasType CardType.Curse card
