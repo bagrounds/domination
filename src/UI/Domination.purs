@@ -292,16 +292,11 @@ renderPlayer cs@{ state, playerIndex } player =
   && playerIndex == Dom.choiceTurn state
   then fromMaybe (HH.div_ []) $
     let
-      choice = (Player.firstChoice player)
-      isAttack = case choice of
-        Just (TrashUpTo { attack: true }) -> true
-        Just (DiscardDownTo { attack: true }) -> true
-        _ -> false
-      hasReaction = case Dom.reaction playerIndex state of
-        Just _ -> true
-        Nothing -> false
+      choice = Player.firstChoice player
+      hasReaction = Dom.hasReaction playerIndex state
+      isAttacked = Dom.isAttacked playerIndex state
     in
-    if isAttack && hasReaction
+    if isAttacked && hasReaction
     then renderReaction
     else renderChoice choice
   else

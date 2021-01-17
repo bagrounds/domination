@@ -22,6 +22,12 @@ data Choice
     , attack :: Boolean
     }
 
+isAttack :: Choice -> Boolean
+isAttack = case _ of
+  DiscardDownTo { attack: true } -> true
+  TrashUpTo { attack: true } -> true
+  _ -> false
+
 derive instance genericChoice :: Generic Choice _
 derive instance eqChoice :: Eq Choice
 instance showChoice :: Show Choice where show = genericShow

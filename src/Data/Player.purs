@@ -3,12 +3,14 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Data.Array (deleteAt, filter, (:))
+import Data.Array (catMaybes, deleteAt, filter, head, (:))
 import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
+import Data.Lens.Prism (Prism')
+import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
@@ -18,6 +20,8 @@ import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
+import Domination.Data.Choice as Choice
+import Domination.Data.Reaction (Reaction)
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver)
 
 type Player =
@@ -30,6 +34,7 @@ type Player =
   , actions :: Int
   , buys :: Int
   , choices :: Array Choice
+  , reaction :: Maybe Reaction
   }
 
 _deck :: Lens' Player (Array Card)
@@ -50,6 +55,8 @@ _buys :: Lens' Player Int
 _buys = prop (SProxy :: SProxy "buys")
 _choices :: Lens' Player (Array Choice)
 _choices = prop (SProxy :: SProxy "choices")
+_reaction :: Traversal' Player Reaction
+_reaction = prop (SProxy :: SProxy "reaction") <<< _Just
 
 _cardInHand :: Int -> Traversal' Player Card
 _cardInHand i = _hand <<< ix i
@@ -101,7 +108,31 @@ dropChoice :: Player -> Maybe Player
 dropChoice = traverseOf _choices $ deleteAt 0
 
 gainChoice :: Choice -> Player -> Player
-gainChoice choice = over _choices $ (choice : _)
+gainChoice choice player =
+  let
+    player' = (over _choices $ (choice : _)) player
+  in
+    if Choice.isAttack choice
+    then case reactionInHand player of
+      Just r -> gainReaction r player'
+      Nothing -> player'
+    else player'
+
+gainReaction :: Reaction -> Player -> Player
+gainReaction reaction = _ { reaction = Just reaction }
+
+dropReaction :: Player -> Player
+dropReaction = _ { reaction = Nothing }
+
+reactionInHand :: Player -> Maybe Reaction
+reactionInHand =
+  _.hand >>> map _.reaction >>> catMaybes >>> head
+
+hasReaction :: Player -> Boolean
+hasReaction { reaction } =
+  case reaction of
+    Just _ -> true
+    Nothing -> false
 
 purchase :: Card -> Player -> Player
 purchase card = decOver _buys >>> prependOver _buying card

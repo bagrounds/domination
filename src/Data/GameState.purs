@@ -25,6 +25,7 @@ import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
+import Domination.Data.Choice as Choice
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
 import Domination.Data.Play (Play(..))
@@ -330,6 +331,23 @@ overStackM
 overStackM assertion stackIndex state =
   assertion =<< getStack stackIndex state
 
+hasReaction :: Int -> GameState -> Boolean
+hasReaction playerIndex state =
+  case preview (Player._reaction >>> _player playerIndex) state of
+    Just _ -> true
+    Nothing -> false
+
+isAttacked :: Int -> GameState -> Boolean
+isAttacked playerIndex state =
+  case firstChoice playerIndex state of
+    Just choice -> Choice.isAttack choice
+    _ -> false
+
+firstChoice :: Int -> GameState -> Maybe Choice
+firstChoice playerIndex state = do
+  player <- preview (_player playerIndex) state
+  Player.firstChoice player
+
 reaction :: Int -> GameState -> Maybe Reaction
 reaction playerIndex state = do
   hand <- preview (Player._hand >>> _player playerIndex) state
@@ -342,13 +360,14 @@ react
   -> Maybe Reaction
   -> GameState
   -> m GameState
-react playerIndex reaction state =
+react playerIndex reaction =
+  modifyPlayer playerIndex Player.dropReaction >=>
   case reaction of
     Nothing ->
-      pure state
+      pure
     Just BlockAttack ->
       fromJust "failed to react!"
-      $ maybeModifyPlayer playerIndex Player.dropChoice state
+      <<< maybeModifyPlayer playerIndex Player.dropChoice
 
 resolveChoice
   :: forall m
@@ -509,6 +528,7 @@ newPlayer =
   , actions: 1
   , buys: 1
   , choices: []
+  , reaction : Nothing
   }
 
 copper :: Card
