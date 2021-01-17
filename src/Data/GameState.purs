@@ -39,7 +39,6 @@ import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, prependOve
 type GameState =
   { turn :: Int
   , phase :: Phase
-  , text :: String
   , players :: Array Player
   , supply :: Supply
   }
@@ -48,8 +47,6 @@ _turn :: Lens' GameState Int
 _turn = prop (SProxy :: SProxy "turn")
 _phase :: Lens' GameState Phase
 _phase = prop (SProxy :: SProxy "phase")
-_text :: Lens' GameState String
-_text = prop (SProxy :: SProxy "text")
 _players :: Lens' GameState (Array Player)
 _players = prop (SProxy :: SProxy "players")
 _supply :: Lens' GameState Supply
@@ -96,39 +93,43 @@ indexOfStack card state = fromJust "card not in supply!"
 type Supply = Array Stack
 
 newGame :: Int -> GameState
-newGame i =
+newGame playerCount =
   { turn: 0
   , phase: ActionPhase
-  , text: ""
-  , players: replicate i newPlayer
+  , players: replicate playerCount newPlayer
   , supply:
-    [ { card: copper, count: 50 }
-    , { card: silver, count: 50 }
-    , { card: gold, count: 50 }
-    , { card: platinum, count: 50 }
-    , { card: estate, count: 8 }
-    , { card: duchy, count: 8 }
-    , { card: province, count: 8 }
-    , { card: colony, count: 8 }
-    , { card: curse, count: 10 * (i - 1) }
-    , { card: chapel, count: 10 }
-    , { card: greatHall, count: 8 }
-    , { card: village, count: 10 }
-    , { card: woodCutter, count: 10 }
-    , { card: monument, count: 8 }
-    , { card: smithy, count: 10 }
-    , { card: workersVillage, count: 10 }
-    , { card: militia, count: 10 }
-    , { card: bazaar, count: 10 }
-    , { card: festival, count: 10 }
-    , { card: laboratory, count: 10 }
-    , { card: market, count: 10 }
-    , { card: harem, count: 8 }
-    , { card: witch, count: 10 }
-    , { card: councilRoom, count: 10 }
-    , { card: scholar, count: 10 }
+    [ { card: copper, count: treasureCount }
+    , { card: silver, count: treasureCount }
+    , { card: gold, count: treasureCount }
+    , { card: platinum, count: treasureCount }
+    , { card: estate, count: victoryCount }
+    , { card: duchy, count: victoryCount }
+    , { card: province, count: victoryCount }
+    , { card: colony, count: victoryCount }
+    , { card: curse, count: curseCount }
+    , { card: chapel, count: kingdomCount }
+    , { card: greatHall, count: victoryCount }
+    , { card: village, count: kingdomCount }
+    , { card: woodCutter, count: kingdomCount }
+    , { card: monument, count: victoryCount }
+    , { card: smithy, count: kingdomCount }
+    , { card: workersVillage, count: kingdomCount }
+    , { card: militia, count: kingdomCount }
+    , { card: bazaar, count: kingdomCount }
+    , { card: festival, count: kingdomCount }
+    , { card: laboratory, count: kingdomCount }
+    , { card: market, count: kingdomCount }
+    , { card: harem, count: victoryCount }
+    , { card: witch, count: kingdomCount }
+    , { card: councilRoom, count: kingdomCount }
+    , { card: scholar, count: kingdomCount }
     ]
   }
+  where
+    curseCount = 10 * (playerCount - 1)
+    victoryCount = 4 * playerCount
+    kingdomCount = 4 * playerCount
+    treasureCount = 10 * playerCount
 
 makeAutoPlay
   :: forall m
