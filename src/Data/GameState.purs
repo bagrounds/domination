@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (catMaybes, dropWhile, filter, findIndex, head, length, takeWhile, updateAt)
+import Data.Array (catMaybes, dropWhile, filter, find, findIndex, head, length, takeWhile, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold (firstOf, preview)
@@ -137,6 +137,15 @@ getStack
   -> GameState
   -> m Stack
 getStack i = fromJust "cannot get stack!" <<< preview (_stack i)
+
+stackByName
+  :: forall m
+  . MonadError String m
+  => String
+  -> GameState
+  -> m Stack
+stackByName cardName { supply } = fromJust "card not in supply!" $
+  find (view (Card._name >>> Stack._card) >>> (_ == cardName)) supply
 
 indexOfStack
   :: forall m
@@ -378,7 +387,7 @@ resolveChoice
   -> m GameState
 resolveChoice playerIndex (TrashUpTo { n, resolution: Nothing }) state =
   throwError "this is an unresolved choice!"
-resolveChoice playerIndex (TrashUpTo { n, resolution: (Just cardIndices) }) state
+resolveChoice playerIndex (TrashUpTo { n, resolution: Just cardIndices }) state
   | length cardIndices > n =
     throwError "cannot trash more indices than cards in hand!"
   | otherwise =
@@ -389,7 +398,7 @@ resolveChoice playerIndex (TrashUpTo { n, resolution: (Just cardIndices) }) stat
         Player.dropCards cardIndices >=> Player.dropChoice
 resolveChoice playerIndex (DiscardDownTo { n, resolution: Nothing }) state =
   throwError "this is an unresolved choice!"
-resolveChoice playerIndex (DiscardDownTo { n, resolution: (Just cardIndices) }) state = do
+resolveChoice playerIndex (DiscardDownTo { n, resolution: Just cardIndices }) state = do
   hand <- fromJust ""
     $ preview (_player playerIndex <<< Player._hand) state
   if length hand - length cardIndices > 3
@@ -409,6 +418,20 @@ resolveChoice playerIndex (DiscardDownTo { n, resolution: (Just cardIndices) }) 
       discarded state'
   fromJust "failed to modify player"
     $ maybeModifyPlayer playerIndex Player.dropChoice state''
+resolveChoice playerIndex (GainCards { resolution: Nothing }) _ =
+  throwError "this is an unresolved choice!"
+resolveChoice playerIndex (GainCards { n, cardName, resolution: Just unit }) state = do
+    stack <- stackByName cardName state
+    stackIndex <- indexOfStack stack.card state
+    let cardsToGain = min n stack.count
+    let newCount = max 0 (stack.count - n)
+    let stackUpdate = set Stack._count newCount
+    let cards = replicate cardsToGain stack.card
+    let playerUpdate = appendOver Player._discard cards
+    modifyPlayer playerIndex playerUpdate state
+      >>= modifyStack stackIndex stackUpdate
+      <$> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
 
 assertTurn
   :: forall m
@@ -572,15 +595,21 @@ monument = Card.action { types = [Action, Victory], name = "Monument", cost = 4,
 workersVillage :: Card
 workersVillage = Card.action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
 witch :: Card
-witch = Card.actionAttack
+witch = let attack = true in
+  Card.actionAttack
   { name = "Witch"
   , cost = 5
   , cards = 2
   , specials =
     [ { target: EveryoneElse
-      , command: Gain curse
+      , command: Choose $ GainCards
+        { cardName: "Curse"
+        , n: 1
+        , resolution: Nothing
+        , attack
+        }
       , description: "Each other player gains a Curse."
-      , attack: true
+      , attack
       }
     ]
   }

@@ -84,11 +84,30 @@ nthOf i lens = view lens >>> (_ !! i)
 firstOf :: forall s a. ArrayLens' s a -> s -> Maybe a
 firstOf = nthOf 0
 
-moveOne :: forall s a . ArrayLens' s a -> ArrayLens' s a -> s -> Maybe s
+moveOne
+  :: forall s a
+  . ArrayLens' s a
+  -> ArrayLens' s a
+  -> s
+  -> Maybe s
 moveOne lens1 lens2 s = do
   x <- firstOf lens1 s
   let s' = prependOver lens2 x s
   dropFirstOf lens1 s'
+
+moveUpTo
+  :: forall s a
+  . Int
+  -> ArrayLens' s a
+  -> ArrayLens' s a
+  -> s
+  -> s
+moveUpTo n lens1 lens2 s =
+  let
+    from = view lens1 s
+    s' = over lens2 (take n from <> _) s
+  in
+  set lens1 (drop n from) s'
 
 moveAll :: forall s a . ArrayLens' s a -> ArrayLens' s a -> s -> s
 moveAll lens1 lens2 s =

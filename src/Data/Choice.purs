@@ -21,12 +21,21 @@ data Choice
     , resolution :: (Maybe (Array Int))
     , attack :: Boolean
     }
+  | GainCards
+    { n :: Int
+    , cardName :: String
+    , resolution :: Maybe Unit
+    , attack :: Boolean
+    }
 
 isAttack :: Choice -> Boolean
 isAttack = case _ of
   DiscardDownTo { attack: true } -> true
+  DiscardDownTo { attack: false } -> false
   TrashUpTo { attack: true } -> true
-  _ -> false
+  TrashUpTo { attack: false } -> false
+  GainCards { attack: true } -> true
+  GainCards { attack: false } -> false
 
 derive instance genericChoice :: Generic Choice _
 derive instance eqChoice :: Eq Choice

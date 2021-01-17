@@ -102,18 +102,32 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
           case choice of
             TrashUpTo { n, resolution: (Just cardIndices) } ->
               "trashed: "
-              <> intercalate ", " (getPlayerCardName playerIndex state <$> cardIndices)
-            TrashUpTo { n, resolution: Nothing } -> "unresolved choice?"
+              <> intercalate
+              ", "
+              (getPlayerCardName playerIndex state <$> cardIndices)
+            TrashUpTo { n, resolution: Nothing } ->
+              "unresolved choice?"
             DiscardDownTo { n, resolution: (Just cardIndices) } ->
               "discarded: "
-              <> intercalate ", " (getPlayerCardName playerIndex state <$> cardIndices)
-            DiscardDownTo { n, resolution: Nothing } -> "unresolved choice?"
+              <> intercalate
+              ", "
+              (getPlayerCardName playerIndex state <$> cardIndices)
+            DiscardDownTo { n, resolution: Nothing } ->
+              "unresolved choice?"
+            GainCards { n, cardName, resolution: Just unit } ->
+              "gained " <> show n <> "x " <> cardName
+            GainCards { resolution: Nothing } ->
+              "unresolved choice?"
         React playerIndex reaction -> Just $
           case reaction of
             Nothing -> "did not react"
             Just BlockAttack -> "blocked an attack"
 
-
 getPlayerCardName :: Int -> GameState -> Int -> String
 getPlayerCardName playerIndex state cardIndex =
-  fromMaybe "???" $ _.name <$> preview (GameState._player playerIndex <<< Player._cardInHand cardIndex) state
+  fromMaybe "???"
+  $ _.name
+  <$> preview
+  (GameState._player playerIndex <<< Player._cardInHand cardIndex)
+  state
+

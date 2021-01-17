@@ -329,13 +329,13 @@ renderPlayer cs@{ state, playerIndex } player =
               $ React playerIndex Nothing ]
             [ HH.text "No" ]
           ]
-      renderChoice choice =
-        choice <#> \c -> case c of
+      renderChoice maybeChoice =
+        maybeChoice <#> \choice -> case choice of
           TrashUpTo _ -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "TrashUpTo")
               0
-              (Trash.component player c)
+              (Trash.component player choice)
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
@@ -343,10 +343,21 @@ renderPlayer cs@{ state, playerIndex } player =
             [ HH.slot
               (SProxy :: SProxy "DiscardDownTo")
               1
-              (Discard.component player c)
+              (Discard.component player choice)
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
+          GainCards x@{ n, cardName } ->
+            HH.div_
+              [ h2__ $ "gained " <> show n <> "x " <> cardName
+              , HH.button
+                [ HE.onClick \_ -> Just $ MakePlay
+                  $ ResolveChoice
+                  playerIndex
+                  (GainCards x { resolution = Just unit })
+                ]
+                [ HH.text "OK" ]
+              ]
 
 renderNextPhaseButton { playerIndex, state } =
   HH.button
