@@ -626,7 +626,7 @@ militia = let attack = true in
   }
 moat :: Card
 moat = let attack = false in
-  Card.reaction
+  Card.actionReaction
   { name = "Moat"
   , cost = 2
   , cards = 2

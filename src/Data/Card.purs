@@ -110,6 +110,9 @@ actionAttack = card { types = [ Action, Attack ] }
 reaction :: Card
 reaction = card { types = [ Reaction ] }
 
+actionReaction :: Card
+actionReaction = card { types = [ Action, Reaction ] }
+
 type Special =
   { target :: Target
   , command :: Command
