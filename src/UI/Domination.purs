@@ -268,7 +268,14 @@ renderPlayer cs@{ state, playerIndex } player =
   if Player.hasChoices player && playerIndex == Dom.choiceTurn state
   then fromMaybe (HH.div_ []) $
     let choice = (Player.firstChoice player) in
-    case Dom.reaction playerIndex state of
+    let
+      isAttack = case choice of
+        Just (TrashUpTo { attack: true }) -> true
+        Just (DiscardDownTo { attack: true }) -> true
+        _ -> false
+    in
+    if isAttack
+    then case Dom.reaction playerIndex state of
       Just r ->
         Just $ HH.div_
           [ h2__ "Block attack ?"
@@ -297,7 +304,25 @@ renderPlayer cs@{ state, playerIndex } player =
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
-      else
+    else
+        choice <#> \c -> case c of
+          TrashUpTo _ -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "TrashUpTo")
+              0
+              (Trash.component player c)
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+            ]
+          DiscardDownTo _ -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "DiscardDownTo")
+              1
+              (Discard.component player c)
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+            ]
+  else
       case state.players !! state.turn of
         Nothing -> h1__ "Something has gone terribly wrong!"
         Just currentPlayer -> HH.div
