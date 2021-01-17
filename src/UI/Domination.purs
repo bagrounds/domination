@@ -9,8 +9,9 @@ module Domination.UI.Domination
 
 import Prelude
 
-import Data.Array (filter, length, (!!), (:))
+import Data.Array (catMaybes, filter, head, length, nub, reverse, (!!), (:))
 import Data.Either (Either(..))
+import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -65,7 +66,8 @@ instance showGameAction :: Show GameAction where
 
 type ComponentState = { playerIndex :: Int, state :: GameState }
 
-gameUi newGame loadGame writeCount writeIndex state updateState = HH.div_ $
+gameUi newGame loadGame writeCount writeIndex state updateState =
+  HH.div_ $
   [ Util.incrementer
     { label: "Players: "
     , mbMin: (Just 1)
@@ -115,18 +117,24 @@ component
   . Log m
   => Random m
   => Int -> Int -> H.Component HTML query GameUpdate GameEvent m
-component playerCount playerIndex = H.mkComponent { initialState, render, eval }
+component playerCount playerIndex =
+  H.mkComponent { initialState, render, eval }
   where
   initialState _ = { playerIndex, state: Dom.newGame playerCount }
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
-    { initialize = Just $ Receive $ MakeNewGame { playerCount, playerIndex }
+    { initialize = Just $ Receive $ MakeNewGame
+      { playerCount, playerIndex }
     , handleAction = handleAction
     , receive = Just <<< Receive
     }
 
 type ChildComponents t1 t2 t3 =
-  H.ComponentSlot HTML ("DiscardDownTo" :: H.Slot t1 Choice.Choice Int, "TrashUpTo" :: H.Slot t1 Choice.Choice Int | t2) t3 GameAction
+  H.ComponentSlot HTML
+  ( "DiscardDownTo" :: H.Slot t1 Choice.Choice Int
+  , "TrashUpTo" :: H.Slot t1 Choice.Choice Int
+  | t2
+  ) t3 GameAction
 
 renderPlayerN :: forall t1 t2 t3.
   ComponentState ->
@@ -136,9 +144,18 @@ renderPlayerN cs@{ playerIndex, state } = HH.div_
   , HH.div_ $ renderPlayers cs
   ]
 
-renderSupply :: forall a. Player -> ComponentState -> Array (HTML a GameAction)
+renderSupply
+  :: forall a
+  . Player
+  -> ComponentState
+  -> Array (HTML a GameAction)
 renderSupply player { playerIndex, state } =
-  renderStack playerIndex player `mapWithIndex` state.supply
+  renderStackI `mapWithIndex` state.supply
+  where
+    renderStackI stackIndex =
+      renderStack onClick player
+      where
+        onClick _ = Just $ MakePlay $ Purchase playerIndex stackIndex
 
 renderDeck :: forall a. Player -> HTML a GameAction
 renderDeck player = HH.button
@@ -158,7 +175,12 @@ renderDiscard player = HH.button
     ]
   ]
 
-renderCard :: forall a. (MouseEvent -> Maybe GameAction) -> Player -> Card -> HTML a GameAction
+renderCard
+  :: forall a
+  . (MouseEvent -> Maybe GameAction)
+  -> Player
+  -> Card
+  -> HTML a GameAction
 renderCard onClick player card =
   Card.render onClick extraClasses card
   where
@@ -168,8 +190,13 @@ renderCard onClick player card =
       else Css.cantPlay
     ]
 
-renderStack :: forall a. Int -> Player -> Int -> Stack -> HTML a GameAction
-renderStack playerIndex player stackIndex stack =
+renderStack
+  :: forall a
+  . (MouseEvent -> Maybe GameAction)
+  -> Player
+  -> Stack
+  -> HTML a GameAction
+renderStack onClick player stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
       [ HH.li
@@ -178,22 +205,36 @@ renderStack playerIndex player stackIndex stack =
       , HH.li
         [ HP.classes
           [ Css.stackCard
-          , if player.buys > 0 && Player.cash player >= stack.card.cost && stack.count > 0
+          , if player.buys > 0
+            && Player.cash player >= stack.card.cost
+            && stack.count > 0
             then Css.canBuy
             else Css.cantBuy
           ]
         ]
-        [ renderCard (\_ -> Just $ MakePlay $ Purchase playerIndex stackIndex) player stack.card ]
+        [ renderCard
+          onClick
+          player
+          stack.card
+        ]
       ]
     ]
 
-renderPlayers :: forall t1 t2 t3. ComponentState -> Array (HTML (ChildComponents t1 t2 t3) GameAction)
+renderPlayers
+  :: forall t1 t2 t3
+  . ComponentState
+  -> Array (HTML (ChildComponents t1 t2 t3) GameAction)
 renderPlayers cs@{ playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> []
     Just player -> [ renderPlayer cs player ]
 
-playerStats :: forall a. ComponentState -> Int -> Player -> (HTML a GameAction)
+playerStats
+  :: forall a
+  . ComponentState
+  -> Int
+  -> Player
+  -> (HTML a GameAction)
 playerStats { state, playerIndex: me } playerIndex player = HH.li
   [ HP.class_ Css.stat ]
   [ HH.text $ "Player " <> show (playerIndex + 1)
@@ -209,7 +250,11 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
       else "_"
     )
     <> " | VP: " <> show (Player.score player)
-    <> (if state.turn == playerIndex then " | " <> Phase.renderText state.phase else "")
+    <>
+    ( if state.turn == playerIndex
+      then " | " <> Phase.renderText state.phase
+      else ""
+    )
   ]
 
 renderPlayer
@@ -223,9 +268,21 @@ renderPlayer cs@{ state, playerIndex } player =
     let choice = (Player.firstChoice player) in
     choice <#> case _ of
       Choice.TrashUpTo _ _ -> HH.div_
-        [ (HH.slot (SProxy :: SProxy "TrashUpTo") 0 (Trash.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
+        [ HH.slot
+          (SProxy :: SProxy "TrashUpTo")
+          0
+          (Trash.component player)
+          unit
+          (Just <<< MakePlay <<< ResolveChoice playerIndex)
+        ]
       Choice.DiscardDownTo _ _ -> HH.div_
-        [ (HH.slot (SProxy :: SProxy "DiscardDownTo") 1 (Discard.component player) unit (Just <<< MakePlay <<< ResolveChoice playerIndex)) ]
+        [ HH.slot
+          (SProxy :: SProxy "DiscardDownTo")
+          1
+          (Discard.component player)
+          unit
+          (Just <<< MakePlay <<< ResolveChoice playerIndex)
+        ]
   else
   case state.players !! state.turn of
     Nothing -> h1__ "Something has gone terribly wrong!"
@@ -249,14 +306,16 @@ renderPlayer cs@{ state, playerIndex } player =
             : HH.ul_
               [ HH.li
                 [ HP.class_ Css.handInfo ]
-                [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
+                [ HH.text $ "$" <> (show $ Player.cash player) ]
               , HH.li
                 [ HP.class_ Css.handInfo ]
                 [ HH.text $ (show $ player.buys) <> " Buys" ]
               ]
             : [ HH.ul_ (renderSupply player cs) ]
       , HH.button
-        [ HP.class_ (Css.nextPhase), HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex ]
+        [ HP.class_ (Css.nextPhase)
+        , HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex
+        ]
         [ HH.text if state.turn == playerIndex
           then if Dom.choicesOutstanding state
             then "Waiting for Player "
@@ -266,56 +325,94 @@ renderPlayer cs@{ state, playerIndex } player =
               ActionPhase -> "Complete Action Phase"
               BuyPhase -> "Complete Buy Phase"
               CleanupPhase -> "Complete Turn"
-          else "Waiting for Player " <> show (state.turn + 1) <> " | " <> Phase.renderText state.phase
+          else "Waiting for Player " <> show (state.turn + 1)
+            <> " | " <> Phase.renderText state.phase
         ]
-      , HH.ul
-        [ HP.class_ Css.stats ]
-        (playerStats cs `mapWithIndex` state.players)
-      , HH.ul
-        [ HP.class_ Css.play ]
-        (HH.li_ [ h3__ "Play" ]
-        : (renderCard (const Nothing) currentPlayer <$> currentPlayer.atPlay))
+      , renderStats cs
+      , renderAtPlay currentPlayer
       , renderBuying currentPlayer
       , renderHand player cs
       ]
 
+renderStats :: forall w. ComponentState -> HTML w GameAction
+renderStats cs = HH.ul
+  [ HP.class_ Css.stats ]
+  (playerStats cs `mapWithIndex` cs.state.players)
+
+renderAtPlay :: forall w. Player -> HTML w GameAction
+renderAtPlay currentPlayer =
+  HH.ul [ HP.class_ Css.play ] $ title : stacks
+  where
+    title = HH.li_ [ h3__ "At Play" ]
+    stacks = renderStack (const Nothing) currentPlayer
+      <$> (stackCards currentPlayer.atPlay)
+
+stackCards :: Array Card -> Array Stack
+stackCards cards = catMaybes (foldr f [] names)
+  where
+    names = nub $ _.name <$> reverse cards
+    f name stacks =
+      ({ card: _, count: length cards' } <$> head cards')
+        : stacks
+      where
+        cards' = (_.name >>> (_ == name)) `filter` cards
+
 renderBuying :: forall w. Player -> HTML w GameAction
-renderBuying currentPlayer = HH.ul
-  [ HP.class_ Css.buying ]
-  $ title : cards
+renderBuying currentPlayer =
+  HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
     title = HH.li_ [ h3__ "Buying" ]
-    cards = renderCard (const Nothing) currentPlayer <$> currentPlayer.buying
+    stacks = renderStack (const Nothing) currentPlayer
+      <$> (stackCards currentPlayer.buying)
 
 renderHand :: forall a. Player -> ComponentState -> HTML a GameAction
 renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
-    , if state.turn == playerIndex && state.phase == ActionPhase
+    , if state.turn == playerIndex
+      && state.phase == ActionPhase
       then Css.active
       else Css.inactive
-    ] <> if player.actions < 1 || (length $ Card.isAction `filter` player.hand) < 1
-      then [ Css.waiting ]
-      else []
+    ] <>
+    if player.actions < 1
+    || (length $ Card.isAction `filter` player.hand) < 1
+    then [ Css.waiting ]
+    else []
   ] $
   [ HH.li_ [ h3__ "Hand" ]
   , HH.li_
     [ HH.ul_
-      [ HH.li [ HP.class_ Css.handInfo ] [ HH.text $ (show $ player.actions) <> " Actions" ]
-      , HH.li [ HP.class_ Css.handInfo ] [ HH.text $ "$" <> (show ((Player.cash player) :: Int)) ]
-      , HH.li [ HP.class_ Css.handInfo ] [ HH.text $ (show $ player.buys) <> " Buys" ]
+      [ HH.li
+        [ HP.class_ Css.handInfo ]
+        [ HH.text $ (show $ player.actions) <> " Actions" ]
+      , HH.li
+        [ HP.class_ Css.handInfo ]
+        [ HH.text $ "$" <> (show $ Player.cash player) ]
+      , HH.li
+        [ HP.class_ Css.handInfo ]
+        [ HH.text $ (show $ player.buys) <> " Buys" ]
       ]
     ]
   , renderDiscard player
-  ] <> renderCardInHand player playerIndex `mapWithIndex` player.hand
+  ]
+  <> renderCardInHand player playerIndex `mapWithIndex` player.hand
   <> [ renderDeck player ]
 
-renderCardInHand :: forall a. Player -> Int -> Int -> Card -> HTML a GameAction
+renderCardInHand
+  :: forall a
+  . Player
+  -> Int
+  -> Int
+  -> Card
+  -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
-  renderCard (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex) player card
+  renderCard
+  (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex)
+  player
+  card
 
-handleAction ::
-  forall s m
+handleAction
+  :: forall s m
   . Log m
   => Random m
   => GameAction

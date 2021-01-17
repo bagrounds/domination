@@ -104,6 +104,12 @@ main ul {
 .stack {
   display: inline-block;
   vertical-align: top;
+}
+.stack {
+  width: 4.5em;
+  height: 7.05em;
+}
+.supply .stack {
   width: 6em;
   height: 9.4em;
 }
@@ -120,11 +126,14 @@ main ul {
   font-weight: bold;
   text-align: center;
   vertical-align: center;
-  font-size: 16pt;
+  font-size: 12pt;
   color: white;
   border-radius: 1em;
   background-color: black;
   opacity: 0.5;
+}
+.supply .stack-count {
+  font-size: 16pt;
 }
 .card, .deck, .discard {
   display: inline-block;
