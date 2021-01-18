@@ -640,7 +640,6 @@ witch = let attack = true in
         , attack
         }
       , description: "Each other player gains a Curse."
-      , attack
       }
     ]
   }
@@ -659,7 +658,6 @@ councilRoom = let attack = false in
         , attack
         }
       , description: "Each other player draws a card."
-      , attack
       }
     ]
   }
@@ -676,7 +674,6 @@ scholar = let attack = false in
         , attack
         }
       , description: "Discard your hand."
-      , attack
       }
     , { target: Self
       , command: Choose $ Draw
@@ -685,7 +682,6 @@ scholar = let attack = false in
         , attack
         }
       , description: "Draw 7 cards"
-      , attack
       }
     ]
   }
@@ -699,7 +695,6 @@ chapel = let attack = false in
       , command: Choose
         $ (TrashUpTo { n: 4, resolution: Nothing, attack })
       , description: "Trash up to 4 cards from your hand"
-      , attack
       }
     ]
   }
@@ -714,12 +709,11 @@ militia = let attack = true in
       , command: Choose
         $ (DiscardDownTo { n: 3, resolution: Nothing, attack })
       , description: "Discard down to 3 cards"
-      , attack
       }
     ]
   }
 moat :: Card
-moat = let attack = false in
+moat =
   Card.actionReaction
   { name = "Moat"
   , cost = 2
@@ -743,7 +737,6 @@ nobles = let attack = false in
         , attack
         }
       , description: "Choose one: +3 cards or +2 actions"
-      , attack
       }
     ]
   }
@@ -765,7 +758,6 @@ steward = let attack = false in
         }
       , description:
         "Choose one: + 2 cards, + $2, or trash 2 cards from your hand"
-      , attack
       }
     ]
   }

@@ -120,7 +120,6 @@ type Special =
   { target :: Target
   , command :: Command
   , description :: String
-  , attack :: Boolean
   }
 
 _target :: Lens' Special Target
