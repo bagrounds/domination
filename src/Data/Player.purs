@@ -110,7 +110,7 @@ dropChoice = traverseOf _choices $ deleteAt 0
 gainChoice :: Choice -> Player -> Player
 gainChoice choice player =
   let
-    player' = (over _choices $ (choice : _)) player
+    player' = (over _choices $ (_ <> [ choice ])) player
   in
     if Choice.isAttack choice
     then case reactionInHand player of

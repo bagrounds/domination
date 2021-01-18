@@ -22,7 +22,6 @@ import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (isAction, value) as Card
 import Domination.Data.Choice (Choice(..))
-import Domination.Data.Choice as Choice
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
 import Domination.Data.Phase (Phase(..))
@@ -30,13 +29,14 @@ import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
-import Domination.UI.Util (h1__, h2__, h3__)
+import Domination.UI.Util (acknowledge, h1__, h2__, h3__, chooseOne)
 import Domination.UI.Util as Util
 import Halogen as H
 import Halogen.Component (ComponentSlot)
@@ -318,16 +318,14 @@ renderPlayer cs@{ state, playerIndex } player =
         ]
     where
       renderReaction =
-        Just $ HH.div_
-          [ h2__ "Block attack ?"
-          , HH.button
-            [ HE.onClick \_ -> Just $ MakePlay
-              $ React playerIndex (Just BlockAttack) ]
-            [ HH.text "Yes" ]
-          , HH.button
-            [ HE.onClick \_ -> Just $ MakePlay
-              $ React playerIndex Nothing ]
-            [ HH.text "No" ]
+        Just $ chooseOne "Block attack?"
+          [ { clickEvent: MakePlay
+              $ React playerIndex (Just BlockAttack)
+            , text: "Yes"
+            }
+          , { clickEvent: MakePlay $ React playerIndex Nothing
+            , text: "No"
+            }
           ]
       renderChoice maybeChoice =
         maybeChoice <#> \choice -> case choice of
@@ -347,17 +345,36 @@ renderPlayer cs@{ state, playerIndex } player =
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
+          DiscardDownTo _ -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "DiscardDownTo")
+              1
+              (Discard.component player choice)
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+            ]
           GainCards x@{ n, cardName } ->
-            HH.div_
-              [ h2__ $ "gained " <> show n <> "x " <> cardName
-              , HH.button
-                [ HE.onClick \_ -> Just $ MakePlay
-                  $ ResolveChoice
-                  playerIndex
-                  (GainCards x { resolution = Just unit })
-                ]
-                [ HH.text "OK" ]
-              ]
+            acknowledge message clickEvent
+            where
+              message = "Gain " <> cardName <> " x" <> show n
+              clickEvent = playEvent GainCards x
+          Discard x@{ selection: SelectAll } ->
+            acknowledge message clickEvent
+            where
+              message = "Discard your hand"
+              clickEvent = playEvent Discard x
+          Draw x@{ n } -> acknowledge message clickEvent
+            where
+              message = "Draw " <> show n <> " cards"
+              clickEvent = playEvent Draw x
+        where
+          playEvent
+            :: forall r
+            . ({ resolution :: Maybe Unit | r } -> Choice)
+            -> { resolution :: Maybe Unit | r }
+            -> GameAction
+          playEvent mk x = MakePlay $ ResolveChoice playerIndex
+            $ mk x { resolution = Just unit }
 
 renderNextPhaseButton { playerIndex, state } =
   HH.button

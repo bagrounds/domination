@@ -2,6 +2,7 @@ module Domination.UI.Util where
 
 import Prelude
 
+import Data.Array ((:))
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Domination.UI.Css as Css
@@ -17,6 +18,30 @@ type IncrementerInput i =
   , value :: Int
   , setValue :: Int -> i
   }
+
+chooseOne
+  :: forall w i
+  . String
+  -> Array { clickEvent :: i, text :: String }
+  -> HTML w i
+chooseOne title bs = HH.div_ $
+  h2__ title : map mkButton bs
+  where
+    mkButton { clickEvent, text } = HH.button
+      [ HE.onClick \_ -> Just clickEvent ]
+      [ HH.text text ]
+
+acknowledge
+  :: forall w i
+  . String
+  -> i
+  -> HTML w i
+acknowledge message clickEvent = HH.div_
+  [ h2__ message
+  , HH.button
+    [ HE.onClick \_ -> Just clickEvent ]
+    [ HH.text "OK" ]
+  ]
 
 incrementer :: forall w i. IncrementerInput i -> HTML w i
 incrementer { label, mbMin, mbMax, value, setValue } = HH.div_

@@ -128,10 +128,7 @@ _description :: Lens' Special String
 _description = prop (SProxy :: SProxy "description")
 
 data Command
-  = Gain Card -- the dependency on Card prevents us from splitting Command into another module
-  | Draw Int
-  | Discard SelectCards
-  | Choose Choice
+  = Choose Choice
 
 derive instance genericCommand :: Generic Command _
 derive instance eqCommand :: Eq Command
@@ -143,18 +140,6 @@ instance encodeJsonCommand :: EncodeJson Command where
 instance decodeJsonCommand :: DecodeJson Command where
   decodeJson x = genericDecodeJson x
 
-_toGain :: Prism' Command Card
-_toGain = prism' Gain case _ of
-  Gain c -> Just c
-  _ -> Nothing
-_toDraw :: Prism' Command Int
-_toDraw = prism' Draw case _ of
-  Draw n -> Just n
-  _ -> Nothing
-_toDiscard :: Prism' Command SelectCards
-_toDiscard = prism' Discard case _ of
-  Discard s -> Just s
-  _ -> Nothing
 _toChoose :: Prism' Command Choice
 _toChoose = prism' Choose case _ of
   Choose s -> Just s

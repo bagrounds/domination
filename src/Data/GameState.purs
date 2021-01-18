@@ -381,57 +381,71 @@ react playerIndex reaction =
 resolveChoice
   :: forall m
   . MonadError String m
+  => Random m
   => Int
   -> Choice
   -> GameState
   -> m GameState
-resolveChoice playerIndex (TrashUpTo { n, resolution: Nothing }) state =
-  throwError "this is an unresolved choice!"
-resolveChoice playerIndex (TrashUpTo { n, resolution: Just cardIndices }) state
-  | length cardIndices > n =
-    throwError "cannot trash more indices than cards in hand!"
-  | otherwise =
-    fromJust "failed to trash cards!"
-    $ maybeModifyPlayer playerIndex playerUpdate state
-    where
-      playerUpdate =
-        Player.dropCards cardIndices >=> Player.dropChoice
-resolveChoice playerIndex (DiscardDownTo { n, resolution: Nothing }) state =
-  throwError "this is an unresolved choice!"
-resolveChoice playerIndex (DiscardDownTo { n, resolution: Just cardIndices }) state = do
-  hand <- fromJust ""
-    $ preview (_player playerIndex <<< Player._hand) state
-  if length hand - length cardIndices > 3
-    then throwError "must discard down to 3!"
-    else if length hand < length cardIndices
-    then throwError "cannot discard more cards than you have"
-    else if length hand < 3 && length cardIndices > 0
-    then throwError "only discard down to 3!"
-    else pure unit
-  discarded <- fromJust "failed discard indices from hand"
-    $ takeIndices cardIndices hand
-  hand' <- fromJust "failed to drop card indices from hand"
-    $ dropIndices cardIndices hand
-  let
-    state' = set (_player playerIndex <<< Player._hand) hand' state
-    state'' = appendOver (_player playerIndex <<< Player._discard)
-      discarded state'
-  fromJust "failed to modify player"
-    $ maybeModifyPlayer playerIndex Player.dropChoice state''
-resolveChoice playerIndex (GainCards { resolution: Nothing }) _ =
-  throwError "this is an unresolved choice!"
-resolveChoice playerIndex (GainCards { n, cardName, resolution: Just unit }) state = do
-    stack <- stackByName cardName state
-    stackIndex <- indexOfStack stack.card state
-    let cardsToGain = min n stack.count
-    let newCount = max 0 (stack.count - n)
-    let stackUpdate = set Stack._count newCount
-    let cards = replicate cardsToGain stack.card
-    let playerUpdate = appendOver Player._discard cards
-    modifyPlayer playerIndex playerUpdate state
-      >>= modifyStack stackIndex stackUpdate
-      <$> \state' -> fromMaybe state'
+resolveChoice playerIndex choice state =
+  case choice of
+    TrashUpTo { resolution: Nothing } -> unresolved
+    DiscardDownTo { resolution: Nothing } -> unresolved
+    GainCards { resolution: Nothing } -> unresolved
+    Discard { resolution: Nothing } -> unresolved
+    Draw { resolution: Nothing } -> unresolved
+    TrashUpTo { n, resolution: Just cardIndices } ->
+      if length cardIndices > n
+      then
+        throwError "cannot trash more indices than cards in hand!"
+      else
+        fromJust "failed to trash cards!"
+        $ maybeModifyPlayer playerIndex playerUpdate state
+        where
+          playerUpdate =
+            Player.dropCards cardIndices >=> Player.dropChoice
+    DiscardDownTo { n, resolution: Just cardIndices } -> do
+      hand <- fromJust ""
+        $ preview (_player playerIndex <<< Player._hand) state
+      if length hand - length cardIndices > 3
+        then throwError "must discard down to 3!"
+        else if length hand < length cardIndices
+        then throwError "cannot discard more cards than you have"
+        else if length hand < 3 && length cardIndices > 0
+        then throwError "only discard down to 3!"
+        else pure unit
+      discarded <- fromJust "failed discard indices from hand"
+        $ takeIndices cardIndices hand
+      hand' <- fromJust "failed to drop card indices from hand"
+        $ dropIndices cardIndices hand
+      let
+        state' = set (_player playerIndex <<< Player._hand) hand' state
+        state'' = appendOver (_player playerIndex <<< Player._discard)
+          discarded state'
+      fromJust "failed to modify player"
+        $ maybeModifyPlayer playerIndex Player.dropChoice state''
+    GainCards { n, cardName, resolution: Just unit } -> do
+      stack <- stackByName cardName state
+      stackIndex <- indexOfStack stack.card state
+      let cardsToGain = min n stack.count
+      let newCount = max 0 (stack.count - n)
+      let stackUpdate = set Stack._count newCount
+      let cards = replicate cardsToGain stack.card
+      let playerUpdate = appendOver Player._discard cards
+      modifyPlayer playerIndex playerUpdate state
+        >>= modifyStack stackIndex stackUpdate
+        <$> \state' -> fromMaybe state'
+          $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    Discard { selection: SelectAll, resolution: Just unit, attack } ->
+      modifyPlayer playerIndex (moveAll Player._hand Player._toDiscard) state
+        <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    Draw { n, resolution: Just unit, attack } ->
+      modifyPlayerM playerIndex (Player.drawCards n) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+  where
+    unresolved =
+      throwError $ "this is an unresolved choice: " <> show choice
 
 assertTurn
   :: forall m
@@ -480,28 +494,6 @@ play playerIndex cardIndex state = do
     applySpecialToTargets attackerIndex state { target, command } =
       foldM (flip $ applySpecialToTarget command) state
       $ targetIndices target attackerIndex state
-
-    applySpecialToTarget :: Command -> Int -> GameState -> m GameState
-    applySpecialToTarget (Gain card) targetIndex state = do
-      stackIndex <- indexOfStack card state
-      stack <- getStack stackIndex state
-      let stackUpdate = if stack.count > 0
-        then over Stack._count (_ - 1)
-        else identity
-      state' <- modifyStack stackIndex stackUpdate state
-      let playerUpdate = if stack.count > 0
-        then prependOver Player._discard stack.card
-        else identity
-      modifyPlayer targetIndex playerUpdate state'
-
-    applySpecialToTarget (Draw n) targetIndex state =
-      modifyPlayerM targetIndex (Player.drawCards n) state
-
-    applySpecialToTarget (Discard SelectAll) targetIndex state =
-      modifyPlayer
-      targetIndex
-      (moveAll Player._hand Player._toDiscard)
-      state
 
     applySpecialToTarget (Choose choice) targetIndex state =
       modifyPlayer targetIndex (Player.gainChoice choice) state
@@ -614,33 +606,47 @@ witch = let attack = true in
     ]
   }
 councilRoom :: Card
-councilRoom = Card.action
+councilRoom = let attack = false in
+  Card.action
   { name = "Council Room"
   , cost = 5
   , cards = 4
   , buys = 1
   , specials =
     [ { target: EveryoneElse
-      , command: Draw 1
+      , command: Choose $ Draw
+        { n: 1
+        , resolution: Nothing
+        , attack
+        }
       , description: "Each other player draws a card."
-      , attack: false
+      , attack
       }
     ]
   }
 scholar :: Card
-scholar = Card.action
+scholar = let attack = false in
+  Card.action
   { name = "Scholar"
   , cost = 5
   , specials =
     [ { target: Self
-      , command: Discard SelectAll
+      , command: Choose $ Discard
+        { selection: SelectAll
+        , resolution: Nothing
+        , attack
+        }
       , description: "Discard your hand."
-      , attack: false
+      , attack
       }
     , { target: Self
-      , command: Draw 7
+      , command: Choose $ Draw
+        { n: 7
+        , resolution: Nothing
+        , attack
+        }
       , description: "Draw 7 cards"
-      , attack: false
+      , attack
       }
     ]
   }

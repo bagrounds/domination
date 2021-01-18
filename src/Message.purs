@@ -16,6 +16,7 @@ import Domination.Data.GameState as GameState
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.SelectCards (SelectCards(..))
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
@@ -117,6 +118,14 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
             GainCards { n, cardName, resolution: Just unit } ->
               "gained " <> show n <> "x " <> cardName
             GainCards { resolution: Nothing } ->
+              "unresolved choice?"
+            Discard { selection: SelectAll, resolution: Just unit } ->
+              "discarded their hand"
+            Discard { resolution: Nothing } ->
+              "unresolved choice?"
+            Draw { n, resolution: Just unit } ->
+              "drew " <> show n <> " cards"
+            Draw { resolution: Nothing } ->
               "unresolved choice?"
         React playerIndex reaction -> Just $
           case reaction of
