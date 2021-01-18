@@ -345,14 +345,6 @@ renderPlayer cs@{ state, playerIndex } player =
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
-          DiscardDownTo _ -> HH.div_
-            [ HH.slot
-              (SProxy :: SProxy "DiscardDownTo")
-              1
-              (Discard.component player choice)
-              unit
-              (Just <<< MakePlay <<< ResolveChoice playerIndex)
-            ]
           GainCards x@{ n, cardName } ->
             acknowledge message clickEvent
             where
