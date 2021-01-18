@@ -10,6 +10,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Bonus (Bonus)
+import Domination.Data.Constraint (Constraint)
 import Domination.Data.SelectCards (SelectCards)
 
 data Choice
@@ -23,8 +24,8 @@ data Choice
     , resolution :: Maybe Choice
     , attack :: Boolean
     }
-  | TrashUpTo
-    { n :: Int
+  | Trash
+    { n :: Constraint
     , resolution :: (Maybe (Array Int))
     , attack :: Boolean
     }
@@ -59,24 +60,18 @@ data Choice
     , resolution :: Maybe Unit
     , attack :: Boolean
     }
-  | TrashExactly
-    { n :: Int
-    , resolution :: Maybe (Array Int)
-    , attack :: Boolean
-    }
 
 isAttack :: Choice -> Boolean
 isAttack = case _ of
   And { attack } -> attack
   Or { attack } -> attack
   DiscardDownTo { attack } -> attack
-  TrashUpTo { attack } -> attack
+  Trash { attack } -> attack
   GainCards { attack } -> attack
   GainActions { attack } -> attack
   Discard { attack } -> attack
   Draw { attack } -> attack
   GainBonus { attack } -> attack
-  TrashExactly { attack } -> attack
 
 derive instance genericChoice :: Generic Choice _
 derive instance eqChoice :: Eq Choice

@@ -27,6 +27,7 @@ import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
+import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
 import Domination.Data.Play (Play(..))
@@ -393,35 +394,36 @@ resolveChoice playerIndex choice state =
   case choice of
     And { resolution: Nothing } -> unresolved
     Or { resolution: Nothing } -> unresolved
-    TrashUpTo { resolution: Nothing } -> unresolved
-    TrashExactly { resolution: Nothing } -> unresolved
+    Trash { resolution: Nothing } -> unresolved
     DiscardDownTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
     GainActions { resolution: Nothing } -> unresolved
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
     GainBonus { resolution: Nothing } -> unresolved
-    TrashUpTo { n, resolution: Just cardIndices } ->
-      if length cardIndices > n
-      then
-        throwError "cannot trash more indices than cards in hand!"
-      else
-        fromJust "failed to trash cards!"
-        $ maybeModifyPlayer playerIndex playerUpdate state
-        where
-          playerUpdate =
-            Player.dropCards cardIndices >=> Player.dropChoice
-    TrashExactly { n, resolution: Just cardIndices } -> do
-      hand <- fromJust "failed to get player hand"
-        $ preview (_player playerIndex <<< Player._hand) state
-      let minToTrash = min n $ length hand
-      if length cardIndices > n
-      then throwError "cannot trash more indices than cards in hand!"
-      else if length cardIndices < minToTrash
-      then throwError $ "must trash " <> show minToTrash <> " cards"
-      else
-        fromJust "failed to trash cards!"
-        $ maybeModifyPlayer playerIndex playerUpdate state
+    Trash { n: constraint, resolution: Just cardIndices } ->
+      case constraint of
+        UpTo n ->
+          if length cardIndices > n
+          then
+            throwError "cannot trash more indices than cards in hand!"
+          else
+            fromJust "failed to trash cards!"
+            $ maybeModifyPlayer playerIndex playerUpdate state
+        Exactly n -> do
+          hand <- fromJust "failed to get player hand"
+            $ preview (_player playerIndex <<< Player._hand) state
+          let minToTrash = min n $ length hand
+          if length cardIndices > n
+          then throwError "cannot trash more indices than cards in hand!"
+          else if length cardIndices < minToTrash
+          then throwError $ "must trash " <> show minToTrash <> " cards"
+          else
+            fromJust "failed to trash cards!"
+            $ maybeModifyPlayer playerIndex playerUpdate state
+            where
+              playerUpdate =
+                Player.dropCards cardIndices >=> Player.dropChoice
         where
           playerUpdate =
             Player.dropCards cardIndices >=> Player.dropChoice
@@ -693,7 +695,7 @@ chapel = let attack = false in
   , specials =
     [ { target: Self
       , command: Choose
-        $ (TrashUpTo { n: 4, resolution: Nothing, attack })
+        $ (Trash { n: UpTo 4, resolution: Nothing, attack })
       , description: "Trash up to 4 cards from your hand"
       }
     ]
@@ -751,7 +753,7 @@ steward = let attack = false in
         { choices:
           [ Draw { n: 2, attack, resolution: Nothing }
           , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
-          , TrashExactly { n: 2, attack, resolution: Nothing }
+          , Trash { n: Exactly 2, attack, resolution: Nothing }
           ]
         , resolution: Nothing
         , attack

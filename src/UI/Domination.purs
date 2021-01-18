@@ -35,8 +35,7 @@ import Domination.UI.Bonus as Bonus
 import Domination.UI.Card (render) as Card
 import Domination.UI.Choice as Choice
 import Domination.UI.ChoiceDiscardDownTo as Discard
-import Domination.UI.ChoiceTrashExactly as TrashExactly
-import Domination.UI.ChoiceTrashUpTo as Trash
+import Domination.UI.ChoiceTrash as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
 import Domination.UI.Util (acknowledge, h1__, h2__, h3__, chooseOne)
@@ -137,8 +136,7 @@ component playerCount playerIndex =
 type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML
   ( "DiscardDownTo" :: H.Slot t1 Choice Int
-  , "TrashUpTo" :: H.Slot t1 Choice Int
-  , "TrashExactly" :: H.Slot t1 Choice Int
+  , "Trash" :: H.Slot t1 Choice Int
   | t2
   ) t3 GameAction
 
@@ -343,19 +341,11 @@ renderPlayer cs@{ state, playerIndex } player =
                 { clickEvent: playEvent Or x choice'
                 , text: Choice.renderText' choice'
                 }
-          TrashUpTo _ -> HH.div_
+          Trash _ -> HH.div_
             [ HH.slot
-              (SProxy :: SProxy "TrashUpTo")
+              (SProxy :: SProxy "Trash")
               0
               (Trash.component player choice)
-              unit
-              (Just <<< MakePlay <<< ResolveChoice playerIndex)
-            ]
-          TrashExactly _ -> HH.div_
-            [ HH.slot
-              (SProxy :: SProxy "TrashExactly")
-              1
-              (TrashExactly.component player choice)
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]

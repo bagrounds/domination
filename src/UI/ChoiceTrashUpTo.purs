@@ -1,14 +1,12 @@
-module Domination.UI.ChoiceTrashUpTo
+module Domination.UI.ChoiceTrash
   ( component
   ) where
 
 import Prelude
 
-import Data.Array (filter)
-import Data.FunctorWithIndex (mapWithIndex)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Data.Choice (Choice(..))
+import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Player (Player)
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.Choice as Choice
@@ -30,16 +28,19 @@ component player choice =
     }
   where
     renderChoice = case _ of
-      x@(TrashUpTo { n, resolution: Nothing }) -> Just
+      x@(Trash { n, resolution: Nothing }) -> Just
         { title: Choice.renderText' x
         , buttonText: "Done trashing cards"
         }
       _ -> Nothing
     canToggle { selected, total } = selected || total < maxSelected
     maxSelected = case choice of
-      TrashUpTo { n } -> n
+      Trash { n } ->
+        case n of
+          UpTo n -> n
+          Exactly n -> n
       _ -> 0
     resolve resolution = case choice of
-      TrashUpTo x -> TrashUpTo x { resolution = resolution }
+      Trash x -> Trash x { resolution = resolution }
       y -> y
 

@@ -6,6 +6,7 @@ import Data.Array (intercalate)
 import Data.Lens.Fold (preview)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Choice (Choice(..))
+import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Player as Player
@@ -24,18 +25,12 @@ renderText playerIndex state =
     Or { choices, resolution: Just choice } ->
       "chose: " <> (intercalate " or " $ renderText' <$> choices)
     Or _ -> unresolved
-    TrashUpTo { n, resolution: (Just cardIndices) } ->
+    Trash { resolution: (Just cardIndices) } ->
       "trashed: "
       <> intercalate
       ", "
       (getPlayerCardName playerIndex state <$> cardIndices)
-    TrashUpTo _ -> unresolved
-    TrashExactly { n, resolution: (Just cardIndices) } ->
-      "trashed: "
-      <> intercalate
-      ", "
-      (getPlayerCardName playerIndex state <$> cardIndices)
-    TrashExactly _ -> unresolved
+    Trash _ -> unresolved
     DiscardDownTo { n, resolution: (Just cardIndices) } ->
       "discarded: "
       <> intercalate
@@ -64,10 +59,11 @@ renderText' = case _ of
     intercalate " and " (renderText' <$> choices)
   Or { choices } ->
     intercalate " or " (renderText' <$> choices)
-  TrashUpTo { n } ->
-    "Trash up to " <> show n
-  TrashExactly { n } ->
-    "Trash " <> show n <> " cards (or as many as you have)"
+  Trash { n } -> case n of
+    UpTo n ->
+      "Trash up to " <> show n
+    Exactly n ->
+      "Trash " <> show n <> " cards (or as many as you have)"
   DiscardDownTo { n } ->
     "Discard down to " <> show n
   GainCards { n, cardName } ->
