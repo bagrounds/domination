@@ -17,6 +17,7 @@ import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Random (class Random, shuffle)
+import Domination.Data.Bonus (Bonus)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
@@ -35,6 +36,7 @@ type Player =
   , buys :: Int
   , choices :: Array Choice
   , reaction :: Maybe Reaction
+  , bonuses :: Array Bonus
   }
 
 _deck :: Lens' Player (Array Card)
@@ -57,6 +59,8 @@ _choices :: Lens' Player (Array Choice)
 _choices = prop (SProxy :: SProxy "choices")
 _reaction :: Traversal' Player Reaction
 _reaction = prop (SProxy :: SProxy "reaction") <<< _Just
+_bonuses :: Lens' Player (Array Bonus)
+_bonuses = prop (SProxy :: SProxy "bonuses")
 
 _cardInHand :: Int -> Traversal' Player Card
 _cardInHand i = _hand <<< ix i
@@ -106,6 +110,15 @@ firstChoice = firstOf traversed <<< view _choices
 
 dropChoice :: Player -> Maybe Player
 dropChoice = traverseOf _choices $ deleteAt 0
+
+gainBonus :: Bonus -> Player -> Player
+gainBonus = prependOver _bonuses
+
+gainActions :: Int -> Player -> Player
+gainActions n = over _actions (_ + n)
+
+gainChoices :: Array Choice -> Player -> Player
+gainChoices = flip $ foldr gainChoice
 
 gainChoice :: Choice -> Player -> Player
 gainChoice choice player =

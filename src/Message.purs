@@ -6,7 +6,6 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
-import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold (preview)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -17,6 +16,8 @@ import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
+import Domination.UI.Bonus as Bonus
+import Domination.UI.Choice as Choice
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
@@ -99,34 +100,8 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
             card = case preview (GameState._stack stackIndex) state of
               Nothing -> "???"
               Just stack -> stack.card.name
-        ResolveChoice playerIndex choice -> Just $
-          case choice of
-            TrashUpTo { n, resolution: (Just cardIndices) } ->
-              "trashed: "
-              <> intercalate
-              ", "
-              (getPlayerCardName playerIndex state <$> cardIndices)
-            TrashUpTo { n, resolution: Nothing } ->
-              "unresolved choice?"
-            DiscardDownTo { n, resolution: (Just cardIndices) } ->
-              "discarded: "
-              <> intercalate
-              ", "
-              (getPlayerCardName playerIndex state <$> cardIndices)
-            DiscardDownTo { n, resolution: Nothing } ->
-              "unresolved choice?"
-            GainCards { n, cardName, resolution: Just unit } ->
-              "gained " <> show n <> "x " <> cardName
-            GainCards { resolution: Nothing } ->
-              "unresolved choice?"
-            Discard { selection: SelectAll, resolution: Just unit } ->
-              "discarded their hand"
-            Discard { resolution: Nothing } ->
-              "unresolved choice?"
-            Draw { n, resolution: Just unit } ->
-              "drew " <> show n <> " cards"
-            Draw { resolution: Nothing } ->
-              "unresolved choice?"
+        ResolveChoice playerIndex choice ->
+          Just $ Choice.renderText playerIndex state choice
         React playerIndex reaction -> Just $
           case reaction of
             Nothing -> "did not react"

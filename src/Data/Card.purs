@@ -107,6 +107,9 @@ action = card { types = [Action] }
 actionAttack :: Card
 actionAttack = card { types = [ Action, Attack ] }
 
+actionVictory :: Card
+actionVictory = card { types = [ Action, Victory ] }
+
 reaction :: Card
 reaction = card { types = [ Reaction ] }
 

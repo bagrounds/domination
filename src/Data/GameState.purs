@@ -190,6 +190,7 @@ newGame playerCount =
     , { card: witch, count: kingdomCount }
     , { card: councilRoom, count: kingdomCount }
     , { card: scholar, count: kingdomCount }
+    , { card: nobles, count: kingdomCount }
     ]
   }
   where
@@ -388,11 +389,15 @@ resolveChoice
   -> m GameState
 resolveChoice playerIndex choice state =
   case choice of
+    And { resolution: Nothing } -> unresolved
+    Or { resolution: Nothing } -> unresolved
     TrashUpTo { resolution: Nothing } -> unresolved
     DiscardDownTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
+    GainActions { resolution: Nothing } -> unresolved
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
+    GainBonus { resolution: Nothing } -> unresolved
     TrashUpTo { n, resolution: Just cardIndices } ->
       if length cardIndices > n
       then
@@ -435,12 +440,28 @@ resolveChoice playerIndex choice state =
         >>= modifyStack stackIndex stackUpdate
         <$> \state' -> fromMaybe state'
           $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    Discard { selection: SelectAll, resolution: Just unit, attack } ->
+    GainActions { n, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainActions n) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    Discard { selection: SelectAll, resolution: Just unit } ->
       modifyPlayer playerIndex (moveAll Player._hand Player._toDiscard) state
         <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    Draw { n, resolution: Just unit, attack } ->
+    Draw { n, resolution: Just unit } ->
       modifyPlayerM playerIndex (Player.drawCards n) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    GainBonus { bonus, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainBonus bonus) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    And { choices, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainChoices choices) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    Or { resolution: Just chosen } ->
+      modifyPlayer playerIndex (Player.gainChoice chosen) state
         <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
   where
@@ -544,6 +565,7 @@ newPlayer =
   , buys: 1
   , choices: []
   , reaction : Nothing
+  , bonuses : []
   }
 
 copper :: Card
@@ -686,6 +708,27 @@ moat = let attack = false in
   , cost = 2
   , cards = 2
   , reaction = Just BlockAttack
+  }
+nobles :: Card
+nobles = let attack = false in
+  Card.actionVictory
+  { name = "Nobles"
+  , cost = 6
+  , victoryPoints = 2
+  , specials =
+    [ { target: Self
+      , command: Choose $ Or
+        { choices:
+          [ Draw { n: 3, attack, resolution: Nothing }
+          , GainActions { n: 2, attack, resolution: Nothing }
+          ]
+        , resolution: Nothing
+        , attack
+        }
+      , description: "Choose one: +3 cards or +2 actions"
+      , attack
+      }
+    ]
   }
 
 

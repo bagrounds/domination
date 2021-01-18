@@ -31,7 +31,9 @@ import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
+import Domination.UI.Bonus as Bonus
 import Domination.UI.Card (render) as Card
+import Domination.UI.Choice as Choice
 import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
@@ -329,6 +331,17 @@ renderPlayer cs@{ state, playerIndex } player =
           ]
       renderChoice maybeChoice =
         maybeChoice <#> \choice -> case choice of
+          And x@{ choices } ->
+            acknowledge message clickEvent
+            where
+              message = Choice.renderText' choice
+              clickEvent = playEvent And x unit
+          Or x@{ choices } ->
+            chooseOne "Choose one" $
+              choices <#> \choice' ->
+                { clickEvent: playEvent Or x choice'
+                , text: Choice.renderText' choice'
+                }
           TrashUpTo _ -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "TrashUpTo")
@@ -349,24 +362,34 @@ renderPlayer cs@{ state, playerIndex } player =
             acknowledge message clickEvent
             where
               message = "Gain " <> cardName <> " x" <> show n
-              clickEvent = playEvent GainCards x
+              clickEvent = playEvent GainCards x unit
+          GainActions x@{ n } ->
+            acknowledge message clickEvent
+            where
+              message = "Gain " <> show n <> " actions"
+              clickEvent = playEvent GainActions x unit
           Discard x@{ selection: SelectAll } ->
             acknowledge message clickEvent
             where
               message = "Discard your hand"
-              clickEvent = playEvent Discard x
+              clickEvent = playEvent Discard x unit
           Draw x@{ n } -> acknowledge message clickEvent
             where
               message = "Draw " <> show n <> " cards"
-              clickEvent = playEvent Draw x
+              clickEvent = playEvent Draw x unit
+          GainBonus x@{ bonus } -> acknowledge message clickEvent
+            where
+              message = "Gain " <> Bonus.renderText bonus
+              clickEvent = playEvent GainBonus x unit
         where
           playEvent
-            :: forall r
-            . ({ resolution :: Maybe Unit | r } -> Choice)
-            -> { resolution :: Maybe Unit | r }
+            :: forall r a
+            . ({ resolution :: Maybe a | r } -> Choice)
+            -> { resolution :: Maybe a | r }
+            -> a
             -> GameAction
-          playEvent mk x = MakePlay $ ResolveChoice playerIndex
-            $ mk x { resolution = Just unit }
+          playEvent mk x r = MakePlay $ ResolveChoice playerIndex
+            $ mk x { resolution = Just r }
 
 renderNextPhaseButton { playerIndex, state } =
   HH.button
