@@ -1,8 +1,8 @@
 {
   "name": "Domination",
   "short_name": "Domination",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/purescript-wip/",
+  "scope": "/purescript-wip/",
   "display": "standalone",
   "theme_color": "#000000",
   "background_color": "#000000",
