@@ -224,8 +224,8 @@ main ul {
 .action-card {
   display: inline-block;
   border-radius: 0.6em;
-  border: 2px solid black;
-  background-color: black;
+  border: 2px solid white;
+  background-color: white;
 }
 .no-action-card {
   display: inline-block;
