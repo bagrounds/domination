@@ -1,8 +1,9 @@
-module Domination.UI.ChoiceDiscardDownTo where
+module Domination.UI.ChoiceTrashExactly
+  ( component
+  ) where
 
 import Prelude
 
-import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Player (Player)
@@ -26,17 +27,16 @@ component player choice =
     }
   where
     renderChoice = case _ of
-      x@(DiscardDownTo { n, resolution: Nothing }) -> Just
+      x@(TrashExactly { n, resolution: Nothing }) -> Just
         { title: Choice.renderText' x
-        , buttonText: "Done discarding"
+        , buttonText: "Done trashing cards"
         }
       _ -> Nothing
     canToggle { selected, total } = selected || total < maxSelected
     maxSelected = case choice of
-      DiscardDownTo { n } ->
-        length player.hand - n
+      TrashExactly { n } -> n
       _ -> 0
     resolve resolution = case choice of
-      DiscardDownTo x -> DiscardDownTo x { resolution = resolution }
+      TrashExactly x -> TrashExactly x { resolution = resolution }
       y -> y
 

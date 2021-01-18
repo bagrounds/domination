@@ -11,6 +11,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Player (Player)
 import Domination.UI.CardChooser as CardChooser
+import Domination.UI.Choice as Choice
 import Halogen (Component)
 import Halogen.HTML (HTML)
 
@@ -29,8 +30,8 @@ component player choice =
     }
   where
     renderChoice = case _ of
-      (TrashUpTo { n, resolution: Nothing }) -> Just
-        { title: "Trash up to " <> show n <> " cards"
+      x@(TrashUpTo { n, resolution: Nothing }) -> Just
+        { title: Choice.renderText' x
         , buttonText: "Done trashing cards"
         }
       _ -> Nothing

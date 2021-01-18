@@ -35,6 +35,7 @@ import Domination.UI.Bonus as Bonus
 import Domination.UI.Card (render) as Card
 import Domination.UI.Choice as Choice
 import Domination.UI.ChoiceDiscardDownTo as Discard
+import Domination.UI.ChoiceTrashExactly as TrashExactly
 import Domination.UI.ChoiceTrashUpTo as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
@@ -137,6 +138,7 @@ type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML
   ( "DiscardDownTo" :: H.Slot t1 Choice Int
   , "TrashUpTo" :: H.Slot t1 Choice Int
+  , "TrashExactly" :: H.Slot t1 Choice Int
   | t2
   ) t3 GameAction
 
@@ -329,8 +331,7 @@ renderPlayer cs@{ state, playerIndex } player =
             , text: "No"
             }
           ]
-      renderChoice maybeChoice =
-        maybeChoice <#> \choice -> case choice of
+      renderChoice = map \choice -> case choice of
           And x@{ choices } ->
             acknowledge message clickEvent
             where
@@ -350,10 +351,18 @@ renderPlayer cs@{ state, playerIndex } player =
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
+          TrashExactly _ -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "TrashExactly")
+              1
+              (TrashExactly.component player choice)
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+            ]
           DiscardDownTo _ -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "DiscardDownTo")
-              1
+              2
               (Discard.component player choice)
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
@@ -361,25 +370,25 @@ renderPlayer cs@{ state, playerIndex } player =
           GainCards x@{ n, cardName } ->
             acknowledge message clickEvent
             where
-              message = "Gain " <> cardName <> " x" <> show n
+              message = Choice.renderText' choice
               clickEvent = playEvent GainCards x unit
           GainActions x@{ n } ->
             acknowledge message clickEvent
             where
-              message = "Gain " <> show n <> " actions"
+              message = Choice.renderText' choice
               clickEvent = playEvent GainActions x unit
           Discard x@{ selection: SelectAll } ->
             acknowledge message clickEvent
             where
-              message = "Discard your hand"
+              message = Choice.renderText' choice
               clickEvent = playEvent Discard x unit
           Draw x@{ n } -> acknowledge message clickEvent
             where
-              message = "Draw " <> show n <> " cards"
+              message = Choice.renderText' choice
               clickEvent = playEvent Draw x unit
           GainBonus x@{ bonus } -> acknowledge message clickEvent
             where
-              message = "Gain " <> Bonus.renderText bonus
+              message = Choice.renderText' choice
               clickEvent = playEvent GainBonus x unit
         where
           playEvent

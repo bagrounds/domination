@@ -30,6 +30,12 @@ renderText playerIndex state =
       ", "
       (getPlayerCardName playerIndex state <$> cardIndices)
     TrashUpTo _ -> unresolved
+    TrashExactly { n, resolution: (Just cardIndices) } ->
+      "trashed: "
+      <> intercalate
+      ", "
+      (getPlayerCardName playerIndex state <$> cardIndices)
+    TrashExactly _ -> unresolved
     DiscardDownTo { n, resolution: (Just cardIndices) } ->
       "discarded: "
       <> intercalate
@@ -60,10 +66,12 @@ renderText' = case _ of
     intercalate " or " (renderText' <$> choices)
   TrashUpTo { n } ->
     "Trash up to " <> show n
+  TrashExactly { n } ->
+    "Trash " <> show n <> " cards (or as many as you have)"
   DiscardDownTo { n } ->
     "Discard down to " <> show n
   GainCards { n, cardName } ->
-    "Gain " <> show n <> "x " <> cardName
+    "Gain " <> cardName <> " x" <> show n
   GainActions { n } ->
     "Gain " <> show n <> " actions"
   GainBonus { bonus } ->

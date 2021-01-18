@@ -18,6 +18,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Bonus (Bonus)
+import Domination.Data.Bonus as Bonus
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
@@ -158,6 +159,7 @@ hasActionCardsInHand = not null <<< filter Card.isAction <<< _.hand
 
 cash :: Player -> Int
 cash player = (Card.value player.atPlay)
+  + (Bonus.cashValue player.bonuses)
   + (Card.value $ Card.isTreasure `filter` player.hand)
   - (Card.cost player.buying)
 
@@ -207,6 +209,7 @@ cleanup player = drawCards 5 player
   , buying = []
   , actions = 1
   , buys = 1
+  , bonuses = []
   }
 
 allCards :: Player -> Array Card

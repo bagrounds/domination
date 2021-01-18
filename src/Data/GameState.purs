@@ -21,6 +21,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
 import Data.Unfoldable (replicate)
 import Domination.Capability.Random (class Random)
+import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
@@ -178,6 +179,7 @@ newGame playerCount =
     , { card: greatHall, count: victoryCount }
     , { card: village, count: kingdomCount }
     , { card: woodCutter, count: kingdomCount }
+    , { card: steward, count: kingdomCount }
     , { card: monument, count: victoryCount }
     , { card: smithy, count: kingdomCount }
     , { card: workersVillage, count: kingdomCount }
@@ -186,10 +188,10 @@ newGame playerCount =
     , { card: festival, count: kingdomCount }
     , { card: laboratory, count: kingdomCount }
     , { card: market, count: kingdomCount }
-    , { card: harem, count: victoryCount }
     , { card: witch, count: kingdomCount }
     , { card: councilRoom, count: kingdomCount }
     , { card: scholar, count: kingdomCount }
+    , { card: harem, count: victoryCount }
     , { card: nobles, count: kingdomCount }
     ]
   }
@@ -392,6 +394,7 @@ resolveChoice playerIndex choice state =
     And { resolution: Nothing } -> unresolved
     Or { resolution: Nothing } -> unresolved
     TrashUpTo { resolution: Nothing } -> unresolved
+    TrashExactly { resolution: Nothing } -> unresolved
     DiscardDownTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
     GainActions { resolution: Nothing } -> unresolved
@@ -408,8 +411,22 @@ resolveChoice playerIndex choice state =
         where
           playerUpdate =
             Player.dropCards cardIndices >=> Player.dropChoice
+    TrashExactly { n, resolution: Just cardIndices } -> do
+      hand <- fromJust "failed to get player hand"
+        $ preview (_player playerIndex <<< Player._hand) state
+      let minToTrash = min n $ length hand
+      if length cardIndices > n
+      then throwError "cannot trash more indices than cards in hand!"
+      else if length cardIndices < minToTrash
+      then throwError $ "must trash " <> show minToTrash <> " cards"
+      else
+        fromJust "failed to trash cards!"
+        $ maybeModifyPlayer playerIndex playerUpdate state
+        where
+          playerUpdate =
+            Player.dropCards cardIndices >=> Player.dropChoice
     DiscardDownTo { n, resolution: Just cardIndices } -> do
-      hand <- fromJust ""
+      hand <- fromJust "failed to get player hand"
         $ preview (_player playerIndex <<< Player._hand) state
       if length hand - length cardIndices > 3
         then throwError "must discard down to 3!"
@@ -726,6 +743,28 @@ nobles = let attack = false in
         , attack
         }
       , description: "Choose one: +3 cards or +2 actions"
+      , attack
+      }
+    ]
+  }
+steward :: Card
+steward = let attack = false in
+  Card.action
+  { name = "Steward"
+  , cost = 3
+  , specials =
+    [ { target: Self
+      , command: Choose $ Or
+        { choices:
+          [ Draw { n: 2, attack, resolution: Nothing }
+          , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
+          , TrashExactly { n: 2, attack, resolution: Nothing }
+          ]
+        , resolution: Nothing
+        , attack
+        }
+      , description:
+        "Choose one: + 2 cards, + $2, or trash 2 cards from your hand"
       , attack
       }
     ]
