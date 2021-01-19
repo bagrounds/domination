@@ -11,6 +11,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Constraint (Constraint)
+import Domination.Data.Pile (Pile)
 import Domination.Data.SelectCards (SelectCards)
 
 data Choice
@@ -30,13 +31,14 @@ data Choice
     , resolution :: Maybe (Array Choice)
     , attack :: Boolean
     }
-  | Trash
-    { n :: Constraint
-    , resolution :: (Maybe (Array Int))
+  | Option
+    { choice :: Choice
+    , resolution :: Maybe Boolean
     , attack :: Boolean
     }
-  | DiscardDownTo
-    { n :: Int
+  | MoveFromHand
+    { n :: Constraint
+    , destination :: Pile
     , resolution :: (Maybe (Array Int))
     , attack :: Boolean
     }
@@ -77,8 +79,8 @@ isAttack = case _ of
   And { attack } -> attack
   Or { attack } -> attack
   PickN { attack } -> attack
-  DiscardDownTo { attack } -> attack
-  Trash { attack } -> attack
+  Option { attack } -> attack
+  MoveFromHand { attack } -> attack
   GainCards { attack } -> attack
   GainActions { attack } -> attack
   GainBuys { attack } -> attack

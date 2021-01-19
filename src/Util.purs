@@ -75,6 +75,9 @@ dropFirstOf = dropNthOf 0
 prependOver :: forall s a. ArrayLens' s a -> a -> s -> s
 prependOver lens x = over lens (x : _)
 
+preAppendOver :: forall s a. ArrayLens' s a -> Array a -> s -> s
+preAppendOver lens xs = over lens (xs <> _)
+
 decOver :: forall s. Setter' s Int -> s -> s
 decOver = flip subOver 1
 

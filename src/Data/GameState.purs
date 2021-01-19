@@ -30,6 +30,8 @@ import Domination.Data.Choice as Choice
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
+import Domination.Data.Pile (Pile)
+import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
@@ -38,7 +40,7 @@ import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
-import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, prependOver, takeIndices, withIndices)
+import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, preAppendOver, prependOver, takeIndices, withIndices)
 
 type GameState =
   { turn :: Int
@@ -56,6 +58,8 @@ _players :: Lens' GameState (Array Player)
 _players = prop (SProxy :: SProxy "players")
 _supply :: Lens' GameState Supply
 _supply = prop (SProxy :: SProxy "supply")
+_trash :: Lens' GameState (Array Card)
+_trash = prop (SProxy :: SProxy "trash")
 
 _player :: Int -> Traversal' GameState Player
 _player i = _players <<< (ix i)
@@ -194,6 +198,7 @@ newGame playerCount =
     , { card: witch, count: kingdomCount }
     , { card: councilRoom, count: kingdomCount }
     , { card: scholar, count: kingdomCount }
+    , { card: torturer, count: kingdomCount }
     , { card: harem, count: victoryCount }
     , { card: nobles, count: kingdomCount }
     ]
@@ -398,17 +403,17 @@ resolveChoice playerIndex choice state =
     And { resolution: Nothing } -> unresolved
     Or { resolution: Nothing } -> unresolved
     PickN { resolution: Nothing } -> unresolved
-    Trash { resolution: Nothing } -> unresolved
-    DiscardDownTo { resolution: Nothing } -> unresolved
+    Option { resolution: Nothing } -> unresolved
+    MoveFromHand { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
     GainActions { resolution: Nothing } -> unresolved
     GainBuys { resolution: Nothing } -> unresolved
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
     GainBonus { resolution: Nothing } -> unresolved
-    Trash { n: constraint, resolution: Just cardIndices } -> do
-      hand <- fromJust "failed to get player hand"
-        $ preview (_player playerIndex <<< Player._hand) state
+    MoveFromHand { n: constraint, destination, resolution: Just cardIndices } -> do
+      hand :: Array Card <- fromJust "failed to get player hand"
+        $ (preview (_player playerIndex <<< Player._hand) state)
       if length hand < length cardIndices
       then throwError "cannot trash more cards than you have"
       else pure unit
@@ -424,35 +429,34 @@ resolveChoice playerIndex choice state =
           then throwError $ "only trash down to " <> show n
           else pure unit
         Exactly n -> do
-          let nToTrash = min n $ length hand
-          if length cardIndices /= nToTrash
-          then throwError $ "must trash " <> show nToTrash
+          let nToMoveFromHand = min n $ length hand
+          if length cardIndices /= nToMoveFromHand
+          then throwError $ "must trash " <> show nToMoveFromHand
           else pure unit
-      fromJust "failed to trash cards!"
-        $ maybeModifyPlayer playerIndex playerUpdate state
-      where
-        playerUpdate =
-          Player.dropCards cardIndices >=> Player.dropChoice
-    DiscardDownTo { n, resolution: Just cardIndices } -> do
-      hand <- fromJust "failed to get player hand"
-        $ preview (_player playerIndex <<< Player._hand) state
-      if length hand - length cardIndices > 3
-        then throwError "must discard down to 3!"
-        else if length hand < length cardIndices
-        then throwError "cannot discard more cards than you have"
-        else if length hand < 3 && length cardIndices > 0
-        then throwError "only discard down to 3!"
-        else pure unit
-      discarded <- fromJust "failed discard indices from hand"
-        $ takeIndices cardIndices hand
-      hand' <- fromJust "failed to drop card indices from hand"
-        $ dropIndices cardIndices hand
+      selectedCards :: Array Card <- fromJust "failed to take indices"
+          $ takeIndices cardIndices hand
+      remainingHand <- fromJust "failed to drop indices"
+          $ dropIndices cardIndices hand
       let
-        state' = set (_player playerIndex <<< Player._hand) hand' state
-        state'' = appendOver (_player playerIndex <<< Player._discard)
-          discarded state'
-      fromJust "failed to modify player"
-        $ maybeModifyPlayer playerIndex Player.dropChoice state''
+        playerUpdate = Player.dropCards cardIndices
+          >=> Player.dropChoice
+      let
+        f = case destination of
+          Pile.Hand -> traverseOf
+            (_player playerIndex <<< Player._hand)
+            (Just <<< (selectedCards <> _))
+          Pile.Trash -> traverseOf
+            _trash
+            (Just <<< (selectedCards <> _))
+          Pile.Deck -> traverseOf
+            (_player playerIndex <<< Player._deck)
+            (Just <<< (selectedCards <> _))
+          Pile.Discard -> traverseOf
+            (_player playerIndex <<< Player._discard)
+            (Just <<< (selectedCards <> _))
+      state' <- fromJust "failed to trash cards!"
+        $ maybeModifyPlayer playerIndex playerUpdate state
+      fromJust "failed to trash cards!" $ f state'
     GainCards { n, cardName, resolution: Just unit } -> do
       stack <- stackByName cardName state
       stackIndex <- indexOfStack stack.card state
@@ -498,6 +502,16 @@ resolveChoice playerIndex choice state =
       then throwError $ "must choose " <> show n
       else
       modifyPlayer playerIndex (Player.gainChoices choices) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    Option { choice, resolution: Just agree } ->
+      let
+        playerUpdate =
+          if agree
+          then Player.gainChoice choice
+          else identity
+      in
+      modifyPlayer playerIndex playerUpdate state
         <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
   where
@@ -712,7 +726,12 @@ chapel = let attack = false in
   , specials =
     [ { target: Self
       , command: Choose
-        $ (Trash { n: UpTo 4, resolution: Nothing, attack })
+        $ MoveFromHand
+        { n: UpTo 4
+        , destination: Pile.Trash
+        , resolution: Nothing
+        , attack
+        }
       , description: "Trash up to 4 cards from your hand"
       }
     ]
@@ -726,7 +745,12 @@ militia = let attack = true in
   , specials =
     [ { target: EveryoneElse
       , command: Choose
-        $ (DiscardDownTo { n: 3, resolution: Nothing, attack })
+        $ MoveFromHand
+        { n: DownTo 3
+        , destination: Pile.Discard
+        , resolution: Nothing
+        , attack
+        }
       , description: "Discard down to 3 cards"
       }
     ]
@@ -770,7 +794,12 @@ steward = let attack = false in
         { choices:
           [ Draw { n: 2, attack, resolution: Nothing }
           , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
-          , Trash { n: Exactly 2, attack, resolution: Nothing }
+          , MoveFromHand
+            { destination: Pile.Trash
+            , n: Exactly 2
+            , attack
+            , resolution: Nothing
+            }
           ]
         , resolution: Nothing
         , attack
@@ -800,6 +829,38 @@ pawn = let attack = false in
         }
       , description:
         "Choose two of: + $1, + 1 card, + 1 action, or +1 buy"
+      }
+    ]
+  }
+torturer :: Card
+torturer = let attack = true in
+  Card.actionAttack
+  { name = "Torturer"
+  , cost = 5
+  , cards = 3
+  , specials =
+    [ { target: EveryoneElse
+      , command: Choose $ PickN
+        { n: 1
+        , choices:
+          [ MoveFromHand
+            { n: Exactly 2
+            , destination: Pile.Discard
+            , attack
+            , resolution: Nothing
+            }
+          , GainCards
+            { n: 1
+            , cardName: "Curse"
+            , attack
+            , resolution: Nothing
+            }
+          ]
+        , resolution: Nothing
+        , attack
+        }
+      , description:
+        "Discard 2 cards or gain a curse"
       }
     ]
   }

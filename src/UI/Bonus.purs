@@ -6,5 +6,5 @@ import Domination.Data.Bonus (Bonus(..))
 
 renderText :: Bonus -> String
 renderText = case _ of
-  Cash n -> "+$" <> show n
+  Cash n -> "$" <> show n
 

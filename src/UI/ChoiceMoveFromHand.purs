@@ -1,4 +1,4 @@
-module Domination.UI.ChoiceTrash
+module Domination.UI.ChoiceMoveFromHand
   ( component
   ) where
 
@@ -29,20 +29,20 @@ component player choice =
     }
   where
     renderChoice = case _ of
-      x@(Trash { n, resolution: Nothing }) -> Just
+      x@(MoveFromHand { n, resolution: Nothing }) -> Just
         { title: Choice.renderText' x
-        , buttonText: "Done trashing cards"
+        , buttonText: "Done"
         }
       _ -> Nothing
     canToggle { selected, total } = selected || total < maxSelected
     maxSelected = case choice of
-      Trash { n } ->
+      MoveFromHand { n } ->
         case n of
           UpTo n -> n
           Exactly n -> n
           DownTo n -> length player.hand - n
       _ -> 0
     resolve resolution = case choice of
-      Trash x -> Trash x { resolution = resolution }
+      MoveFromHand x -> MoveFromHand x { resolution = resolution }
       y -> y
 

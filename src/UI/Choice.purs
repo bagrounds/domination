@@ -9,6 +9,7 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
+import Domination.Data.Pile as Pile
 import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.UI.Bonus as Bonus
@@ -30,18 +31,15 @@ renderText playerIndex state =
       "chose " <> show n <> " of: "
       <> (intercalate ", " $ renderText' <$> choices)
     PickN _ -> unresolved
-    Trash { resolution: (Just cardIndices) } ->
+    Option { choice } ->
+      "chose to optionally " <> renderText' choice
+    Option _ -> unresolved
+    MoveFromHand { resolution: (Just cardIndices) } ->
       "trashed: "
       <> intercalate
       ", "
       (getPlayerCardName playerIndex state <$> cardIndices)
-    Trash _ -> unresolved
-    DiscardDownTo { n, resolution: (Just cardIndices) } ->
-      "discarded: "
-      <> intercalate
-      ", "
-      (getPlayerCardName playerIndex state <$> cardIndices)
-    DiscardDownTo _ -> unresolved
+    MoveFromHand _ -> unresolved
     GainCards { n, cardName, resolution: Just unit } ->
       "gained " <> show n <> "x " <> cardName
     GainCards _ -> unresolved
@@ -69,15 +67,21 @@ renderText' = case _ of
     intercalate " or " (renderText' <$> choices)
   PickN { n, choices } ->
     show n <> " of: " <> intercalate " or " (renderText' <$> choices)
-  Trash { n } -> case n of
+  Option { choice } ->
+    "optionally " <> renderText' choice
+  MoveFromHand { n, destination } -> case n of
     UpTo n ->
-      "Trash up to " <> show n
+      verb <> " up to " <> show n
     Exactly n ->
-      "Trash " <> show n <> " cards (or as many as you have)"
+      verb <> " " <> show n <> " (or as many as you have)"
     DownTo n ->
-      "Trash down to " <> show n
-  DiscardDownTo { n } ->
-    "Discard down to " <> show n
+      verb <> " down to " <> show n
+    where
+      verb = case destination of
+        Pile.Hand -> "Gain to your hand"
+        Pile.Discard -> "Discard"
+        Pile.Deck -> "Put onto your deck"
+        Pile.Trash -> "Trash"
   GainCards { n, cardName } ->
     "Gain " <> cardName <> " x" <> show n
   GainActions { n } ->

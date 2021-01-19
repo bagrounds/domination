@@ -34,8 +34,7 @@ import Domination.Data.Stack (Stack)
 import Domination.UI.Bonus as Bonus
 import Domination.UI.Card (render) as Card
 import Domination.UI.Choice as Choice
-import Domination.UI.ChoiceDiscardDownTo as Discard
-import Domination.UI.ChoiceTrash as Trash
+import Domination.UI.ChoiceMoveFromHand as MoveFromHand
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
 import Domination.UI.PickN as PickN
@@ -136,8 +135,7 @@ component playerCount playerIndex =
 
 type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML
-  ( "DiscardDownTo" :: H.Slot t1 Choice Int
-  , "Trash" :: H.Slot t1 Choice Int
+  ( "MoveFromHand" :: H.Slot t1 Choice Int
   , "PickN" :: H.Slot t1 (Array Choice) Int
   | t2
   ) t3 GameAction
@@ -358,19 +356,24 @@ renderPlayer cs@{ state, playerIndex } player =
             ]
             where
               f xs = PickN x { resolution = Just xs }
-          Trash _ -> HH.div_
+          Option x@{ choice } ->
+            chooseOne (Choice.renderText' choice <> "?")
+              [ { clickEvent: MakePlay
+                  $ ResolveChoice playerIndex
+                  $ Option x { resolution = Just true }
+                , text: "Yes"
+                }
+              , { clickEvent: MakePlay
+                  $ ResolveChoice playerIndex
+                  $ Option x { resolution = Just false }
+                , text: "No"
+                }
+              ]
+          MoveFromHand _ -> HH.div_
             [ HH.slot
-              (SProxy :: SProxy "Trash")
+              (SProxy :: SProxy "MoveFromHand")
               0
-              (Trash.component player choice)
-              unit
-              (Just <<< MakePlay <<< ResolveChoice playerIndex)
-            ]
-          DiscardDownTo _ -> HH.div_
-            [ HH.slot
-              (SProxy :: SProxy "DiscardDownTo")
-              2
-              (Discard.component player choice)
+              (MoveFromHand.component player choice)
               unit
               (Just <<< MakePlay <<< ResolveChoice playerIndex)
             ]
