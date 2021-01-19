@@ -24,6 +24,12 @@ data Choice
     , resolution :: Maybe Choice
     , attack :: Boolean
     }
+  | PickN
+    { choices :: Array Choice
+    , n :: Int
+    , resolution :: Maybe (Array Choice)
+    , attack :: Boolean
+    }
   | Trash
     { n :: Constraint
     , resolution :: (Maybe (Array Int))
@@ -41,6 +47,11 @@ data Choice
     , attack :: Boolean
     }
   | GainActions
+    { n :: Int
+    , resolution :: Maybe Unit
+    , attack :: Boolean
+    }
+  | GainBuys
     { n :: Int
     , resolution :: Maybe Unit
     , attack :: Boolean
@@ -65,10 +76,12 @@ isAttack :: Choice -> Boolean
 isAttack = case _ of
   And { attack } -> attack
   Or { attack } -> attack
+  PickN { attack } -> attack
   DiscardDownTo { attack } -> attack
   Trash { attack } -> attack
   GainCards { attack } -> attack
   GainActions { attack } -> attack
+  GainBuys { attack } -> attack
   Discard { attack } -> attack
   Draw { attack } -> attack
   GainBonus { attack } -> attack

@@ -45,6 +45,7 @@ type GameState =
   , phase :: Phase
   , players :: Array Player
   , supply :: Supply
+  , trash :: Array Card
   }
 
 _turn :: Lens' GameState Int
@@ -177,6 +178,7 @@ newGame playerCount =
     , { card: curse, count: curseCount }
     , { card: chapel, count: kingdomCount }
     , { card: moat, count: kingdomCount }
+    , { card: pawn, count: kingdomCount }
     , { card: greatHall, count: victoryCount }
     , { card: village, count: kingdomCount }
     , { card: woodCutter, count: kingdomCount }
@@ -195,6 +197,7 @@ newGame playerCount =
     , { card: harem, count: victoryCount }
     , { card: nobles, count: kingdomCount }
     ]
+  , trash: []
   }
   where
     curseCount = 10 * (playerCount - 1)
@@ -394,10 +397,12 @@ resolveChoice playerIndex choice state =
   case choice of
     And { resolution: Nothing } -> unresolved
     Or { resolution: Nothing } -> unresolved
+    PickN { resolution: Nothing } -> unresolved
     Trash { resolution: Nothing } -> unresolved
     DiscardDownTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
     GainActions { resolution: Nothing } -> unresolved
+    GainBuys { resolution: Nothing } -> unresolved
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
     GainBonus { resolution: Nothing } -> unresolved
@@ -464,6 +469,10 @@ resolveChoice playerIndex choice state =
       modifyPlayer playerIndex (Player.gainActions n) state
         <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    GainBuys { n, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainBuys n) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
     Discard { selection: SelectAll, resolution: Just unit } ->
       modifyPlayer playerIndex (moveAll Player._hand Player._toDiscard) state
         <#> \state' -> fromMaybe state'
@@ -482,6 +491,13 @@ resolveChoice playerIndex choice state =
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
     Or { resolution: Just chosen } ->
       modifyPlayer playerIndex (Player.gainChoice chosen) state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    PickN { n, resolution: Just choices } ->
+      if length choices /= n
+      then throwError $ "must choose " <> show n
+      else
+      modifyPlayer playerIndex (Player.gainChoices choices) state
         <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
   where
@@ -761,6 +777,29 @@ steward = let attack = false in
         }
       , description:
         "Choose one: + 2 cards, + $2, or trash 2 cards from your hand"
+      }
+    ]
+  }
+pawn :: Card
+pawn = let attack = false in
+  Card.action
+  { name = "Pawn"
+  , cost = 2
+  , specials =
+    [ { target: Self
+      , command: Choose $ PickN
+        { n: 2
+        , choices:
+          [ Draw { n: 1, attack, resolution: Nothing }
+          , GainBonus { bonus: Cash 1, attack, resolution: Nothing }
+          , GainActions { n: 1, attack, resolution: Nothing }
+          , GainBuys { n: 1, attack, resolution: Nothing }
+          ]
+        , resolution: Nothing
+        , attack
+        }
+      , description:
+        "Choose two of: + $1, + 1 card, + 1 action, or +1 buy"
       }
     ]
   }

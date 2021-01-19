@@ -118,6 +118,9 @@ gainBonus = prependOver _bonuses
 gainActions :: Int -> Player -> Player
 gainActions n = over _actions (_ + n)
 
+gainBuys :: Int -> Player -> Player
+gainBuys n = over _buys (_ + n)
+
 gainChoices :: Array Choice -> Player -> Player
 gainChoices = flip $ foldr gainChoice
 

@@ -38,6 +38,7 @@ import Domination.UI.ChoiceDiscardDownTo as Discard
 import Domination.UI.ChoiceTrash as Trash
 import Domination.UI.Css as Css
 import Domination.UI.Phase as Phase
+import Domination.UI.PickN as PickN
 import Domination.UI.Util (acknowledge, h1__, h2__, h3__, chooseOne)
 import Domination.UI.Util as Util
 import Halogen as H
@@ -137,6 +138,7 @@ type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML
   ( "DiscardDownTo" :: H.Slot t1 Choice Int
   , "Trash" :: H.Slot t1 Choice Int
+  , "PickN" :: H.Slot t1 (Array Choice) Int
   | t2
   ) t3 GameAction
 
@@ -341,6 +343,21 @@ renderPlayer cs@{ state, playerIndex } player =
                 { clickEvent: playEvent Or x choice'
                 , text: Choice.renderText' choice'
                 }
+          PickN x@{ n, choices } -> HH.div_
+            [ HH.slot
+              (SProxy :: SProxy "PickN")
+              0
+              ( PickN.component
+                { title: "Choose " <> show n
+                , n
+                , choices
+                }
+              )
+              unit
+              (Just <<< MakePlay <<< ResolveChoice playerIndex <<< f)
+            ]
+            where
+              f xs = PickN x { resolution = Just xs }
           Trash _ -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "Trash")
@@ -367,6 +384,11 @@ renderPlayer cs@{ state, playerIndex } player =
             where
               message = Choice.renderText' choice
               clickEvent = playEvent GainActions x unit
+          GainBuys x@{ n } ->
+            acknowledge message clickEvent
+            where
+              message = Choice.renderText' choice
+              clickEvent = playEvent GainBuys x unit
           Discard x@{ selection: SelectAll } ->
             acknowledge message clickEvent
             where

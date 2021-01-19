@@ -22,9 +22,14 @@ renderText playerIndex state =
     And { choices, resolution: Just unit } ->
       intercalate " and " (renderText playerIndex state <$> choices)
     And _ -> unresolved
-    Or { choices, resolution: Just choice } ->
-      "chose: " <> (intercalate " or " $ renderText' <$> choices)
+    Or { choices } ->
+      "chose one of: "
+      <> (intercalate ", " $ renderText' <$> choices)
     Or _ -> unresolved
+    PickN { n, choices } ->
+      "chose " <> show n <> " of: "
+      <> (intercalate ", " $ renderText' <$> choices)
+    PickN _ -> unresolved
     Trash { resolution: (Just cardIndices) } ->
       "trashed: "
       <> intercalate
@@ -43,6 +48,9 @@ renderText playerIndex state =
     GainActions { n, resolution: Just unit } ->
       "gained " <> show n <> " actions"
     GainActions _ -> unresolved
+    GainBuys { n, resolution: Just unit } ->
+      "gained " <> show n <> " buys"
+    GainBuys _ -> unresolved
     GainBonus { bonus, resolution: Just unit } ->
       "gained " <> Bonus.renderText bonus
     GainBonus _ -> unresolved
@@ -59,6 +67,8 @@ renderText' = case _ of
     intercalate " and " (renderText' <$> choices)
   Or { choices } ->
     intercalate " or " (renderText' <$> choices)
+  PickN { n, choices } ->
+    show n <> " of: " <> intercalate " or " (renderText' <$> choices)
   Trash { n } -> case n of
     UpTo n ->
       "Trash up to " <> show n
@@ -71,9 +81,11 @@ renderText' = case _ of
   GainCards { n, cardName } ->
     "Gain " <> cardName <> " x" <> show n
   GainActions { n } ->
-    "Gain " <> show n <> " actions"
+    "+" <> show n <> " actions"
+  GainBuys { n } ->
+    "+" <> show n <> " buys"
   GainBonus { bonus } ->
-    "Gain " <> Bonus.renderText bonus
+    "+" <> Bonus.renderText bonus
   Discard { selection: SelectAll } ->
     "Discard your hand"
   Draw { n } ->
