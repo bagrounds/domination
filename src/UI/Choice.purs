@@ -64,6 +64,8 @@ renderText' = case _ of
       "Trash up to " <> show n
     Exactly n ->
       "Trash " <> show n <> " cards (or as many as you have)"
+    DownTo n ->
+      "Trash down to " <> show n
   DiscardDownTo { n } ->
     "Discard down to " <> show n
   GainCards { n, cardName } ->

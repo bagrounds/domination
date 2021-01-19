@@ -401,32 +401,33 @@ resolveChoice playerIndex choice state =
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
     GainBonus { resolution: Nothing } -> unresolved
-    Trash { n: constraint, resolution: Just cardIndices } ->
+    Trash { n: constraint, resolution: Just cardIndices } -> do
+      hand <- fromJust "failed to get player hand"
+        $ preview (_player playerIndex <<< Player._hand) state
+      if length hand < length cardIndices
+      then throwError "cannot trash more cards than you have"
+      else pure unit
       case constraint of
         UpTo n ->
           if length cardIndices > n
-          then
-            throwError "cannot trash more indices than cards in hand!"
-          else
-            fromJust "failed to trash cards!"
-            $ maybeModifyPlayer playerIndex playerUpdate state
+          then throwError $ "cannot trash more than " <> show n
+          else pure unit
+        DownTo n ->
+          if length hand - length cardIndices > n
+          then throwError $ "must trash down to " <> show n
+          else if length hand < n && length cardIndices > 0
+          then throwError $ "only trash down to " <> show n
+          else pure unit
         Exactly n -> do
-          hand <- fromJust "failed to get player hand"
-            $ preview (_player playerIndex <<< Player._hand) state
-          let minToTrash = min n $ length hand
-          if length cardIndices > n
-          then throwError "cannot trash more indices than cards in hand!"
-          else if length cardIndices < minToTrash
-          then throwError $ "must trash " <> show minToTrash <> " cards"
-          else
-            fromJust "failed to trash cards!"
-            $ maybeModifyPlayer playerIndex playerUpdate state
-            where
-              playerUpdate =
-                Player.dropCards cardIndices >=> Player.dropChoice
-        where
-          playerUpdate =
-            Player.dropCards cardIndices >=> Player.dropChoice
+          let nToTrash = min n $ length hand
+          if length cardIndices /= nToTrash
+          then throwError $ "must trash " <> show nToTrash
+          else pure unit
+      fromJust "failed to trash cards!"
+        $ maybeModifyPlayer playerIndex playerUpdate state
+      where
+        playerUpdate =
+          Player.dropCards cardIndices >=> Player.dropChoice
     DiscardDownTo { n, resolution: Just cardIndices } -> do
       hand <- fromJust "failed to get player hand"
         $ preview (_player playerIndex <<< Player._hand) state

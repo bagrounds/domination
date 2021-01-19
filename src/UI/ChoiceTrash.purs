@@ -4,6 +4,7 @@ module Domination.UI.ChoiceTrash
 
 import Prelude
 
+import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
@@ -39,6 +40,7 @@ component player choice =
         case n of
           UpTo n -> n
           Exactly n -> n
+          DownTo n -> length player.hand - n
       _ -> 0
     resolve resolution = case choice of
       Trash x -> Trash x { resolution = resolution }
