@@ -6,6 +6,7 @@ import Data.Array (intercalate)
 import Data.Lens.Fold (preview)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Choice (Choice(..))
+import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
@@ -20,18 +21,21 @@ unresolved = "unresolved choice?"
 renderText :: Int -> GameState -> Choice -> String
 renderText playerIndex state =
   case _ of
+    If { choice, condition, resolution: Just unit } ->
+      "don't judge me"
+    If { resolution: Nothing } -> unresolved
     And { choices, resolution: Just unit } ->
       intercalate " and " (renderText playerIndex state <$> choices)
     And _ -> unresolved
-    Or { choices } ->
+    Or { choices, resolution: Just _ } ->
       "chose one of: "
       <> (intercalate ", " $ renderText' <$> choices)
     Or _ -> unresolved
-    PickN { n, choices } ->
+    PickN { n, choices, resolution: Just _ } ->
       "chose " <> show n <> " of: "
       <> (intercalate ", " $ renderText' <$> choices)
     PickN _ -> unresolved
-    Option { choice } ->
+    Option { choice, resolution: Just _ } ->
       "chose to optionally " <> renderText' choice
     Option _ -> unresolved
     MoveFromHand { resolution: (Just cardIndices) } ->
@@ -61,6 +65,12 @@ renderText playerIndex state =
 
 renderText' :: Choice -> String
 renderText' = case _ of
+  If { condition, choice } ->
+    "if " <> renderCondition condition
+      <> " then " <> renderText' choice
+    where
+      renderCondition = case _ of
+        HasCard name -> "hand contains a " <> name
   And { choices } ->
     intercalate " and " (renderText' <$> choices)
   Or { choices } ->

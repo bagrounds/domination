@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (catMaybes, dropWhile, filter, find, findIndex, head, length, takeWhile, updateAt)
+import Data.Array (all, catMaybes, dropWhile, filter, find, findIndex, head, length, takeWhile, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold (firstOf, preview)
@@ -27,7 +27,9 @@ import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
+import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Filter (Filter(..))
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
 import Domination.Data.Pile (Pile)
@@ -183,6 +185,7 @@ newGame playerCount =
     , { card: chapel, count: kingdomCount }
     , { card: moat, count: kingdomCount }
     , { card: pawn, count: kingdomCount }
+    , { card: consolation, count: kingdomCount }
     , { card: greatHall, count: victoryCount }
     , { card: village, count: kingdomCount }
     , { card: woodCutter, count: kingdomCount }
@@ -191,6 +194,7 @@ newGame playerCount =
     , { card: smithy, count: kingdomCount }
     , { card: workersVillage, count: kingdomCount }
     , { card: militia, count: kingdomCount }
+    , { card: moneyLender, count: kingdomCount }
     , { card: bazaar, count: kingdomCount }
     , { card: festival, count: kingdomCount }
     , { card: laboratory, count: kingdomCount }
@@ -400,6 +404,7 @@ resolveChoice
   -> m GameState
 resolveChoice playerIndex choice state =
   case choice of
+    If { resolution: Nothing } -> unresolved
     And { resolution: Nothing } -> unresolved
     Or { resolution: Nothing } -> unresolved
     PickN { resolution: Nothing } -> unresolved
@@ -411,7 +416,7 @@ resolveChoice playerIndex choice state =
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
     GainBonus { resolution: Nothing } -> unresolved
-    MoveFromHand { n: constraint, destination, resolution: Just cardIndices } -> do
+    MoveFromHand { filter, n: constraint, destination, resolution: Just cardIndices } -> do
       hand :: Array Card <- fromJust "failed to get player hand"
         $ (preview (_player playerIndex <<< Player._hand) state)
       if length hand < length cardIndices
@@ -435,6 +440,12 @@ resolveChoice playerIndex choice state =
           else pure unit
       selectedCards :: Array Card <- fromJust "failed to take indices"
           $ takeIndices cardIndices hand
+      case filter of
+        Just f ->
+          if evalFilter f `all` selectedCards
+          then pure unit
+          else throwError "cannot trash filtered card"
+        Nothing -> pure unit
       remainingHand <- fromJust "failed to drop indices"
           $ dropIndices cardIndices hand
       let
@@ -489,6 +500,15 @@ resolveChoice playerIndex choice state =
       modifyPlayer playerIndex (Player.gainBonus bonus) state
         <#> \state' -> fromMaybe state'
         $ maybeModifyPlayer playerIndex Player.dropChoice state'
+    If { choice: choice', condition, resolution: Just unit } ->
+      modifyPlayer playerIndex playerUpdate state
+        <#> \state' -> fromMaybe state'
+        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+      where
+        playerUpdate player =
+          if evalCondition condition player
+          then Player.gainChoice choice' player
+          else player
     And { choices, resolution: Just unit } ->
       modifyPlayer playerIndex (Player.gainChoices choices) state
         <#> \state' -> fromMaybe state'
@@ -728,6 +748,7 @@ chapel = let attack = false in
       , command: Choose
         $ MoveFromHand
         { n: UpTo 4
+        , filter: Nothing
         , destination: Pile.Trash
         , resolution: Nothing
         , attack
@@ -747,6 +768,7 @@ militia = let attack = true in
       , command: Choose
         $ MoveFromHand
         { n: DownTo 3
+        , filter: Nothing
         , destination: Pile.Discard
         , resolution: Nothing
         , attack
@@ -796,6 +818,7 @@ steward = let attack = false in
           , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
           , MoveFromHand
             { destination: Pile.Trash
+            , filter: Nothing
             , n: Exactly 2
             , attack
             , resolution: Nothing
@@ -845,6 +868,7 @@ torturer = let attack = true in
         , choices:
           [ MoveFromHand
             { n: Exactly 2
+            , filter: Nothing
             , destination: Pile.Discard
             , attack
             , resolution: Nothing
@@ -864,5 +888,71 @@ torturer = let attack = true in
       }
     ]
   }
+consolation :: Card
+consolation = let attack = false in
+  Card.action
+  { name = "Consolation"
+  , cost = 2
+  , specials =
+    [ { target: Self
+      , command: Choose $ If
+        { condition: HasCard "Estate"
+        , choice: GainBonus
+          { bonus: Cash 2
+          , attack
+          , resolution: Nothing
+          }
+        , resolution: Nothing
+        , attack
+        }
+      , description:
+        "If you have an Estate in your hand, + $2"
+      }
+    ]
+  }
+moneyLender :: Card
+moneyLender = let attack = false in
+  Card.action
+  { name = "Money Lender"
+  , cost = 4
+  , specials =
+    [ { target: Self
+      , command: Choose $ If
+        { condition: HasCard "Copper"
+        , choice: Option
+          { choice: And
+            { choices:
+              [ MoveFromHand
+                { n: Exactly 1
+                , filter: Just (HasName "Copper")
+                , destination: Pile.Trash
+                , attack
+                , resolution: Nothing
+                }
+              , GainBonus
+                { bonus: Cash 3
+                , attack
+                , resolution: Nothing
+                }
+              ]
+            , attack
+            , resolution: Nothing
+            }
+          , attack
+          , resolution: Nothing
+          }
+        , attack
+        , resolution: Nothing
+        }
+      , description:
+        "You may trash a copper from your hand for + $3"
+      }
+    ]
+  }
 
+evalCondition :: Condition -> Player -> Boolean
+evalCondition (HasCard name) = _.hand >>> any (_.name >>> (_ == name))
+
+evalFilter :: Filter -> Card -> Boolean
+evalFilter (HasName name) = _.name >>> (_ == name)
 

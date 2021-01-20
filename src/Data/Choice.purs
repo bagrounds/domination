@@ -10,12 +10,20 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Bonus (Bonus)
+import Domination.Data.Condition (Condition)
 import Domination.Data.Constraint (Constraint)
+import Domination.Data.Filter (Filter)
 import Domination.Data.Pile (Pile)
 import Domination.Data.SelectCards (SelectCards)
 
 data Choice
-  = And
+  = If
+    { choice :: Choice
+    , condition :: Condition
+    , resolution :: Maybe Unit
+    , attack :: Boolean
+    }
+  | And
     { choices :: Array Choice
     , resolution :: Maybe Unit
     , attack :: Boolean
@@ -38,6 +46,7 @@ data Choice
     }
   | MoveFromHand
     { n :: Constraint
+    , filter :: Maybe Filter
     , destination :: Pile
     , resolution :: (Maybe (Array Int))
     , attack :: Boolean
@@ -76,6 +85,7 @@ data Choice
 
 isAttack :: Choice -> Boolean
 isAttack = case _ of
+  If { attack } -> attack
   And { attack } -> attack
   Or { attack } -> attack
   PickN { attack } -> attack

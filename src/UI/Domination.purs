@@ -330,6 +330,11 @@ renderPlayer cs@{ state, playerIndex } player =
             }
           ]
       renderChoice = map \choice -> case choice of
+          If x ->
+            acknowledge message clickEvent
+            where
+              message = "Checking " <> Choice.renderText' choice
+              clickEvent = playEvent If x unit
           And x@{ choices } ->
             acknowledge message clickEvent
             where
