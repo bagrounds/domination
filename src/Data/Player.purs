@@ -2,17 +2,16 @@ module Domination.Data.Player where
 
 import Prelude
 
-import Control.Monad.Error.Class (class MonadError, throwError)
-import Data.Array (catMaybes, deleteAt, filter, head, (:))
+import Control.Monad.Error.Class (class MonadError)
+import Data.Array (catMaybes, deleteAt, filter, head, length, (:))
 import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, viewOn)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
-import Data.Lens.Prism (Prism')
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set)
+import Data.Lens.Setter (over, set, (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
@@ -24,7 +23,9 @@ import Domination.Data.Card as Card
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
-import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver)
+import Relation (Relation, is)
+import Rule (Rule, check, (!>), (<@!))
+import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~))
 
 type Player =
   { deck :: Array Card
@@ -69,20 +70,16 @@ _cardInHand i = _hand <<< ix i
 getCard :: forall m. MonadError String m => Int -> Player -> m Card
 getCard i = fromJust "cannot get card!" <<< preview (_cardInHand i)
 
-getHand :: Player -> Array Card
-getHand = view _hand
+dropCard :: forall m. MonadError String m => Int -> Player -> m (Array Card)
+dropCard i = fromJust "cannot drop card!" <<< deleteAt i <<< _.hand
 
-setHand :: Array Card -> Player -> Player
-setHand = set _hand
-
-modifyHand :: (Array Card -> Array Card) -> Player -> Player
-modifyHand = over _hand
-
-maybeModifyHand :: (Array Card -> Maybe (Array Card)) -> Player -> Maybe Player
-maybeModifyHand = traverseOf _hand
-
-dropCards :: Array Int -> Player -> Maybe Player
-dropCards = maybeModifyHand <<< dropIndices
+dropCards
+  :: forall m
+  . MonadError String m
+  => Array Int
+  -> Player
+  -> m Player
+dropCards = traverseOf _hand <<< dropIndices
 
 hasChoices :: Player -> Boolean
 hasChoices = _.choices >>> not null
@@ -94,23 +91,23 @@ play
   => Int -> Player -> m Player
 play cardIndex player = do
   playedCard <- getCard cardIndex player
-  hand' <- case (deleteAt cardIndex player.hand) of
-    Nothing -> throwError "cannot delete card index from hand"
-    Just h -> pure h
-  player' :: Player <- (drawCards playedCard.cards (player { hand = hand' }))
-  if not Card.isAction playedCard
-  then throwError $ "cannot play non-action card"
-  else pure player'
-    { atPlay = playedCard : player'.atPlay
-    , actions = player'.actions + playedCard.actions - 1
-    , buys = player'.buys + playedCard.buys
-    }
+  hand' <- dropCard cardIndex player
+  player' <- drawCards playedCard.cards (_hand .~ hand' $ player)
+  check $ playedCard <@! Card.isAction !> "must play action cards"
+  pure $ player' # (_atPlay :~ playedCard)
+    >>> (_actions +~ (playedCard.actions - 1))
+    >>> (_buys +~ playedCard.buys)
 
 firstChoice :: Player -> Maybe Choice
 firstChoice = firstOf traversed <<< view _choices
 
-dropChoice :: Player -> Maybe Player
-dropChoice = traverseOf _choices $ deleteAt 0
+dropChoice
+  :: forall m
+  . MonadError String m
+  => Player
+  -> m Player
+dropChoice = fromJust "failed to drop choice"
+  <<< traverseOf _choices (deleteAt 0)
 
 gainBonus :: Bonus -> Player -> Player
 gainBonus = prependOver _bonuses
@@ -228,11 +225,23 @@ score :: Player -> Int
 score player = foldr (+) 0 $ _.victoryPoints <$> (allCards player)
 
 assertHasBuys :: forall m. MonadError String m => Player -> m Player
-assertHasBuys = assert "no buys!" (_.buys >>> (_ > 0))
+assertHasBuys = assert (_.buys >>> (_ > 0)) "no buys!"
 
 assertHasActions :: forall m. MonadError String m => Player -> m Player
-assertHasActions = assert "no actions!" (_.actions >>> (_ > 0))
+assertHasActions = assert (_.actions >>> (_ > 0)) "no actions!"
 
-assertHasCash :: forall m. MonadError String m => Int -> Player -> m Player
-assertHasCash i = assert "not enough treasure!" $ cash >>> (_ >= i)
+assertHasCash
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Player
+  -> m Player
+assertHasCash i = assert (cash >>> (_ >= i)) "not enough treasure!"
+
+hasCash :: Int -> Rule Player
+hasCash i = cash >>> (_ >= i) !> ("need $" <> show i)
+
+handSizeIs :: Relation -> Int -> Rule Player
+handSizeIs r i = _.hand >>> length >>> is r i
+  !> "must have " <> show r <> " " <> show i <> " cards in hand"
 

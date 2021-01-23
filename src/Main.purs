@@ -7,7 +7,7 @@ import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set)
+import Data.Lens.Setter (over, set, (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
@@ -34,7 +34,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (Message(..), Envelope)
-import Util (prependOver, readJson, writeJson)
+import Util (prependOver, readJson, writeJson, (:~))
 import Web.Event.Event (Event, EventType(..))
 
 type AppState =
@@ -210,20 +210,20 @@ handleAction = case _ of
           ConnectionsMessage count ->
             H.modify_ $ set _connectionCount count
           ChatMessage { message, username } -> do
-            H.modify_ $ prependOver _messages msg
+            H.modify_ $ _messages :~ msg
             if message == "PING"
               then do
-                H.modify_ $ set _message "PONG"
+                H.modify_ $ _message .~ "PONG"
                 sendChatMessage
               else pure unit
           GameStateMessage state -> do
             log "Receive GameStateMessage"
             { playerIndex } <- H.get
-            H.modify_ $ set _gameState $ Just
-              $ UpdateState { state, playerIndex }
+            H.modify_ $ _gameState .~ Just
+              (UpdateState { state, playerIndex })
           PlayMadeMessage _ -> do
-            log "Receive PlayMadeMessage"
-            H.modify_ $ prependOver _messages msg
+            log $ "Receive PlayMadeMessage: " <> show msg
+            H.modify_ $ _messages :~ msg
   LoadGame -> do
     mbGameState <- load "game_state"
     case mbGameState of
@@ -246,13 +246,13 @@ handleAction = case _ of
       sendMessage $ GameStateMessage state
       save "game_state" state
       log $ "NewState"
-    PlayMade play -> do
-      log $ "PlayMade: " <> show play
+    PlayMade x -> do
+      log $ "PlayMade "
       { gameState } <- H.get
       case gameState of
         Just (UpdateState { state, playerIndex }) -> do
-          log $ "UpdateState" <> show play
-          let message = PlayMadeMessage { play, playerIndex, state }
+          log $ "UpdateState"
+          let message = PlayMadeMessage x
           sendMessage message
           H.modify_ $ prependOver _messages message
         Just (MakeNewGame { playerCount, playerIndex }) ->

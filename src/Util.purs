@@ -30,8 +30,13 @@ dropIndex i xs = take i xs <> drop (i + 1) xs
 withIndices :: forall a. Array a -> Array (Tuple Int a)
 withIndices xs = zip (indices xs) xs
 
-dropIndices :: forall a. Array Int -> Array a -> Maybe (Array a)
-dropIndices is xs =
+dropIndices
+  :: forall m a
+  . MonadError String m
+  => Array Int
+  -> Array a
+  -> m (Array a)
+dropIndices is xs =  fromJust "failed to drop indices" $
   if length is > length xs
   || length (nub is) /= length is
   || (_ < 0) `any` is
@@ -40,8 +45,13 @@ dropIndices is xs =
   else Just $ snd <$>
   (fst >>> flip notElem is) `filter` withIndices xs
 
-takeIndices :: forall a. Array Int -> Array a -> Maybe (Array a)
-takeIndices is xs =
+takeIndices
+  :: forall m a
+  . MonadError String m
+  => Array Int
+  -> Array a
+  -> m (Array a)
+takeIndices is xs = fromJust "failed to drop indices" $
   if length is > length xs
   || length (nub is) /= length is
   || (_ < 0) `any` is
@@ -56,8 +66,26 @@ indices xs = fst <$> mapWithIndex Tuple xs
 justIf :: forall a. (a -> Boolean) -> a -> Maybe a
 justIf f x = if f x then Just x else Nothing
 
-assert :: forall e m a. MonadError e m => e -> (a -> Boolean) -> a -> m a
-assert e p x = if p x then pure x else throwError e
+assert
+  :: forall e m a
+  . MonadError e m
+  => (a -> Boolean)
+  -> e
+  -> a
+  -> m a
+assert p e x = if p x then pure x else throwError e
+
+assert_
+  :: forall e m a
+  . MonadError e m
+  => (a -> Boolean)
+  -> e
+  -> a
+  -> m Unit
+assert_ p e x = if p x then pure unit else throwError e
+
+forget :: forall a. a -> Unit
+forget _ = unit
 
 fromJust :: forall e m a. MonadError e m => e -> Maybe a -> m a
 fromJust e = case _ of
@@ -74,6 +102,8 @@ dropFirstOf = dropNthOf 0
 
 prependOver :: forall s a. ArrayLens' s a -> a -> s -> s
 prependOver lens x = over lens (x : _)
+
+infixr 4 prependOver as :~
 
 preAppendOver :: forall s a. ArrayLens' s a -> Array a -> s -> s
 preAppendOver lens xs = over lens (xs <> _)

@@ -4,17 +4,17 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, catMaybes, dropWhile, filter, find, findIndex, head, length, takeWhile, updateAt)
+import Data.Array (all, catMaybes, dropWhile, filter, find, findIndex, head, length, null, takeWhile, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
-import Data.Lens.Fold (firstOf, preview)
-import Data.Lens.Getter (view)
+import Data.Lens.Fold ((^?))
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', prism')
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (appendOver, over, set)
-import Data.Lens.Traversal (Traversal', traverseOf, traversed)
+import Data.Lens.Setter (over, set, (.~), (<>~))
+import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -35,14 +35,16 @@ import Domination.Data.Phase as Phase
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
-import Domination.Data.Player (Player)
+import Domination.Data.Player (Player, handSizeIs)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
-import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, preAppendOver, prependOver, takeIndices, withIndices)
+import Relation (Relation(..))
+import Rule (appendError, appendErrorOn, check, enforceOn, lengthIs, (!<>), (!>), (!@>), (<>!), (<@!))
+import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices)
 
 type GameState =
   { turn :: Int
@@ -63,6 +65,7 @@ _supply = prop (SProxy :: SProxy "supply")
 _trash :: Lens' GameState (Array Card)
 _trash = prop (SProxy :: SProxy "trash")
 
+
 _player :: Int -> Traversal' GameState Player
 _player i = _players <<< (ix i)
 _stack :: Int -> Traversal' GameState Stack
@@ -77,7 +80,16 @@ getPlayer
   => Int
   -> GameState
   -> m Player
-getPlayer i = fromJust "cannot get player!" <<< preview (_player i)
+getPlayer i = fromJust "cannot get player!" <<< (_ ^? _player i)
+
+getPlayerHand
+  :: forall m
+  . MonadError String m
+  => Int
+  -> GameState
+  -> m (Array Card)
+getPlayerHand playerIndex = fromJust "cannot get player hand!"
+  <<< (_ ^? _player playerIndex <<< Player._hand)
 
 updatePlayer
   :: forall m
@@ -145,7 +157,7 @@ getStack
   => Int
   -> GameState
   -> m Stack
-getStack i = fromJust "cannot get stack!" <<< preview (_stack i)
+getStack i = fromJust "cannot get stack!" <<< (_ ^? _stack i)
 
 stackByName
   :: forall m
@@ -154,7 +166,7 @@ stackByName
   -> GameState
   -> m Stack
 stackByName cardName { supply } = fromJust "card not in supply!" $
-  find (view (Card._name >>> Stack._card) >>> (_ == cardName)) supply
+  find (view (Stack._card <<< Card._name) >>> (_ == cardName)) supply
 
 indexOfStack
   :: forall m
@@ -162,8 +174,8 @@ indexOfStack
   => Card
   -> GameState
   -> m Int
-indexOfStack card state = fromJust "card not in supply!"
-  $ findIndex (\x -> x.card == card) state.supply
+indexOfStack card = fromJust "card not in supply!"
+  <<< findIndex (view Stack._card >>> (_ == card)) <<< _.supply
 
 type Supply = Array Stack
 
@@ -308,8 +320,8 @@ assertPhase
   -> GameState
   -> m GameState
 assertPhase expected = assert
-  ("Expected: " <> show expected)
   (_.phase >>> (_ == expected))
+  ("Expected: " <> show expected)
 
 purchase
   :: forall m
@@ -358,7 +370,7 @@ overStackM assertion stackIndex state =
 
 hasReaction :: Int -> GameState -> Boolean
 hasReaction playerIndex state =
-  case preview (Player._reaction >>> _player playerIndex) state of
+  case state ^? _player playerIndex <<< Player._reaction of
     Just _ -> true
     Nothing -> false
 
@@ -369,14 +381,13 @@ isAttacked playerIndex state =
     _ -> false
 
 firstChoice :: Int -> GameState -> Maybe Choice
-firstChoice playerIndex state = do
-  player <- preview (_player playerIndex) state
-  Player.firstChoice player
+firstChoice playerIndex state =
+  state ^? _player playerIndex >>= Player.firstChoice
 
 reaction :: Int -> GameState -> Maybe Reaction
 reaction playerIndex state = do
-  hand <- preview (Player._hand >>> _player playerIndex) state
-  head $ catMaybes (_.reaction <$> hand)
+  hand <- state ^? _player playerIndex <<< Player._hand
+  head $ catMaybes $ _.reaction <$> hand
 
 react
   :: forall m
@@ -391,8 +402,13 @@ react playerIndex reaction =
     Nothing ->
       pure
     Just BlockAttack ->
-      fromJust "failed to react!"
-      <<< maybeModifyPlayer playerIndex Player.dropChoice
+      traverseOf (_player playerIndex) Player.dropChoice
+
+_pile pile playerIndex = case pile of
+  Pile.Hand -> _player playerIndex <<< Player._hand
+  Pile.Trash -> _trash
+  Pile.Deck -> _player playerIndex <<< Player._deck
+  Pile.Discard -> _player playerIndex <<< Player._discard
 
 resolveChoice
   :: forall m
@@ -404,6 +420,90 @@ resolveChoice
   -> m GameState
 resolveChoice playerIndex choice state =
   case choice of
+    MoveFromHand
+      { filter
+      , n: constraint
+      , destination
+      , resolution: Just cardIndices
+      } -> do
+      let
+        _source = _pile Pile.Hand playerIndex
+        _source' = _player playerIndex <<< Player._hand
+        _destination = _pile destination playerIndex
+      source <- fromJust "failed to get source" $ state ^? _source
+      player <- getPlayer playerIndex state
+      selected <- takeIndices cardIndices source
+      remaining <- dropIndices cardIndices source
+      let
+        forSelected = ("selected cards" <>! _) >>> (selected <@! _)
+        forRemaining = ("remaining cards" <>! _) >>> (remaining <@! _)
+        forSource = ("source cards" <>! _) >>> (source <@! _)
+      case constraint of
+        UpTo n -> check $
+          forSelected $ lengthIs LTE n
+        DownTo n -> check $
+          forRemaining (lengthIs EQ n)
+          ||
+          ( forSource (lengthIs LT n)
+          && forSelected (lengthIs EQ 0)
+          )
+        Exactly n -> check $
+          forSelected (lengthIs EQ n)
+          ||
+          ( forSource (lengthIs LT n)
+          && forSelected (lengthIs EQ $ length source)
+          )
+      case filter of
+        Just f -> check $
+          forSelected $ all (passFilter f) !> "illegal choice in"
+        Nothing -> pure unit
+      pure
+        $ _source' .~ remaining
+        $ _destination <>~ selected
+        $ state
+
+    GainCards { n, cardName, resolution: Just unit } -> do
+      stack <- stackByName cardName state
+      stackIndex <- indexOfStack stack.card state
+      let cardsToGain = min n stack.count
+      let newCount = max 0 (stack.count - n)
+      let stackUpdate = Stack._count .~ newCount
+      let cards = replicate cardsToGain stack.card
+      let playerUpdate = Player._discard <>~ cards
+      modifyPlayer playerIndex playerUpdate state
+        >>= modifyStack stackIndex stackUpdate
+    GainActions { n, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainActions n) state
+    GainBuys { n, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainBuys n) state
+    Discard { selection: SelectAll, resolution: Just unit } ->
+      modifyPlayer playerIndex (moveAll Player._hand Player._toDiscard) state
+    Draw { n, resolution: Just unit } ->
+      modifyPlayerM playerIndex (Player.drawCards n) state
+    GainBonus { bonus, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainBonus bonus) state
+    If { choice: choice', condition, resolution: Just unit } ->
+      modifyPlayer playerIndex playerUpdate state
+      where
+        playerUpdate player =
+          if condition `describes` player
+          then Player.gainChoice choice' player
+          else player
+    And { choices, resolution: Just unit } ->
+      modifyPlayer playerIndex (Player.gainChoices choices) state
+    Or { resolution: Just chosen } ->
+      modifyPlayer playerIndex (Player.gainChoice chosen) state
+    PickN { n, resolution: Just choices } -> do
+      check $ choices <@! lengthIs EQ n !<> "choices"
+      modifyPlayer playerIndex (Player.gainChoices choices) state
+    Option { choice, resolution: Just agree } ->
+      let
+        playerUpdate =
+          if agree
+          then Player.gainChoice choice
+          else identity
+      in
+      modifyPlayer playerIndex playerUpdate state
     If { resolution: Nothing } -> unresolved
     And { resolution: Nothing } -> unresolved
     Or { resolution: Nothing } -> unresolved
@@ -416,124 +516,7 @@ resolveChoice playerIndex choice state =
     Discard { resolution: Nothing } -> unresolved
     Draw { resolution: Nothing } -> unresolved
     GainBonus { resolution: Nothing } -> unresolved
-    MoveFromHand { filter, n: constraint, destination, resolution: Just cardIndices } -> do
-      hand :: Array Card <- fromJust "failed to get player hand"
-        $ (preview (_player playerIndex <<< Player._hand) state)
-      if length hand < length cardIndices
-      then throwError "cannot trash more cards than you have"
-      else pure unit
-      case constraint of
-        UpTo n ->
-          if length cardIndices > n
-          then throwError $ "cannot trash more than " <> show n
-          else pure unit
-        DownTo n ->
-          if length hand - length cardIndices > n
-          then throwError $ "must trash down to " <> show n
-          else if length hand < n && length cardIndices > 0
-          then throwError $ "only trash down to " <> show n
-          else pure unit
-        Exactly n -> do
-          let nToMoveFromHand = min n $ length hand
-          if length cardIndices /= nToMoveFromHand
-          then throwError $ "must trash " <> show nToMoveFromHand
-          else pure unit
-      selectedCards :: Array Card <- fromJust "failed to take indices"
-          $ takeIndices cardIndices hand
-      case filter of
-        Just f ->
-          if evalFilter f `all` selectedCards
-          then pure unit
-          else throwError "cannot trash filtered card"
-        Nothing -> pure unit
-      remainingHand <- fromJust "failed to drop indices"
-          $ dropIndices cardIndices hand
-      let
-        playerUpdate = Player.dropCards cardIndices
-          >=> Player.dropChoice
-      let
-        f = case destination of
-          Pile.Hand -> traverseOf
-            (_player playerIndex <<< Player._hand)
-            (Just <<< (selectedCards <> _))
-          Pile.Trash -> traverseOf
-            _trash
-            (Just <<< (selectedCards <> _))
-          Pile.Deck -> traverseOf
-            (_player playerIndex <<< Player._deck)
-            (Just <<< (selectedCards <> _))
-          Pile.Discard -> traverseOf
-            (_player playerIndex <<< Player._discard)
-            (Just <<< (selectedCards <> _))
-      state' <- fromJust "failed to trash cards!"
-        $ maybeModifyPlayer playerIndex playerUpdate state
-      fromJust "failed to trash cards!" $ f state'
-    GainCards { n, cardName, resolution: Just unit } -> do
-      stack <- stackByName cardName state
-      stackIndex <- indexOfStack stack.card state
-      let cardsToGain = min n stack.count
-      let newCount = max 0 (stack.count - n)
-      let stackUpdate = set Stack._count newCount
-      let cards = replicate cardsToGain stack.card
-      let playerUpdate = appendOver Player._discard cards
-      modifyPlayer playerIndex playerUpdate state
-        >>= modifyStack stackIndex stackUpdate
-        <$> \state' -> fromMaybe state'
-          $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    GainActions { n, resolution: Just unit } ->
-      modifyPlayer playerIndex (Player.gainActions n) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    GainBuys { n, resolution: Just unit } ->
-      modifyPlayer playerIndex (Player.gainBuys n) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    Discard { selection: SelectAll, resolution: Just unit } ->
-      modifyPlayer playerIndex (moveAll Player._hand Player._toDiscard) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    Draw { n, resolution: Just unit } ->
-      modifyPlayerM playerIndex (Player.drawCards n) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    GainBonus { bonus, resolution: Just unit } ->
-      modifyPlayer playerIndex (Player.gainBonus bonus) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    If { choice: choice', condition, resolution: Just unit } ->
-      modifyPlayer playerIndex playerUpdate state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-      where
-        playerUpdate player =
-          if evalCondition condition player
-          then Player.gainChoice choice' player
-          else player
-    And { choices, resolution: Just unit } ->
-      modifyPlayer playerIndex (Player.gainChoices choices) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    Or { resolution: Just chosen } ->
-      modifyPlayer playerIndex (Player.gainChoice chosen) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    PickN { n, resolution: Just choices } ->
-      if length choices /= n
-      then throwError $ "must choose " <> show n
-      else
-      modifyPlayer playerIndex (Player.gainChoices choices) state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
-    Option { choice, resolution: Just agree } ->
-      let
-        playerUpdate =
-          if agree
-          then Player.gainChoice choice
-          else identity
-      in
-      modifyPlayer playerIndex playerUpdate state
-        <#> \state' -> fromMaybe state'
-        $ maybeModifyPlayer playerIndex Player.dropChoice state'
+  >>= traverseOf (_player playerIndex) Player.dropChoice
   where
     unresolved =
       throwError $ "this is an unresolved choice: " <> show choice
@@ -544,17 +527,18 @@ assertTurn
   => Int
   -> GameState
   -> m GameState
-assertTurn playerIndex = assert "not your turn!"
-  $ (playerIndex == _) <<< _.turn
+assertTurn playerIndex = assert
+  ((playerIndex == _) <<< _.turn)
+  "not your turn!"
 
 assertChoicesResolved ::
   forall m
   . MonadError String m
   => GameState
   -> m GameState
-assertChoicesResolved =
-  assert "error: play: choices outstanding!"
-    $ not <<< choicesOutstanding
+assertChoicesResolved = assert
+  (not <<< choicesOutstanding)
+  "error: play: choices outstanding!"
 
 play
   :: forall m
@@ -596,21 +580,7 @@ play playerIndex cardIndex state = do
     targetIndices Self attackerIndex = const [ attackerIndex ]
 
 choicesOutstanding :: GameState -> Boolean
-choicesOutstanding = any Player.hasChoices <<< view _players
-
-maybeModifyPlayer
-  :: Int
-  -> (Player -> Maybe Player)
-  -> GameState
-  -> Maybe GameState
-maybeModifyPlayer i = traverseOf (_player i)
-
-maybeModifyPlayerHand
-  :: Int
-  -> (Array Card -> Maybe (Array Card))
-  -> GameState
-  -> Maybe GameState
-maybeModifyPlayerHand i = traverseOf (Player._hand >>> _player i)
+choicesOutstanding = view _players >>> any Player.hasChoices
 
 -- should we return a maybe here in case there are no players?
 -- or should players be a non-empty list?
@@ -950,9 +920,9 @@ moneyLender = let attack = false in
     ]
   }
 
-evalCondition :: Condition -> Player -> Boolean
-evalCondition (HasCard name) = _.hand >>> any (_.name >>> (_ == name))
+describes :: Condition -> Player -> Boolean
+describes (HasCard name) = _.hand >>> any (_.name >>> (_ == name))
 
-evalFilter :: Filter -> Card -> Boolean
-evalFilter (HasName name) = _.name >>> (_ == name)
+passFilter :: Filter -> Card -> Boolean
+passFilter (HasName name) = _.name >>> (_ == name)
 

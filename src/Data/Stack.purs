@@ -23,5 +23,5 @@ take :: Stack -> Stack
 take = decOver _count
 
 assertNotEmpty :: forall m. MonadError String m => Stack -> m Stack
-assertNotEmpty = assert "stack is empty!" (_.count >>> (_ > 0))
+assertNotEmpty = assert (_.count >>> (_ > 0)) "stack is empty!"
 

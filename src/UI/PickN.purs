@@ -8,14 +8,9 @@ import Data.Array (filter, (:))
 import Data.Foldable (length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..), fst, snd)
-import Domination.Data.Card (Card)
 import Domination.Data.Choice (Choice)
-import Domination.Data.Player (Player)
-import Domination.Data.Player as Player
-import Domination.UI.Card as Card
-import Domination.UI.Choice as Choice
 import Domination.UI.Css as Css
+import Domination.UI.RenderText (renderText)
 import Domination.UI.Util (h2__)
 import Halogen (Component)
 import Halogen as H
@@ -58,7 +53,7 @@ component { n, title, choices } =
               then Css.toTrash
               else Css.toKeep
             ]
-            [ HH.text $ Choice.renderText' choice ]
+            [ HH.text $ renderText choice ]
 
     eval
       :: forall a

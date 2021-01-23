@@ -7,17 +7,16 @@ import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Fold (preview)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
-import Domination.UI.Bonus as Bonus
-import Domination.UI.Choice as Choice
+import Domination.UI.RenderText (renderTextInContext)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
@@ -37,6 +36,8 @@ data Message
   | ConnectionsMessage Int
 
 derive instance genericMessage :: Generic Message _
+instance showMessage :: Show Message where
+  show = genericShow
 instance encodeJsonMessage :: EncodeJson Message where
   encodeJson = genericEncodeJson
 instance decodeJsonMessage :: DecodeJson Message where
@@ -101,7 +102,7 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
               Nothing -> "???"
               Just stack -> stack.card.name
         ResolveChoice playerIndex choice ->
-          Just $ Choice.renderText playerIndex state choice
+          Just $ renderTextInContext playerIndex state choice
         React playerIndex reaction -> Just $
           case reaction of
             Nothing -> "did not react"

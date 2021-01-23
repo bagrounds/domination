@@ -1,11 +1,4 @@
-module Domination.UI.Domination
-  ( gameUi
-  , component
-  , Component
-  , GameUpdate(..)
-  , ComponentState(..)
-  , GameEvent(..)
-  ) where
+module Domination.UI.Domination where
 
 import Prelude
 
@@ -31,13 +24,11 @@ import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
-import Domination.UI.Bonus as Bonus
 import Domination.UI.Card (render) as Card
-import Domination.UI.Choice as Choice
 import Domination.UI.ChoiceMoveFromHand as MoveFromHand
 import Domination.UI.Css as Css
-import Domination.UI.Phase as Phase
 import Domination.UI.PickN as PickN
+import Domination.UI.RenderText (renderText)
 import Domination.UI.Util (acknowledge, h1__, h2__, h3__, chooseOne)
 import Domination.UI.Util as Util
 import Halogen as H
@@ -52,7 +43,7 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 
 data GameEvent
   = NewState GameState
-  | PlayMade Play
+  | PlayMade { play :: Play, playerIndex :: Int, state :: GameState }
 
 data GameUpdate
   = UpdateState ComponentState
@@ -279,7 +270,7 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
     <> " | VP: " <> show (Player.score player)
     <>
     ( if state.turn == playerIndex
-      then " | " <> Phase.renderText state.phase
+      then " | " <> renderText state.phase
       else ""
     )
   ]
@@ -333,18 +324,18 @@ renderPlayer cs@{ state, playerIndex } player =
           If x ->
             acknowledge message clickEvent
             where
-              message = "Checking " <> Choice.renderText' choice
+              message = "Checking " <> renderText choice
               clickEvent = playEvent If x unit
           And x@{ choices } ->
             acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent And x unit
           Or x@{ choices } ->
             chooseOne "Choose one" $
               choices <#> \choice' ->
                 { clickEvent: playEvent Or x choice'
-                , text: Choice.renderText' choice'
+                , text: renderText choice'
                 }
           PickN x@{ n, choices } -> HH.div_
             [ HH.slot
@@ -362,7 +353,7 @@ renderPlayer cs@{ state, playerIndex } player =
             where
               f xs = PickN x { resolution = Just xs }
           Option x@{ choice } ->
-            chooseOne (Choice.renderText' choice <> "?")
+            chooseOne (renderText choice <> "?")
               [ { clickEvent: MakePlay
                   $ ResolveChoice playerIndex
                   $ Option x { resolution = Just true }
@@ -385,30 +376,30 @@ renderPlayer cs@{ state, playerIndex } player =
           GainCards x@{ n, cardName } ->
             acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent GainCards x unit
           GainActions x@{ n } ->
             acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent GainActions x unit
           GainBuys x@{ n } ->
             acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent GainBuys x unit
           Discard x@{ selection: SelectAll } ->
             acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent Discard x unit
           Draw x@{ n } -> acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent Draw x unit
           GainBonus x@{ bonus } -> acknowledge message clickEvent
             where
-              message = Choice.renderText' choice
+              message = renderText choice
               clickEvent = playEvent GainBonus x unit
         where
           playEvent
@@ -435,7 +426,7 @@ renderNextPhaseButton { playerIndex, state } =
           BuyPhase -> "Complete Buy Phase"
           CleanupPhase -> "Complete Turn"
       else "Waiting for Player " <> show (state.turn + 1)
-        <> " | " <> Phase.renderText state.phase
+        <> " | " <> renderText state.phase
     ]
 
 renderStats :: forall w. ComponentState -> HTML w GameAction
@@ -536,16 +527,18 @@ handleAction gameAction = do
         log "Domination: MakePlay"
         playAndReport play state
   where
-    playAndReport play s = do
-      result <- Dom.makeAutoPlay play s
+    playAndReport play state = do
+      result <- Dom.makeAutoPlay play state
       case result of
         Left e -> error e
         Right gs -> do
           case play of
-            EndPhase _ ->
-              pure unit
-            _ ->
-              H.raise $ PlayMade play
+            EndPhase _ -> pure unit
+            _ -> H.raise $ PlayMade
+              { play
+              , playerIndex: state.turn
+              , state
+              }
           H.modify _ { state = gs }
             >>= _.state
             >>> NewState

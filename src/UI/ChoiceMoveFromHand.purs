@@ -10,7 +10,7 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Player (Player)
 import Domination.UI.CardChooser as CardChooser
-import Domination.UI.Choice as Choice
+import Domination.UI.RenderText (renderText)
 import Halogen (Component)
 import Halogen.HTML (HTML)
 
@@ -30,7 +30,7 @@ component player choice =
   where
     renderChoice = case _ of
       x@(MoveFromHand { n, resolution: Nothing }) -> Just
-        { title: Choice.renderText' x
+        { title: renderText x
         , buttonText: "Done"
         }
       _ -> Nothing
