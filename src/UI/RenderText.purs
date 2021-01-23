@@ -51,9 +51,15 @@ instance choiceRenderTextInContext :: RenderTextInContext Choice where
         <> (intercalate ", " $ renderText <$> choices)
       Option { choice } ->
         "chose to optionally " <> renderText choice
-      MoveFromHand { resolution: (Just cardIndices) } ->
-        "trashed: " <> intercalate ", "
-        (getPlayerCardName playerIndex state <$> cardIndices)
+      MoveFromHand { destination, resolution: (Just cardIndices) } ->
+        case destination of
+            Pile.Trash -> "trashed: " <> cards
+            Pile.Discard -> "discarded: " <> cards
+            Pile.Hand -> "gained: " <> cards <> " to their hand"
+            Pile.Deck -> "gained: " <> cards <> " to their deck"
+        where
+          cards = intercalate ", "
+            $ getPlayerCardName playerIndex state <$> cardIndices
       GainCards { n, cardName } ->
         "gained " <> show n <> "x " <> cardName
       GainActions { n, resolution } ->
