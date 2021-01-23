@@ -58,11 +58,13 @@ component { renderChoice, canToggle, resolve, player, choice } =
       case Player.firstChoice player >>= renderChoice of
         Just { title, buttonText } -> HH.div_ $
           [ h2__ title
-          , HH.button
-            [ HP.class_ Css.resolveChoice
-            , HE.onClick \_ -> Just $ Done
+          , HH.p_
+            [ HH.button
+              [ HP.class_ Css.resolveChoice
+              , HE.onClick \_ -> Just $ Done
+              ]
+              [ HH.text buttonText ]
             ]
-            [ HH.text buttonText ]
           ]
           <> renderCardToTrash `mapWithIndex` xs
         Nothing -> h2__ "Something has gone terribly wrong!"
