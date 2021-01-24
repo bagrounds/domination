@@ -8,8 +8,9 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens.Fold (preview)
+import Data.Lens.Fold (preview, (^?))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Domination.Data.Card as Card
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Play (Play(..))
@@ -90,29 +91,27 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
   where
       play' :: Maybe String
       play' = case play of
-        NewGame n -> Just $
-          "created a new " <> show n <> " player game"
-        EndPhase playerIndex -> Nothing
-        PlayCard playerIndex cardIndex -> Just $
+        NewGame { playerCount } -> Just $
+          "created a new " <> show playerCount <> " player game"
+        EndPhase { playerIndex } -> Nothing
+        PlayCard { playerIndex, cardIndex } -> Just $
           "played: " <> getPlayerCardName playerIndex state cardIndex
-        Purchase playerIndex stackIndex -> Just $
+        Purchase { playerIndex, stackIndex } -> Just $
           "purchased: " <> card
           where
             card = case preview (GameState._stack stackIndex) state of
               Nothing -> "???"
               Just stack -> stack.card.name
-        ResolveChoice playerIndex choice ->
+        ResolveChoice { playerIndex, choice } ->
           Just $ renderTextInContext playerIndex state choice
-        React playerIndex reaction -> Just $
+        React { playerIndex, reaction } -> Just $
           case reaction of
             Nothing -> "did not react"
             Just BlockAttack -> "blocked an attack"
 
 getPlayerCardName :: Int -> GameState -> Int -> String
-getPlayerCardName playerIndex state cardIndex =
-  fromMaybe "???"
-  $ _.name
-  <$> preview
-  (GameState._player playerIndex <<< Player._cardInHand cardIndex)
-  state
+getPlayerCardName playerIndex state cardIndex = fromMaybe "???"
+  $ state ^? GameState._player playerIndex
+    <<< Player._cardInHand cardIndex
+    <<< Card._name
 

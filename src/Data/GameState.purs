@@ -245,12 +245,12 @@ makePlay
   -> GameState
   -> m GameState
 makePlay = case _ of
-  NewGame n -> const $ setup (newGame n)
-  EndPhase playerIndex -> nextPhase playerIndex
-  PlayCard playerIndex card -> play playerIndex card
-  Purchase playerIndex stackIndex -> purchase playerIndex stackIndex
-  ResolveChoice playerIndex choice -> resolveChoice playerIndex choice
-  React playerIndex reaction -> react playerIndex reaction
+  NewGame { playerCount } -> const $ setup (newGame playerCount)
+  EndPhase { playerIndex } -> nextPhase playerIndex
+  PlayCard x -> play x
+  Purchase x -> purchase x
+  ResolveChoice x -> resolveChoice x
+  React x -> react x
 
 getCurrentPlayer
   :: forall m
@@ -326,11 +326,10 @@ assertPhase expected = assert
 purchase
   :: forall m
   . MonadError String m
-  => Int
-  -> Int
+  => { playerIndex :: Int, stackIndex :: Int }
   -> GameState
   -> m GameState
-purchase playerIndex stackIndex =
+purchase { playerIndex, stackIndex } =
   assertTurn playerIndex
     >=> assertPhase BuyPhase
     >=> modifyPlayerM playerIndex Player.assertHasBuys
@@ -392,11 +391,10 @@ reaction playerIndex state = do
 react
   :: forall m
   . MonadError String m
-  => Int
-  -> Maybe Reaction
+  => { playerIndex :: Int, reaction :: Maybe Reaction }
   -> GameState
   -> m GameState
-react playerIndex reaction =
+react { playerIndex, reaction } =
   modifyPlayer playerIndex Player.dropReaction >=>
   case reaction of
     Nothing ->
@@ -414,11 +412,10 @@ resolveChoice
   :: forall m
   . MonadError String m
   => Random m
-  => Int
-  -> Choice
+  => { playerIndex :: Int, choice :: Choice }
   -> GameState
   -> m GameState
-resolveChoice playerIndex choice state =
+resolveChoice { playerIndex, choice } state =
   case choice of
     MoveFromHand
       { filter
@@ -544,11 +541,10 @@ play
   :: forall m
   . MonadError String m
   => Random m
-  => Int
-  -> Int
+  => { playerIndex :: Int, cardIndex :: Int }
   -> GameState
   -> m GameState
-play playerIndex cardIndex state = do
+play { playerIndex, cardIndex } state = do
   player <- getPlayer playerIndex state
   card <- Player.getCard cardIndex player
   assertTurn playerIndex state

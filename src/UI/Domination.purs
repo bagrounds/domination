@@ -8,6 +8,8 @@ import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens.Fold ((^?))
+import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Log (class Log, error, log)
@@ -19,6 +21,7 @@ import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
+import Domination.Data.Play as Play
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
@@ -173,7 +176,8 @@ renderSupply player { playerIndex, state } =
     renderStackI stackIndex =
       renderStack onClick player
       where
-        onClick _ = Just $ MakePlay $ Purchase playerIndex stackIndex
+        onClick _ =
+          Just $ MakePlay $ Purchase { playerIndex,  stackIndex }
 
 renderDeck :: forall a. Player -> HTML a GameAction
 renderDeck player = HH.button
@@ -313,10 +317,11 @@ renderPlayer cs@{ state, playerIndex } player =
       renderReaction =
         Just $ chooseOne "Block attack?"
           [ { clickEvent: MakePlay
-              $ React playerIndex (Just BlockAttack)
+              $ React { playerIndex, reaction: Just BlockAttack }
             , text: "Yes"
             }
-          , { clickEvent: MakePlay $ React playerIndex Nothing
+          , { clickEvent:
+              MakePlay $ React { playerIndex, reaction: Nothing }
             , text: "No"
             }
           ]
@@ -348,20 +353,27 @@ renderPlayer cs@{ state, playerIndex } player =
                 }
               )
               unit
-              (Just <<< MakePlay <<< ResolveChoice playerIndex <<< f)
+              $ Just
+              <<< MakePlay
+              <<< ResolveChoice
+              <<< \x -> { playerIndex, choice: f x }
             ]
             where
               f xs = PickN x { resolution = Just xs }
           Option x@{ choice } ->
             chooseOne (renderText choice <> "?")
               [ { clickEvent: MakePlay
-                  $ ResolveChoice playerIndex
-                  $ Option x { resolution = Just true }
+                  $ ResolveChoice
+                  { playerIndex
+                  , choice: Option x { resolution = Just true }
+                  }
                 , text: "Yes"
                 }
               , { clickEvent: MakePlay
-                  $ ResolveChoice playerIndex
-                  $ Option x { resolution = Just false }
+                  $ ResolveChoice
+                  { playerIndex
+                  , choice: Option x { resolution = Just false }
+                  }
                 , text: "No"
                 }
               ]
@@ -371,7 +383,10 @@ renderPlayer cs@{ state, playerIndex } player =
               0
               (MoveFromHand.component player choice)
               unit
-              (Just <<< MakePlay <<< ResolveChoice playerIndex)
+              $ Just
+              <<< MakePlay
+              <<< ResolveChoice
+              <<< { playerIndex, choice: _ }
             ]
           GainCards x@{ n, cardName } ->
             acknowledge message clickEvent
@@ -408,13 +423,19 @@ renderPlayer cs@{ state, playerIndex } player =
             -> { resolution :: Maybe a | r }
             -> a
             -> GameAction
-          playEvent mk x r = MakePlay $ ResolveChoice playerIndex
-            $ mk x { resolution = Just r }
+          playEvent mk x r = MakePlay $ ResolveChoice
+            { playerIndex
+            , choice: mk x { resolution = Just r }
+            }
 
+renderNextPhaseButton
+  :: forall w
+  . { playerIndex :: Int, state :: GameState }
+  -> HTML w GameAction
 renderNextPhaseButton { playerIndex, state } =
   HH.button
     [ HP.class_ (Css.nextPhase)
-    , HE.onClick \_ -> Just $ MakePlay $ EndPhase playerIndex
+    , HE.onClick $ const $ Just $ MakePlay $ EndPhase { playerIndex }
     ]
     [ HH.text if state.turn == playerIndex
       then if Dom.choicesOutstanding state
@@ -502,7 +523,7 @@ renderCardInHand
   -> HTML a GameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard
-  (\_ -> Just $ MakePlay $ PlayCard playerIndex cardIndex)
+  (const $ Just $ MakePlay $ PlayCard { playerIndex,  cardIndex })
   player
   card
 
@@ -519,15 +540,17 @@ handleAction gameAction = do
       MakeNewGame { playerCount, playerIndex } -> do
         log "Domination: MakeNewGame"
         H.modify_ _ { playerIndex = playerIndex }
-        playAndReport (NewGame playerCount) state
+        playAndReport playerIndex (NewGame { playerCount }) state
       UpdateState cs -> do
         log "Domination: UpdateState"
         H.put cs
     MakePlay play -> do
-        log "Domination: MakePlay"
-        playAndReport play state
+      let
+        playerIndex = fromMaybe state.turn $ play ^? Play._playerIndex
+      log "Domination: MakePlay"
+      playAndReport playerIndex play state
   where
-    playAndReport play state = do
+    playAndReport playerIndex play state = do
       result <- Dom.makeAutoPlay play state
       case result of
         Left e -> error e
@@ -536,7 +559,7 @@ handleAction gameAction = do
             EndPhase _ -> pure unit
             _ -> H.raise $ PlayMade
               { play
-              , playerIndex: state.turn
+              , playerIndex
               , state
               }
           H.modify _ { state = gs }

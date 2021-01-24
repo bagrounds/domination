@@ -8,17 +8,34 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens.Internal.Wander (wander)
+import Data.Lens.Lens (Lens')
+import Data.Lens.Record (prop)
+import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe)
+import Data.Symbol (SProxy(..))
 import Domination.Data.Choice (Choice)
 import Domination.Data.Reaction (Reaction)
 
 data Play
-  = NewGame Int
-  | EndPhase Int
-  | PlayCard Int Int
-  | Purchase Int Int
-  | ResolveChoice Int Choice
-  | React Int (Maybe Reaction)
+  = NewGame { playerCount :: Int }
+  | EndPhase { playerIndex :: Int }
+  | PlayCard { playerIndex :: Int, cardIndex :: Int }
+  | Purchase { playerIndex :: Int,  stackIndex :: Int }
+  | ResolveChoice { playerIndex :: Int, choice :: Choice }
+  | React { playerIndex :: Int, reaction :: Maybe Reaction }
+
+_playerIndex' :: forall r. Lens' { playerIndex :: Int | r } Int
+_playerIndex' = prop (SProxy :: SProxy "playerIndex")
+
+_playerIndex :: Traversal' Play Int
+_playerIndex = wander \f s -> case s of
+  NewGame _ -> pure s
+  EndPhase x -> EndPhase <$> traverseOf _playerIndex' f x
+  PlayCard x -> PlayCard <$> traverseOf _playerIndex' f x
+  Purchase x -> Purchase <$> traverseOf _playerIndex' f x
+  ResolveChoice x -> ResolveChoice <$> traverseOf _playerIndex' f x
+  React x -> React <$> traverseOf _playerIndex' f x
 
 derive instance genericPlay :: Generic Play _
 instance encodeJsonPlay :: EncodeJson Play where

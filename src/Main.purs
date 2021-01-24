@@ -234,8 +234,8 @@ handleAction = case _ of
           $ UpdateState { state, playerIndex }
         sendMessage $ GameStateMessage state
   StartNewGame -> do
-    log "StartNewGame"
     { playerIndex, playerCount } <- H.get
+    log $ "StartNewGame as player " <> show playerIndex
     H.modify_ $ set _gameState $ Just
       $ MakeNewGame { playerCount, playerIndex }
   UpdateGameState event -> case event of
