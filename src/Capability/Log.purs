@@ -4,8 +4,6 @@ import Prelude
 
 import Control.Monad.Trans.Class (lift)
 import Domination.AppM (AppM)
-import Effect (Effect)
-import Effect as Effect
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)

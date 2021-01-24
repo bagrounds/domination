@@ -13,11 +13,11 @@ import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create, runBroadcastM)
 import Domination.Capability.GenUuid (genUuid, runGenUuidM)
-import Domination.Capability.Log (class Log, error, log, runLogM)
+import Domination.Capability.Log (class Log, log, runLogM)
 import Domination.Capability.Random (class Random, randomElement, runRandomM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
 import Domination.UI.Chat as Chat
-import Domination.UI.Domination (GameEvent(..), GameUpdate(..))
+import Domination.UI.Domination (GameAction(..), GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util (h1__)
@@ -48,13 +48,10 @@ type AppState =
   , messages :: Array Message
   , localDescription :: String
   , gameOn :: Boolean
-  , gameState :: Maybe GameUpdate
   , broadcaster :: Broadcaster
   , roomCode :: String
   }
 
-_gameState :: Lens' AppState (Maybe GameUpdate)
-_gameState = prop (SProxy :: SProxy "gameState")
 _messages :: Lens' AppState (Array Message)
 _messages = prop (SProxy :: SProxy "messages")
 _playerIndex :: Lens' AppState Int
@@ -82,7 +79,6 @@ newApp broadcaster username uuid usernames =
   , messages: []
   , localDescription: ""
   , gameOn: false
-  , gameState: Nothing
   , broadcaster: broadcaster
   , roomCode: globalRoomCode
   }
@@ -135,18 +131,24 @@ component
   => Log m
   => Random m
   => Broadcast m
-  => AppState -> Component HTML query o s m
+  => AppState
+  -> Component HTML query o s m
 component state = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval { handleAction = handleAction }
   initialState _ = state
 
 render
-  :: forall o c m
+  :: forall c m
   . Log m
   => Random m
-  => AppState -> HTML (Domination.Component o c m AppAction) AppAction
+  => AppState
+  -> HTML (Domination.Component GameQuery c m AppAction) AppAction
 render state = HH.main_ $
-  [ HH.div [ HP.id_ "msg", HE.handler (EventType "msg") (Just <<< ReceiveMessage) ] []
+  [ HH.div
+    [ HP.id_ "msg"
+    , HE.handler (EventType "msg") (Just <<< ReceiveMessage)
+    ]
+    []
   , UsernameInput.render { onInput: WriteUsername, state }
   , h1__ $ show state.connectionCount <> " Users Connected"
   , Chat.render
@@ -154,26 +156,25 @@ render state = HH.main_ $
     , onInput: Write _message
     , state
     }
-  , Domination.gameUi StartNewGame LoadGame WritePlayerCount WritePlayerIndex state UpdateGameState
+  , Domination.gameUi state HandleGameAction
   ]
 
 data AppAction
   = WriteUsername String
   | Write (Lens' AppState String) String
-  | WritePlayerIndex Int
-  | WritePlayerCount Int
   | SendMessage
   | ReceiveMessage Event
-  | LoadGame
-  | StartNewGame
-  | UpdateGameState GameEvent
+  | HandleGameAction GameAction
+
+type ChildComponents o r =
+  ("Domination" :: H.Slot GameQuery o Int | r)
 
 handleAction
-  :: forall slots output m
+  :: forall output m t1 r
   . Storage m
   => Log m
   => Broadcast m
-  => AppAction -> HalogenM AppState AppAction slots output m Unit
+  => AppAction -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
 handleAction = case _ of
   WriteUsername username -> do
     { id, usernames } <- H.get
@@ -181,18 +182,6 @@ handleAction = case _ of
     sendMessage $ UsernameMessage { username, id }
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
-  WritePlayerIndex index -> do
-    { playerIndex, playerCount } <- H.get
-    log $ "updating playerIndex from "
-      <> show playerIndex <> " -> " <> show index
-    H.modify_ $ set _playerIndex (max index 0)
-      <<< set _playerCount (max (index + 1) playerCount)
-  WritePlayerCount count -> do
-    { playerIndex, playerCount } <- H.get
-    log $ "updating playerCount from "
-      <> show playerCount <> " -> " <> show count
-    H.modify_ $ set _playerCount (max count 1)
-      <<< set _playerIndex (min (count - 1) playerIndex)
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
   ReceiveMessage customEvent ->
@@ -218,47 +207,57 @@ handleAction = case _ of
               else pure unit
           GameStateMessage state -> do
             log "Receive GameStateMessage"
-            { playerIndex } <- H.get
-            H.modify_ $ _gameState .~ Just
-              (UpdateState { state, playerIndex })
+            { playerIndex, playerCount } <- H.get
+            updateState state playerIndex
           PlayMadeMessage _ -> do
-            log $ "Receive PlayMadeMessage: " <> show msg
+            log $ "Receive PlayMadeMessage"
             H.modify_ $ _messages :~ msg
-  LoadGame -> do
-    mbGameState <- load "game_state"
-    case mbGameState of
-      Left e -> log e
-      Right state -> do
+  HandleGameAction gameAction -> case gameAction of
+    WritePlayerIndex index -> do
+      { playerIndex, playerCount } <- H.get
+      log $ "Main: updating playerIndex from "
+        <> show playerIndex <> " -> " <> show index
+      H.modify_ $ set _playerIndex (max index 0)
+        <<< set _playerCount (max (index + 1) playerCount)
+    WritePlayerCount count -> do
+      { playerIndex, playerCount } <- H.get
+      log $ "Main: updating playerCount from "
+        <> show playerCount <> " -> " <> show count
+      H.modify_ $ set _playerCount (max count 1)
+        <<< set _playerIndex (min (count - 1) playerIndex)
+    LoadGame -> do
+      mbGameState <- load "game_state"
+      case mbGameState of
+        Left e -> log e
+        Right state -> do
+          { playerIndex } <- H.get
+          updateState state playerIndex
+          sendMessage $ GameStateMessage state
+    StartNewGame -> do
+      { playerIndex, playerCount } <- H.get
+      log $ "Main: StartNewGame as player " <> show playerIndex
+      makeNewGame playerCount playerIndex
+    UpdateGameState event -> case event of
+      NewState state -> do
         { playerIndex } <- H.get
-        H.modify_ $ set _gameState $ Just
-          $ UpdateState { state, playerIndex }
+        updateState state playerIndex
         sendMessage $ GameStateMessage state
-  StartNewGame -> do
-    { playerIndex, playerCount } <- H.get
-    log $ "StartNewGame as player " <> show playerIndex
-    H.modify_ $ set _gameState $ Just
-      $ MakeNewGame { playerCount, playerIndex }
-  UpdateGameState event -> case event of
-    NewState state -> do
-      { playerIndex } <- H.get
-      H.modify_ $ set _gameState $ Just
-        $ UpdateState { state, playerIndex }
-      sendMessage $ GameStateMessage state
-      save "game_state" state
-      log $ "NewState"
-    PlayMade x -> do
-      log $ "PlayMade "
-      { gameState } <- H.get
-      case gameState of
-        Just (UpdateState { state, playerIndex }) -> do
-          log $ "UpdateState"
-          let message = PlayMadeMessage x
-          sendMessage message
-          H.modify_ $ prependOver _messages message
-        Just (MakeNewGame { playerCount, playerIndex }) ->
-          error "I didn't realize this could happen!"
-        Nothing -> pure unit
+        save "game_state" state
+        log $ "Main: NewState"
+      PlayMade x -> do
+        log $ "Main: PlayMade"
+        let message = PlayMadeMessage x
+        sendMessage message
+        H.modify_ $ prependOver _messages message
   where
+    updateState state playerIndex = do
+      _ <- H.query Domination._component 0
+        (UpdateState { state, playerIndex } unit)
+      pure unit
+    makeNewGame playerCount playerIndex = do
+      _ <- H.query Domination._component 0
+        (MakeNewGame { playerCount, playerIndex } unit)
+      pure unit
     sendChatMessage = do
       { id, message } <- H.get
       let chat = ChatMessage { username: id, message }
