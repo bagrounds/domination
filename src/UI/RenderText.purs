@@ -51,7 +51,7 @@ instance choiceRenderTextInContext :: RenderTextInContext Choice where
         <> (intercalate ", " $ renderText <$> choices)
       Option { choice } ->
         "chose to optionally " <> renderText choice
-      MoveFromHand { destination, resolution: (Just cardIndices) } ->
+      MoveFromTo { destination, resolution: (Just cardIndices) } ->
         case destination of
             Pile.Trash -> "trashed: " <> cards
             Pile.Discard -> "discarded: " <> cards
@@ -72,7 +72,7 @@ instance choiceRenderTextInContext :: RenderTextInContext Choice where
         "discarded their hand"
       Draw { n, resolution } ->
         "drew " <> show n <> " cards"
-      MoveFromHand { resolution: Nothing } ->
+      MoveFromTo { resolution: Nothing } ->
         unresolved
       where
         unresolved :: String
@@ -90,7 +90,7 @@ instance choiceRenderText :: RenderText Choice where
       show n <> " of: " <> intercalate " or " (renderText <$> choices)
     Option { choice } ->
       "optionally " <> renderText choice
-    MoveFromHand { n, destination } -> case n of
+    MoveFromTo { n, destination } -> case n of
       UpTo n ->
         verb <> " up to " <> show n
       Exactly n ->

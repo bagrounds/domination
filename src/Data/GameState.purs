@@ -402,6 +402,7 @@ react { playerIndex, reaction } =
     Just BlockAttack ->
       traverseOf (_player playerIndex) Player.dropChoice
 
+_pile :: Pile -> Int -> Traversal' GameState (Array Card)
 _pile pile playerIndex = case pile of
   Pile.Hand -> _player playerIndex <<< Player._hand
   Pile.Trash -> _trash
@@ -417,24 +418,24 @@ resolveChoice
   -> m GameState
 resolveChoice { playerIndex, choice } state =
   case choice of
-    MoveFromHand
+    MoveFromTo
       { filter
       , n: constraint
+      , source
       , destination
       , resolution: Just cardIndices
       } -> do
       let
-        _source = _pile Pile.Hand playerIndex
-        _source' = _player playerIndex <<< Player._hand
+        _source = _pile source playerIndex
         _destination = _pile destination playerIndex
-      source <- fromJust "failed to get source" $ state ^? _source
+      sourcePile <- fromJust "failed to get source" $ state ^? _source
       player <- getPlayer playerIndex state
-      selected <- takeIndices cardIndices source
-      remaining <- dropIndices cardIndices source
+      selected <- takeIndices cardIndices sourcePile
+      remaining <- dropIndices cardIndices sourcePile
       let
         forSelected = ("selected cards" <>! _) >>> (selected <@! _)
         forRemaining = ("remaining cards" <>! _) >>> (remaining <@! _)
-        forSource = ("source cards" <>! _) >>> (source <@! _)
+        forSource = ("source cards" <>! _) >>> (sourcePile <@! _)
       case constraint of
         UpTo n -> check $
           forSelected $ lengthIs LTE n
@@ -448,14 +449,14 @@ resolveChoice { playerIndex, choice } state =
           forSelected (lengthIs EQ n)
           ||
           ( forSource (lengthIs LT n)
-          && forSelected (lengthIs EQ $ length source)
+          && forSelected (lengthIs EQ $ length sourcePile)
           )
       case filter of
         Just f -> check $
           forSelected $ all (passFilter f) !> "illegal choice in"
         Nothing -> pure unit
       pure
-        $ _source' .~ remaining
+        $ _source .~ remaining
         $ _destination <>~ selected
         $ state
 
@@ -506,7 +507,7 @@ resolveChoice { playerIndex, choice } state =
     Or { resolution: Nothing } -> unresolved
     PickN { resolution: Nothing } -> unresolved
     Option { resolution: Nothing } -> unresolved
-    MoveFromHand { resolution: Nothing } -> unresolved
+    MoveFromTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
     GainActions { resolution: Nothing } -> unresolved
     GainBuys { resolution: Nothing } -> unresolved
@@ -712,9 +713,10 @@ chapel = let attack = false in
   , specials =
     [ { target: Self
       , command: Choose
-        $ MoveFromHand
+        $ MoveFromTo
         { n: UpTo 4
         , filter: Nothing
+        , source: Pile.Hand
         , destination: Pile.Trash
         , resolution: Nothing
         , attack
@@ -732,9 +734,10 @@ militia = let attack = true in
   , specials =
     [ { target: EveryoneElse
       , command: Choose
-        $ MoveFromHand
+        $ MoveFromTo
         { n: DownTo 3
         , filter: Nothing
+        , source: Pile.Hand
         , destination: Pile.Discard
         , resolution: Nothing
         , attack
@@ -782,8 +785,9 @@ steward = let attack = false in
         { choices:
           [ Draw { n: 2, attack, resolution: Nothing }
           , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
-          , MoveFromHand
-            { destination: Pile.Trash
+          , MoveFromTo
+            { source: Pile.Hand
+            , destination: Pile.Trash
             , filter: Nothing
             , n: Exactly 2
             , attack
@@ -832,9 +836,10 @@ torturer = let attack = true in
       , command: Choose $ PickN
         { n: 1
         , choices:
-          [ MoveFromHand
+          [ MoveFromTo
             { n: Exactly 2
             , filter: Nothing
+            , source: Pile.Hand
             , destination: Pile.Discard
             , attack
             , resolution: Nothing
@@ -888,9 +893,10 @@ moneyLender = let attack = false in
         , choice: Option
           { choice: And
             { choices:
-              [ MoveFromHand
+              [ MoveFromTo
                 { n: Exactly 1
                 , filter: Just (HasName "Copper")
+                , source: Pile.Hand
                 , destination: Pile.Trash
                 , attack
                 , resolution: Nothing

@@ -44,9 +44,10 @@ data Choice
     , resolution :: Maybe Boolean
     , attack :: Boolean
     }
-  | MoveFromHand
+  | MoveFromTo
     { n :: Constraint
     , filter :: Maybe Filter
+    , source :: Pile
     , destination :: Pile
     , resolution :: (Maybe (Array Int))
     , attack :: Boolean
@@ -90,7 +91,7 @@ isAttack = case _ of
   Or { attack } -> attack
   PickN { attack } -> attack
   Option { attack } -> attack
-  MoveFromHand { attack } -> attack
+  MoveFromTo { attack } -> attack
   GainCards { attack } -> attack
   GainActions { attack } -> attack
   GainBuys { attack } -> attack

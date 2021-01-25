@@ -26,7 +26,7 @@ import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.UI.Card (render) as Card
-import Domination.UI.ChoiceMoveFromHand as MoveFromHand
+import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
@@ -144,7 +144,7 @@ handleQuery = case _ of
 
 type ChildComponents t1 t2 t3 =
   H.ComponentSlot HTML
-  ( "MoveFromHand" :: H.Slot t1 Choice Int
+  ( "MoveFromTo" :: H.Slot t1 Choice Int
   , "PickN" :: H.Slot t1 (Array Choice) Int
   | t2
   ) t3 Play
@@ -394,11 +394,11 @@ renderPlayer cs@{ state, playerIndex } player =
                 , text: "No"
                 }
               ]
-          MoveFromHand _ -> HH.div_
+          MoveFromTo _ -> HH.div_
             [ HH.slot
-              (SProxy :: SProxy "MoveFromHand")
+              (SProxy :: SProxy "MoveFromTo")
               0
-              (MoveFromHand.component player choice)
+              (MoveFromTo.component player choice)
               unit
               $ Just
               <<< ResolveChoice

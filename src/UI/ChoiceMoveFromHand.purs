@@ -1,4 +1,4 @@
-module Domination.UI.ChoiceMoveFromHand
+module Domination.UI.ChoiceMoveFromTo
   ( component
   ) where
 
@@ -29,20 +29,20 @@ component player choice =
     }
   where
     renderChoice = case _ of
-      x@(MoveFromHand { n, resolution: Nothing }) -> Just
+      x@(MoveFromTo { n, resolution: Nothing }) -> Just
         { title: renderText x
         , buttonText: "Done"
         }
       _ -> Nothing
     canToggle { selected, total } = selected || total < maxSelected
     maxSelected = case choice of
-      MoveFromHand { n } ->
+      MoveFromTo { n } ->
         case n of
           UpTo n -> n
           Exactly n -> n
           DownTo n -> length player.hand - n
       _ -> 0
     resolve resolution = case choice of
-      MoveFromHand x -> MoveFromHand x { resolution = resolution }
+      MoveFromTo x -> MoveFromTo x { resolution = resolution }
       y -> y
 
