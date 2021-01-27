@@ -743,7 +743,7 @@ militia = let attack = true in
         , resolution: Nothing
         , attack
         }
-      , description: "Discard down to 3 cards"
+      , description: "Each other player discards down to 3 cards"
       }
     ]
   }
@@ -856,7 +856,7 @@ torturer = let attack = true in
         , attack
         }
       , description:
-        "Discard 2 cards or gain a curse"
+        "Each other player either discards 2 cards or gains a Curse to their hand, their choice. (They may pick an option they can't do.)"
       }
     ]
   }

@@ -6,6 +6,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Array (intercalate, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Fold (preview, (^?))
@@ -96,11 +97,17 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
         PlayCard { playerIndex, cardIndex } -> Just $
           "played: " <> getPlayerCardName playerIndex state cardIndex
         Purchase { playerIndex, stackIndex } -> Just $
-          "purchased: " <> card
+          "purchased: " <> text
           where
-            card = case preview (GameState._stack stackIndex) state of
+            text = case preview (GameState._stack stackIndex) state of
               Nothing -> "???"
-              Just stack -> stack.card.name
+              Just { card } -> card.name
+                <>
+                if null card.specials
+                then ""
+                else " ("
+                <> intercalate ", " (_.description <$> card.specials)
+                <> ")"
         ResolveChoice { playerIndex, choice } ->
           Just $ renderTextInContext playerIndex state choice
         React { playerIndex, reaction } -> Just $

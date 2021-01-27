@@ -15,7 +15,6 @@ import Domination.Data.GameState as GameState
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
-import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
 
 class RenderTextInContext a where
