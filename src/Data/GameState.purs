@@ -8,7 +8,7 @@ import Data.Array (all, catMaybes, dropWhile, filter, find, findIndex, head, len
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Getter (view, (^.))
+import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', prism')
@@ -35,7 +35,7 @@ import Domination.Data.Phase as Phase
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
-import Domination.Data.Player (Player, handSizeIs)
+import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
@@ -43,7 +43,7 @@ import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
 import Relation (Relation(..))
-import Rule (appendError, appendErrorOn, check, enforceOn, lengthIs, (!<>), (!>), (!@>), (<>!), (<@!))
+import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices)
 
 type GameState =
@@ -202,6 +202,7 @@ newGame playerCount =
     , { card: village, count: kingdomCount }
     , { card: woodCutter, count: kingdomCount }
     , { card: steward, count: kingdomCount }
+    , { card: harbinger, count: kingdomCount }
     , { card: monument, count: victoryCount }
     , { card: smithy, count: kingdomCount }
     , { card: workersVillage, count: kingdomCount }
@@ -457,7 +458,7 @@ resolveChoice { playerIndex, choice } state =
         Nothing -> pure unit
       pure
         $ _source .~ remaining
-        $ _destination <>~ selected
+        $ over _destination (selected <> _)
         $ state
 
     GainCards { n, cardName, resolution: Just unit } -> do
@@ -881,6 +882,7 @@ consolation = let attack = false in
       }
     ]
   }
+
 moneyLender :: Card
 moneyLender = let attack = false in
   Card.action
@@ -922,8 +924,33 @@ moneyLender = let attack = false in
     ]
   }
 
+harbinger :: Card
+harbinger = let attack = false in
+  Card.action
+  { name = "Harbinger"
+  , cost = 3
+  , cards = 1
+  , actions = 1
+  , specials =
+    [ { target: Self
+      , command: Choose $ MoveFromTo
+        { n: UpTo 1
+        , filter: Nothing
+        , source: Pile.Discard
+        , destination: Pile.Deck
+        , resolution: Nothing
+        , attack
+        }
+      , description:
+        "Look through your discard pile. You may put a card from it onto your deck."
+      }
+    ]
+  }
+
 describes :: Condition -> Player -> Boolean
-describes (HasCard name) = _.hand >>> any (_.name >>> (_ == name))
+describes = case _ of
+  HasCard name -> _.hand >>> any (_.name >>> (_ == name))
+  HasDiscard -> _.discard >>> (not <<< null)
 
 passFilter :: Filter -> Card -> Boolean
 passFilter (HasName name) = _.name >>> (_ == name)

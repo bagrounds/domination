@@ -11,6 +11,7 @@ import Data.Generic.Rep.Show (genericShow)
 
 data Condition
   = HasCard String
+  | HasDiscard
 
 derive instance genericCondition :: Generic Condition _
 derive instance eqCondition :: Eq Condition

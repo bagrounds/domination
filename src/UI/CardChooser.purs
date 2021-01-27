@@ -11,6 +11,8 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Data.Card (Card)
 import Domination.Data.Choice (Choice)
+import Domination.Data.Pile (Pile)
+import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Card as Card
@@ -43,17 +45,23 @@ type ComponentSpec =
   , resolve :: Maybe (Array Int) -> Choice
   , player :: Player
   , choice :: Choice
+  , pile :: Pile
   }
 component
   :: forall query input m
   . ComponentSpec
   -> Component HTML query input Choice m
-component { renderChoice, canToggle, resolve, player, choice } =
+component { renderChoice, canToggle, resolve, player, choice, pile } =
   H.mkComponent { initialState, render, eval }
     where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
-    initialState _ = (\x -> Tuple x false) <$> player.hand
-
+    initialState _ = (\x -> Tuple x false) <$> cards
+      where
+        cards = case pile of
+          Pile.Hand -> player.hand
+          Pile.Discard -> player.discard
+          Pile.Deck -> player.deck
+          Pile.Trash -> []
     render xs =
       case Player.firstChoice player >>= renderChoice of
         Just { title, buttonText } -> HH.div_ $

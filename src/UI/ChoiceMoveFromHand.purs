@@ -8,6 +8,7 @@ import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.RenderText (renderText)
@@ -26,6 +27,7 @@ component player choice =
     , resolve
     , player
     , choice
+    , pile
     }
   where
     renderChoice = case _ of
@@ -40,9 +42,18 @@ component player choice =
         case n of
           UpTo n -> n
           Exactly n -> n
-          DownTo n -> length player.hand - n
+          DownTo n -> length cards - n
       _ -> 0
     resolve resolution = case choice of
       MoveFromTo x -> MoveFromTo x { resolution = resolution }
       y -> y
+    pile = case choice of
+      MoveFromTo { source } -> source
+      _ -> Pile.Trash
+    cards = case pile of
+      Pile.Trash -> []
+      Pile.Hand -> player.hand
+      Pile.Discard -> player.discard
+      Pile.Deck -> player.deck
+
 

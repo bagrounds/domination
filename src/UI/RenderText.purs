@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Array (intercalate)
 import Data.Lens ((^?))
+import Data.Lens.Index (ix)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Choice (Choice(..))
@@ -12,6 +13,7 @@ import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Phase (Phase(..))
+import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
@@ -34,6 +36,7 @@ instance bonusRenderText :: RenderText Bonus where
 instance conditionRenderText :: RenderText Condition where
   renderText = case _ of
     HasCard name -> "hand contains a " <> name
+    HasDiscard -> "discard pile is not empty"
 
 instance choiceRenderTextInContext :: RenderTextInContext Choice where
   renderTextInContext :: Int -> GameState -> Choice -> String
@@ -51,7 +54,7 @@ instance choiceRenderTextInContext :: RenderTextInContext Choice where
         <> (intercalate ", " $ renderText <$> choices)
       Option { choice } ->
         "chose to optionally " <> renderText choice
-      MoveFromTo { destination, resolution: (Just cardIndices) } ->
+      MoveFromTo { source, destination, resolution: (Just cardIndices) } ->
         case destination of
             Pile.Trash -> "trashed: " <> cards
             Pile.Discard -> "discarded: " <> cards
@@ -59,7 +62,7 @@ instance choiceRenderTextInContext :: RenderTextInContext Choice where
             Pile.Deck -> "gained: " <> cards <> " to their deck"
         where
           cards = intercalate ", "
-            $ getPlayerCardName playerIndex state <$> cardIndices
+            $ getCardName source playerIndex state <$> cardIndices
       GainCards { n, cardName } ->
         "gained " <> show n <> "x " <> cardName
       GainActions { n, resolution } ->
@@ -116,8 +119,8 @@ instance choiceRenderText :: RenderText Choice where
     Draw { n } ->
       "Draw " <> show n <> " cards"
 
-getPlayerCardName :: Int -> GameState -> Int -> String
-getPlayerCardName playerIndex state cardIndex =
-  fromMaybe "???" $ _.name <$> state ^?
-  (GameState._player playerIndex <<< Player._cardInHand cardIndex)
+getCardName :: Pile -> Int -> GameState -> Int -> String
+getCardName source playerIndex state cardIndex =
+  fromMaybe "???" $ _.name <$> state
+  ^? GameState._pile source playerIndex <<< ix cardIndex
 
