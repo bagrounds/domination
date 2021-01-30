@@ -46,7 +46,6 @@ type AppState =
   , playerIndex :: Int
   , message :: String
   , messages :: Array Message
-  , localDescription :: String
   , gameOn :: Boolean
   , broadcaster :: Broadcaster
   , roomCode :: String
@@ -77,7 +76,6 @@ newApp broadcaster username uuid usernames =
   , playerIndex: 0
   , message: ""
   , messages: []
-  , localDescription: ""
   , gameOn: false
   , broadcaster: broadcaster
   , roomCode: globalRoomCode
