@@ -49,6 +49,9 @@ data GameAction
   | StartNewGame
   | UpdateGameState GameEvent
 
+data InternalGameAction
+  = MakePlay Play
+
 data GameEvent
   = NewState GameState
   | PlayMade { play :: Play, playerIndex :: Int, state :: GameState }
@@ -62,12 +65,12 @@ derive instance genericGameQuery :: Generic (GameQuery a) _
 type ComponentState = { playerIndex :: Int, state :: GameState }
 
 gameUi
-  :: forall c m r a
+  :: forall m input r1 r2
   . Log m
   => Random m
-  => { playerCount :: Int, playerIndex :: Int | r }
-  -> (GameAction -> a)
-  -> HTML (Component GameQuery c m a) a
+  => { playerCount :: Int, playerIndex :: Int | r1 }
+  -> (GameAction -> input)
+  -> HTML (Component GameQuery r2 m input) input
 gameUi { playerCount, playerIndex } wrap =
   HH.div_ $
   [ Util.incrementer
@@ -95,17 +98,22 @@ gameUi { playerCount, playerIndex } wrap =
       [ HH.text "Load Game" ]
     ]
     , HH.slot
-      (SProxy :: SProxy "Domination")
+      _component
       0
       (component playerCount playerIndex)
       unit
       (Just <<< wrap <<< UpdateGameState)
     ]
 
-_component = SProxy :: SProxy "Domination"
+_component :: SProxy "Domination"
+_component = SProxy
 
-type Component o c m a =
-  ComponentSlot HTML ("Domination" :: Slot o GameEvent Int | c) m a
+type Component query r m action =
+  ComponentSlot
+  HTML
+  ("Domination" :: Slot query GameEvent Int | r)
+  m
+  action
 
 component
   :: forall input m
@@ -120,17 +128,17 @@ component playerCount playerIndex =
   initialState _ = { playerIndex, state: Dom.newGame playerCount }
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
-    { initialize = Just $ NewGame { playerCount }
+    { initialize = Just $ MakePlay $ NewGame { playerCount }
     , handleAction = handleAction
     , handleQuery = handleQuery
     }
 
 handleQuery
-  :: forall a m slots
+  :: forall action slots m a
   . Log m
   => Random m
   => GameQuery a
-  -> H.HalogenM ComponentState Play slots GameEvent m (Maybe a)
+  -> H.HalogenM ComponentState action slots GameEvent m (Maybe a)
 handleQuery = case _ of
   MakeNewGame { playerCount, playerIndex } a -> do
     log "Domination: MakeNewGame"
@@ -142,26 +150,30 @@ handleQuery = case _ of
     H.put cs
     pure $ Just a
 
-type ChildComponents t1 t2 t3 =
-  H.ComponentSlot HTML
-  ( "MoveFromTo" :: H.Slot t1 Choice Int
-  , "PickN" :: H.Slot t1 (Array Choice) Int
-  | t2
-  ) t3 Play
+type ChildComponents query r m =
+  ComponentSlot
+  HTML
+  ( "MoveFromTo" :: H.Slot query Choice Int
+  , "PickN" :: H.Slot query (Array Choice) Int
+  | r
+  )
+  m
+  InternalGameAction
 
-renderPlayerN :: forall t1 t2 t3.
-  ComponentState ->
-  HTML (ChildComponents t1 t2 t3) Play
+renderPlayerN
+  :: forall query r m
+  . ComponentState
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayerN cs@{ playerIndex, state } = HH.div_
   [ h1__ "Domination"
   , HH.div_ $ renderPlayers cs
   ]
 
 renderSupply'
-  :: forall t1 t2 t3
+  :: forall query r m
   . ComponentState
   -> Player
-  -> HTML (ChildComponents t1 t2 t3) Play
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderSupply' cs@{ state, playerIndex } player =
   HH.ul
     [ HP.classes $
@@ -186,20 +198,19 @@ renderSupply' cs@{ state, playerIndex } player =
       : [ HH.ul_ (renderSupply player cs) ]
 
 renderSupply
-  :: forall a
+  :: forall widget
   . Player
   -> ComponentState
-  -> Array (HTML a Play)
+  -> Array (HTML widget InternalGameAction)
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
-    renderStackI stackIndex =
-      renderStack onClick player
+    renderStackI stackIndex = renderStack onClick player
       where
         onClick _ =
-          Just $ Purchase { playerIndex,  stackIndex }
+          Just $ MakePlay $ Purchase { playerIndex,  stackIndex }
 
-renderDeck :: forall a. Player -> HTML a Play
+renderDeck :: forall widget input. Player -> HTML widget input
 renderDeck player = HH.button
   [ HE.onClick (const Nothing), HP.class_ Css.deck ]
   [ HH.ul_
@@ -208,7 +219,7 @@ renderDeck player = HH.button
     ]
   ]
 
-renderDiscard :: forall a. Player -> HTML a Play
+renderDiscard :: forall widget input. Player -> HTML widget input
 renderDiscard player = HH.button
   [ HE.onClick (const Nothing), HP.class_ Css.discard ]
   [ HH.ul_
@@ -218,11 +229,11 @@ renderDiscard player = HH.button
   ]
 
 renderCard
-  :: forall a
-  . (MouseEvent -> Maybe Play)
+  :: forall widget input
+  . (MouseEvent -> Maybe input)
   -> Player
   -> Card
-  -> HTML a Play
+  -> HTML widget input
 renderCard onClick player card =
   Card.render onClick extraClasses card
   where
@@ -233,11 +244,11 @@ renderCard onClick player card =
     ]
 
 renderStack
-  :: forall a
-  . (MouseEvent -> Maybe Play)
+  :: forall widget input
+  . (MouseEvent -> Maybe input)
   -> Player
   -> Stack
-  -> HTML a Play
+  -> HTML widget input
 renderStack onClick player stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
@@ -263,20 +274,20 @@ renderStack onClick player stack =
     ]
 
 renderPlayers
-  :: forall t1 t2 t3
+  :: forall query r m
   . ComponentState
-  -> Array (HTML (ChildComponents t1 t2 t3) Play)
+  -> Array (HTML (ChildComponents query r m) InternalGameAction)
 renderPlayers cs@{ playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> []
     Just player -> [ renderPlayer cs player ]
 
 playerStats
-  :: forall a
+  :: forall a i
   . ComponentState
   -> Int
   -> Player
-  -> (HTML a Play)
+  -> HTML a i
 playerStats { state, playerIndex: me } playerIndex player = HH.li
   [ HP.class_ Css.stat ]
   [ HH.text $ "Player " <> show (playerIndex + 1)
@@ -300,10 +311,10 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
   ]
 
 renderPlayer
-  :: forall t1 t2 t3
+  :: forall query r m
   . ComponentState
   -> Player
-  -> HTML (ChildComponents t1 t2 t3) Play
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayer cs@{ state, playerIndex } player =
   if Player.hasChoices player
   && playerIndex == Dom.choiceTurn state
@@ -334,27 +345,28 @@ renderPlayer cs@{ state, playerIndex } player =
         , renderHand player cs
         ]
     where
+      renderReaction
+        :: forall widget
+        . Maybe (HTML widget InternalGameAction)
       renderReaction =
         Just $ chooseOne "Block attack?"
-          [ { clickEvent:
+          [ { clickEvent: MakePlay $
               React { playerIndex, reaction: Just BlockAttack }
             , text: "Yes"
             }
-          , { clickEvent: React { playerIndex, reaction: Nothing }
+          , { clickEvent: MakePlay $
+              React { playerIndex, reaction: Nothing }
             , text: "No"
             }
           ]
+      renderChoice
+        :: Maybe Choice
+        -> Maybe (HTML (ChildComponents query r m) InternalGameAction)
       renderChoice = map \choice -> case choice of
           If x ->
-            acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent If x unit
+            acknowledge (renderText choice) (playEvent If x unit)
           And x@{ choices } ->
-            acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent And x unit
+            acknowledge (renderText choice) (playEvent And x unit)
           Or x@{ choices } ->
             chooseOne "Choose one" $
               choices <#> \choice' ->
@@ -373,6 +385,7 @@ renderPlayer cs@{ state, playerIndex } player =
               )
               unit
               $ Just
+              <<< MakePlay
               <<< ResolveChoice
               <<< ({ playerIndex, choice: _ })
               <<< PickN
@@ -381,13 +394,13 @@ renderPlayer cs@{ state, playerIndex } player =
             ]
           Option x ->
             chooseOne (renderText x.choice <> "?")
-              [ { clickEvent: ResolveChoice
+              [ { clickEvent: MakePlay $ ResolveChoice
                   { playerIndex
                   , choice: Option x { resolution = Just true }
                   }
                 , text: "Yes"
                 }
-              , { clickEvent: ResolveChoice
+              , { clickEvent: MakePlay $ ResolveChoice
                   { playerIndex
                   , choice: Option x { resolution = Just false }
                   }
@@ -401,45 +414,40 @@ renderPlayer cs@{ state, playerIndex } player =
               (MoveFromTo.component player choice)
               unit
               $ Just
+              <<< MakePlay
               <<< ResolveChoice
               <<< { playerIndex, choice: _ }
             ]
           GainCards x@{ n, cardName } ->
-            acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent GainCards x unit
+            acknowledge
+            (renderText choice)
+            (playEvent GainCards x unit)
           GainActions x@{ n } ->
-            acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent GainActions x unit
+            acknowledge
+            (renderText choice)
+            (playEvent GainActions x unit)
           GainBuys x@{ n } ->
-            acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent GainBuys x unit
+            acknowledge
+            (renderText choice)
+            (playEvent GainBuys x unit)
           Discard x@{ selection: SelectAll } ->
-            acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent Discard x unit
-          Draw x@{ n } -> acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent Draw x unit
-          GainBonus x@{ bonus } -> acknowledge message clickEvent
-            where
-              message = renderText choice
-              clickEvent = playEvent GainBonus x unit
+            acknowledge (renderText choice) (playEvent Discard x unit)
+          Draw x@{ n } ->
+            acknowledge
+            (renderText choice)
+            (playEvent Draw x unit)
+          GainBonus x ->
+            acknowledge
+            (renderText choice)
+            (playEvent GainBonus x unit)
         where
           playEvent
-            :: forall r a
-            . ({ resolution :: Maybe a | r } -> Choice)
-            -> { resolution :: Maybe a | r }
+            :: forall a r2
+            . ({ resolution :: Maybe a | r2 } -> Choice)
+            -> { resolution :: Maybe a | r2 }
             -> a
-            -> Play
-          playEvent mk x r = ResolveChoice
+            -> InternalGameAction
+          playEvent mk x r = MakePlay $ ResolveChoice
             { playerIndex
             , choice: mk x { resolution = Just r }
             }
@@ -447,11 +455,11 @@ renderPlayer cs@{ state, playerIndex } player =
 renderNextPhaseButton
   :: forall w
   . { playerIndex :: Int, state :: GameState }
-  -> HTML w Play
+  -> HTML w InternalGameAction
 renderNextPhaseButton { playerIndex, state } =
   HH.button
     [ HP.class_ (Css.nextPhase)
-    , HE.onClick $ const $ Just $ EndPhase { playerIndex }
+    , HE.onClick $ const $ Just $ MakePlay $ EndPhase { playerIndex }
     ]
     [ HH.text if state.turn == playerIndex
       then if Dom.choicesOutstanding state
@@ -466,12 +474,12 @@ renderNextPhaseButton { playerIndex, state } =
         <> " | " <> renderText state.phase
     ]
 
-renderStats :: forall w. ComponentState -> HTML w Play
+renderStats :: forall w i. ComponentState -> HTML w i
 renderStats cs = HH.ul
   [ HP.class_ Css.stats ]
   (playerStats cs `mapWithIndex` cs.state.players)
 
-renderAtPlay :: forall w. Player -> HTML w Play
+renderAtPlay :: forall w i. Player -> HTML w i
 renderAtPlay currentPlayer =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
@@ -489,7 +497,7 @@ stackCards cards = catMaybes (foldr f [] names)
       where
         cards' = (_.name >>> (_ == name)) `filter` cards
 
-renderBuying :: forall w. Player -> HTML w Play
+renderBuying :: forall w i. Player -> HTML w i
 renderBuying currentPlayer =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
@@ -497,7 +505,7 @@ renderBuying currentPlayer =
     stacks = renderStack (const Nothing) currentPlayer
       <$> (stackCards currentPlayer.buying)
 
-renderHand :: forall a. Player -> ComponentState -> HTML a Play
+renderHand :: forall w. Player -> ComponentState -> HTML w InternalGameAction
 renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
@@ -536,31 +544,32 @@ renderCardInHand
   -> Int
   -> Int
   -> Card
-  -> HTML a Play
+  -> HTML a InternalGameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard
-  (const $ Just $ PlayCard { playerIndex,  cardIndex })
+  (const $ Just $ MakePlay $ PlayCard { playerIndex,  cardIndex })
   player
   card
 
 handleAction
-  :: forall s m
+  :: forall s p m
   . Log m
   => Random m
-  => Play
-  -> HalogenM ComponentState Play s GameEvent m Unit
-handleAction play = do
-  let playerIndex = fromMaybe 0 $ play ^? Play._playerIndex
-  log "Domination: MakePlay"
-  playAndReport playerIndex play
+  => InternalGameAction
+  -> HalogenM ComponentState p s GameEvent m Unit
+handleAction = case _ of
+  MakePlay play -> do
+    let playerIndex = fromMaybe 0 $ play ^? Play._playerIndex
+    log "Domination: MakePlay"
+    playAndReport playerIndex play
 
 playAndReport
-  :: forall s m
+  :: forall s p m
   . Log m
   => Random m
   => Int
   -> Play
-  -> HalogenM ComponentState Play s GameEvent m Unit
+  -> HalogenM ComponentState p s GameEvent m Unit
 playAndReport playerIndex play = do
   { state } <- H.get
   result <- Dom.makeAutoPlay play state
