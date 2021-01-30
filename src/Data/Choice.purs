@@ -8,7 +8,7 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Condition (Condition)
 import Domination.Data.Constraint (Constraint)
@@ -19,6 +19,7 @@ import Domination.Data.SelectCards (SelectCards)
 data Choice
   = If
     { choice :: Choice
+    , otherwise :: Maybe Choice
     , condition :: Condition
     , resolution :: Maybe Unit
     , attack :: Boolean

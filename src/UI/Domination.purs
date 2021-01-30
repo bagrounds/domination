@@ -348,7 +348,7 @@ renderPlayer cs@{ state, playerIndex } player =
           If x ->
             acknowledge message clickEvent
             where
-              message = "Checking " <> renderText choice
+              message = renderText choice
               clickEvent = playEvent If x unit
           And x@{ choices } ->
             acknowledge message clickEvent

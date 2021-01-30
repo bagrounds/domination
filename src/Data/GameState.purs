@@ -203,6 +203,7 @@ newGame playerCount =
     , { card: woodCutter, count: kingdomCount }
     , { card: steward, count: kingdomCount }
     , { card: harbinger, count: kingdomCount }
+    , { card: baron, count: kingdomCount }
     , { card: monument, count: victoryCount }
     , { card: smithy, count: kingdomCount }
     , { card: workersVillage, count: kingdomCount }
@@ -481,13 +482,15 @@ resolveChoice { playerIndex, choice } state =
       modifyPlayerM playerIndex (Player.drawCards n) state
     GainBonus { bonus, resolution: Just unit } ->
       modifyPlayer playerIndex (Player.gainBonus bonus) state
-    If { choice: choice', condition, resolution: Just unit } ->
+    If { choice: choice', otherwise, condition, resolution: Just unit } ->
       modifyPlayer playerIndex playerUpdate state
       where
         playerUpdate player =
           if condition `describes` player
           then Player.gainChoice choice' player
-          else player
+          else case otherwise of
+            Nothing -> player
+            Just c -> Player.gainChoice c player
     And { choices, resolution: Just unit } ->
       modifyPlayer playerIndex (Player.gainChoices choices) state
     Or { resolution: Just chosen } ->
@@ -874,6 +877,7 @@ consolation = let attack = false in
           , attack
           , resolution: Nothing
           }
+        , otherwise: Nothing
         , resolution: Nothing
         , attack
         }
@@ -915,6 +919,7 @@ moneyLender = let attack = false in
           , attack
           , resolution: Nothing
           }
+        , otherwise: Nothing
         , attack
         , resolution: Nothing
         }
@@ -943,6 +948,59 @@ harbinger = let attack = false in
         }
       , description:
         "Look through your discard pile. You may put a card from it onto your deck."
+      }
+    ]
+  }
+
+baron :: Card
+baron = let
+  attack = false
+  plus4 = GainBonus
+    { bonus: Cash 4
+    , attack
+    , resolution: Nothing
+    }
+  discardEstate = MoveFromTo
+    { filter: Just $ HasName "Estate"
+    , n: Exactly 1
+    , source: Pile.Hand
+    , destination: Pile.Discard
+    , attack
+    , resolution: Nothing
+    }
+  gainEstate = GainCards
+    { cardName: "Estate"
+    , n: 1
+    , attack
+    , resolution: Nothing
+    }
+  discardEstateAndPlus4 = And
+    { choices: [ plus4, discardEstate ]
+    , attack
+    , resolution: Nothing
+    }
+  discardOrGainEstate = Or
+    { choices: [ discardEstateAndPlus4, gainEstate ]
+    , attack
+    , resolution: Nothing
+    }
+  command = Choose $ If
+    { condition: HasCard "Estate"
+    , choice: discardOrGainEstate
+    , otherwise: Just gainEstate
+    , attack
+    , resolution: Nothing
+    }
+  in
+  Card.action
+  { name = "Baron"
+  , cost = 4
+  , buys = 1
+  , specials =
+    [ { target: Self
+      , command
+      , description: "You may discard an estate for + $4."
+        <> " If you don't, gain an Estate."
       }
     ]
   }

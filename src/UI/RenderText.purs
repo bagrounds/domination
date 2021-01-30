@@ -34,7 +34,7 @@ instance bonusRenderText :: RenderText Bonus where
 
 instance conditionRenderText :: RenderText Condition where
   renderText = case _ of
-    HasCard name -> "hand contains a " <> name
+    HasCard name -> "hand contains " <> name
     HasDiscard -> "discard pile is not empty"
 
 instance choiceRenderTextInContext :: RenderTextInContext Choice where
@@ -82,12 +82,16 @@ instance choiceRenderTextInContext :: RenderTextInContext Choice where
 
 instance choiceRenderText :: RenderText Choice where
   renderText = case _ of
-    If { condition, choice } ->
-      "if " <> renderText condition <> " then " <> renderText choice
+    If { condition, choice, otherwise } ->
+      "If (" <> renderText condition <> ") then ("
+      <> renderText choice <> ")"
+      <> case otherwise of
+        Nothing -> ""
+        Just o -> " otherwise (" <> renderText o <> ")"
     And { choices } ->
-      intercalate " and " (renderText <$> choices)
+      intercalate " and " (parenthesize <<< renderText <$> choices)
     Or { choices } ->
-      intercalate " or " (renderText <$> choices)
+      intercalate " or " (parenthesize <<< renderText <$> choices)
     PickN { n, choices } ->
       show n <> " of: " <> intercalate " or " (renderText <$> choices)
     Option { choice } ->
@@ -123,3 +127,5 @@ getCardName source playerIndex state cardIndex =
   fromMaybe "???" $ _.name <$> state
   ^? GameState._pile source playerIndex <<< ix cardIndex
 
+parenthesize :: String -> String
+parenthesize s = "(" <> s <> ")"
