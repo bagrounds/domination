@@ -56,8 +56,9 @@ data InternalGameAction
   | UndoRequest ActiveState
 
 data GameEvent
-  = NewState ActiveState
-  | PlayMade { play :: Play, playerIndex :: Int, state :: GameState }
+  = NewState
+    ActiveState
+    (Maybe { play :: Play, playerIndex :: Int, state :: GameState })
   | LoadGame
   | SaveGame ActiveState
   | Undo ActiveState
@@ -654,14 +655,14 @@ playAndReport playerIndex play = do
       case result of
         Left e -> error e
         Right gs -> do
-          case play of
-            EndPhase _ -> pure unit
-            _ -> H.raise $ PlayMade
-              { play
-              , playerIndex
-              , state: activeState.state
-              }
           let
+            playMade = case play of
+              EndPhase _ -> Nothing
+              _ -> Just
+                { play
+                , playerIndex
+                , state: activeState.state
+                }
             newI = case play of
               NewGame _ -> 0
               _ -> activeState.i + 1
@@ -669,5 +670,6 @@ playAndReport playerIndex play = do
             $ (_state .~ gs)
             >>> (_maybeGame <<< _Just <<< _playerIndex .~ activeState.playerIndex)
             >>> (_maybeGame <<< _Just <<< prop (SProxy :: SProxy "i") .~ newI)
-          H.raise $ NewState (activeState { i = newI, state = gs })
+          H.raise
+            $ NewState (activeState { i = newI, state = gs }) playMade
 

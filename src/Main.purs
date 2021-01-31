@@ -13,7 +13,7 @@ import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create, runBroadcastM)
 import Domination.Capability.GenUuid (genUuid, runGenUuidM)
-import Domination.Capability.Log (class Log, log, runLogM)
+import Domination.Capability.Log (class Log, error, log, runLogM)
 import Domination.Capability.Random (class Random, randomElement, runRandomM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
 import Domination.UI.Chat as Chat
@@ -34,7 +34,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (Message(..), Envelope)
-import Util (prependOver, readJson, writeJson, (:~))
+import Util (readJson, writeJson, (:~))
 import Web.Event.Event (Event, EventType(..))
 
 type AppState =
@@ -203,27 +203,32 @@ handleAction = case _ of
                 H.modify_ $ _message .~ "PONG"
                 sendChatMessage
               else pure unit
-          GameStateMessage state -> do
+          GameStateMessage { i, state, playMade } -> do
             log "Receive GameStateMessage"
-            queryGame $ ReceiveGameState state
-          PlayMadeMessage _ -> do
-            log $ "Receive PlayMadeMessage"
-            H.modify_ $ _messages :~ msg
+            queryGame $ ReceiveGameState { i, state }
+            case playMade of
+              Just x -> do
+                log $ "Receive PlayMadeMessage"
+                H.modify_ $ _messages :~ PlayMadeMessage x
+              Nothing -> pure unit
+          PlayMadeMessage _ ->
+            error "PlayMadeMessage should not be called"
   HandleGameEvent gameEvent -> case gameEvent of
-    NewState activeState -> do
+    NewState activeState playMade -> do
       sendMessage $ GameStateMessage
         { state: activeState.state
         , i: activeState.i
+        , playMade
         }
+      case playMade of
+        Just x -> do
+          log $ "Main: PlayMade"
+          H.modify_ $ _messages :~ (PlayMadeMessage x)
+        Nothing -> pure unit
       log $ "saving state as player" <> show activeState.playerIndex
       saveGame activeState
       queryGame $ LoadActiveState activeState
       log $ "Main: NewState"
-    PlayMade x -> do
-      log $ "Main: PlayMade"
-      let message = PlayMadeMessage x
-      sendMessage message
-      H.modify_ $ prependOver _messages message
     LoadGame -> loadGame "game_state"
     SaveGame activeState -> saveGame activeState
     Undo { i } -> do
@@ -244,6 +249,7 @@ handleAction = case _ of
           sendMessage $ GameStateMessage
             { state: activeState.state
             , i: activeState.i
+            , playMade: Nothing
             }
     saveGame activeState = do
       log $ "saving state as player" <> show activeState.playerIndex
