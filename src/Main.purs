@@ -216,16 +216,24 @@ handleAction = case _ of
         , i: activeState.i
         }
       log $ "saving state as player" <> show activeState.playerIndex
-      save "game_state" activeState
+      saveGame activeState
       log $ "Main: NewState"
     PlayMade x -> do
       log $ "Main: PlayMade"
       let message = PlayMadeMessage x
       sendMessage message
       H.modify_ $ prependOver _messages message
-    LoadGame -> do
+    LoadGame -> loadGame "game_state"
+    SaveGame activeState -> saveGame activeState
+    Undo { i } -> do
+      let
+        saveNumber = (i - 1) `mod` 10
+        key = "game_state_" <> show saveNumber
+      loadGame key
+  where
+    loadGame key = do
       log $ "Main: LoadGame"
-      mbGameState <- load "game_state"
+      mbGameState <- load key
       case mbGameState of
         Left e -> log e
         Right activeState -> do
@@ -236,10 +244,13 @@ handleAction = case _ of
             { state: activeState.state
             , i: activeState.i
             }
-    SaveGame activeState -> do
+    saveGame activeState = do
       log $ "saving state as player" <> show activeState.playerIndex
+      let
+        saveNumber = activeState.i `mod` 10
+        key = "game_state_" <> show saveNumber
+      save key activeState
       save "game_state" activeState
-  where
     queryGame state = do
       _ <- H.query Domination._component 0 (state unit)
       pure unit

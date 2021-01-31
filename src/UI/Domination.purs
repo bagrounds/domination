@@ -53,12 +53,14 @@ data InternalGameAction
   | StartNewGame
   | MakePlay Play
   | LoadGameRequest
+  | UndoRequest ActiveState
 
 data GameEvent
   = NewState ActiveState
   | PlayMade { play :: Play, playerIndex :: Int, state :: GameState }
   | LoadGame
   | SaveGame ActiveState
+  | Undo ActiveState
 
 data GameQuery a
   = LoadActiveState ActiveState a
@@ -198,6 +200,9 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
     , HH.button
       [ HE.onClick \_ -> Just $ LoadGameRequest ]
       [ HH.text "Load Game" ]
+    , HH.button
+      [ HE.onClick \_ -> x]
+      [ HH.text "Undo" ]
     ]
     , case cs.maybeGame of
       Nothing -> HH.div_ []
@@ -206,6 +211,10 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
         , HH.div_ $ renderPlayers activeState
         ]
   ]
+  where
+    x = case cs.maybeGame of
+      Just activeState -> Just $ UndoRequest activeState
+      Nothing -> Nothing
 
 renderSupply'
   :: forall query r m
@@ -617,6 +626,7 @@ handleAction = case _ of
     log "Domination: MakePlay"
     playAndReport playerIndex play
   LoadGameRequest -> H.raise LoadGame
+  UndoRequest as -> H.raise $ Undo as
 
 playAndReport
   :: forall s p m
