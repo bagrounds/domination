@@ -111,7 +111,8 @@ exports.makeBugout = roomCode => left => right => callback => () => {
   })
 
   bugout.on("message", (address, message) => {
-    address === bugout.address() || broadcastEvent(message)
+    const inflated = pako.inflateRaw(message, { to: 'string' })
+    address === bugout.address() || broadcastEvent(inflated)
   })
 
   bugout.on("seen", address => {
@@ -123,7 +124,8 @@ exports.makeBugout = roomCode => left => right => callback => () => {
 exports.address = bugout => () => bugout.address()
 
 exports.send = bugout => message => () => {
-  bugout.send(message)
+  const deflated = pako.deflateRaw(message, { level: 9 })
+  bugout.send(deflated)
 }
 
 // https://stackoverflow.com/a/8809472
