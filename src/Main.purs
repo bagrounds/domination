@@ -217,6 +217,7 @@ handleAction = case _ of
         }
       log $ "saving state as player" <> show activeState.playerIndex
       saveGame activeState
+      queryGame $ LoadActiveState activeState
       log $ "Main: NewState"
     PlayMade x -> do
       log $ "Main: PlayMade"
