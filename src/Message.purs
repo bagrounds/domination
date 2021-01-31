@@ -12,7 +12,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Fold (preview, (^?))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Card as Card
-import Domination.Data.GameState (GameState)
+import Domination.Data.GameState (GameState, WireGameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
@@ -33,11 +33,11 @@ data Message
   | UsernameMessage { username :: String, id :: String }
   | GameStateMessage
     { i :: Int
-    , state :: GameState
+    , state :: WireGameState
     , playMade :: Maybe
       { play :: Play
       , playerIndex :: Int
-      , state :: GameState
+      , state :: WireGameState
       }
     }
   | PlayMadeMessage

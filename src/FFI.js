@@ -112,6 +112,7 @@ exports.makeBugout = roomCode => left => right => callback => () => {
 
   bugout.on("message", (address, message) => {
     const inflated = pako.inflateRaw(message, { to: 'string' })
+    logInfo("inflated: ", inflated)
     address === bugout.address() || broadcastEvent(inflated)
   })
 

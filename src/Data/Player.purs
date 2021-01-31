@@ -8,24 +8,28 @@ import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view, viewOn)
 import Data.Lens.Index (ix)
+import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens')
+import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus as Bonus
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
+import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
-import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~))
+import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
 
 type Player =
   { deck :: Array Card
@@ -40,6 +44,86 @@ type Player =
   , reaction :: Maybe Reaction
   , bonuses :: Array Bonus
   }
+
+type WirePlayer =
+  (Tuple Int
+  (Tuple (Array Int)
+  (Tuple (Array Bonus)
+  (Tuple (Array Int)
+  (Tuple Int
+  (Tuple (Array Choice)
+  (Tuple (Array Int)
+  (Tuple (Array Int)
+  (Tuple (Array Int)
+  (Tuple (Maybe Reaction) (Array Int)))))))))))
+
+_toWire :: Iso' Player WirePlayer
+_toWire = iso to from where
+  to = (prop _deck <$>~ view Cards._toWire)
+    >>> (prop _hand <$>~ view Cards._toWire)
+    >>> (prop _discard <$>~ view Cards._toWire)
+    >>> (prop _toDiscard <$>~ view Cards._toWire)
+    >>> (prop _atPlay <$>~ view Cards._toWire)
+    >>> (prop _buying <$>~ view Cards._toWire)
+    >>> toTuple
+  from = fromTuple
+    >>> (prop _deck <$>~ review Cards._toWire)
+    >>> (prop _hand <$>~ review Cards._toWire)
+    >>> (prop _discard <$>~ review Cards._toWire)
+    >>> (prop _toDiscard <$>~ review Cards._toWire)
+    >>> (prop _atPlay <$>~ review Cards._toWire)
+    >>> (prop _buying <$>~ review Cards._toWire)
+  _deck = SProxy :: SProxy "deck"
+  _hand = SProxy :: SProxy "hand"
+  _discard = SProxy :: SProxy "discard"
+  _toDiscard = SProxy :: SProxy "toDiscard"
+  _atPlay = SProxy :: SProxy "atPlay"
+  _buying = SProxy :: SProxy "buying"
+  toTuple
+    { actions
+    , atPlay
+    , bonuses
+    , buying
+    , buys
+    , choices
+    , deck
+    , discard
+    , hand
+    , reaction
+    , toDiscard
+    } = Tuple actions
+      $ Tuple atPlay
+      $ Tuple bonuses
+      $ Tuple buying
+      $ Tuple buys
+      $ Tuple choices
+      $ Tuple deck
+      $ Tuple discard
+      $ Tuple hand
+      $ Tuple reaction toDiscard
+  fromTuple
+    (Tuple actions
+    (Tuple atPlay
+    (Tuple bonuses
+    (Tuple buying
+    (Tuple buys
+    (Tuple choices
+    (Tuple deck
+    (Tuple discard
+    (Tuple hand
+    (Tuple reaction toDiscard)))))))))) =
+    { actions
+    , atPlay
+    , bonuses
+    , buying
+    , buys
+    , choices
+    , deck
+    , discard
+    , hand
+    , reaction
+    , toDiscard
+    }
 
 _deck :: Lens' Player (Array Card)
 _deck = prop (SProxy :: SProxy "deck")

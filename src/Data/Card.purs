@@ -19,7 +19,6 @@ import Data.Symbol (SProxy(..))
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
 import Domination.Data.Reaction (Reaction)
-import Domination.Data.SelectCards (SelectCards)
 import Domination.Data.Target (Target)
 import Util (justIf)
 

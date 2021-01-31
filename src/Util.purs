@@ -15,8 +15,8 @@ import Data.Either (Either)
 import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
-import Data.Lens.Lens (Lens')
-import Data.Lens.Setter (Setter', over, set, subOver)
+import Data.Lens.Lens (Lens', Lens)
+import Data.Lens.Setter (Setter', over, set, subOver, (%~))
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
@@ -104,6 +104,16 @@ prependOver :: forall s a. ArrayLens' s a -> a -> s -> s
 prependOver lens x = over lens (x : _)
 
 infixr 4 prependOver as :~
+
+mapOver
+  :: forall s t a b
+  . Lens s t (Array a) (Array b)
+  -> (a -> b)
+  -> s
+  -> t
+mapOver lens f = over lens (map f)
+
+infixr 4 mapOver as <$>~
 
 preAppendOver :: forall s a. ArrayLens' s a -> Array a -> s -> s
 preAppendOver lens xs = over lens (xs <> _)

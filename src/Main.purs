@@ -6,8 +6,10 @@ import Data.Either (Either(..))
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Lens.Lens (Lens')
+import Data.Lens.Prism (review)
+import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set, (.~))
+import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
@@ -16,6 +18,8 @@ import Domination.Capability.GenUuid (genUuid, runGenUuidM)
 import Domination.Capability.Log (class Log, error, log, runLogM)
 import Domination.Capability.Random (class Random, randomElement, runRandomM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
+import Domination.Data.GameState (fromWire, toWire)
+import Domination.Data.GameState as GameState
 import Domination.UI.Chat as Chat
 import Domination.UI.Domination (GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
@@ -204,21 +208,27 @@ handleAction = case _ of
                 sendChatMessage
               else pure unit
           GameStateMessage { i, state, playMade } -> do
-            log "Receive GameStateMessage"
-            queryGame $ ReceiveGameState { i, state }
+            log "Main: Receive GameStateMessage"
+            queryGame $ ReceiveGameState
+              { i
+              , state: fromWire state
+              }
             case playMade of
               Just x -> do
+                let
+                  x' = (prop (SProxy :: SProxy "state") %~ fromWire) x
                 log $ "Receive PlayMadeMessage"
-                H.modify_ $ _messages :~ PlayMadeMessage x
+                H.modify_ $ _messages :~ PlayMadeMessage x'
               Nothing -> pure unit
           PlayMadeMessage _ ->
             error "PlayMadeMessage should not be called"
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       sendMessage $ GameStateMessage
-        { state: activeState.state
+        { state: toWire activeState.state
         , i: activeState.i
-        , playMade
+        , playMade:
+        _Just <<< prop (SProxy :: SProxy "state") %~ toWire $ playMade
         }
       case playMade of
         Just x -> do
@@ -247,7 +257,7 @@ handleAction = case _ of
             <> show activeState.playerIndex
           queryGame $ LoadActiveState activeState
           sendMessage $ GameStateMessage
-            { state: activeState.state
+            { state: toWire activeState.state
             , i: activeState.i
             , playMade: Nothing
             }
