@@ -31,7 +31,7 @@ wrapMessage id message = { id, message }
 data Message
   = ChatMessage { username :: String, message :: String }
   | UsernameMessage { username :: String, id :: String }
-  | GameStateMessage GameState
+  | GameStateMessage { state :: GameState, i :: Int }
   | PlayMadeMessage { play :: Play, playerIndex :: Int, state :: GameState }
   | SeenMessage String
   | ConnectionsMessage Int

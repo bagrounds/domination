@@ -211,7 +211,10 @@ handleAction = case _ of
             H.modify_ $ _messages :~ msg
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState -> do
-      sendMessage $ GameStateMessage activeState.state
+      sendMessage $ GameStateMessage
+        { state: activeState.state
+        , i: activeState.i
+        }
       log $ "saving state as player" <> show activeState.playerIndex
       save "game_state" activeState
       log $ "Main: NewState"
@@ -229,7 +232,10 @@ handleAction = case _ of
           log $ "Main: LoadGame successful as player"
             <> show activeState.playerIndex
           queryGame $ LoadActiveState activeState
-          sendMessage $ GameStateMessage activeState.state
+          sendMessage $ GameStateMessage
+            { state: activeState.state
+            , i: activeState.i
+            }
     SaveGame activeState -> do
       log $ "saving state as player" <> show activeState.playerIndex
       save "game_state" activeState

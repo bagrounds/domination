@@ -62,12 +62,13 @@ data GameEvent
 
 data GameQuery a
   = LoadActiveState ActiveState a
-  | ReceiveGameState GameState a
+  | ReceiveGameState { state :: GameState, i :: Int } a
 
 derive instance genericGameQuery :: Generic (GameQuery a) _
 
 type ActiveState =
-  { playerIndex :: Int
+  { i :: Int
+  , playerIndex :: Int
   , playerCount :: Int
   , state :: GameState
   }
@@ -126,31 +127,31 @@ handleQuery
   => GameQuery a
   -> H.HalogenM ComponentState action slots GameEvent m (Maybe a)
 handleQuery = case _ of
-  ReceiveGameState state a -> do
+  ReceiveGameState { state, i } a -> do
     cs <- H.get
     log "Domination: UpdateState"
-    case cs.maybeGame of
-      Nothing -> do
-        let
-          newActiveState =
-            { playerIndex: cs.nextPlayerIndex
-            , playerCount: length state.players
-            , state
-            }
-        H.modify_ $ _maybeGame .~ (Just newActiveState)
-        H.raise $ SaveGame newActiveState
-        pure $ Just a
+    ok <- case cs.maybeGame of
+      Nothing -> pure true
       Just activeGame -> do
         log "I should ask the user if they want to load this state"
         let
-          newActiveState =
-            { playerIndex: cs.nextPlayerIndex
-            , playerCount: length state.players
-            , state
-            }
-        H.modify_ $ _maybeGame .~ (Just newActiveState)
-        H.raise $ SaveGame newActiveState
-        pure $ Just a
+          previousI = activeGame.i
+          expectedI = previousI + 1
+          isExpected = i == expectedI
+        log
+          $ "Expected i = " <> show expectedI
+          <> ". Received i = " <> show i
+        pure isExpected
+    let
+      newActiveState =
+        { playerIndex: cs.nextPlayerIndex
+        , playerCount: length state.players
+        , state
+        , i
+        }
+    H.modify_ $ _maybeGame .~ (Just newActiveState)
+    H.raise $ SaveGame newActiveState
+    pure $ Just a
   LoadActiveState activeState a -> do
     log $ "LoadActiveState as player " <> show activeState.playerIndex
     H.modify_
@@ -201,7 +202,7 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
     , case cs.maybeGame of
       Nothing -> HH.div_ []
       Just activeState -> HH.div_
-        [ h1__ "Domination"
+        [ h1__ $ "Domination (" <> show activeState.i <> ")"
         , HH.div_ $ renderPlayers activeState
         ]
   ]
@@ -630,7 +631,8 @@ playAndReport playerIndex play = do
     Nothing -> case play of
       NewGame { playerCount } -> doTheRest
       -- TODO: WritePlayerCount here
-        { state: Dom.newGame playerCount
+        { i: 0
+        , state: Dom.newGame playerCount
         , playerCount: nextPlayerCount
         , playerIndex: nextPlayerIndex
         }
@@ -649,8 +651,13 @@ playAndReport playerIndex play = do
               , playerIndex
               , state: activeState.state
               }
+          let
+            newI = case play of
+              NewGame _ -> 0
+              _ -> activeState.i + 1
           H.modify_
             $ (_state .~ gs)
             >>> (_maybeGame <<< _Just <<< _playerIndex .~ activeState.playerIndex)
-          H.raise $ NewState (activeState { state = gs })
+            >>> (_maybeGame <<< _Just <<< prop (SProxy :: SProxy "i") .~ newI)
+          H.raise $ NewState (activeState { i = newI, state = gs })
 
