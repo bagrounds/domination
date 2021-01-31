@@ -231,7 +231,9 @@ newGame playerCount =
 makeAutoPlay
   :: forall m
   . Random m
-  => Play -> GameState -> m (Either String GameState)
+  => Play
+  -> GameState
+  -> m (Either String GameState)
 makeAutoPlay p s = runExceptT $ do
   state <- makePlay p s
   eNextState <- runExceptT $ autoAdvance state

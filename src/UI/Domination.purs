@@ -8,6 +8,11 @@ import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
+import Data.Lens.Lens (Lens')
+import Data.Lens.Prism.Maybe (_Just)
+import Data.Lens.Record (prop)
+import Data.Lens.Setter ((.~))
+import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Log (class Log, error, log)
@@ -42,68 +47,49 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-data GameAction
+data InternalGameAction
   = WritePlayerIndex Int
   | WritePlayerCount Int
-  | LoadGame
   | StartNewGame
-  | UpdateGameState GameEvent
-
-data InternalGameAction
-  = MakePlay Play
+  | MakePlay Play
+  | LoadGameRequest
 
 data GameEvent
-  = NewState GameState
+  = NewState ActiveState
   | PlayMade { play :: Play, playerIndex :: Int, state :: GameState }
+  | LoadGame
+  | SaveGame ActiveState
 
 data GameQuery a
-  = UpdateState ComponentState a
-  | MakeNewGame { playerCount :: Int, playerIndex :: Int } a
+  = LoadActiveState ActiveState a
+  | ReceiveGameState GameState a
 
 derive instance genericGameQuery :: Generic (GameQuery a) _
 
-type ComponentState = { playerIndex :: Int, state :: GameState }
+type ActiveState =
+  { playerIndex :: Int
+  , playerCount :: Int
+  , state :: GameState
+  }
 
-gameUi
-  :: forall m input r1 r2
-  . Log m
-  => Random m
-  => { playerCount :: Int, playerIndex :: Int | r1 }
-  -> (GameAction -> input)
-  -> HTML (Component GameQuery r2 m input) input
-gameUi { playerCount, playerIndex } wrap =
-  HH.div_ $
-  [ Util.incrementer
-    { label: "Players: "
-    , mbMin: (Just 1)
-    , mbMax: Nothing
-    , value: playerCount
-    , setValue: WritePlayerCount >>> wrap
-    }
-  , Util.incrementer
-    { label: "Player #: "
-    , mbMin: (Just 1)
-    , mbMax: Nothing
-    , value: playerIndex + 1
-    , setValue: (_ - 1) >>> WritePlayerIndex >>> wrap
-    }
-  , HH.div_
-    [ HH.button
-      [ HE.onClick \_ -> Just $ wrap $ StartNewGame ]
-      [ HH.text $ "Start New " <> show playerCount
-        <> " Player Game as Player " <> show (playerIndex + 1)
-      ]
-    , HH.button
-      [ HE.onClick \_ -> Just $ wrap $ LoadGame ]
-      [ HH.text "Load Game" ]
-    ]
-    , HH.slot
-      _component
-      0
-      (component playerCount playerIndex)
-      unit
-      (Just <<< wrap <<< UpdateGameState)
-    ]
+type ComponentState =
+  { nextPlayerIndex :: Int
+  , nextPlayerCount :: Int
+  , maybeGame :: Maybe ActiveState
+  }
+
+_nextPlayerIndex :: Lens' ComponentState Int
+_nextPlayerIndex = prop (SProxy :: SProxy "nextPlayerIndex")
+_nextPlayerCount :: Lens' ComponentState Int
+_nextPlayerCount = prop (SProxy :: SProxy "nextPlayerCount")
+_playerIndex :: Lens' ActiveState Int
+_playerIndex = prop (SProxy :: SProxy "playerIndex")
+_playerCount :: Lens' ActiveState Int
+_playerCount = prop (SProxy :: SProxy "playerCount")
+_maybeGame :: Lens' ComponentState (Maybe ActiveState)
+_maybeGame = prop (SProxy :: SProxy "maybeGame")
+_state :: Traversal' ComponentState GameState
+_state = _maybeGame <<< _Just <<< prop (SProxy :: SProxy "state")
 
 _component :: SProxy "Domination"
 _component = SProxy
@@ -119,17 +105,17 @@ component
   :: forall input m
   . Log m
   => Random m
-  => Int
-  -> Int
-  -> H.Component HTML GameQuery input GameEvent m
-component playerCount playerIndex =
-  H.mkComponent { initialState, render, eval }
+  => H.Component HTML GameQuery input GameEvent m
+component = H.mkComponent { initialState, render, eval }
   where
-  initialState _ = { playerIndex, state: Dom.newGame playerCount }
+  initialState _ =
+    { nextPlayerCount: 1
+    , nextPlayerIndex: 0
+    , maybeGame: Nothing
+    }
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
-    { initialize = Just $ MakePlay $ NewGame { playerCount }
-    , handleAction = handleAction
+    { handleAction = handleAction
     , handleQuery = handleQuery
     }
 
@@ -140,14 +126,37 @@ handleQuery
   => GameQuery a
   -> H.HalogenM ComponentState action slots GameEvent m (Maybe a)
 handleQuery = case _ of
-  MakeNewGame { playerCount, playerIndex } a -> do
-    log "Domination: MakeNewGame"
-    H.modify_ _ { playerIndex = playerIndex }
-    playAndReport playerIndex (NewGame { playerCount })
-    pure $ Just a
-  UpdateState cs a -> do
+  ReceiveGameState state a -> do
+    cs <- H.get
     log "Domination: UpdateState"
-    H.put cs
+    case cs.maybeGame of
+      Nothing -> do
+        let
+          newActiveState =
+            { playerIndex: cs.nextPlayerIndex
+            , playerCount: length state.players
+            , state
+            }
+        H.modify_ $ _maybeGame .~ (Just newActiveState)
+        H.raise $ SaveGame newActiveState
+        pure $ Just a
+      Just activeGame -> do
+        log "I should ask the user if they want to load this state"
+        let
+          newActiveState =
+            { playerIndex: cs.nextPlayerIndex
+            , playerCount: length state.players
+            , state
+            }
+        H.modify_ $ _maybeGame .~ (Just newActiveState)
+        H.raise $ SaveGame newActiveState
+        pure $ Just a
+  LoadActiveState activeState a -> do
+    log $ "LoadActiveState as player " <> show activeState.playerIndex
+    H.modify_
+      $ (_maybeGame .~ (Just activeState))
+      >>> (_nextPlayerIndex .~ activeState.playerIndex)
+      >>> (_nextPlayerCount .~ activeState.playerCount)
     pure $ Just a
 
 type ChildComponents query r m =
@@ -164,14 +173,42 @@ renderPlayerN
   :: forall query r m
   . ComponentState
   -> HTML (ChildComponents query r m) InternalGameAction
-renderPlayerN cs@{ playerIndex, state } = HH.div_
-  [ h1__ "Domination"
-  , HH.div_ $ renderPlayers cs
+renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
+  [ Util.incrementer
+    { label: "Players: "
+    , mbMin: (Just 1)
+    , mbMax: Nothing
+    , value: nextPlayerCount
+    , setValue: WritePlayerCount
+    }
+  , Util.incrementer
+    { label: "Player #: "
+    , mbMin: (Just 1)
+    , mbMax: Nothing
+    , value: nextPlayerIndex + 1
+    , setValue: (_ - 1) >>> WritePlayerIndex
+    }
+  , HH.div_
+    [ HH.button
+      [ HE.onClick \_ -> Just $ StartNewGame ]
+      [ HH.text $ "Start New " <> show nextPlayerCount
+        <> " Player Game as Player " <> show (nextPlayerIndex + 1)
+      ]
+    , HH.button
+      [ HE.onClick \_ -> Just $ LoadGameRequest ]
+      [ HH.text "Load Game" ]
+    ]
+    , case cs.maybeGame of
+      Nothing -> HH.div_ []
+      Just activeState -> HH.div_
+        [ h1__ "Domination"
+        , HH.div_ $ renderPlayers activeState
+        ]
   ]
 
 renderSupply'
   :: forall query r m
-  . ComponentState
+  . ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
 renderSupply' cs@{ state, playerIndex } player =
@@ -200,7 +237,7 @@ renderSupply' cs@{ state, playerIndex } player =
 renderSupply
   :: forall widget
   . Player
-  -> ComponentState
+  -> ActiveState
   -> Array (HTML widget InternalGameAction)
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
@@ -275,7 +312,7 @@ renderStack onClick player stack =
 
 renderPlayers
   :: forall query r m
-  . ComponentState
+  . ActiveState
   -> Array (HTML (ChildComponents query r m) InternalGameAction)
 renderPlayers cs@{ playerIndex, state } =
   case state.players !! playerIndex of
@@ -284,7 +321,7 @@ renderPlayers cs@{ playerIndex, state } =
 
 playerStats
   :: forall a i
-  . ComponentState
+  . ActiveState
   -> Int
   -> Player
   -> HTML a i
@@ -312,7 +349,7 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
 
 renderPlayer
   :: forall query r m
-  . ComponentState
+  . ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayer cs@{ state, playerIndex } player =
@@ -454,7 +491,7 @@ renderPlayer cs@{ state, playerIndex } player =
 
 renderNextPhaseButton
   :: forall w
-  . { playerIndex :: Int, state :: GameState }
+  . ActiveState
   -> HTML w InternalGameAction
 renderNextPhaseButton { playerIndex, state } =
   HH.button
@@ -474,7 +511,7 @@ renderNextPhaseButton { playerIndex, state } =
         <> " | " <> renderText state.phase
     ]
 
-renderStats :: forall w i. ComponentState -> HTML w i
+renderStats :: forall w i. ActiveState -> HTML w i
 renderStats cs = HH.ul
   [ HP.class_ Css.stats ]
   (playerStats cs `mapWithIndex` cs.state.players)
@@ -505,7 +542,7 @@ renderBuying currentPlayer =
     stacks = renderStack (const Nothing) currentPlayer
       <$> (stackCards currentPlayer.buying)
 
-renderHand :: forall w. Player -> ComponentState -> HTML w InternalGameAction
+renderHand :: forall w. Player -> ActiveState -> HTML w InternalGameAction
 renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
@@ -558,10 +595,27 @@ handleAction
   => InternalGameAction
   -> HalogenM ComponentState p s GameEvent m Unit
 handleAction = case _ of
+  WritePlayerIndex index -> do
+    { nextPlayerIndex, nextPlayerCount } <- H.get
+    log $ "Domination: updating playerIndex from "
+      <> show nextPlayerIndex <> " -> " <> show index
+    H.modify_ $ (_nextPlayerIndex .~ (max index 0))
+      >>> (_nextPlayerCount .~ (max (index + 1) nextPlayerCount))
+  WritePlayerCount count -> do
+    { nextPlayerIndex, nextPlayerCount } <- H.get
+    log $ "Domination: updating playerCount from "
+      <> show nextPlayerCount <> " -> " <> show count
+    H.modify_ $ (_nextPlayerCount .~ (max count 1))
+      <<< (_nextPlayerIndex .~ (min (count - 1) nextPlayerIndex))
+  StartNewGame -> do
+    { nextPlayerIndex: playerIndex, nextPlayerCount: playerCount } <- H.get
+    log $ "Domination: StartNewGame as player " <> show playerIndex
+    playAndReport playerIndex $ NewGame { playerCount }
   MakePlay play -> do
     let playerIndex = fromMaybe 0 $ play ^? Play._playerIndex
     log "Domination: MakePlay"
     playAndReport playerIndex play
+  LoadGameRequest -> H.raise LoadGame
 
 playAndReport
   :: forall s p m
@@ -571,20 +625,32 @@ playAndReport
   -> Play
   -> HalogenM ComponentState p s GameEvent m Unit
 playAndReport playerIndex play = do
-  { state } <- H.get
-  result <- Dom.makeAutoPlay play state
-  case result of
-    Left e -> error e
-    Right gs -> do
-      case play of
-        EndPhase _ -> pure unit
-        _ -> H.raise $ PlayMade
-          { play
-          , playerIndex
-          , state
-          }
-      H.modify _ { state = gs }
-        >>= _.state
-        >>> NewState
-        >>> H.raise
+  { maybeGame, nextPlayerCount, nextPlayerIndex } <- H.get
+  case maybeGame of
+    Nothing -> case play of
+      NewGame { playerCount } -> doTheRest
+      -- TODO: WritePlayerCount here
+        { state: Dom.newGame playerCount
+        , playerCount: nextPlayerCount
+        , playerIndex: nextPlayerIndex
+        }
+      _ -> error "Domination: playing with no game state?"
+    Just activeState -> doTheRest activeState
+  where
+    doTheRest activeState = do
+      result <- Dom.makeAutoPlay play activeState.state
+      case result of
+        Left e -> error e
+        Right gs -> do
+          case play of
+            EndPhase _ -> pure unit
+            _ -> H.raise $ PlayMade
+              { play
+              , playerIndex
+              , state: activeState.state
+              }
+          H.modify_
+            $ (_state .~ gs)
+            >>> (_maybeGame <<< _Just <<< _playerIndex .~ activeState.playerIndex)
+          H.raise $ NewState (activeState { state = gs })
 

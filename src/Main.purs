@@ -17,7 +17,7 @@ import Domination.Capability.Log (class Log, log, runLogM)
 import Domination.Capability.Random (class Random, randomElement, runRandomM)
 import Domination.Capability.Storage (class Storage, load, runStorageM, save)
 import Domination.UI.Chat as Chat
-import Domination.UI.Domination (GameAction(..), GameEvent(..), GameQuery(..))
+import Domination.UI.Domination (GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util (h1__)
@@ -42,8 +42,6 @@ type AppState =
   , id :: String
   , username :: String
   , usernames :: HashMap String String
-  , playerCount :: Int
-  , playerIndex :: Int
   , message :: String
   , messages :: Array Message
   , gameOn :: Boolean
@@ -53,10 +51,6 @@ type AppState =
 
 _messages :: Lens' AppState (Array Message)
 _messages = prop (SProxy :: SProxy "messages")
-_playerIndex :: Lens' AppState Int
-_playerIndex = prop (SProxy :: SProxy "playerIndex")
-_playerCount :: Lens' AppState Int
-_playerCount = prop (SProxy :: SProxy "playerCount")
 _message :: Lens' AppState String
 _message = prop (SProxy :: SProxy "message")
 _connectionCount :: Lens' AppState Int
@@ -72,8 +66,6 @@ newApp broadcaster username uuid usernames =
   , id: uuid
   , username: username
   , usernames
-  , playerCount: 1
-  , playerIndex: 0
   , message: ""
   , messages: []
   , gameOn: false
@@ -118,7 +110,7 @@ main = launchAff_ $ do
 
   broadcaster <- runBroadcastM $ create globalRoomCode
   let initialState = newApp broadcaster username uuid usernames
-  runUI (root initialState) (MakeNewGame { playerCount: 1, playerIndex: 0 }) body
+  runUI (root initialState) unit body
 
 root :: forall s query o. AppState -> Component HTML query o s Aff
 root state = H.hoist (runAppM {}) $ component state
@@ -132,7 +124,10 @@ component
   => AppState
   -> Component HTML query o s m
 component state = H.mkComponent { eval, initialState, render } where
-  eval = H.mkEval H.defaultEval { handleAction = handleAction }
+  eval = H.mkEval H.defaultEval
+    { handleAction = handleAction
+    , initialize = Just $ HandleGameEvent LoadGame
+    }
   initialState _ = state
 
 render
@@ -154,7 +149,12 @@ render state = HH.main_ $
     , onInput: Write _message
     , state
     }
-  , Domination.gameUi state HandleGameAction
+  , HH.slot
+    Domination._component
+    0
+    Domination.component
+    unit
+    (Just <<< HandleGameEvent)
   ]
 
 data AppAction
@@ -162,7 +162,7 @@ data AppAction
   | Write (Lens' AppState String) String
   | SendMessage
   | ReceiveMessage Event
-  | HandleGameAction GameAction
+  | HandleGameEvent GameEvent
 
 type ChildComponents o r =
   ("Domination" :: H.Slot GameQuery o Int | r)
@@ -205,62 +205,43 @@ handleAction = case _ of
               else pure unit
           GameStateMessage state -> do
             log "Receive GameStateMessage"
-            { playerIndex, playerCount } <- H.get
-            updateState state playerIndex
+            queryGame $ ReceiveGameState state
           PlayMadeMessage _ -> do
             log $ "Receive PlayMadeMessage"
             H.modify_ $ _messages :~ msg
-  HandleGameAction gameAction -> case gameAction of
-    WritePlayerIndex index -> do
-      { playerIndex, playerCount } <- H.get
-      log $ "Main: updating playerIndex from "
-        <> show playerIndex <> " -> " <> show index
-      H.modify_ $ set _playerIndex (max index 0)
-        <<< set _playerCount (max (index + 1) playerCount)
-    WritePlayerCount count -> do
-      { playerIndex, playerCount } <- H.get
-      log $ "Main: updating playerCount from "
-        <> show playerCount <> " -> " <> show count
-      H.modify_ $ set _playerCount (max count 1)
-        <<< set _playerIndex (min (count - 1) playerIndex)
+  HandleGameEvent gameEvent -> case gameEvent of
+    NewState activeState -> do
+      sendMessage $ GameStateMessage activeState.state
+      log $ "saving state as player" <> show activeState.playerIndex
+      save "game_state" activeState
+      log $ "Main: NewState"
+    PlayMade x -> do
+      log $ "Main: PlayMade"
+      let message = PlayMadeMessage x
+      sendMessage message
+      H.modify_ $ prependOver _messages message
     LoadGame -> do
+      log $ "Main: LoadGame"
       mbGameState <- load "game_state"
       case mbGameState of
         Left e -> log e
-        Right state -> do
-          { playerIndex } <- H.get
-          updateState state playerIndex
-          sendMessage $ GameStateMessage state
-    StartNewGame -> do
-      { playerIndex, playerCount } <- H.get
-      log $ "Main: StartNewGame as player " <> show playerIndex
-      makeNewGame playerCount playerIndex
-    UpdateGameState event -> case event of
-      NewState state -> do
-        { playerIndex } <- H.get
-        updateState state playerIndex
-        sendMessage $ GameStateMessage state
-        save "game_state" state
-        log $ "Main: NewState"
-      PlayMade x -> do
-        log $ "Main: PlayMade"
-        let message = PlayMadeMessage x
-        sendMessage message
-        H.modify_ $ prependOver _messages message
+        Right activeState -> do
+          log $ "Main: LoadGame successful as player"
+            <> show activeState.playerIndex
+          queryGame $ LoadActiveState activeState
+          sendMessage $ GameStateMessage activeState.state
+    SaveGame activeState -> do
+      log $ "saving state as player" <> show activeState.playerIndex
+      save "game_state" activeState
   where
-    updateState state playerIndex = do
-      _ <- H.query Domination._component 0
-        (UpdateState { state, playerIndex } unit)
-      pure unit
-    makeNewGame playerCount playerIndex = do
-      _ <- H.query Domination._component 0
-        (MakeNewGame { playerCount, playerIndex } unit)
+    queryGame state = do
+      _ <- H.query Domination._component 0 (state unit)
       pure unit
     sendChatMessage = do
       { id, message } <- H.get
       let chat = ChatMessage { username: id, message }
       sendMessage chat
-      H.modify_ $ set _message "" <<< prependOver _messages chat
+      H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
 
     sendMessage message = do
       log "Main: sending message"
