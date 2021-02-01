@@ -63,44 +63,122 @@ cardMap =
 
 copper :: Card
 copper = Card.treasure { name = "Copper", treasure = 1 }
+
 silver :: Card
 silver = Card.treasure { name = "Silver", cost = 3, treasure = 2 }
+
 gold :: Card
-gold = Card.treasure { name = "Gold", cost = 6, victoryPoints = 0, treasure = 3 }
+gold = Card.treasure { name = "Gold", cost = 6, treasure = 3 }
+
 platinum :: Card
 platinum = Card.treasure { name = "Platinum", cost = 9, treasure = 5 }
+
 estate :: Card
 estate = Card.victory { name = "Estate", cost = 2, victoryPoints  = 1 }
+
 duchy :: Card
 duchy = Card.victory { name = "Duchy", cost = 5, victoryPoints = 3 }
+
 province :: Card
-province = Card.victory { name = "Province", cost = 8, victoryPoints = 6 }
+province =
+  Card.victory { name = "Province", cost = 8, victoryPoints = 6 }
+
 colony :: Card
-colony = Card.victory { name = "Colony", cost = 11, victoryPoints = 10 }
+colony =
+  Card.victory { name = "Colony", cost = 11, victoryPoints = 10 }
+
 curse :: Card
-curse = Card.card { types = [Curse], name = "Curse", victoryPoints = -1 }
+curse =
+  Card.card { types = [Curse], name = "Curse", victoryPoints = -1 }
+
 greatHall :: Card
-greatHall = Card.victory { types = [Action, Victory], name = "Great Hall", cost = 3, cards = 1, actions = 1, victoryPoints = 1 }
+greatHall = Card.victory
+  { types = [Action, Victory]
+  , name = "Great Hall"
+  , cost = 3
+  , cards = 1
+  , actions = 1
+  , victoryPoints = 1
+  }
+
 village :: Card
-village = Card.action { name = "Village", cost = 3, cards = 1, actions = 2 }
+village =
+  Card.action { name = "Village", cost = 3, cards = 1, actions = 2 }
+
 woodCutter :: Card
-woodCutter = Card.action { name = "Wood Cutter", cost = 3, buys = 1, treasure = 2 }
+woodCutter = Card.action
+  { name = "Wood Cutter"
+  , cost = 3
+  , buys = 1
+  , treasure = 2
+  }
+
 laboratory :: Card
-laboratory = Card.action { name = "Laboratory", cost = 5, cards = 2, actions = 1 }
+laboratory = Card.action
+  { name = "Laboratory"
+  , cost = 5
+  , cards = 2
+  , actions = 1
+  }
+
 smithy :: Card
 smithy = Card.action { name = "Smithy", cost = 4, cards = 3 }
+
 festival :: Card
-festival = Card.action { name = "Festival", cost = 5, actions = 2, buys = 1, treasure = 2 }
+festival = Card.action
+  { name = "Festival"
+  , cost = 5
+  , actions = 2
+  , buys = 1
+  , treasure = 2
+  }
+
 market :: Card
-market = Card.action { name = "Market", cost = 5, actions = 1, cards = 1, buys = 1, treasure = 1 }
+market = Card.action
+  { name = "Market"
+  , cost = 5
+  , actions = 1
+  , cards = 1
+  , buys = 1
+  , treasure = 1
+  }
+
 harem :: Card
-harem = Card.treasure { types = [Treasure, Victory], name = "Harem", cost = 6, treasure = 2, victoryPoints = 2 }
+harem = Card.treasure
+  { types = [Treasure, Victory]
+  , name = "Harem"
+  , cost = 6
+  , treasure = 2
+  , victoryPoints = 2
+  }
+
 bazaar :: Card
-bazaar = Card.action { name = "Bazaar", cost = 5, cards = 1, actions = 2, treasure = 1 }
+bazaar = Card.action
+  { name = "Bazaar"
+  , cost = 5
+  , cards = 1
+  , actions = 2
+  , treasure = 1
+  }
+
 monument :: Card
-monument = Card.action { types = [Action, Victory], name = "Monument", cost = 4, treasure = 2, victoryPoints = 1 }
+monument = Card.action
+  { types = [Action, Victory]
+  , name = "Monument"
+  , cost = 4
+  , treasure = 2
+  , victoryPoints = 1
+  }
+
 workersVillage :: Card
-workersVillage = Card.action { name = "Worker's Village", cost = 4, cards = 1, actions = 2, buys = 1 }
+workersVillage = Card.action
+  { name = "Worker's Village"
+  , cost = 4
+  , cards = 1
+  , actions = 2
+  , buys = 1
+  }
+
 witch :: Card
 witch = let attack = true in
   Card.actionAttack
@@ -119,6 +197,7 @@ witch = let attack = true in
       }
     ]
   }
+
 councilRoom :: Card
 councilRoom = let attack = false in
   Card.action
@@ -137,6 +216,7 @@ councilRoom = let attack = false in
       }
     ]
   }
+
 scholar :: Card
 scholar = let attack = false in
   Card.action
@@ -161,6 +241,7 @@ scholar = let attack = false in
       }
     ]
   }
+
 chapel :: Card
 chapel = let attack = false in
   Card.action
@@ -181,6 +262,7 @@ chapel = let attack = false in
       }
     ]
   }
+
 militia :: Card
 militia = let attack = true in
   Card.actionAttack
@@ -202,6 +284,7 @@ militia = let attack = true in
       }
     ]
   }
+
 moat :: Card
 moat =
   Card.actionReaction
@@ -210,6 +293,7 @@ moat =
   , cards = 2
   , reaction = Just BlockAttack
   }
+
 nobles :: Card
 nobles = let attack = false in
   Card.actionVictory
@@ -230,6 +314,7 @@ nobles = let attack = false in
       }
     ]
   }
+
 steward :: Card
 steward = let attack = false in
   Card.action
@@ -258,6 +343,7 @@ steward = let attack = false in
       }
     ]
   }
+
 pawn :: Card
 pawn = let attack = false in
   Card.action
@@ -281,6 +367,7 @@ pawn = let attack = false in
       }
     ]
   }
+
 torturer :: Card
 torturer = let attack = true in
   Card.actionAttack
@@ -315,6 +402,7 @@ torturer = let attack = true in
       }
     ]
   }
+
 consolation :: Card
 consolation = let attack = false in
   Card.action

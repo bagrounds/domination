@@ -6,20 +6,19 @@ import Data.Either (Either(..))
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Lens.Lens (Lens')
-import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.AppM (runAppM)
-import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create, runBroadcastM)
-import Domination.Capability.GenUuid (genUuid, runGenUuidM)
-import Domination.Capability.Log (class Log, error, log, runLogM)
-import Domination.Capability.Random (class Random, randomElement, runRandomM)
-import Domination.Capability.Storage (class Storage, load, runStorageM, save)
+import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create)
+import Domination.Capability.Dom (class Dom)
+import Domination.Capability.GenUuid (class GenUuid, genUuid)
+import Domination.Capability.Log (class Log, error, log)
+import Domination.Capability.Random (class Random, randomElement)
+import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Data.GameState (fromWire, toWire)
-import Domination.Data.GameState as GameState
 import Domination.UI.Chat as Chat
 import Domination.UI.Domination (GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
@@ -49,10 +48,12 @@ type AppState =
   , message :: String
   , messages :: Array Message
   , gameOn :: Boolean
-  , broadcaster :: Broadcaster
+  , maybeBroadcaster :: Maybe Broadcaster
   , roomCode :: String
   }
 
+_id :: Lens' AppState String
+_id = prop (SProxy :: SProxy "id")
 _messages :: Lens' AppState (Array Message)
 _messages = prop (SProxy :: SProxy "messages")
 _message :: Lens' AppState String
@@ -63,17 +64,19 @@ _usernames :: Lens' AppState (HashMap String String)
 _usernames = prop (SProxy :: SProxy "usernames")
 _username :: Lens' AppState String
 _username = prop (SProxy :: SProxy "username")
+_maybeBroadcaster :: Lens' AppState (Maybe Broadcaster)
+_maybeBroadcaster = prop (SProxy :: SProxy "maybeBroadcaster")
 
-newApp :: Broadcaster -> String -> String -> HashMap String String -> AppState
-newApp broadcaster username uuid usernames =
+newApp :: AppState
+newApp =
   { connectionCount: 0
-  , id: uuid
-  , username: username
-  , usernames
+  , id: ""
+  , username: ""
+  , usernames: HashMap.empty
   , message: ""
   , messages: []
   , gameOn: false
-  , broadcaster: broadcaster
+  , maybeBroadcaster: Nothing
   , roomCode: globalRoomCode
   }
 
@@ -91,52 +94,32 @@ emojis = ["😄","😃","😀","😊","☺","😉","😍","😘","😚","😗","
 
 main :: Effect Unit
 main = launchAff_ $ do
-  eUuid <- runStorageM $ load uuidKey
-  eUsername <- runStorageM $ load usernameKey
-  uuid <- case eUuid of
-    Left e -> do
-      runLogM $ log "no existing uuid found, generating a new one"
-      uuid <- runGenUuidM genUuid
-      runStorageM $ save uuidKey uuid
-      pure $ show uuid
-    Right uuid -> pure uuid
-
   body <- HA.awaitBody
+  runUI root unit body
 
-  username <- case eUsername of
-    Left e -> do
-      runLogM $ log "no existing username found, using default"
-      emoji <- fromMaybe ":)" <$> runRandomM (randomElement emojis)
-      pure $ emoji <> "lurker" <> emoji
-    Right u -> pure u
-
-  let usernames = HashMap.insert uuid username HashMap.empty
-
-  broadcaster <- runBroadcastM $ create globalRoomCode
-  let initialState = newApp broadcaster username uuid usernames
-  runUI (root initialState) unit body
-
-root :: forall s query o. AppState -> Component HTML query o s Aff
-root state = H.hoist (runAppM {}) $ component state
+root :: forall s query o. Component HTML query o s Aff
+root = H.hoist (runAppM {}) component
 
 component
   :: forall m s query o
   . Storage m
+  => Dom m
   => Log m
   => Random m
+  => GenUuid m
   => Broadcast m
-  => AppState
-  -> Component HTML query o s m
-component state = H.mkComponent { eval, initialState, render } where
+  => Component HTML query o s m
+component = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval
     { handleAction = handleAction
-    , initialize = Just $ HandleGameEvent LoadGame
+    , initialize = Just $ Initialize
     }
-  initialState _ = state
+  initialState _ = newApp
 
 render
   :: forall c m
   . Log m
+  => Dom m
   => Random m
   => AppState
   -> HTML (Domination.Component GameQuery c m AppAction) AppAction
@@ -162,7 +145,8 @@ render state = HH.main_ $
   ]
 
 data AppAction
-  = WriteUsername String
+  = Initialize
+  | WriteUsername String
   | Write (Lens' AppState String) String
   | SendMessage
   | ReceiveMessage Event
@@ -175,9 +159,38 @@ handleAction
   :: forall output m t1 r
   . Storage m
   => Log m
+  => GenUuid m
+  => Random m
   => Broadcast m
   => AppAction -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
 handleAction = case _ of
+  Initialize -> do
+    eUuid <- load uuidKey
+    uuid <- case eUuid of
+      Left e -> do
+        log "no existing uuid found, generating a new one"
+        uuid <- genUuid
+        save uuidKey uuid
+        pure $ show uuid
+      Right uuid -> pure uuid
+
+    eUsername <- load usernameKey
+    username <- case eUsername of
+      Left e -> do
+        log "no existing username found, using default"
+        emoji <- fromMaybe ":)" <$> randomElement emojis
+        pure $ emoji <> "lurker" <> emoji
+      Right u -> pure u
+
+    broadcaster <- create globalRoomCode
+
+    H.modify_ $ (_id .~ uuid)
+      >>> (_username .~ username)
+      >>> (_usernames %~ HashMap.insert uuid username)
+      >>> (_maybeBroadcaster .~ Just broadcaster)
+
+    loadGame "game_state"
+
   WriteUsername username -> do
     { id, usernames } <- H.get
     save "username" username
@@ -279,6 +292,10 @@ handleAction = case _ of
 
     sendMessage message = do
       log "Main: sending message"
-      { broadcaster, id } <- H.get
-      broadcast broadcaster $ writeJson { id, message }
+      { maybeBroadcaster, id } <- H.get
+      case maybeBroadcaster of
+        Nothing -> do
+          error "no broadcaster; cannot send message"
+        Just broadcaster ->
+          broadcast broadcaster $ writeJson { id, message }
 

@@ -18,14 +18,10 @@ import Domination.Data.Player as Player
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.Util (h2__)
-import Halogen (Component)
 import Halogen as H
-import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Query.HalogenM (HalogenM)
-import Halogen.Query.HalogenQ (HalogenQ)
 
 type State = Array (Tuple Card Boolean)
 
@@ -47,10 +43,10 @@ type ComponentSpec =
   , choice :: Choice
   , pile :: Pile
   }
-component
-  :: forall query input m
-  . ComponentSpec
-  -> Component HTML query input Choice m
+--component
+--  :: forall query input m
+--  . ComponentSpec
+--  -> Component HTML query input Choice m
 component { renderChoice, canToggle, resolve, player, choice, pile } =
   H.mkComponent { initialState, render, eval }
     where
@@ -77,10 +73,10 @@ component { renderChoice, canToggle, resolve, player, choice, pile } =
           <> renderCardToTrash `mapWithIndex` xs
         Nothing -> h2__ "Something has gone terribly wrong!"
 
-    eval
-      :: forall a
-      . HalogenQ query Action input a
-      -> HalogenM State Action () Choice m a
+--    eval
+--      :: forall a
+--      . HalogenQ query Action input a
+--      -> HalogenM State Action () Choice m a
     eval = H.mkEval H.defaultEval
       { handleAction = case _ of
         Toggle i -> do
@@ -102,11 +98,11 @@ component { renderChoice, canToggle, resolve, player, choice, pile } =
           $ filter fst
           $ (\i (Tuple _ b) -> (Tuple b i)) `mapWithIndex` xs
 
-    renderCardToTrash
-      :: forall a
-      . Int
-      -> Tuple Card Boolean
-      -> HTML a Action
+--    renderCardToTrash
+--      :: forall w
+--      . Int
+--      -> Tuple Card Boolean
+--      -> HTML w Action
     renderCardToTrash cardIndex (Tuple card selected) =
       Card.render onClick extraClasses card
       where

@@ -15,6 +15,7 @@ import Data.Lens.Setter ((.~))
 import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
+import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card)
@@ -108,6 +109,7 @@ type Component query r m action =
 component
   :: forall input m
   . Log m
+  => Dom m
   => Random m
   => H.Component HTML GameQuery input GameEvent m
 component = H.mkComponent { initialState, render, eval }
@@ -168,6 +170,7 @@ type ChildComponents query r m =
   HTML
   ( "MoveFromTo" :: H.Slot query Choice Int
   , "PickN" :: H.Slot query (Array Choice) Int
+  , "description" :: H.Slot query Unit Int
   | r
   )
   m
@@ -175,7 +178,8 @@ type ChildComponents query r m =
 
 renderPlayerN
   :: forall query r m
-  . ComponentState
+  . Dom m
+  => ComponentState
   -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
   [ Util.incrementer
@@ -219,7 +223,8 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
 
 renderSupply'
   :: forall query r m
-  . ActiveState
+  . Dom m
+  => ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
 renderSupply' cs@{ state, playerIndex } player =
@@ -245,11 +250,11 @@ renderSupply' cs@{ state, playerIndex } player =
         ]
       : [ HH.ul_ (renderSupply player cs) ]
 
-renderSupply
-  :: forall widget
-  . Player
-  -> ActiveState
-  -> Array (HTML widget InternalGameAction)
+--renderSupply
+--  :: forall widget
+--  . Player
+--  -> ActiveState
+--  -> Array (HTML widget InternalGameAction)
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
@@ -276,12 +281,12 @@ renderDiscard player = HH.button
     ]
   ]
 
-renderCard
-  :: forall widget input
-  . (MouseEvent -> Maybe input)
-  -> Player
-  -> Card
-  -> HTML widget input
+--renderCard
+--  :: forall widget input
+--  . (MouseEvent -> Maybe input)
+--  -> Player
+--  -> Card
+--  -> HTML widget input
 renderCard onClick player card =
   Card.render onClick extraClasses card
   where
@@ -291,12 +296,12 @@ renderCard onClick player card =
       else Css.cantPlay
     ]
 
-renderStack
-  :: forall widget input
-  . (MouseEvent -> Maybe input)
-  -> Player
-  -> Stack
-  -> HTML widget input
+--renderStack
+--  :: forall widget input
+--  . (MouseEvent -> Maybe input)
+--  -> Player
+--  -> Stack
+--  -> HTML widget input
 renderStack onClick player stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
@@ -323,7 +328,8 @@ renderStack onClick player stack =
 
 renderPlayers
   :: forall query r m
-  . ActiveState
+  . Dom m
+  => ActiveState
   -> Array (HTML (ChildComponents query r m) InternalGameAction)
 renderPlayers cs@{ playerIndex, state } =
   case state.players !! playerIndex of
@@ -360,7 +366,8 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
 
 renderPlayer
   :: forall query r m
-  . ActiveState
+  . Dom m
+  => ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayer cs@{ state, playerIndex } player =
@@ -527,7 +534,7 @@ renderStats cs = HH.ul
   [ HP.class_ Css.stats ]
   (playerStats cs `mapWithIndex` cs.state.players)
 
-renderAtPlay :: forall w i. Player -> HTML w i
+--renderAtPlay :: forall w i. Player -> HTML w i
 renderAtPlay currentPlayer =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
@@ -545,7 +552,7 @@ stackCards cards = catMaybes (foldr f [] names)
       where
         cards' = (_.name >>> (_ == name)) `filter` cards
 
-renderBuying :: forall w i. Player -> HTML w i
+--renderBuying :: forall w i. Player -> HTML w i
 renderBuying currentPlayer =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
@@ -553,7 +560,7 @@ renderBuying currentPlayer =
     stacks = renderStack (const Nothing) currentPlayer
       <$> (stackCards currentPlayer.buying)
 
-renderHand :: forall w. Player -> ActiveState -> HTML w InternalGameAction
+--renderHand :: forall w. Player -> ActiveState -> HTML w InternalGameAction
 renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
@@ -586,13 +593,13 @@ renderHand player { playerIndex, state } = HH.ul
   <> renderCardInHand player playerIndex `mapWithIndex` player.hand
   <> [ renderDeck player ]
 
-renderCardInHand
-  :: forall a
-  . Player
-  -> Int
-  -> Int
-  -> Card
-  -> HTML a InternalGameAction
+--renderCardInHand
+--  :: forall a
+--  . Player
+--  -> Int
+--  -> Int
+--  -> Card
+--  -> HTML a InternalGameAction
 renderCardInHand player playerIndex cardIndex card =
   renderCard
   (const $ Just $ MakePlay $ PlayCard { playerIndex,  cardIndex })

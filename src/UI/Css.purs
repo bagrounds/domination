@@ -47,6 +47,9 @@ nextPhase = ClassName "next-phase"
 resolveChoice = ClassName "resolve-choice"
 toTrash = ClassName "to-trash"
 toKeep = ClassName "to-keep"
+description = ClassName "description"
+toolTip = ClassName "tool-tip"
+toggle = ClassName "toggle"
 
 incrementer = ClassName "incrementer"
 

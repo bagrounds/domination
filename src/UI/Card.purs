@@ -3,24 +3,30 @@ module Domination.UI.Card
   ) where
 
 import Prelude
-import Data.Maybe (Maybe)
+
+import Data.Array (intercalate, null)
+import Data.Maybe (Maybe(..))
+import Data.Symbol (SProxy(..))
+import Domination.Capability.Dom (class Dom, stopPropagation)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
+import Effect.Class (liftEffect)
 import Halogen as H
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Events as HP
 import Halogen.HTML.Properties as HP
-import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
-render
-  :: forall a b
-  . (MouseEvent -> Maybe b)
-  -> Array H.ClassName
-  -> Card
-  -> HTML a b
+--render
+--  :: forall w i
+--  . (MouseEvent -> Maybe i)
+--  -> Array H.ClassName
+--  -> Card
+--  -> HTML w i
 render onClick extraClasses card = HH.div
   ( if Card.isTreasure card
     then [ HP.class_ Css.treasureCard ]
@@ -43,9 +49,12 @@ render onClick extraClasses card = HH.div
         , HP.classes $ [ Css.card ] <> extraClasses
         ]
         [ HH.ul_
-          [ HH.li
-            [ HP.classes [ Css.cardText, Css.cardName ] ]
-            [ HH.text $ " " <> card.name ]
+          [ HH.slot
+            (SProxy :: SProxy "description")
+            5
+            (descriptionComponent card)
+            unit
+            (const Nothing)
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardCards ] ]
             [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
@@ -76,4 +85,40 @@ render onClick extraClasses card = HH.div
       ]
     ]
   ]
+
+descriptionComponent
+  :: forall query input output m
+  . Dom m
+  => Card
+  -> H.Component HTML query input output m
+descriptionComponent { name, specials } =
+  H.mkComponent { initialState, render, eval }
+  where
+    initialState _ = false
+    render visible =
+      if null specials
+      then HH.li [ HP.classes [ Css.cardText, Css.cardName ] ] [ HH.text name ]
+      else
+        HH.li
+        [ HP.classes [ Css.description ] ] $
+        [ HH.button
+          [ HP.classes [ Css.cardText, Css.cardName, Css.toggle ]
+          , HP.onClick Just
+          ]
+          [ HH.text name ]
+        ] <>
+        if visible
+        then
+          [ HH.button
+            [ HP.class_ Css.toolTip, HP.onClick Just ]
+            [ HH.text description ]
+          ]
+        else []
+    description = intercalate ". " (_.description <$> specials)
+    eval = H.mkEval H.defaultEval
+      { handleAction = \e -> do
+        stopPropagation $ toEvent e
+        H.modify_ not
+      }
+
 

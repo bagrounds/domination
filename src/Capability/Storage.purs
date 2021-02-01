@@ -71,7 +71,7 @@ loadStorage key = liftEffect $ do
   ls <- localStorage w
   item <- getItem key ls
   pure $ case item of
-    Nothing -> Left "Error retrieving item from storage"
+    Nothing -> Left $ "Error retrieving from storage: " <> key
     Just x -> readJson x
 
 example :: forall m. MonadEffect m => Log m => m Unit

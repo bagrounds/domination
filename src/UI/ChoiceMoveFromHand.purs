@@ -6,6 +6,7 @@ import Prelude
 
 import Data.Array (length)
 import Data.Maybe (Maybe(..))
+import Domination.Capability.Dom (class Dom)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Pile as Pile
@@ -17,7 +18,8 @@ import Halogen.HTML (HTML)
 
 component
   :: forall query input m
-  . Player
+  . Dom m
+  => Player
   -> Choice
   -> Component HTML query input Choice m
 component player choice =
