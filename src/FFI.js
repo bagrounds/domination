@@ -98,7 +98,17 @@ const prepareMessage = (tag, values) =>
   JSON.stringify({ id: "LOCAL", message: { tag, values } })
 
 exports.makeBugout = roomCode => left => right => callback => () => {
-  const bugout = new Bugout(roomCode)
+  const options = {
+    heartbeat: 5000,
+    timeout: 10000,
+    announce: [
+      "wss://hub.bugout.link",
+      "wss://tracker.btorrent.xyz",
+      "wss://tracker.openwebtorrent.com",
+      "wss://tracker.fastcast.nz"
+    ]
+  }
+  const bugout = new Bugout(roomCode, options)
   var fresh = true
 
   bugout.on("connections", count => {
@@ -111,22 +121,37 @@ exports.makeBugout = roomCode => left => right => callback => () => {
   })
 
   bugout.on("message", (address, message) => {
-    const inflated = pako.inflateRaw(message, { to: 'string' })
-    logInfo("inflated: ", inflated)
-    address === bugout.address() || broadcastEvent(inflated)
+    const decompressed = LZString.decompress(message)
+    address === bugout.address() || broadcastEvent(decompressed)
   })
 
   bugout.on("seen", address => {
     const message = prepareMessage("SeenMessage", [ address ])
     broadcastEvent(message)
   })
+
+  bugout.on("ping", address => {
+    if (address !== bugout.address()) {
+      logInfo("ping from: ", address)
+    } else {
+      logInfo("self ping? ", address)
+    }
+  })
+
+  bugout.on("timeout", address => {
+    if (address !== bugout.address()) {
+      logInfo("timeout: ", address)
+    } else {
+      logInfo("self timeout? ", address)
+    }
+  })
 }
 
 exports.address = bugout => () => bugout.address()
 
 exports.send = bugout => message => () => {
-  const deflated = pako.deflateRaw(message, { level: 9 })
-  bugout.send(deflated)
+  const compressed = LZString.compress(message)
+  bugout.send(compressed)
 }
 
 // https://stackoverflow.com/a/8809472

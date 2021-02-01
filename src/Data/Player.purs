@@ -306,7 +306,7 @@ allCards player
   <> player.buying
 
 score :: Player -> Int
-score player = foldr (+) 0 $ _.victoryPoints <$> (allCards player)
+score player = foldr (+) 0 $ _.victoryPoints <$> allCards player
 
 assertHasBuys :: forall m. MonadError String m => Player -> m Player
 assertHasBuys = assert (_.buys >>> (_ > 0)) "no buys!"

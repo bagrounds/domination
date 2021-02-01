@@ -543,8 +543,8 @@ assertTurn playerIndex = assert
   ((playerIndex == _) <<< _.turn)
   "not your turn!"
 
-assertChoicesResolved ::
-  forall m
+assertChoicesResolved
+  :: forall m
   . MonadError String m
   => GameState
   -> m GameState
