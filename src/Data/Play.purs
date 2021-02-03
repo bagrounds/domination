@@ -6,16 +6,23 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens.Getter (view)
 import Data.Lens.Internal.Wander (wander)
+import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens')
+import Data.Lens.Prism (review)
 import Data.Lens.Record (prop)
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
+import Domination.Data.Cards (_choiceToWire)
 import Domination.Data.Choice (Choice)
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.WireInt (WireInt, _WireInt)
 
 data Play
   = NewGame { playerCount :: Int }
@@ -24,6 +31,53 @@ data Play
   | Purchase { playerIndex :: Int,  stackIndex :: Int }
   | ResolveChoice { playerIndex :: Int, choice :: Choice }
   | React { playerIndex :: Int, reaction :: Maybe Reaction }
+
+_toWire :: Iso' Play WirePlay
+_toWire = iso to from where
+  to = case _ of
+    NewGame { playerCount } ->
+      WireNewGame $ view _WireInt playerCount
+    EndPhase { playerIndex } ->
+      WireEndPhase $ view _WireInt playerIndex
+    PlayCard { playerIndex, cardIndex } ->
+      WirePlayCard $ Tuple
+        (view _WireInt playerIndex)
+        (view _WireInt cardIndex)
+    Purchase { playerIndex,  stackIndex } ->
+      WirePurchase $ Tuple
+        (view _WireInt playerIndex)
+        (view _WireInt stackIndex)
+    ResolveChoice { playerIndex, choice } ->
+      WireResolveChoice $ Tuple
+        (view _WireInt playerIndex)
+        (view _choiceToWire choice)
+    React { playerIndex, reaction } ->
+      WireReact $ Tuple (view _WireInt playerIndex) reaction
+  from = case _ of
+    WireNewGame playerCount ->
+      NewGame { playerCount: review _WireInt playerCount }
+    WireEndPhase playerIndex ->
+      EndPhase { playerIndex: review _WireInt playerIndex }
+    WirePlayCard (Tuple playerIndex cardIndex) ->
+      PlayCard
+        { playerIndex: review _WireInt playerIndex
+        , cardIndex: review _WireInt cardIndex
+        }
+    WirePurchase (Tuple playerIndex stackIndex) ->
+      Purchase
+        { playerIndex: review _WireInt playerIndex
+        , stackIndex: review _WireInt stackIndex
+        }
+    WireResolveChoice (Tuple playerIndex choice) ->
+      ResolveChoice
+        { playerIndex: review _WireInt playerIndex
+        , choice: review _choiceToWire choice
+        }
+    WireReact (Tuple playerIndex reaction) ->
+      React
+        { playerIndex: review _WireInt playerIndex
+        , reaction
+        }
 
 _playerIndex' :: forall r. Lens' { playerIndex :: Int | r } Int
 _playerIndex' = prop (SProxy :: SProxy "playerIndex")
@@ -44,4 +98,26 @@ instance decodeJsonPlay :: DecodeJson Play where
   decodeJson = genericDecodeJson
 instance showPlay :: Show Play where
   show = genericShow
+
+data WirePlay
+  = WireNewGame WireInt
+  | WireEndPhase WireInt
+  | WirePlayCard (Tuple WireInt WireInt)
+  | WirePurchase (Tuple WireInt WireInt)
+  | WireResolveChoice (Tuple WireInt WireInt)
+  | WireReact (Tuple WireInt (Maybe Reaction))
+
+derive instance genericWirePlay :: Generic WirePlay _
+instance encodeJsonWirePlay :: EncodeJson WirePlay where
+  encodeJson = genericEncodeJson
+instance decodeJsonWirePlay :: DecodeJson WirePlay where
+  decodeJson = genericDecodeJson
+instance showWirePlay :: Show WirePlay where
+  show = genericShow
+instance dynamicByteLengthWirePlay :: DynamicByteLength WirePlay where
+  byteLength = genericByteLength
+instance encodeArrayBuffeWirePlay :: EncodeArrayBuffer WirePlay where
+  putArrayBuffer = genericPutArrayBuffer
+instance decodeArrayBuffeWirePlay :: DecodeArrayBuffer WirePlay where
+  readArrayBuffer = genericReadArrayBuffer
 

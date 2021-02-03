@@ -9,9 +9,18 @@ import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Array (foldr)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens.Getter (view)
+import Data.Lens.Iso (Iso', iso)
+import Data.Lens.Prism (review)
+import Domination.Data.WireInt (WireInt, _WireInt)
 
 data Bonus
   = Cash Int
+
+_toWire :: Iso' Bonus WireInt
+_toWire = iso to from where
+  to (Cash i) = view _WireInt i
+  from = Cash <<< review _WireInt
 
 cashValue :: Array Bonus -> Int
 cashValue = foldr (\a b -> cashValue1 a + b) 0

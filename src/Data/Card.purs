@@ -31,7 +31,7 @@ type Card =
   , buys :: Int
   , cards :: Int
   , actions :: Int
-  , specials :: Array Special
+  , special :: Maybe Special
   , reaction :: Maybe Reaction
   }
 
@@ -51,8 +51,8 @@ _cards :: Lens' Card Int
 _cards = prop (SProxy :: SProxy "cards")
 _actions :: Lens' Card Int
 _actions = prop (SProxy :: SProxy "actions")
-_specials :: Lens' Card (Array Special)
-_specials = prop (SProxy :: SProxy "specials")
+_maybeSpecial :: Lens' Card (Maybe Special)
+_maybeSpecial = prop (SProxy :: SProxy "special")
 _reaction :: Traversal' Card Reaction
 _reaction = prop (SProxy :: SProxy "reaction") <<< _Just
 
@@ -90,7 +90,7 @@ card =
   , buys: 0
   , cards: 0
   , actions: 0
-  , specials: []
+  , special: Nothing
   , reaction: Nothing
   }
 
@@ -144,5 +144,4 @@ instance decodeJsonCommand :: DecodeJson Command where
 _toChoose :: Prism' Command Choice
 _toChoose = prism' Choose case _ of
   Choose s -> Just s
-  _ -> Nothing
 

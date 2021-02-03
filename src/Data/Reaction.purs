@@ -6,6 +6,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
@@ -19,4 +20,10 @@ instance encodeJsonReaction :: EncodeJson Reaction where
   encodeJson a = genericEncodeJson a
 instance decodeJsonReaction :: DecodeJson Reaction where
   decodeJson a = genericDecodeJson a
+instance dynamicByteLengthReaction :: DynamicByteLength Reaction where
+  byteLength = genericByteLength
+instance encodeArrayBufferReaction :: EncodeArrayBuffer Reaction where
+  putArrayBuffer = genericPutArrayBuffer
+instance decodeArrayBufferReaction :: DecodeArrayBuffer Reaction where
+  readArrayBuffer = genericReadArrayBuffer
 

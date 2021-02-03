@@ -2,15 +2,18 @@ module Main where
 
 import Prelude
 
+import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
+import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens')
-import Data.Lens.Prism.Maybe (_Just)
+import Data.Lens.Prism (review)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create)
 import Domination.Capability.Dom (class Dom)
@@ -18,7 +21,7 @@ import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random, randomElement)
 import Domination.Capability.Storage (class Storage, load, save)
-import Domination.Data.GameState (fromWire, toWire)
+import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.UI.Chat as Chat
 import Domination.UI.Domination (GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
@@ -36,8 +39,9 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
-import Message (Message(..), Envelope)
-import Util (readJson, writeJson, (:~))
+import Message (Message(..), WireEnvelope, WireMessage)
+import Message as Message
+import Util ((:~))
 import Web.Event.Event (Event, EventType(..))
 
 type AppState =
@@ -108,6 +112,7 @@ component
   => Random m
   => GenUuid m
   => Broadcast m
+  => WireCodec m
   => Component HTML query o s m
 component = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval
@@ -162,6 +167,7 @@ handleAction
   => GenUuid m
   => Random m
   => Broadcast m
+  => WireCodec m
   => AppAction -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
 handleAction = case _ of
   Initialize -> do
@@ -199,10 +205,18 @@ handleAction = case _ of
       <<< over _usernames (HashMap.insert id username)
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
-  ReceiveMessage customEvent ->
-    case readJson $ FFI.detail customEvent of
+  ReceiveMessage customEvent -> do
+    let detail = FFI.detail customEvent
+    log $ "ReceiveMessage: " <> detail
+    (eWireEnvelope :: Either String WireEnvelope) <- readWire detail
+    let
+      eMessage = (
+        rmap
+        (review Message._toWire))
+        <$> eWireEnvelope
+    case eMessage of
       Left e -> log $ "problem receiving message: " <> e
-      Right ({ message: msg } :: Envelope) -> do
+      Right (Tuple _ (msg :: Message)) -> do
         case msg of
           UsernameMessage { username, id } -> do
             log $ "username incoming: " <> username
@@ -224,24 +238,21 @@ handleAction = case _ of
             log "Main: Receive GameStateMessage"
             queryGame $ ReceiveGameState
               { i
-              , state: fromWire state
+              , state
               }
             case playMade of
               Just x -> do
-                let
-                  x' = (prop (SProxy :: SProxy "state") %~ fromWire) x
                 log $ "Receive PlayMadeMessage"
-                H.modify_ $ _messages :~ PlayMadeMessage x'
+                H.modify_ $ _messages :~ PlayMadeMessage x
               Nothing -> pure unit
           PlayMadeMessage _ ->
             error "PlayMadeMessage should not be called"
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       sendMessage $ GameStateMessage
-        { state: toWire activeState.state
+        { state: activeState.state
         , i: activeState.i
-        , playMade:
-        _Just <<< prop (SProxy :: SProxy "state") %~ toWire $ playMade
+        , playMade
         }
       case playMade of
         Just x -> do
@@ -270,7 +281,7 @@ handleAction = case _ of
             <> show activeState.playerIndex
           queryGame $ LoadActiveState activeState
           sendMessage $ GameStateMessage
-            { state: toWire activeState.state
+            { state: activeState.state
             , i: activeState.i
             , playMade: Nothing
             }
@@ -286,16 +297,27 @@ handleAction = case _ of
       pure unit
     sendChatMessage = do
       { id, message } <- H.get
-      let chat = ChatMessage { username: id, message }
+      let (chat :: Message) = ChatMessage { username: id, message }
       sendMessage chat
       H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
 
-    sendMessage message = do
+    sendMessage
+      :: Message
+      -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
+    sendMessage message' = do
+      let (message :: WireMessage) = view Message._toWire message'
       log "Main: sending message"
       { maybeBroadcaster, id } <- H.get
+      let (wireEnvelope :: WireEnvelope) = Tuple id message
       case maybeBroadcaster of
         Nothing -> do
           error "no broadcaster; cannot send message"
-        Just broadcaster ->
-          broadcast broadcaster $ writeJson { id, message }
+        Just broadcaster -> do
+          log $ "Encoding message: " <> show wireEnvelope
+          (eString :: Either String String) <- writeWire wireEnvelope
+          case eString of
+            Left e -> error e
+            Right string -> do
+              log $ "Sending message: " <> string
+              broadcast broadcaster string
 

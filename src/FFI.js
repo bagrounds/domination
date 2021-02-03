@@ -97,10 +97,10 @@ const loadCert = () => new Promise((resolve, reject) => {
 const prepareMessage = (tag, values) =>
   JSON.stringify({ id: "LOCAL", message: { tag, values } })
 
-exports.makeBugout = roomCode => left => right => callback => () => {
+exports.makeBugout = roomCode => tuple => connections => seen =>  left => right => callback => () => {
   const options = {
-    heartbeat: 5000,
-    timeout: 10000,
+    //heartbeat: 5000,
+    //timeout: 10000,
     announce: [
       "wss://hub.bugout.link",
       "wss://tracker.btorrent.xyz",
@@ -116,18 +116,20 @@ exports.makeBugout = roomCode => left => right => callback => () => {
       fresh = false
       callback(right(bugout))()
     }
-    const message = prepareMessage("ConnectionsMessage", [ count ])
-    broadcastEvent(message)
+    const message = tuple("LOCAL")(connections(count))
+    //broadcastEvent(message)
   })
 
   bugout.on("message", (address, message) => {
+    logInfo("incoming message length: ", message.length)
     const decompressed = LZString.decompress(message)
+    logInfo("incoming decompressed message length: ", decompressed.length)
     address === bugout.address() || broadcastEvent(decompressed)
   })
 
   bugout.on("seen", address => {
-    const message = prepareMessage("SeenMessage", [ address ])
-    broadcastEvent(message)
+    const message = tuple("LOCAL")(seen(address))
+    //broadcastEvent(message)
   })
 
   bugout.on("ping", address => {
@@ -150,7 +152,9 @@ exports.makeBugout = roomCode => left => right => callback => () => {
 exports.address = bugout => () => bugout.address()
 
 exports.send = bugout => message => () => {
+  logInfo("sent message length: ", message.length)
   const compressed = LZString.compress(message)
+  logInfo("sent compressed message length: ", compressed.length)
   bugout.send(compressed)
 }
 
@@ -177,4 +181,16 @@ exports.genUuid = () => { // Public Domain/MIT
       return (c === 'x' ? r : (r & 0x3 | 0x8))
         .toString(16)
     })
+}
+
+exports.arrayBufferAsString = buf =>
+  String.fromCharCode.apply(null, new Uint8Array(buf))
+
+exports.stringAsArrayBuffer = str => {
+  var buf = new ArrayBuffer(str.length*2) // 2 bytes for each char
+  var bufView = new Uint8Array(buf)
+  for (var i=0, strLen=str.length; i < strLen; i++) {
+    bufView[i] = str.charCodeAt(i)
+  }
+  return buf
 }

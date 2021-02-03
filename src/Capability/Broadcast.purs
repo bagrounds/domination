@@ -4,12 +4,14 @@ import Prelude
 
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
+import Data.Tuple (Tuple(..))
 import Domination.AppM (AppM)
 import Effect.Aff (Aff, makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI as FFI
 import Halogen (HalogenM)
+import Message (WireMessage(..), mkConnectionsWireMessage)
 
 newtype Broadcaster = Broadcaster FFI.Bugout
 
@@ -51,7 +53,7 @@ broadcastMessage (Broadcaster bugout) = liftEffect <<< FFI.send bugout
 
 createBroadcaster :: String -> Aff Broadcaster
 createBroadcaster roomCode = Broadcaster
-  <$> makeAff (FFI.makeBugout roomCode Left Right)
+  <$> makeAff (FFI.makeBugout roomCode Tuple mkConnectionsWireMessage SeenWireMessage Left Right)
 
 getAddress :: Broadcaster -> Aff String
 getAddress (Broadcaster bugout) = liftEffect $ FFI.address bugout

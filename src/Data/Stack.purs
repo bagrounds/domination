@@ -13,6 +13,7 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Cards as Cards
+import Domination.Data.WireInt (WireInt(..), _WireInt)
 import Util (assert, decOver)
 
 type Stack =
@@ -20,13 +21,18 @@ type Stack =
   , count :: Int
   }
 
-type WireStack = Tuple Int Int
+type WireStack = Tuple WireInt WireInt
 
 _toWire :: Iso' Stack WireStack
 _toWire = iso to from where
-  to = (prop _card %~ view Cards._toWire) >>> toTuple
-  from = fromTuple >>> (prop _card %~ review Cards._toWire)
+  to = (prop _card %~ view Cards._toWire)
+    >>> (prop _count %~ view _WireInt)
+    >>> toTuple
+  from = fromTuple
+    >>> (prop _card %~ review Cards._toWire)
+    >>> (prop _count %~ review _WireInt)
   _card = SProxy :: SProxy "card"
+  _count = SProxy :: SProxy "count"
   toTuple { card, count } = Tuple card count
   fromTuple (Tuple card count) = { card, count }
 

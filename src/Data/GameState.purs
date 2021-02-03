@@ -5,6 +5,8 @@ import Prelude
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Array (all, catMaybes, dropWhile, filter, find, findIndex, head, length, null, takeWhile, updateAt)
+import Data.ArrayBuffer.Class (putArrayBuffer)
+import Data.ArrayBuffer.Types (ArrayBuffer)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
@@ -17,6 +19,7 @@ import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (%~), (.~), (<>~))
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (unwrap, wrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
@@ -44,6 +47,7 @@ import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
+import Domination.Data.WireInt (WireInt(..), _WireInt)
 import Relation (Relation(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (<$>~))
@@ -56,10 +60,12 @@ type GameState =
   , trash :: Array Card
   }
 
+x ab = putArrayBuffer ab 0 (toWire (newGame 1))
+
 type WireGameState = Tuple Phase
   (Tuple (Array WirePlayer)
   (Tuple (Array WireStack)
-  (Tuple (Array Int) Int)))
+  (Tuple (Array WireInt) WireInt)))
 
 toWire :: GameState -> WireGameState
 toWire = view _toWire
@@ -69,17 +75,20 @@ fromWire = review _toWire
 
 _toWire :: Iso' GameState WireGameState
 _toWire = iso to from where
-  to = (prop _players <$>~ view Player._toWire)
+  to = (prop _turn %~ view _WireInt)
+    >>> (prop _players <$>~ view Player._toWire)
     >>> (prop _supply <$>~ view Stack._toWire)
     >>> (prop _trash <$>~ view Cards._toWire)
     >>> toTuple
   from = fromTuple
+    >>> (prop _turn %~ review _WireInt)
     >>> (prop _players <$>~ review Player._toWire)
     >>> (prop _supply <$>~ review Stack._toWire)
-    >>> (prop _trash <$>~ review Cards._toWire)
+    >>> (prop _trash <$>~ (review Cards._toWire))
   _players = SProxy :: SProxy "players"
   _supply = SProxy :: SProxy "supply"
   _trash = SProxy :: SProxy "trash"
+  _turn = SProxy :: SProxy "turn"
   toTuple { phase, players, supply, trash, turn } =
     Tuple phase $ Tuple players $ Tuple supply $ Tuple trash turn
   fromTuple
@@ -570,7 +579,7 @@ play { playerIndex, cardIndex } state = do
   where
     applySpecialsToTargets :: Card -> GameState -> m GameState
     applySpecialsToTargets card =
-      flip (foldM $ applySpecialToTargets playerIndex) card.specials
+      flip (foldM $ applySpecialToTargets playerIndex) card.special
 
     applySpecialToTargets
       :: Int

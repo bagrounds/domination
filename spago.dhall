@@ -20,6 +20,8 @@ You can edit this file as you like.
   , "monad-loops"
   , "web-storage"
   , "unordered-collections"
+  , "arraybuffer-class"
+  , "arraybuffer-types"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

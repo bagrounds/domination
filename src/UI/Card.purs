@@ -91,15 +91,16 @@ descriptionComponent
   . Dom m
   => Card
   -> H.Component HTML query input output m
-descriptionComponent { name, specials } =
+descriptionComponent { name, special } =
   H.mkComponent { initialState, render, eval }
   where
     initialState _ = false
     render visible =
-      if null specials
-      then HH.li [ HP.classes [ Css.cardText, Css.cardName ] ] [ HH.text name ]
-      else
-        HH.li
+      case special of
+      Nothing -> HH.li
+        [ HP.classes [ Css.cardText, Css.cardName ] ]
+        [ HH.text name ]
+      Just _ -> HH.li
         [ HP.classes [ Css.description ] ] $
         [ HH.button
           [ HP.classes [ Css.cardText, Css.cardName, Css.toggle ]
@@ -114,7 +115,7 @@ descriptionComponent { name, specials } =
             [ HH.text description ]
           ]
         else []
-    description = intercalate ". " (_.description <$> specials)
+    description = intercalate ". " (_.description <$> special)
     eval = H.mkEval H.defaultEval
       { handleAction = \e -> do
         stopPropagation $ toEvent e

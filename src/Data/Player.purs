@@ -3,7 +3,7 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, deleteAt, filter, head, length, (:))
+import Data.Array (catMaybes, deleteAt, filter, head, length, reverse, (:))
 import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view, viewOn)
@@ -13,7 +13,7 @@ import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set, (+~), (.~))
+import Data.Lens.Setter (over, set, (+~), (.~), (%~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
@@ -23,10 +23,12 @@ import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus as Bonus
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
+import Domination.Data.Cards (_choiceToWire)
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.WireInt (WireInt(..), _WireInt)
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
@@ -46,20 +48,24 @@ type Player =
   }
 
 type WirePlayer =
-  (Tuple Int
-  (Tuple (Array Int)
-  (Tuple (Array Bonus)
-  (Tuple (Array Int)
-  (Tuple Int
-  (Tuple (Array Choice)
-  (Tuple (Array Int)
-  (Tuple (Array Int)
-  (Tuple (Array Int)
-  (Tuple (Maybe Reaction) (Array Int)))))))))))
+  (Tuple WireInt
+  (Tuple (Array WireInt)
+  (Tuple (Array WireInt) -- bonuses
+  (Tuple (Array WireInt)
+  (Tuple WireInt
+  (Tuple (Array WireInt) -- choices
+  (Tuple (Array WireInt)
+  (Tuple (Array WireInt)
+  (Tuple (Array WireInt)
+  (Tuple (Maybe Reaction) (Array WireInt)))))))))))
 
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
-  to = (prop _deck <$>~ view Cards._toWire)
+  to = (prop _buys %~ view _WireInt)
+    >>> (prop _bonuses <$>~ view Bonus._toWire)
+    >>> (prop _actions %~ view _WireInt)
+    >>> (prop _choices <$>~ view _choiceToWire)
+    >>> (prop _deck <$>~ view Cards._toWire)
     >>> (prop _hand <$>~ view Cards._toWire)
     >>> (prop _discard <$>~ view Cards._toWire)
     >>> (prop _toDiscard <$>~ view Cards._toWire)
@@ -67,12 +73,20 @@ _toWire = iso to from where
     >>> (prop _buying <$>~ view Cards._toWire)
     >>> toTuple
   from = fromTuple
+    >>> (prop _buys %~ review _WireInt)
+    >>> (prop _bonuses <$>~ review Bonus._toWire)
+    >>> (prop _actions %~ review _WireInt)
+    >>> (prop _choices <$>~ review _choiceToWire)
     >>> (prop _deck <$>~ review Cards._toWire)
     >>> (prop _hand <$>~ review Cards._toWire)
     >>> (prop _discard <$>~ review Cards._toWire)
     >>> (prop _toDiscard <$>~ review Cards._toWire)
     >>> (prop _atPlay <$>~ review Cards._toWire)
     >>> (prop _buying <$>~ review Cards._toWire)
+  _buys = SProxy :: SProxy "buys"
+  _bonuses = SProxy :: SProxy "bonuses"
+  _actions = SProxy :: SProxy "actions"
+  _choices = SProxy :: SProxy "choices"
   _deck = SProxy :: SProxy "deck"
   _hand = SProxy :: SProxy "hand"
   _discard = SProxy :: SProxy "discard"
@@ -203,7 +217,7 @@ gainBuys :: Int -> Player -> Player
 gainBuys n = over _buys (_ + n)
 
 gainChoices :: Array Choice -> Player -> Player
-gainChoices = flip $ foldr gainChoice
+gainChoices = flip (foldr gainChoice) <<< reverse
 
 gainChoice :: Choice -> Player -> Player
 gainChoice choice player =

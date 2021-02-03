@@ -3,10 +3,12 @@ module Domination.Data.Cards where
 import Prelude
 
 import Data.Array (findIndex, (!!))
+import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso', iso)
+import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Bonus (Bonus(..))
-import Domination.Data.Card (Card, Command(..))
+import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
@@ -17,11 +19,15 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Target (Target(..))
+import Domination.Data.WireInt (WireInt, _WireInt)
 
-_toWire :: Iso' Card Int
+_toWire :: Iso' Card WireInt
 _toWire = iso to from where
-  to card = fromMaybe (-1) $ findIndex (_ == card) cardMap
-  from i = fromMaybe Card.card $ cardMap !! i
+  to card = view _WireInt
+    <<< fromMaybe (-1) $ findIndex (_ == card) cardMap
+  from = fromMaybe Card.card
+    <<< (cardMap !! _)
+    <<< review _WireInt
 
 cardMap :: Array Card
 cardMap =
@@ -59,6 +65,38 @@ cardMap =
   , torturer
   , harem
   , nobles
+  ]
+
+_choiceToWire :: Iso' Choice WireInt
+_choiceToWire = iso to from where
+  to choice = view _WireInt
+    <<< fromMaybe (-1) $ findIndex (_ == choice) choiceMap
+  from = fromMaybe emptyChoice
+    <<< (choiceMap !! _)
+    <<< review _WireInt
+
+emptyChoice :: Choice
+emptyChoice = GainBonus
+  { bonus: Cash 100
+  , attack: false
+  , resolution: Nothing
+  }
+
+choiceMap :: Array Choice
+choiceMap =
+  [ chapelChoice
+  , pawnChoice
+  , consolationChoice
+  , stewardChoice
+  , harbingerChoice
+  , baronChoice
+  , militiaChoice
+  , moneyLenderChoice
+  , witchChoice
+  , councilRoomChoice
+  , scholarChoice
+  , torturerChoice
+  , noblesChoice
   ]
 
 copper :: Card
@@ -185,17 +223,22 @@ witch = let attack = true in
   { name = "Witch"
   , cost = 5
   , cards = 2
-  , specials =
-    [ { target: EveryoneElse
-      , command: Choose $ GainCards
-        { cardName: "Curse"
-        , n: 1
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Each other player gains a Curse."
-      }
-    ]
+  , special = Just witchSpecial
+  }
+
+witchChoice :: Choice
+witchChoice = let attack = true in GainCards
+  { cardName: "Curse"
+  , n: 1
+  , resolution: Nothing
+  , attack
+  }
+
+witchSpecial :: Special
+witchSpecial = let attack = true in
+  { target: EveryoneElse
+  , command: Choose witchChoice
+  , description: "Each other player gains a Curse."
   }
 
 councilRoom :: Card
@@ -205,16 +248,21 @@ councilRoom = let attack = false in
   , cost = 5
   , cards = 4
   , buys = 1
-  , specials =
-    [ { target: EveryoneElse
-      , command: Choose $ Draw
-        { n: 1
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Each other player draws a card."
-      }
-    ]
+  , special = Just councilRoomSpecial
+  }
+
+councilRoomChoice :: Choice
+councilRoomChoice = let attack = false in Draw
+  { n: 1
+  , resolution: Nothing
+  , attack
+  }
+
+councilRoomSpecial :: Special
+councilRoomSpecial = let attack = false in
+  { target: EveryoneElse
+  , command: Choose councilRoomChoice
+  , description: "Each other player draws a card."
   }
 
 scholar :: Card
@@ -222,24 +270,32 @@ scholar = let attack = false in
   Card.action
   { name = "Scholar"
   , cost = 5
-  , specials =
-    [ { target: Self
-      , command: Choose $ Discard
-        { selection: SelectAll
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Discard your hand."
+  , special = Just scholarSpecial
+  }
+
+scholarChoice :: Choice
+scholarChoice = let attack = false in And
+  { choices:
+    [ Discard
+      { selection: SelectAll
+      , resolution: Nothing
+      , attack
       }
-    , { target: Self
-      , command: Choose $ Draw
-        { n: 7
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Draw 7 cards"
+    , Draw
+      { n: 7
+      , resolution: Nothing
+      , attack
       }
     ]
+    , resolution: Nothing
+    , attack
+  }
+
+scholarSpecial :: Special
+scholarSpecial = let attack = false in
+  { target: Self
+  , command: Choose scholarChoice
+  , description: "Discard your hand and draw 7 cards"
   }
 
 chapel :: Card
@@ -247,20 +303,24 @@ chapel = let attack = false in
   Card.action
   { name = "Chapel"
   , cost = 2
-  , specials =
-    [ { target: Self
-      , command: Choose
-        $ MoveFromTo
-        { n: UpTo 4
-        , filter: Nothing
-        , source: Pile.Hand
-        , destination: Pile.Trash
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Trash up to 4 cards from your hand"
-      }
-    ]
+  , special = Just chapelSpecial
+  }
+
+chapelChoice :: Choice
+chapelChoice = let attack = false in MoveFromTo
+  { n: UpTo 4
+  , filter: Nothing
+  , source: Pile.Hand
+  , destination: Pile.Trash
+  , resolution: Nothing
+  , attack
+  }
+
+chapelSpecial :: Special
+chapelSpecial = let attack = false in
+  { target: Self
+  , command: Choose chapelChoice
+  , description: "Trash up to 4 cards from your hand"
   }
 
 militia :: Card
@@ -269,20 +329,24 @@ militia = let attack = true in
   { name = "Militia"
   , cost = 4
   , treasure = 2
-  , specials =
-    [ { target: EveryoneElse
-      , command: Choose
-        $ MoveFromTo
-        { n: DownTo 3
-        , filter: Nothing
-        , source: Pile.Hand
-        , destination: Pile.Discard
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Each other player discards down to 3 cards"
-      }
-    ]
+  , special = Just militiaSpecial
+  }
+
+militiaChoice :: Choice
+militiaChoice = let attack = true in MoveFromTo
+  { n: DownTo 3
+  , filter: Nothing
+  , source: Pile.Hand
+  , destination: Pile.Discard
+  , resolution: Nothing
+  , attack
+  }
+
+militiaSpecial :: Special
+militiaSpecial = let attack = true in
+  { target: EveryoneElse
+  , command: Choose militiaChoice
+  , description: "Each other player discards down to 3 cards"
   }
 
 moat :: Card
@@ -300,19 +364,24 @@ nobles = let attack = false in
   { name = "Nobles"
   , cost = 6
   , victoryPoints = 2
-  , specials =
-    [ { target: Self
-      , command: Choose $ Or
-        { choices:
-          [ Draw { n: 3, attack, resolution: Nothing }
-          , GainActions { n: 2, attack, resolution: Nothing }
-          ]
-        , resolution: Nothing
-        , attack
-        }
-      , description: "Choose one: +3 cards or +2 actions"
-      }
+  , special = Just noblesSpecial
+  }
+
+noblesChoice :: Choice
+noblesChoice = let attack = false in Or
+  { choices:
+    [ Draw { n: 3, attack, resolution: Nothing }
+    , GainActions { n: 2, attack, resolution: Nothing }
     ]
+  , resolution: Nothing
+  , attack
+  }
+
+noblesSpecial :: Special
+noblesSpecial = let attack = false in
+  { target: Self
+  , command: Choose noblesChoice
+  , description: "Choose one: +3 cards or +2 actions"
   }
 
 steward :: Card
@@ -320,228 +389,263 @@ steward = let attack = false in
   Card.action
   { name = "Steward"
   , cost = 3
-  , specials =
-    [ { target: Self
-      , command: Choose $ Or
-        { choices:
-          [ Draw { n: 2, attack, resolution: Nothing }
-          , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
-          , MoveFromTo
-            { source: Pile.Hand
-            , destination: Pile.Trash
-            , filter: Nothing
-            , n: Exactly 2
-            , attack
-            , resolution: Nothing
-            }
-          ]
-        , resolution: Nothing
-        , attack
-        }
-      , description:
-        "Choose one: + 2 cards, + $2, or trash 2 cards from your hand"
+  , special = Just stewardSpecial
+  }
+
+stewardChoice :: Choice
+stewardChoice = let attack = false in Or
+  { choices:
+    [ Draw { n: 2, attack, resolution: Nothing }
+    , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
+    , MoveFromTo
+      { source: Pile.Hand
+      , destination: Pile.Trash
+      , filter: Nothing
+      , n: Exactly 2
+      , attack
+      , resolution: Nothing
       }
     ]
+  , resolution: Nothing
+  , attack
+  }
+
+stewardSpecial :: Special
+stewardSpecial = let attack = false in
+  { target: Self
+  , command: Choose stewardChoice
+  , description:
+    "Choose 1: + 2 cards, + $2, or trash 2 cards from your hand"
   }
 
 pawn :: Card
-pawn = let attack = false in
-  Card.action
+pawn = Card.action
   { name = "Pawn"
   , cost = 2
-  , specials =
-    [ { target: Self
-      , command: Choose $ PickN
-        { n: 2
-        , choices:
-          [ Draw { n: 1, attack, resolution: Nothing }
-          , GainBonus { bonus: Cash 1, attack, resolution: Nothing }
-          , GainActions { n: 1, attack, resolution: Nothing }
-          , GainBuys { n: 1, attack, resolution: Nothing }
-          ]
-        , resolution: Nothing
-        , attack
-        }
-      , description:
-        "Choose two of: + $1, + 1 card, + 1 action, or +1 buy"
-      }
+  , special = Just pawnSpecial
+  }
+
+pawnChoice :: Choice
+pawnChoice = let attack = false in PickN
+  { n: 2
+  , choices:
+    [ Draw { n: 1, attack, resolution: Nothing }
+    , GainBonus { bonus: Cash 1, attack, resolution: Nothing }
+    , GainActions { n: 1, attack, resolution: Nothing }
+    , GainBuys { n: 1, attack, resolution: Nothing }
     ]
+  , resolution: Nothing
+  , attack
+  }
+
+pawnSpecial :: Special
+pawnSpecial = let attack = false in
+  { target: Self
+  , command: Choose pawnChoice
+  , description: "Choose 2 of: + $1, + 1 card, + 1 action, or +1 buy"
   }
 
 torturer :: Card
-torturer = let attack = true in
-  Card.actionAttack
+torturer = Card.actionAttack
   { name = "Torturer"
   , cost = 5
   , cards = 3
-  , specials =
-    [ { target: EveryoneElse
-      , command: Choose $ PickN
-        { n: 1
-        , choices:
-          [ MoveFromTo
-            { n: Exactly 2
-            , filter: Nothing
-            , source: Pile.Hand
-            , destination: Pile.Discard
-            , attack
-            , resolution: Nothing
-            }
-          , GainCards
-            { n: 1
-            , cardName: "Curse"
-            , attack
-            , resolution: Nothing
-            }
-          ]
-        , resolution: Nothing
-        , attack
-        }
-      , description:
-        "Each other player either discards 2 cards or gains a Curse to their hand, their choice. (They may pick an option they can't do.)"
+  , special = Just torturerSpecial
+  }
+
+torturerChoice :: Choice
+torturerChoice = let attack = true in
+  PickN
+  { n: 1
+  , choices:
+    [ MoveFromTo
+      { n: Exactly 2
+      , filter: Nothing
+      , source: Pile.Hand
+      , destination: Pile.Discard
+      , attack
+      , resolution: Nothing
+      }
+    , GainCards
+      { n: 1
+      , cardName: "Curse"
+      , attack
+      , resolution: Nothing
       }
     ]
+  , resolution: Nothing
+  , attack
+  }
+
+torturerSpecial :: Special
+torturerSpecial = let attack = true in
+  { target: EveryoneElse
+  , command: Choose torturerChoice
+  , description:
+    "Each other player either discards 2 cards or gains a Curse to their hand, their choice. (They may pick an option they can't do.)"
   }
 
 consolation :: Card
-consolation = let attack = false in
-  Card.action
+consolation = Card.action
   { name = "Consolation"
   , cost = 2
-  , specials =
-    [ { target: Self
-      , command: Choose $ If
-        { condition: HasCard "Estate"
-        , choice: GainBonus
-          { bonus: Cash 2
-          , attack
-          , resolution: Nothing
-          }
-        , otherwise: Nothing
-        , resolution: Nothing
-        , attack
-        }
-      , description:
-        "If you have an Estate in your hand, + $2"
-      }
-    ]
+  , special = Just consolationSpecial
+  }
+
+consolationChoice :: Choice
+consolationChoice = let attack = false in
+  If
+  { condition: HasCard "Estate"
+  , choice: GainBonus
+    { bonus: Cash 2
+    , attack
+    , resolution: Nothing
+    }
+  , otherwise: Nothing
+  , resolution: Nothing
+  , attack
+  }
+
+consolationSpecial :: Special
+consolationSpecial =
+  { target: Self
+  , command: Choose consolationChoice
+  , description: "If you have an Estate in your hand, + $2"
   }
 
 moneyLender :: Card
-moneyLender = let attack = false in
-  Card.action
+moneyLender = Card.action
   { name = "Money Lender"
   , cost = 4
-  , specials =
-    [ { target: Self
-      , command: Choose $ If
-        { condition: HasCard "Copper"
-        , choice: Option
-          { choice: And
-            { choices:
-              [ MoveFromTo
-                { n: Exactly 1
-                , filter: Just (HasName "Copper")
-                , source: Pile.Hand
-                , destination: Pile.Trash
-                , attack
-                , resolution: Nothing
-                }
-              , GainBonus
-                { bonus: Cash 3
-                , attack
-                , resolution: Nothing
-                }
-              ]
-            , attack
-            , resolution: Nothing
-            }
+  , special = Just moneyLenderSpecial
+  }
+
+moneyLenderChoice :: Choice
+moneyLenderChoice = let attack = false in
+  If
+  { condition: HasCard "Copper"
+  , choice: Option
+    { choice: And
+      { choices:
+        [ MoveFromTo
+          { n: Exactly 1
+          , filter: Just (HasName "Copper")
+          , source: Pile.Hand
+          , destination: Pile.Trash
           , attack
           , resolution: Nothing
           }
-        , otherwise: Nothing
-        , attack
-        , resolution: Nothing
-        }
-      , description:
-        "You may trash a copper from your hand for + $3"
+        , GainBonus
+          { bonus: Cash 3
+          , attack
+          , resolution: Nothing
+          }
+        ]
+      , attack
+      , resolution: Nothing
       }
-    ]
+    , attack
+    , resolution: Nothing
+    }
+  , otherwise: Nothing
+  , attack
+  , resolution: Nothing
+  }
+
+moneyLenderSpecial :: Special
+moneyLenderSpecial = let attack = false in
+  { target: Self
+  , command: Choose moneyLenderChoice
+  , description: "You may trash a copper from your hand for + $3"
   }
 
 harbinger :: Card
-harbinger = let attack = false in
-  Card.action
+harbinger = Card.action
   { name = "Harbinger"
   , cost = 3
   , cards = 1
   , actions = 1
-  , specials =
-    [ { target: Self
-      , command: Choose $ MoveFromTo
-        { n: UpTo 1
-        , filter: Nothing
-        , source: Pile.Discard
-        , destination: Pile.Deck
-        , resolution: Nothing
-        , attack
-        }
-      , description:
-        "Look through your discard pile. You may put a card from it onto your deck."
-      }
-    ]
+  , special = Just harbingerSpecial
+  }
+
+harbingerChoice :: Choice
+harbingerChoice = MoveFromTo
+  { n: UpTo 1
+  , filter: Nothing
+  , source: Pile.Discard
+  , destination: Pile.Deck
+  , resolution: Nothing
+  , attack: false
+  }
+
+harbingerSpecial :: Special
+harbingerSpecial =
+  { target: Self
+  , command: Choose $ harbingerChoice
+  , description: "Look through your discard pile."
+    <> " You may put a card from it onto your deck."
   }
 
 baron :: Card
-baron = let
-  attack = false
-  plus4 = GainBonus
-    { bonus: Cash 4
-    , attack
-    , resolution: Nothing
-    }
-  discardEstate = MoveFromTo
-    { filter: Just $ HasName "Estate"
-    , n: Exactly 1
-    , source: Pile.Hand
-    , destination: Pile.Discard
-    , attack
-    , resolution: Nothing
-    }
-  gainEstate = GainCards
-    { cardName: "Estate"
-    , n: 1
-    , attack
-    , resolution: Nothing
-    }
-  discardEstateAndPlus4 = And
-    { choices: [ plus4, discardEstate ]
-    , attack
-    , resolution: Nothing
-    }
-  discardOrGainEstate = Or
-    { choices: [ discardEstateAndPlus4, gainEstate ]
-    , attack
-    , resolution: Nothing
-    }
-  command = Choose $ If
-    { condition: HasCard "Estate"
-    , choice: discardOrGainEstate
-    , otherwise: Just gainEstate
-    , attack
-    , resolution: Nothing
-    }
-  in
-  Card.action
+baron = Card.action
   { name = "Baron"
   , cost = 4
   , buys = 1
-  , specials =
-    [ { target: Self
-      , command
-      , description: "You may discard an estate for + $4."
-        <> " If you don't, gain an Estate."
-      }
-    ]
+  , special = Just baronSpecial
   }
 
+gain4Cash :: Choice
+gain4Cash = GainBonus
+  { bonus: Cash 4
+  , attack: false
+  , resolution: Nothing
+  }
+
+gain1Estate :: Choice
+gain1Estate = GainCards
+  { cardName: "Estate"
+  , n: 1
+  , attack: false
+  , resolution: Nothing
+  }
+
+discard1Estate :: Choice
+discard1Estate = MoveFromTo
+  { filter: Just $ HasName "Estate"
+  , n: Exactly 1
+  , source: Pile.Hand
+  , destination: Pile.Discard
+  , attack: false
+  , resolution: Nothing
+  }
+
+discard1EstateAndGain4Cash :: Choice
+discard1EstateAndGain4Cash = And
+  { choices: [ gain4Cash, discard1Estate ]
+  , attack: false
+  , resolution: Nothing
+  }
+
+discardOrGain1Estate :: Choice
+discardOrGain1Estate = Or
+  { choices: [ gain1Estate, discard1EstateAndGain4Cash ]
+  , attack: false
+  , resolution: Nothing
+  }
+
+baronChoice :: Choice
+baronChoice = If
+  { condition: HasCard "Estate"
+  , choice: discardOrGain1Estate
+  , otherwise: Just gain1Estate
+  , attack: false
+  , resolution: Nothing
+  }
+
+baronSpecial :: Special
+baronSpecial =
+  { target: Self
+  , command: Choose baronChoice
+  , description: "You may discard an estate for + $4."
+    <> " If you don't, gain an Estate."
+  }
