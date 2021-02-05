@@ -46,7 +46,6 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
-import Web.UIEvent.MouseEvent (MouseEvent)
 
 data InternalGameAction
   = WritePlayerIndex Int
@@ -158,11 +157,11 @@ handleQuery = case _ of
     H.raise $ SaveGame newActiveState
     pure $ Just a
   LoadActiveState activeState a -> do
-    log $ "LoadActiveState as player " <> show activeState.playerIndex
+    { nextPlayerIndex } <- H.get
+    let newActiveState = activeState { playerIndex = nextPlayerIndex }
+    log $ "LoadActiveState as player " <> show nextPlayerIndex
     H.modify_
-      $ (_maybeGame .~ (Just activeState))
-      >>> (_nextPlayerIndex .~ activeState.playerIndex)
-      >>> (_nextPlayerCount .~ activeState.playerCount)
+      $ (_maybeGame .~ (Just newActiveState))
     pure $ Just a
 
 type ChildComponents query r m =

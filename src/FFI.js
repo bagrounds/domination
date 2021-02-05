@@ -1,36 +1,19 @@
 'use strict'
 
-// constants
-
-const MESSAGE_EVENT_TARGET = '#msg'
-
-// exports
-
-exports.copyToClipboard = id => () => {
-  const element = document.getElementById(id)
-
-  element.select()
-
-  element.setSelectionRange(0, 99999)
-
-  document.execCommand('copy')
-}
-
-exports.detail = customEvent => customEvent.detail
-
 // helpers
 
-const broadcastEvent = event => {
-  const eventTarget = document.querySelector(MESSAGE_EVENT_TARGET)
+const broadcastEvent = messageTarget => event => {
+  const eventTarget = document.querySelector('#' + messageTarget)
   if (eventTarget) {
     eventTarget.dispatchEvent(customEvent(event))
   }
   else {
-    logError(`${MESSAGE_EVENT_TARGET} undefined, cannot dispatch event: `, event)
+    logError(`${domQuery} undefined, cannot dispatch event: `, event)
   }
 }
 
-const customEvent = detail => new CustomEvent('msg', { detail })
+const customEvent = detail =>
+  new CustomEvent('purescript', { detail })
 
 const log = level => (...args) => console[level]('FFI: ', ...args)
 
@@ -94,13 +77,32 @@ const loadCert = () => new Promise((resolve, reject) => {
   }
 })
 
-const prepareMessage = (tag, values) =>
-  JSON.stringify({ id: "LOCAL", message: { tag, values } })
+exports.copyToClipboard = id => () => {
+  const element = document.getElementById(id)
 
-exports.makeBugout = roomCode => tuple => connections => seen =>  left => right => callback => () => {
+  element.select()
+
+  element.setSelectionRange(0, 99999)
+
+  document.execCommand('copy')
+}
+
+exports.detail = ({ detail }) => detail
+
+exports.makeBugoutFFI = tuple =>
+  left =>
+  right =>
+  connections =>
+  seen =>
+  roomCode =>
+  remoteMessageTarget =>
+  localMessageTarget =>
+  callback =>
+  () => {
   const options = {
-    //heartbeat: 5000,
-    //timeout: 10000,
+    // try these options again when we can do something about timeouts
+    // heartbeat: 5000,
+    // timeout: 10000,
     announce: [
       "wss://hub.bugout.link",
       "wss://tracker.btorrent.xyz",
@@ -116,20 +118,17 @@ exports.makeBugout = roomCode => tuple => connections => seen =>  left => right 
       fresh = false
       callback(right(bugout))()
     }
-    const message = tuple("LOCAL")(connections(count))
-    //broadcastEvent(message)
+    broadcastEvent(localMessageTarget)(connections(count))
   })
 
   bugout.on("message", (address, message) => {
     logInfo("incoming message length: ", message.length)
-    const decompressed = LZString.decompress(message)
-    logInfo("incoming decompressed message length: ", decompressed.length)
-    address === bugout.address() || broadcastEvent(decompressed)
+    address === bugout.address()
+      || broadcastEvent(remoteMessageTarget)(message)
   })
 
   bugout.on("seen", address => {
-    const message = tuple("LOCAL")(seen(address))
-    //broadcastEvent(message)
+    broadcastEvent(localMessageTarget)(seen(address))
   })
 
   bugout.on("ping", address => {
@@ -153,9 +152,7 @@ exports.address = bugout => () => bugout.address()
 
 exports.send = bugout => message => () => {
   logInfo("sent message length: ", message.length)
-  const compressed = LZString.compress(message)
-  logInfo("sent compressed message length: ", compressed.length)
-  bugout.send(compressed)
+  bugout.send(message)
 }
 
 // https://stackoverflow.com/a/8809472
@@ -183,14 +180,25 @@ exports.genUuid = () => { // Public Domain/MIT
     })
 }
 
-exports.arrayBufferAsString = buf =>
-  String.fromCharCode.apply(null, new Uint8Array(buf))
+exports.arrayBufferAsString = buffer =>
+  String.fromCharCode.apply(null, new Uint8Array(buffer))
 
-exports.stringAsArrayBuffer = str => {
-  var buf = new ArrayBuffer(str.length*2) // 2 bytes for each char
-  var bufView = new Uint8Array(buf)
-  for (var i=0, strLen=str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i)
+exports.stringAsArrayBuffer = string => {
+  const stringLength = string.length
+  const buffer = new ArrayBuffer(stringLength * 2)
+  const bufferView = new Uint8Array(buffer)
+  for (let i = 0; i < stringLength; i++) {
+    bufferView[i] = string.charCodeAt(i)
   }
-  return buf
+  return buffer
 }
+
+exports.compressString = LZString.compress
+
+exports.decompressStringFFI = just => nothing => s => {
+  const result = LZString.decompress(s)
+  return result == null
+    ? nothing
+    : just(result)
+}
+

@@ -5,6 +5,7 @@ import Prelude
 import Control.Monad.Trans.Class (lift)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, decodeArrayBuffer, encodeArrayBuffer)
 import Data.Either (Either(..), note)
+import Data.Maybe (Maybe(..))
 import Domination.AppM (AppM)
 import Effect (Effect)
 import Effect.Aff (Aff)
@@ -60,13 +61,20 @@ writeWire'
   => a
   -> Effect (Either String String)
 writeWire' = encodeArrayBuffer
-  >>> map (FFI.arrayBufferAsString >>> Right)
+  >>> map (FFI.arrayBufferAsString >>> FFI.compressString >>> Right)
 
 readWire'
   :: forall a
   . DecodeArrayBuffer a
   => String
   -> Effect (Either String a)
-readWire' = FFI.stringAsArrayBuffer >>> decodeArrayBuffer
-  >>> map (note "failed to read wire formatted messgae")
+readWire' string =
+  case FFI.decompressString string of
+    Nothing ->
+      pure $ Left $ "Failed to decompress string"
+        <> " (are you sure this string was compressed?): " <> string
+    Just decompressed -> do
+      maybeA <- decodeArrayBuffer
+        $ FFI.stringAsArrayBuffer decompressed
+      pure $ note "Failed to decode ArrayBuffer" maybeA
 

@@ -39,7 +39,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
-import Message (Message(..), WireEnvelope, WireMessage)
+import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope, WireMessage)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (Event, EventType(..))
@@ -50,7 +50,7 @@ type AppState =
   , username :: String
   , usernames :: HashMap String String
   , message :: String
-  , messages :: Array Message
+  , messages :: Array RemoteMessage
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe Broadcaster
   , roomCode :: String
@@ -58,7 +58,7 @@ type AppState =
 
 _id :: Lens' AppState String
 _id = prop (SProxy :: SProxy "id")
-_messages :: Lens' AppState (Array Message)
+_messages :: Lens' AppState (Array RemoteMessage)
 _messages = prop (SProxy :: SProxy "messages")
 _message :: Lens' AppState String
 _message = prop (SProxy :: SProxy "message")
@@ -85,7 +85,13 @@ newApp =
   }
 
 globalRoomCode :: String
-globalRoomCode = "global"
+globalRoomCode = "global-dev"
+
+remoteMessageTarget :: String
+remoteMessageTarget = "remote-message-target"
+
+localMessageTarget :: String
+localMessageTarget = "local-message-target"
 
 uuidKey :: String
 uuidKey = "player-id"
@@ -130,8 +136,15 @@ render
   -> HTML (Domination.Component GameQuery c m AppAction) AppAction
 render state = HH.main_ $
   [ HH.div
-    [ HP.id_ "msg"
-    , HE.handler (EventType "msg") (Just <<< ReceiveMessage)
+    [ HP.id_ $ remoteMessageTarget
+    , HE.handler (EventType "purescript") (Just <<< ReceiveRemoteMessage)
+    ]
+    []
+  , HH.div
+    [ HP.id_ $ localMessageTarget
+    , HE.handler
+      (EventType "purescript")
+      (Just <<< ReceiveLocalMessage)
     ]
     []
   , UsernameInput.render { onInput: WriteUsername, state }
@@ -154,7 +167,8 @@ data AppAction
   | WriteUsername String
   | Write (Lens' AppState String) String
   | SendMessage
-  | ReceiveMessage Event
+  | ReceiveRemoteMessage Event
+  | ReceiveLocalMessage Event
   | HandleGameEvent GameEvent
 
 type ChildComponents o r =
@@ -188,7 +202,8 @@ handleAction = case _ of
         pure $ emoji <> "lurker" <> emoji
       Right u -> pure u
 
-    broadcaster <- create globalRoomCode
+    broadcaster <- create
+      globalRoomCode remoteMessageTarget localMessageTarget
 
     H.modify_ $ (_id .~ uuid)
       >>> (_username .~ username)
@@ -205,9 +220,20 @@ handleAction = case _ of
       <<< over _usernames (HashMap.insert id username)
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
-  ReceiveMessage customEvent -> do
+  ReceiveLocalMessage customEvent -> do
+    let localMessage = FFI.detail customEvent
+    case localMessage of
+      SeenMessage address -> do
+        log $ "I see you: " <> address
+        { username, id } <- H.get
+        sendMessage $ UsernameMessage { username, id }
+      ConnectionsMessage count ->
+        H.modify_ $ set _connectionCount count
+
+
+  ReceiveRemoteMessage customEvent -> do
     let detail = FFI.detail customEvent
-    log $ "ReceiveMessage: " <> detail
+    log $ "ReceiveRemoteMessage: " <> detail
     (eWireEnvelope :: Either String WireEnvelope) <- readWire detail
     let
       eMessage = (
@@ -216,17 +242,11 @@ handleAction = case _ of
         <$> eWireEnvelope
     case eMessage of
       Left e -> log $ "problem receiving message: " <> e
-      Right (Tuple _ (msg :: Message)) -> do
+      Right (Tuple _ (msg :: RemoteMessage)) -> do
         case msg of
           UsernameMessage { username, id } -> do
             log $ "username incoming: " <> username
             H.modify_ $ over _usernames (HashMap.insert id username)
-          SeenMessage address -> do
-            log $ "I see you: " <> address
-            { username, id } <- H.get
-            sendMessage $ UsernameMessage { username, id }
-          ConnectionsMessage count ->
-            H.modify_ $ set _connectionCount count
           ChatMessage { message, username } -> do
             H.modify_ $ _messages :~ msg
             if message == "PING"
@@ -297,12 +317,12 @@ handleAction = case _ of
       pure unit
     sendChatMessage = do
       { id, message } <- H.get
-      let (chat :: Message) = ChatMessage { username: id, message }
+      let (chat :: RemoteMessage) = ChatMessage { username: id, message }
       sendMessage chat
       H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
 
     sendMessage
-      :: Message
+      :: RemoteMessage
       -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
     sendMessage message' = do
       let (message :: WireMessage) = view Message._toWire message'

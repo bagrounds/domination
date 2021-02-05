@@ -8,7 +8,6 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Array (intercalate)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
-import Data.ArrayBuffer.Class.Types (Int8(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Fold (preview, (^?))
@@ -24,20 +23,20 @@ import Domination.Data.Play (Play(..), WirePlay)
 import Domination.Data.Play as Play
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
-import Domination.Data.WireInt (WireInt(..), _WireInt)
+import Domination.Data.WireInt (WireInt, _WireInt)
 import Domination.UI.RenderText (renderTextInContext)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span) as HH
 import Halogen.HTML.Properties (class_) as HH
 
-type Envelope = { id :: String, message :: Message }
+type Envelope = { id :: String, message :: RemoteMessage }
 type WireEnvelope = Tuple String WireMessage
 
-wrapMessage :: String -> Message -> Envelope
+wrapMessage :: String -> RemoteMessage -> Envelope
 wrapMessage id message = { id, message }
 
-data Message
+data RemoteMessage
   = ChatMessage { username :: String, message :: String }
   | UsernameMessage { username :: String, id :: String }
   | GameStateMessage
@@ -54,15 +53,17 @@ data Message
     , playerIndex :: Int
     , state :: GameState
     }
-  | SeenMessage String
+
+data LocalMessage
+  = SeenMessage String
   | ConnectionsMessage Int
 
-derive instance genericMessage :: Generic Message _
-instance showMessage :: Show Message where
+derive instance genericRemoteMessage :: Generic RemoteMessage _
+instance showRemoteMessage :: Show RemoteMessage where
   show = genericShow
-instance encodeJsonMessage :: EncodeJson Message where
+instance encodeJsonRemoteMessage :: EncodeJson RemoteMessage where
   encodeJson = genericEncodeJson
-instance decodeJsonMessage :: DecodeJson Message where
+instance decodeJsonRemoteMessage :: DecodeJson RemoteMessage where
   decodeJson = genericDecodeJson
 
 data WireMessage
@@ -77,13 +78,8 @@ data WireMessage
   | PlayMadeWireMessage
     (Tuple WirePlay
     (Tuple WireInt WireGameState))
-  | SeenWireMessage String
-  | ConnectionsWireMessage WireInt
 
-mkConnectionsWireMessage :: Int -> WireMessage
-mkConnectionsWireMessage = ConnectionsWireMessage <<< WireInt <<< Int8
-
-_toWire :: Iso' Message WireMessage
+_toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
   to = case _ of
     ChatMessage { username, message } ->
@@ -96,10 +92,6 @@ _toWire = iso to from where
       $ Tuple (view GameState._toWire state) (pmm <$> playMade)
     PlayMadeMessage x ->
       PlayMadeWireMessage $ pmm x
-    SeenMessage s ->
-      SeenWireMessage s
-    ConnectionsMessage i ->
-      ConnectionsWireMessage $ view _WireInt i
     where
       pmm { play, playerIndex, state } =
         Tuple (view Play._toWire play)
@@ -119,10 +111,6 @@ _toWire = iso to from where
         }
     PlayMadeWireMessage x ->
       PlayMadeMessage $ pmm x
-    SeenWireMessage s ->
-      SeenMessage s
-    ConnectionsWireMessage i ->
-      ConnectionsMessage $ review _WireInt i
     where
       pmm (Tuple play (Tuple playerIndex state)) =
         { play: review Play._toWire play
@@ -147,7 +135,7 @@ instance decodeArrayBuffeWireMessage
   :: DecodeArrayBuffer WireMessage where
   readArrayBuffer = genericReadArrayBuffer
 
-renderHtml :: forall w i. Message -> HTML w i
+renderHtml :: forall w i. RemoteMessage -> HTML w i
 renderHtml (ChatMessage { username, message }) =
   HH.div
     [ HH.class_ $ ClassName "chat-message" ]
@@ -159,20 +147,6 @@ renderHtml (GameStateMessage _) =
   HH.div
     [ HH.class_ $ ClassName "game-state-message" ]
     [ HH.div [ HH.class_ $ ClassName "game-state" ] [ HH.text "(Game Data Received)" ]
-    ]
-renderHtml (SeenMessage address) =
-  HH.div
-    [ HH.class_ $ ClassName "seen-message" ]
-    [ HH.text "(New Connection: "
-    , HH.span [ HH.class_ $ ClassName "address" ] [ HH.text address ]
-    , HH.text ")"
-    ]
-renderHtml (ConnectionsMessage count) =
-  HH.div
-    [ HH.class_ $ ClassName "connections-message" ]
-    [ HH.text "("
-    , HH.span [ HH.class_ $ ClassName "address" ] [ HH.text $ show count ]
-    , HH.text " Connections)"
     ]
 renderHtml (UsernameMessage { username, id }) =
   HH.div

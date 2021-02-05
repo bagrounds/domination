@@ -3,26 +3,42 @@ module FFI where
 import Prelude
 
 import Data.ArrayBuffer.Types (ArrayBuffer)
-import Data.Either (Either)
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (Canceler, Error)
-import Message (WireMessage)
+import Message (LocalMessage(..))
 import Web.Event.Event (Event)
 
 foreign import copyToClipboard :: String -> Effect Unit
-foreign import detail :: Event -> String
+
+foreign import detail :: forall a. Event -> a
 
 foreign import data Bugout :: Type
 
-foreign import makeBugout
-  :: forall a b
-  . String
-  -> (a -> b -> Tuple a b) -- Tuple
-  -> (Int -> WireMessage) -- ConnectionsWireMessage
-  -> (String -> WireMessage) -- SeenWireMessage
-  -> (a -> Either Error a) -- Left
-  -> (a -> Either Error a) -- Right
+makeBugout
+  :: String -- remote message target
+  -> String -- local message target
+  -> String -- room code
+  -> (Either Error Bugout -> Effect Unit)
+  -> Effect Canceler
+makeBugout = makeBugoutFFI
+  Tuple
+  Left
+  Right
+  ConnectionsMessage
+  SeenMessage
+
+foreign import makeBugoutFFI
+  :: (forall a b. a -> b -> Tuple a b) -- Tuple
+  -> (forall l r. l -> Either l r) -- Left
+  -> (forall l r. r -> Either l r) -- Right
+  -> (Int -> LocalMessage) -- ConnectionsWireMessage
+  -> (String -> LocalMessage) -- SeenWireMessage
+  -> String
+  -> String
+  -> String
   -> (Either Error Bugout -> Effect Unit)
   -> Effect Canceler
 
@@ -35,4 +51,15 @@ foreign import genUuid :: Effect String
 foreign import arrayBufferAsString :: ArrayBuffer -> String
 
 foreign import stringAsArrayBuffer :: String -> ArrayBuffer
+
+foreign import compressString :: String -> String
+
+decompressString :: String -> Maybe String
+decompressString = decompressStringFFI Just Nothing
+
+foreign import decompressStringFFI
+  :: (forall x. x -> Maybe x)
+  -> (forall x. Maybe x)
+  -> String
+  -> Maybe String
 

@@ -10,13 +10,13 @@ import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Message (Message(..))
+import Message (RemoteMessage(..))
 import Message as Message
 import Web.UIEvent.KeyboardEvent as KE
 
 type State r =
   { usernames :: HashMap String String
-  , messages :: Array Message
+  , messages :: Array RemoteMessage
   , message :: String
   | r
   }
