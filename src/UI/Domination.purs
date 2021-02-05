@@ -178,6 +178,7 @@ type ChildComponents query r m =
 renderPlayerN
   :: forall query r m
   . Dom m
+  => Log m
   => ComponentState
   -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
@@ -223,6 +224,7 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
 renderSupply'
   :: forall query r m
   . Dom m
+  => Log m
   => ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
@@ -257,7 +259,7 @@ renderSupply' cs@{ state, playerIndex } player =
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
-    renderStackI stackIndex = renderStack onClick player
+    renderStackI stackIndex = renderStack onClick player stackIndex
       where
         onClick _ =
           Just $ MakePlay $ Purchase { playerIndex,  stackIndex }
@@ -286,8 +288,8 @@ renderDiscard player = HH.button
 --  -> Player
 --  -> Card
 --  -> HTML widget input
-renderCard onClick player card =
-  Card.render onClick extraClasses card
+renderCard onClick player card slotNumber =
+  Card.render onClick extraClasses card slotNumber
   where
     extraClasses = [
       if player.actions > 0 && Card.isAction card
@@ -301,7 +303,7 @@ renderCard onClick player card =
 --  -> Player
 --  -> Stack
 --  -> HTML widget input
-renderStack onClick player stack =
+renderStack onClick player slotNumber stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
       [ HH.li
@@ -321,6 +323,7 @@ renderStack onClick player stack =
           onClick
           player
           stack.card
+          slotNumber
         ]
       ]
     ]
@@ -328,6 +331,7 @@ renderStack onClick player stack =
 renderPlayers
   :: forall query r m
   . Dom m
+  => Log m
   => ActiveState
   -> Array (HTML (ChildComponents query r m) InternalGameAction)
 renderPlayers cs@{ playerIndex, state } =
@@ -366,6 +370,7 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
 renderPlayer
   :: forall query r m
   . Dom m
+  => Log m
   => ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
@@ -380,7 +385,13 @@ renderPlayer cs@{ state, playerIndex } player =
     in
     if isAttacked && hasReaction
     then renderReaction
-    else renderChoice choice
+    else
+      let
+        baseSlotNumber = length state.supply
+          + length player.atPlay
+          + length player.buying
+          + length player.hand
+      in renderChoice baseSlotNumber choice
   else
     case state.players !! state.turn of
       Nothing -> h1__ "Something has gone terribly wrong!"
@@ -394,8 +405,9 @@ renderPlayer cs@{ state, playerIndex } player =
         , renderSupply' cs player
         , renderNextPhaseButton cs
         , renderStats cs
-        , renderAtPlay currentPlayer
-        , renderBuying currentPlayer
+        , renderAtPlay currentPlayer (length cs.state.supply)
+        , renderBuying currentPlayer $ length cs.state.supply
+          + length currentPlayer.atPlay
         , renderHand player cs
         ]
     where
@@ -414,9 +426,10 @@ renderPlayer cs@{ state, playerIndex } player =
             }
           ]
       renderChoice
-        :: Maybe Choice
+        :: Int
+        -> Maybe Choice
         -> Maybe (HTML (ChildComponents query r m) InternalGameAction)
-      renderChoice = map \choice -> case choice of
+      renderChoice baseSlotNumber = map \choice -> case choice of
           If x ->
             acknowledge (renderText choice) (playEvent If x unit)
           And x@{ choices } ->
@@ -465,7 +478,7 @@ renderPlayer cs@{ state, playerIndex } player =
             [ HH.slot
               (SProxy :: SProxy "MoveFromTo")
               0
-              (MoveFromTo.component player choice)
+              (MoveFromTo.component player choice baseSlotNumber)
               unit
               $ Just
               <<< MakePlay
@@ -534,12 +547,12 @@ renderStats cs = HH.ul
   (playerStats cs `mapWithIndex` cs.state.players)
 
 --renderAtPlay :: forall w i. Player -> HTML w i
-renderAtPlay currentPlayer =
+renderAtPlay currentPlayer baseSlotNumber =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
     title = HH.li_ [ h3__ "At Play" ]
-    stacks = renderStack (const Nothing) currentPlayer
-      <$> (stackCards currentPlayer.atPlay)
+    stacks = (\i -> renderStack (const Nothing) currentPlayer (baseSlotNumber + i))
+      `mapWithIndex` stackCards currentPlayer.atPlay
 
 stackCards :: Array Card -> Array Stack
 stackCards cards = catMaybes (foldr f [] names)
@@ -552,12 +565,12 @@ stackCards cards = catMaybes (foldr f [] names)
         cards' = (_.name >>> (_ == name)) `filter` cards
 
 --renderBuying :: forall w i. Player -> HTML w i
-renderBuying currentPlayer =
+renderBuying currentPlayer baseSlotNumber =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
     title = HH.li_ [ h3__ "Buying" ]
-    stacks = renderStack (const Nothing) currentPlayer
-      <$> (stackCards currentPlayer.buying)
+    stacks = (\i -> renderStack (const Nothing) currentPlayer (i + baseSlotNumber))
+      `mapWithIndex` stackCards currentPlayer.buying
 
 --renderHand :: forall w. Player -> ActiveState -> HTML w InternalGameAction
 renderHand player { playerIndex, state } = HH.ul
@@ -589,8 +602,13 @@ renderHand player { playerIndex, state } = HH.ul
     ]
   , renderDiscard player
   ]
-  <> renderCardInHand player playerIndex `mapWithIndex` player.hand
+  <> renderCardInHand baseSlotNumber player playerIndex
+    `mapWithIndex` player.hand
   <> [ renderDeck player ]
+  where
+    baseSlotNumber = length state.supply
+      + length player.atPlay
+      + length player.buying
 
 --renderCardInHand
 --  :: forall a
@@ -599,11 +617,12 @@ renderHand player { playerIndex, state } = HH.ul
 --  -> Int
 --  -> Card
 --  -> HTML a InternalGameAction
-renderCardInHand player playerIndex cardIndex card =
+renderCardInHand baseSlotNumber player playerIndex cardIndex card =
   renderCard
   (const $ Just $ MakePlay $ PlayCard { playerIndex,  cardIndex })
   player
   card
+  (baseSlotNumber + cardIndex)
 
 handleAction
   :: forall s p m

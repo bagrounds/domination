@@ -8,6 +8,7 @@ import Data.Array (intercalate, null)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Dom (class Dom, stopPropagation)
+import Domination.Capability.Log (class Log, log)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType as CardType
@@ -27,7 +28,7 @@ import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 --  -> Array H.ClassName
 --  -> Card
 --  -> HTML w i
-render onClick extraClasses card = HH.div
+render onClick extraClasses card slotNumber = HH.div
   ( if Card.isTreasure card
     then [ HP.class_ Css.treasureCard ]
     else [ HP.class_ Css.noTreasureCard ]
@@ -51,9 +52,9 @@ render onClick extraClasses card = HH.div
         [ HH.ul_
           [ HH.slot
             (SProxy :: SProxy "description")
-            5
-            (descriptionComponent card)
-            unit
+            slotNumber
+            (descriptionComponent slotNumber card)
+            card
             (const Nothing)
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardCards ] ]
@@ -87,39 +88,54 @@ render onClick extraClasses card = HH.div
   ]
 
 descriptionComponent
-  :: forall query input output m
+  :: forall query output m
   . Dom m
-  => Card
-  -> H.Component HTML query input output m
-descriptionComponent { name, special } =
+  => Log m
+  => Int
+  -> Card
+  -> H.Component HTML query Card output m
+descriptionComponent slotNumber card =
   H.mkComponent { initialState, render, eval }
   where
-    initialState _ = false
-    render visible =
-      case special of
+    initialState _ = { card, visible: false }
+    render { visible, card } =
+      case card.special of
       Nothing -> HH.li
         [ HP.classes [ Css.cardText, Css.cardName ] ]
-        [ HH.text name ]
+        [ HH.text card.name ]
       Just _ -> HH.li
         [ HP.classes [ Css.description ] ] $
         [ HH.button
           [ HP.classes [ Css.cardText, Css.cardName, Css.toggle ]
-          , HP.onClick Just
+          , HP.onClick \event -> Just  { card, event: Just event, reset: false }
           ]
-          [ HH.text name ]
+          [ HH.text card.name ]
         ] <>
         if visible
         then
           [ HH.button
-            [ HP.class_ Css.toolTip, HP.onClick Just ]
-            [ HH.text description ]
+            [ HP.class_ Css.toolTip
+            , HP.onClick \event -> Just { card, event: Just event, reset: false }
+            ]
+            [ HH.text $ description card.special ]
           ]
         else []
-    description = intercalate ". " (_.description <$> special)
+    description special = intercalate ". " (_.description <$> special)
     eval = H.mkEval H.defaultEval
-      { handleAction = \e -> do
-        stopPropagation $ toEvent e
-        H.modify_ not
+      { handleAction = \{ event, reset, card } -> do
+        case event of
+          Nothing -> pure unit
+          Just e -> stopPropagation $ toEvent e
+        if reset
+          then do
+            log $ "(" <> card.name <> ") " <> "reset slotNumber: "
+              <> show slotNumber
+            H.put { card, visible: false }
+          else do
+            log $ "(" <> card.name <> ") " <> "toggle slotNumber: "
+              <> show slotNumber
+            H.modify_ \{ visible } -> { visible: not visible, card: card }
+      , receive = \card -> Just { event: Nothing, reset: true, card }
       }
 
 

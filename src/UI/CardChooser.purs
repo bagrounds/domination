@@ -42,12 +42,13 @@ type ComponentSpec =
   , player :: Player
   , choice :: Choice
   , pile :: Pile
+  , baseSlotNumber :: Int
   }
 --component
 --  :: forall query input m
 --  . ComponentSpec
 --  -> Component HTML query input Choice m
-component { renderChoice, canToggle, resolve, player, choice, pile } =
+component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pile } =
   H.mkComponent { initialState, render, eval }
     where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
@@ -104,7 +105,7 @@ component { renderChoice, canToggle, resolve, player, choice, pile } =
 --      -> Tuple Card Boolean
 --      -> HTML w Action
     renderCardToTrash cardIndex (Tuple card selected) =
-      Card.render onClick extraClasses card
+      Card.render onClick extraClasses card (baseSlotNumber + cardIndex)
       where
         onClick _ = Just (Toggle cardIndex)
         extraClasses =

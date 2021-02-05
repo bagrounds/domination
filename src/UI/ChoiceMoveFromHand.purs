@@ -7,6 +7,7 @@ import Prelude
 import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Domination.Capability.Dom (class Dom)
+import Domination.Capability.Log (class Log)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Pile as Pile
@@ -19,10 +20,12 @@ import Halogen.HTML (HTML)
 component
   :: forall query input m
   . Dom m
+  => Log m
   => Player
   -> Choice
+  -> Int
   -> Component HTML query input Choice m
-component player choice =
+component player choice baseSlotNumber =
   CardChooser.component
     { renderChoice
     , canToggle
@@ -30,6 +33,7 @@ component player choice =
     , player
     , choice
     , pile
+    , baseSlotNumber
     }
   where
     renderChoice = case _ of
