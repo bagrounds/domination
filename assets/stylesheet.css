@@ -112,6 +112,10 @@ main ul {
   width: 6em;
   height: 10.4em;
 }
+.hand .stack {
+  width: 6em;
+  height: 10.4em;
+}
 .stack {
   position: relative;
 }
@@ -134,6 +138,9 @@ main ul {
 .supply .stack-count {
   font-size: 16pt;
 }
+.hand .stack-count {
+  font-size: 16pt;
+}
 .card, .deck, .discard {
   display: inline-block;
   vertical-align: top;
@@ -147,7 +154,12 @@ main ul {
 .supply {
   padding: 1em;
 }
-.supply, .hand, .play, .buying {
+.supply, .hand {
+  border-radius: 0.6em;
+  border: 1px solid white;
+  min-height: 14em;
+}
+.play, .buying {
   border-radius: 0.6em;
   border: 1px solid white;
   min-height: 11em;

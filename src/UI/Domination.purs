@@ -2,7 +2,7 @@ module Domination.UI.Domination where
 
 import Prelude
 
-import Data.Array (catMaybes, filter, head, length, nub, reverse, (!!), (:))
+import Data.Array (catMaybes, filter, findIndex, head, length, nub, reverse, (!!), (:))
 import Data.Either (Either(..))
 import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
@@ -602,27 +602,18 @@ renderHand player { playerIndex, state } = HH.ul
     ]
   , renderDiscard player
   ]
-  <> renderCardInHand baseSlotNumber player playerIndex
-    `mapWithIndex` player.hand
+  <> (\i s -> renderStack (onClick s player.hand) player (baseSlotNumber + i) s)
+    `mapWithIndex` (stackCards player.hand)
   <> [ renderDeck player ]
   where
+    onClick stack hand = const $ Just $ MakePlay
+      $ PlayCard { playerIndex,  cardIndex }
+      where
+        cardIndex = fromMaybe (-1)
+          $ findIndex (_.name >>> (_ == stack.card.name)) hand
     baseSlotNumber = length state.supply
       + length player.atPlay
       + length player.buying
-
---renderCardInHand
---  :: forall a
---  . Player
---  -> Int
---  -> Int
---  -> Card
---  -> HTML a InternalGameAction
-renderCardInHand baseSlotNumber player playerIndex cardIndex card =
-  renderCard
-  (const $ Just $ MakePlay $ PlayCard { playerIndex,  cardIndex })
-  player
-  card
-  (baseSlotNumber + cardIndex)
 
 handleAction
   :: forall s p m
