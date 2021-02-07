@@ -21,61 +21,7 @@ const logInfo = (...args) => log('log')(...args)
 
 const logError = (...args) => log('error')(...args)
 
-const OBJECT_STORE = "MyObjectStore"
-const DB_NAME = "db"
-const indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB || window.shimIndexedDB
-
-const saveCert = cert => new Promise((resolve, reject) => {
-  const open = indexedDB.open(DB_NAME, 1)
-
-  // Create the schema
-  open.onupgradeneeded = () => {
-    const db = open.result
-    const store = db.createObjectStore(OBJECT_STORE, { keyPath: "id" })
-  }
-
-  open.onsuccess = () => {
-    // Start a new transaction
-    const db = open.result
-    const tx = db.transaction(OBJECT_STORE, "readwrite")
-    const store = tx.objectStore(OBJECT_STORE)
-
-    store.put({ id: 1, cert })
-
-    tx.oncomplete = () => {
-      db.close()
-      localStorage.cert = true
-      resolve()
-    }
-  }
-})
-
-const loadCert = () => new Promise((resolve, reject) => {
-  const open = indexedDB.open(DB_NAME, 1)
-
-  // Create the schema
-  open.onupgradeneeded = () => {
-    const db = open.result
-    const store = db.createObjectStore(OBJECT_STORE, {keyPath: "id"})
-  }
-
-  open.onsuccess = () => {
-    // Start a new transaction
-    const db = open.result
-    const tx = db.transaction(OBJECT_STORE, "readwrite")
-    const store = tx.objectStore(OBJECT_STORE)
-
-    const query = store.get(1)
-
-    query.onsuccess = () => {
-      tx.oncomplete = () => {
-        logInfo("transaction complete")
-        db.close()
-        resolve(query.result.cert)
-      }
-    }
-  }
-})
+// exports
 
 exports.copyToClipboard = id => () => {
   const element = document.getElementById(id)
@@ -193,7 +139,10 @@ exports.stringAsArrayBuffer = string => {
   return buffer
 }
 
-exports.compressString = LZString.compress
+// cannot eta-reduce this function because LZString does not
+// exist in our test suite - we currently import the library
+// in an HTML script tag
+exports.compressString = s => LZString.compress(s)
 
 exports.decompressStringFFI = just => nothing => s => {
   const result = LZString.decompress(s)

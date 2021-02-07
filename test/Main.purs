@@ -2,10 +2,107 @@ module Test.Main where
 
 import Prelude
 
+import Data.Array ((..))
+import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, decodeArrayBuffer, encodeArrayBuffer)
+import Data.Either (Either(..))
+import Data.Lens.Getter (view)
+import Data.Lens.Iso (Iso')
+import Data.Lens.Prism (review)
+import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse_)
+import Domination.Capability.Random (runRandomM)
+import Domination.Capability.WireCodec (class WireCodec, readWire, runWireCodecM, writeWire)
+import Domination.Data.Cards (_choiceToWire)
+import Domination.Data.Cards as Cards
+import Domination.Data.GameState (newGame)
+import Domination.Data.GameState as Dom
+import Domination.Data.Play (Play(..))
 import Effect (Effect)
-import Effect.Class.Console (log)
+import Test.QuickCheck (quickCheck')
 
 main :: Effect Unit
 main = do
-  log "🍝"
-  log "You should add some tests."
+  quickCheck' 1 `traverse_` examples
+
+-- can't run this test outside of the browser due to FFI.js
+-- using browser specific APIs (window) and libraries (LZString)
+--  let wireWitchChoice = view _choiceToWire Cards.witchChoice
+--  b <- runWireCodecM $ write_read wireWitchChoice
+--  quickCheck' 1 b
+
+-- properties
+
+encode_decode
+  :: forall a
+  . EncodeArrayBuffer a
+  => DecodeArrayBuffer a
+  => DynamicByteLength a
+  => Eq a
+  => a
+  -> Effect Boolean
+encode_decode x = do
+  ab <- encodeArrayBuffer x
+  mbX <- decodeArrayBuffer ab
+  pure case mbX of
+    Nothing -> false
+    Just x' -> x == x'
+
+write_read
+  :: forall m a
+  . WireCodec m
+  => EncodeArrayBuffer a
+  => DynamicByteLength a
+  => DecodeArrayBuffer a
+  => Eq a
+  => a
+  -> m Boolean
+write_read x = do
+  eS <- writeWire x
+  case eS of
+    Left e -> pure false
+    Right s -> do
+      eX' <- readWire s
+      case eX' of
+        Left e -> pure false
+        Right x' -> pure $ x' == x
+
+game_wire_iso :: Int -> Boolean
+game_wire_iso n = iso_prop Dom._toWire (newGame n)
+
+-- examples
+
+examples :: Array Boolean
+examples =
+  [ choice_wire_iso
+  ] <> game_wire_isos
+  where
+    game_wire_isos = game_wire_iso <$> (1 .. 10)
+
+exampleGame :: Effect Boolean
+exampleGame = do
+  let g0 = newGame 1
+  g1 <- runRandomM $ Dom.makeAutoPlay (NewGame { playerCount: 1 }) g0
+  pure case g1 of
+    Left _ -> false
+    Right _ -> true
+
+choice_wire_iso :: Boolean
+choice_wire_iso = let
+  choices = Cards.choiceMap
+  wireChoices = view _choiceToWire <$> choices
+  choices' = review _choiceToWire <$> wireChoices
+  in choices == choices'
+
+-- helpers
+
+iso_prop
+  :: forall a b
+  . Eq a
+  => (Iso' a b)
+  -> a
+  -> Boolean
+iso_prop iso before = let
+  mapped = view iso before
+  after = review iso mapped
+  in before == after
+

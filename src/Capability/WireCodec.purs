@@ -8,8 +8,6 @@ import Data.Either (Either(..), note)
 import Data.Maybe (Maybe(..))
 import Domination.AppM (AppM)
 import Effect (Effect)
-import Effect.Aff (Aff)
-import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI as FFI
 import Halogen (HalogenM)
@@ -37,7 +35,7 @@ instance wireCodecAppM :: WireCodec AppM where
   writeWire = liftEffect <<< writeWire'
   readWire = liftEffect <<< readWire'
 
-newtype WireCodecM a = WireCodecM (Aff a)
+newtype WireCodecM a = WireCodecM (Effect a)
 
 derive newtype instance functorWireCodecM :: Functor WireCodecM
 derive newtype instance applyWireCodecM :: Apply WireCodecM
@@ -45,14 +43,13 @@ derive newtype instance applicativeWireCodecM :: Applicative WireCodecM
 derive newtype instance bindWireCodecM :: Bind WireCodecM
 derive newtype instance monadWireCodecM :: Monad WireCodecM
 derive newtype instance monadEffectWireCodecM :: MonadEffect WireCodecM
-derive newtype instance monadAffWireCodecM :: MonadAff WireCodecM
 
 instance wireCodecWireCodecM :: WireCodec WireCodecM where
   writeWire = liftEffect <<< writeWire'
   readWire = liftEffect <<< readWire'
 
-runWireCodecM :: WireCodecM ~> Aff
-runWireCodecM (WireCodecM m) = liftAff m
+runWireCodecM :: WireCodecM ~> Effect
+runWireCodecM (WireCodecM m) = liftEffect m
 
 writeWire'
   :: forall a

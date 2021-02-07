@@ -59,6 +59,7 @@ data LocalMessage
   | ConnectionsMessage Int
 
 derive instance genericRemoteMessage :: Generic RemoteMessage _
+derive instance eqRemoteMessage :: Eq RemoteMessage
 instance showRemoteMessage :: Show RemoteMessage where
   show = genericShow
 instance encodeJsonRemoteMessage :: EncodeJson RemoteMessage where

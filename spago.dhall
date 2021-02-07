@@ -22,6 +22,9 @@ You can edit this file as you like.
   , "unordered-collections"
   , "arraybuffer-class"
   , "arraybuffer-types"
+
+  -- test dependencies
+  , "quickcheck"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

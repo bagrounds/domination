@@ -10,8 +10,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Domination.AppM (AppM)
 import Domination.Capability.Log (class Log, log)
-import Effect.Aff (Aff)
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Halogen.Query.HalogenM (HalogenM)
 import Util (readJson)
@@ -27,7 +26,7 @@ instance storageHalogenM :: Storage m => Storage (HalogenM st act slots msg m) w
   save key = lift <<< save key
   load = lift <<< load
 
-newtype StorageM a = StorageM (Aff a)
+newtype StorageM a = StorageM (Effect a)
 
 derive newtype instance functorStorageM :: Functor StorageM
 derive newtype instance applyStorageM :: Apply StorageM
@@ -35,14 +34,13 @@ derive newtype instance applicativeStorageM :: Applicative StorageM
 derive newtype instance bindStorageM :: Bind StorageM
 derive newtype instance monadStorageM :: Monad StorageM
 derive newtype instance monadEffectStorageM :: MonadEffect StorageM
-derive newtype instance monadAffStorageM :: MonadAff StorageM
 
 instance storageStorageM :: Storage StorageM where
   save key = liftEffect <<< saveStorage key
   load = liftEffect <<< loadStorage
 
-runStorageM :: StorageM ~> Aff
-runStorageM (StorageM m) = liftAff m
+runStorageM :: StorageM ~> Effect
+runStorageM (StorageM m) = liftEffect m
 
 instance storageAppM :: Storage AppM where
   save key = liftEffect <<< saveStorage key

@@ -92,6 +92,7 @@ _playerIndex = wander \f s -> case s of
   React x -> React <$> traverseOf _playerIndex' f x
 
 derive instance genericPlay :: Generic Play _
+derive instance eqPlay :: Eq Play
 instance encodeJsonPlay :: EncodeJson Play where
   encodeJson = genericEncodeJson
 instance decodeJsonPlay :: DecodeJson Play where
