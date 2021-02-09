@@ -16,6 +16,8 @@ newtype WireInt = WireInt Int8
 derive instance genericWireInt :: Generic WireInt _
 derive instance eqWireInt :: Eq WireInt
 derive instance ordWireInt :: Ord WireInt
+derive newtype instance semiringWireInt
+  :: Semiring WireInt
 instance showWireInt :: Show WireInt where show = genericShow
 instance encodeJsonWireInt :: EncodeJson WireInt where
   encodeJson (WireInt (Int8 i)) = encodeJson i

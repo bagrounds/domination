@@ -19,8 +19,8 @@ import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Domination.Data.Cards (_choiceToWire)
-import Domination.Data.Choice (Choice)
+import Domination.Data.Choice (Choice, WireChoice)
+import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.WireInt (WireInt, _WireInt)
 
@@ -50,7 +50,7 @@ _toWire = iso to from where
     ResolveChoice { playerIndex, choice } ->
       WireResolveChoice $ Tuple
         (view _WireInt playerIndex)
-        (view _choiceToWire choice)
+        (view Choice._toWire choice)
     React { playerIndex, reaction } ->
       WireReact $ Tuple (view _WireInt playerIndex) reaction
   from = case _ of
@@ -71,7 +71,7 @@ _toWire = iso to from where
     WireResolveChoice (Tuple playerIndex choice) ->
       ResolveChoice
         { playerIndex: review _WireInt playerIndex
-        , choice: review _choiceToWire choice
+        , choice: review Choice._toWire choice
         }
     WireReact (Tuple playerIndex reaction) ->
       React
@@ -105,10 +105,11 @@ data WirePlay
   | WireEndPhase WireInt
   | WirePlayCard (Tuple WireInt WireInt)
   | WirePurchase (Tuple WireInt WireInt)
-  | WireResolveChoice (Tuple WireInt WireInt)
+  | WireResolveChoice (Tuple WireInt WireChoice)
   | WireReact (Tuple WireInt (Maybe Reaction))
 
 derive instance genericWirePlay :: Generic WirePlay _
+derive instance eqWirePlay :: Eq WirePlay
 instance encodeJsonWirePlay :: EncodeJson WirePlay where
   encodeJson = genericEncodeJson
 instance decodeJsonWirePlay :: DecodeJson WirePlay where

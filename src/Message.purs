@@ -120,6 +120,7 @@ _toWire = iso to from where
         }
 
 derive instance genericWireMessage :: Generic WireMessage _
+derive instance eqWireMessage :: Eq WireMessage
 instance showWireMessage :: Show WireMessage where
   show = genericShow
 instance encodeJsonWireMessage :: EncodeJson WireMessage where

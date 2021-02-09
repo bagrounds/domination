@@ -23,9 +23,8 @@ import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus as Bonus
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
-import Domination.Data.Cards (_choiceToWire)
 import Domination.Data.Cards as Cards
-import Domination.Data.Choice (Choice)
+import Domination.Data.Choice (Choice, WireChoice)
 import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.WireInt (WireInt(..), _WireInt)
@@ -50,10 +49,10 @@ type Player =
 type WirePlayer =
   (Tuple WireInt
   (Tuple (Array WireInt)
-  (Tuple (Array WireInt) -- bonuses
+  (Tuple (Array Bonus) -- bonuses
   (Tuple (Array WireInt)
   (Tuple WireInt
-  (Tuple (Array WireInt) -- choices
+  (Tuple (Array WireChoice) -- choices
   (Tuple (Array WireInt)
   (Tuple (Array WireInt)
   (Tuple (Array WireInt)
@@ -62,9 +61,8 @@ type WirePlayer =
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
   to = (prop _buys %~ view _WireInt)
-    >>> (prop _bonuses <$>~ view Bonus._toWire)
     >>> (prop _actions %~ view _WireInt)
-    >>> (prop _choices <$>~ view _choiceToWire)
+    >>> (prop _choices <$>~ view Choice._toWire)
     >>> (prop _deck <$>~ view Cards._toWire)
     >>> (prop _hand <$>~ view Cards._toWire)
     >>> (prop _discard <$>~ view Cards._toWire)
@@ -74,9 +72,8 @@ _toWire = iso to from where
     >>> toTuple
   from = fromTuple
     >>> (prop _buys %~ review _WireInt)
-    >>> (prop _bonuses <$>~ review Bonus._toWire)
     >>> (prop _actions %~ review _WireInt)
-    >>> (prop _choices <$>~ review _choiceToWire)
+    >>> (prop _choices <$>~ review Choice._toWire)
     >>> (prop _deck <$>~ review Cards._toWire)
     >>> (prop _hand <$>~ review Cards._toWire)
     >>> (prop _discard <$>~ review Cards._toWire)

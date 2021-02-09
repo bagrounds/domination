@@ -6,7 +6,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
-import Data.ArrayBuffer.Class (class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer)
+import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
@@ -22,8 +22,13 @@ instance encodeJsonCondition :: EncodeJson Condition where
   encodeJson a = genericEncodeJson a
 instance decodeJsonCondition :: DecodeJson Condition where
   decodeJson a = genericDecodeJson a
-instance dynamicByteLengthCondition :: DynamicByteLength Condition where
+instance dynamicByteLengthCondition
+  :: DynamicByteLength Condition where
   byteLength = genericByteLength
-instance encodeArrayBufferCondition :: EncodeArrayBuffer Condition where
+instance encodeArrayBufferCondition
+  :: EncodeArrayBuffer Condition where
   putArrayBuffer = genericPutArrayBuffer
+instance decodeArrayBufferCondition
+  :: DecodeArrayBuffer Condition where
+  readArrayBuffer = genericReadArrayBuffer
 

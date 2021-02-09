@@ -10,7 +10,7 @@ import Data.ArrayBuffer.Types (ArrayBuffer)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Index (ix)
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens')
@@ -459,17 +459,17 @@ resolveChoice { playerIndex, choice } state =
         forSource = ("source cards" <>! _) >>> (sourcePile <@! _)
       case constraint of
         UpTo n -> check $
-          forSelected $ lengthIs LTE n
+          forSelected $ lengthIs LTE (review _WireInt n)
         DownTo n -> check $
-          forRemaining (lengthIs EQ n)
+          forRemaining (lengthIs EQ $ review _WireInt n)
           ||
-          ( forSource (lengthIs LT n)
+          ( forSource (lengthIs LT $ review _WireInt n)
           && forSelected (lengthIs EQ 0)
           )
         Exactly n -> check $
-          forSelected (lengthIs EQ n)
+          forSelected (lengthIs EQ $ review _WireInt n)
           ||
-          ( forSource (lengthIs LT n)
+          ( forSource (lengthIs LT $ review _WireInt n)
           && forSelected (lengthIs EQ $ length sourcePile)
           )
       case filter of

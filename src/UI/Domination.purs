@@ -653,6 +653,7 @@ playAndReport
   -> Play
   -> HalogenM ComponentState p s GameEvent m Unit
 playAndReport playerIndex play = do
+  log $ "~Domination: play: " <> show play
   { maybeGame, nextPlayerCount, nextPlayerIndex } <- H.get
   case maybeGame of
     Nothing -> case play of

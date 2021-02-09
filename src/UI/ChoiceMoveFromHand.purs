@@ -5,6 +5,7 @@ module Domination.UI.ChoiceMoveFromTo
 import Prelude
 
 import Data.Array (length)
+import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
@@ -12,6 +13,7 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
+import Domination.Data.WireInt (_WireInt)
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.RenderText (renderText)
 import Halogen (Component)
@@ -46,9 +48,9 @@ component player choice baseSlotNumber =
     maxSelected = case choice of
       MoveFromTo { n } ->
         case n of
-          UpTo n -> n
-          Exactly n -> n
-          DownTo n -> length cards - n
+          UpTo n -> review _WireInt n
+          Exactly n -> review _WireInt n
+          DownTo n -> length cards - (review _WireInt n)
       _ -> 0
     resolve resolution = case choice of
       MoveFromTo x -> MoveFromTo x { resolution = resolution }

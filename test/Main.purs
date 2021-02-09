@@ -11,9 +11,7 @@ import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse_)
 import Domination.Capability.Random (runRandomM)
-import Domination.Capability.WireCodec (class WireCodec, readWire, runWireCodecM, writeWire)
-import Domination.Data.Cards (_choiceToWire)
-import Domination.Data.Cards as Cards
+import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.GameState (newGame)
 import Domination.Data.GameState as Dom
 import Domination.Data.Play (Play(..))
@@ -72,11 +70,7 @@ game_wire_iso n = iso_prop Dom._toWire (newGame n)
 -- examples
 
 examples :: Array Boolean
-examples =
-  [ choice_wire_iso
-  ] <> game_wire_isos
-  where
-    game_wire_isos = game_wire_iso <$> (1 .. 10)
+examples = game_wire_iso <$> (1 .. 10)
 
 exampleGame :: Effect Boolean
 exampleGame = do
@@ -85,13 +79,6 @@ exampleGame = do
   pure case g1 of
     Left _ -> false
     Right _ -> true
-
-choice_wire_iso :: Boolean
-choice_wire_iso = let
-  choices = Cards.choiceMap
-  wireChoices = view _choiceToWire <$> choices
-  choices' = review _choiceToWire <$> wireChoices
-  in choices == choices'
 
 -- helpers
 

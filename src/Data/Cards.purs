@@ -3,7 +3,7 @@ module Domination.Data.Cards where
 import Prelude
 
 import Data.Array (findIndex, (!!))
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -67,37 +67,12 @@ cardMap =
   , nobles
   ]
 
-_choiceToWire :: Iso' Choice WireInt
-_choiceToWire = iso to from where
-  to choice = view _WireInt
-    <<< fromMaybe (-1) $ findIndex (_ == choice) choiceMap
-  from = fromMaybe emptyChoice
-    <<< (choiceMap !! _)
-    <<< review _WireInt
-
 emptyChoice :: Choice
 emptyChoice = GainBonus
-  { bonus: Cash 100
+  { bonus: Cash $ 100 ^. _WireInt
   , attack: false
   , resolution: Nothing
   }
-
-choiceMap :: Array Choice
-choiceMap =
-  [ chapelChoice
-  , pawnChoice
-  , consolationChoice
-  , stewardChoice
-  , harbingerChoice
-  , baronChoice
-  , militiaChoice
-  , moneyLenderChoice
-  , witchChoice
-  , councilRoomChoice
-  , scholarChoice
-  , torturerChoice
-  , noblesChoice
-  ]
 
 copper :: Card
 copper = Card.treasure { name = "Copper", treasure = 1 }
@@ -308,7 +283,7 @@ chapel = let attack = false in
 
 chapelChoice :: Choice
 chapelChoice = let attack = false in MoveFromTo
-  { n: UpTo 4
+  { n: UpTo $ 4 ^. _WireInt
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Trash
@@ -334,7 +309,7 @@ militia = let attack = true in
 
 militiaChoice :: Choice
 militiaChoice = let attack = true in MoveFromTo
-  { n: DownTo 3
+  { n: DownTo $ 3 ^. _WireInt
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Discard
@@ -396,12 +371,12 @@ stewardChoice :: Choice
 stewardChoice = let attack = false in Or
   { choices:
     [ Draw { n: 2, attack, resolution: Nothing }
-    , GainBonus { bonus: Cash 2, attack, resolution: Nothing }
+    , GainBonus { bonus: Cash $ 2 ^. _WireInt, attack, resolution: Nothing }
     , MoveFromTo
       { source: Pile.Hand
       , destination: Pile.Trash
       , filter: Nothing
-      , n: Exactly 2
+      , n: Exactly $ 2 ^. _WireInt
       , attack
       , resolution: Nothing
       }
@@ -430,7 +405,7 @@ pawnChoice = let attack = false in PickN
   { n: 2
   , choices:
     [ Draw { n: 1, attack, resolution: Nothing }
-    , GainBonus { bonus: Cash 1, attack, resolution: Nothing }
+    , GainBonus { bonus: Cash $ 1 ^. _WireInt, attack, resolution: Nothing }
     , GainActions { n: 1, attack, resolution: Nothing }
     , GainBuys { n: 1, attack, resolution: Nothing }
     ]
@@ -459,7 +434,7 @@ torturerChoice = let attack = true in
   { n: 1
   , choices:
     [ MoveFromTo
-      { n: Exactly 2
+      { n: Exactly $ 2 ^. _WireInt
       , filter: Nothing
       , source: Pile.Hand
       , destination: Pile.Discard
@@ -497,7 +472,7 @@ consolationChoice = let attack = false in
   If
   { condition: HasCard "Estate"
   , choice: GainBonus
-    { bonus: Cash 2
+    { bonus: Cash $ 2 ^. _WireInt
     , attack
     , resolution: Nothing
     }
@@ -528,7 +503,7 @@ moneyLenderChoice = let attack = false in
     { choice: And
       { choices:
         [ MoveFromTo
-          { n: Exactly 1
+          { n: Exactly $ 1 ^. _WireInt
           , filter: Just (HasName "Copper")
           , source: Pile.Hand
           , destination: Pile.Trash
@@ -536,7 +511,7 @@ moneyLenderChoice = let attack = false in
           , resolution: Nothing
           }
         , GainBonus
-          { bonus: Cash 3
+          { bonus: Cash $ 3 ^. _WireInt
           , attack
           , resolution: Nothing
           }
@@ -570,7 +545,7 @@ harbinger = Card.action
 
 harbingerChoice :: Choice
 harbingerChoice = MoveFromTo
-  { n: UpTo 1
+  { n: UpTo $ 1 ^. _WireInt
   , filter: Nothing
   , source: Pile.Discard
   , destination: Pile.Deck
@@ -596,7 +571,7 @@ baron = Card.action
 
 gain4Cash :: Choice
 gain4Cash = GainBonus
-  { bonus: Cash 4
+  { bonus: Cash $ 4 ^. _WireInt
   , attack: false
   , resolution: Nothing
   }
@@ -612,7 +587,7 @@ gain1Estate = GainCards
 discard1Estate :: Choice
 discard1Estate = MoveFromTo
   { filter: Just $ HasName "Estate"
-  , n: Exactly 1
+  , n: Exactly $ 1 ^. _WireInt
   , source: Pile.Hand
   , destination: Pile.Discard
   , attack: false
