@@ -17,6 +17,7 @@ import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens', Lens)
+import Data.Lens.Prism (Review', Review, review)
 import Data.Lens.Setter (Setter', over, set, subOver)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
@@ -101,6 +102,11 @@ dropNthOf n lens = traverseOf lens $ deleteAt n
 
 dropFirstOf :: forall s a. ArrayLens' s a -> s -> Maybe s
 dropFirstOf = dropNthOf 0
+
+reviewOn :: forall s t a b. b -> Review s t a b -> t
+reviewOn = flip review
+
+infixl 8 reviewOn as .^
 
 prependOver :: forall s a. ArrayLens' s a -> a -> s -> s
 prependOver lens x = over lens (x : _)

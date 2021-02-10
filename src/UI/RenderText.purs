@@ -16,6 +16,8 @@ import Domination.Data.Phase (Phase(..))
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.SelectCards (SelectCards(..))
+import Domination.Data.WireInt (_WireInt)
+import Util ((.^))
 
 class RenderTextInContext a where
   renderTextInContext :: Int -> GameState -> a -> String
@@ -30,7 +32,7 @@ instance phaseRenderText :: RenderText Phase where
 
 instance bonusRenderText :: RenderText Bonus where
   renderText = case _ of
-    Cash n -> "$" <> show n
+    Cash n -> "$" <> show (n .^ _WireInt)
 
 instance conditionRenderText :: RenderText Condition where
   renderText = case _ of
@@ -98,11 +100,11 @@ instance choiceRenderText :: RenderText Choice where
       "optionally " <> renderText choice
     MoveFromTo { n, destination } -> case n of
       UpTo n ->
-        verb <> " up to " <> show n
+        verb <> " up to " <> show (n .^ _WireInt)
       Exactly n ->
-        verb <> " " <> show n <> " (or as many as you have)"
+        verb <> " " <> show (n .^ _WireInt)
       DownTo n ->
-        verb <> " down to " <> show n
+        verb <> " down to " <> show (n .^ _WireInt)
       where
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
