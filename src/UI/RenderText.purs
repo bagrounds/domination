@@ -38,6 +38,9 @@ instance conditionRenderText :: RenderText Condition where
   renderText = case _ of
     HasCard name -> "hand contains " <> name
     HasDiscard -> "discard pile is not empty"
+    Randomly percent -> "randomly (" <> percentString <> "% chance)"
+      where
+        percentString = show $ percent .^ _WireInt
 
 instance choiceRenderTextInContext :: RenderTextInContext Choice where
   renderTextInContext :: Int -> GameState -> Choice -> String

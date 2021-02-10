@@ -49,6 +49,7 @@ cardMap =
   , woodCutter
   , steward
   , harbinger
+  , goldfish
   , baron
   , monument
   , smithy
@@ -624,3 +625,32 @@ baronSpecial =
   , description: "You may discard an estate for + $4."
     <> " If you don't, gain an Estate."
   }
+
+goldfish :: Card
+goldfish = Card.action
+  { name = "Goldfish"
+  , cost = 3
+  , special = Just goldfishSpecial
+  }
+
+goldfishSpecial :: Special
+goldfishSpecial =
+  { target: Self
+  , command: Choose goldfishChoice
+  , description: "You might gain a gold"
+  }
+
+goldfishChoice :: Choice
+goldfishChoice = let attack = false in If
+  { condition: Randomly $ 50 ^. _WireInt
+  , choice: GainCards
+    { cardName: "Gold"
+    , n: 1
+    , resolution: Nothing
+    , attack
+    }
+  , otherwise: Nothing
+  , attack
+  , resolution: Nothing
+  }
+

@@ -24,7 +24,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unfoldable (replicate)
-import Domination.Capability.Random (class Random)
+import Domination.Capability.Random (class Random, randomIntBetween)
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
@@ -47,10 +47,10 @@ import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Target (Target(..))
-import Domination.Data.WireInt (WireInt(..), _WireInt)
+import Domination.Data.WireInt (WireInt, _WireInt)
 import Relation (Relation(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
-import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (<$>~))
+import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (.^), (<$>~))
 
 type GameState =
   { turn :: Int
@@ -501,11 +501,13 @@ resolveChoice { playerIndex, choice } state =
       modifyPlayerM playerIndex (Player.drawCards n) state
     GainBonus { bonus, resolution: Just unit } ->
       modifyPlayer playerIndex (Player.gainBonus bonus) state
-    If { choice: choice', otherwise, condition, resolution: Just unit } ->
-      modifyPlayer playerIndex playerUpdate state
+    If { choice: choice', otherwise, condition, resolution: Just unit } -> do
+      player <- getPlayer playerIndex state
+      ok <- condition `describes` player
+      modifyPlayer playerIndex (playerUpdate ok) state
       where
-        playerUpdate player =
-          if condition `describes` player
+        playerUpdate ok player = do
+          if ok
           then Player.gainChoice choice' player
           else case otherwise of
             Nothing -> player
@@ -628,10 +630,12 @@ newPlayer =
   , bonuses : []
   }
 
-describes :: Condition -> Player -> Boolean
+describes :: forall m. Random m => Condition -> Player -> m Boolean
 describes = case _ of
-  HasCard name -> _.hand >>> any (_.name >>> (_ == name))
-  HasDiscard -> _.discard >>> (not <<< null)
+  HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
+  HasDiscard -> pure <<< _.discard >>> (not <<< null)
+  Randomly percent ->
+    const $ (_ > (percent .^ _WireInt)) <$> randomIntBetween 0 100
 
 passFilter :: Filter -> Card -> Boolean
 passFilter (HasName name) = _.name >>> (_ == name)
