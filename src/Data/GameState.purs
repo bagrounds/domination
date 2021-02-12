@@ -1,31 +1,27 @@
 module Domination.Data.GameState where
 
-import Prelude
+import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, catMaybes, dropWhile, filter, find, findIndex, head, length, null, takeWhile, updateAt)
-import Data.ArrayBuffer.Class (putArrayBuffer)
-import Data.ArrayBuffer.Types (ArrayBuffer)
+import Data.Array (all, dropWhile, filter, find, findIndex, head, length, null, takeWhile, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Getter (view, (^.))
+import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso (Iso', iso)
-import Data.Lens.Lens (Lens')
+import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (Prism', prism', review)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (%~), (.~), (<>~))
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (unwrap, wrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unfoldable (replicate)
 import Domination.Capability.Random (class Random, randomIntBetween)
-import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
@@ -60,50 +56,49 @@ type GameState =
   , trash :: Array Card
   }
 
-x ab = putArrayBuffer ab 0 (toWire (newGame 1))
-
 type WireGameState = Tuple Phase
   (Tuple (Array WirePlayer)
   (Tuple (Array WireStack)
   (Tuple (Array WireInt) WireInt)))
-
-toWire :: GameState -> WireGameState
-toWire = view _toWire
 
 fromWire :: WireGameState -> GameState
 fromWire = review _toWire
 
 _toWire :: Iso' GameState WireGameState
 _toWire = iso to from where
-  to = (prop _turn %~ view _WireInt)
-    >>> (prop _players <$>~ view Player._toWire)
-    >>> (prop _supply <$>~ view Stack._toWire)
-    >>> (prop _trash <$>~ view Cards._toWire)
+  to = (_turn %~ view _WireInt)
+    >>> (_players <$>~ view Player._toWire)
+    >>> (_supply <$>~ view Stack._toWire)
+    >>> (_trash <$>~ view Cards._toWire)
     >>> toTuple
   from = fromTuple
-    >>> (prop _turn %~ review _WireInt)
-    >>> (prop _players <$>~ review Player._toWire)
-    >>> (prop _supply <$>~ review Stack._toWire)
-    >>> (prop _trash <$>~ (review Cards._toWire))
-  _players = SProxy :: SProxy "players"
-  _supply = SProxy :: SProxy "supply"
-  _trash = SProxy :: SProxy "trash"
-  _turn = SProxy :: SProxy "turn"
+    >>> (_turn %~ review _WireInt)
+    >>> (_players <$>~ review Player._toWire)
+    >>> (_supply <$>~ review Stack._toWire)
+    >>> (_trash <$>~ (review Cards._toWire))
   toTuple { phase, players, supply, trash, turn } =
     Tuple phase $ Tuple players $ Tuple supply $ Tuple trash turn
   fromTuple
     (Tuple phase (Tuple players (Tuple supply (Tuple trash turn)))) =
     { phase, players, supply, trash, turn }
 
-_turn :: Lens' GameState Int
+_turn
+  :: forall a b r
+  . Lens { turn :: a | r } { turn :: b | r } a b
 _turn = prop (SProxy :: SProxy "turn")
 _phase :: Lens' GameState Phase
 _phase = prop (SProxy :: SProxy "phase")
-_players :: Lens' GameState (Array Player)
+_players
+  :: forall a b r
+  . Lens { players :: a | r } { players :: b | r } a b
 _players = prop (SProxy :: SProxy "players")
-_supply :: Lens' GameState Supply
+_supply
+  :: forall a b r
+  . Lens { supply :: a | r } { supply :: b | r } a b
 _supply = prop (SProxy :: SProxy "supply")
-_trash :: Lens' GameState (Array Card)
+_trash
+  :: forall a b r
+  . Lens { trash :: a | r } { trash :: b | r } a b
 _trash = prop (SProxy :: SProxy "trash")
 
 _player :: Int -> Traversal' GameState Player
@@ -404,11 +399,6 @@ firstChoice :: Int -> GameState -> Maybe Choice
 firstChoice playerIndex state =
   state ^? _player playerIndex >>= Player.firstChoice
 
-reaction :: Int -> GameState -> Maybe Reaction
-reaction playerIndex state = do
-  hand <- state ^? _player playerIndex <<< Player._hand
-  head $ catMaybes $ _.reaction <$> hand
-
 react
   :: forall m
   . MonadError String m
@@ -519,11 +509,11 @@ resolveChoice { playerIndex, choice } state =
     PickN { n, resolution: Just choices } -> do
       check $ choices <@! lengthIs EQ n !<> "choices"
       modifyPlayer playerIndex (Player.gainChoices choices) state
-    Option { choice, resolution: Just agree } ->
+    Option { choice: choice', resolution: Just agree } ->
       let
         playerUpdate =
           if agree
-          then Player.gainChoice choice
+          then Player.gainChoice choice'
           else identity
       in
       modifyPlayer playerIndex playerUpdate state
@@ -588,12 +578,12 @@ play { playerIndex, cardIndex } state = do
       -> GameState
       -> Special
       -> m GameState
-    applySpecialToTargets attackerIndex state { target, command } =
-      foldM (flip $ applySpecialToTarget command) state
-      $ targetIndices target attackerIndex state
+    applySpecialToTargets attackerIndex state' { target, command } =
+      foldM (flip $ applySpecialToTarget command) state'
+      $ targetIndices target attackerIndex state'
 
-    applySpecialToTarget (Choose choice) targetIndex state =
-      modifyPlayer targetIndex (Player.gainChoice choice) state
+    applySpecialToTarget (Choose choice) targetIndex state' =
+      modifyPlayer targetIndex (Player.gainChoice choice) state'
 
     targetIndices :: Target -> Int -> GameState -> Array Int
     targetIndices EveryoneElse attackerIndex =

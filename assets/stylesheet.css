@@ -153,6 +153,7 @@ main ul {
 }
 .supply {
   padding: 1em;
+  padding-bottom: 1em;
 }
 .supply, .hand {
   border-radius: 0.6em;
@@ -205,7 +206,9 @@ main ul {
 }
 .hand-info {
   display: inline-block;
-  width: 6em;
+  width: 4.8em;
+  border: 1px solid white;
+  border-radius: 0.2em;
 }
 .curse-card {
   display: inline-block;

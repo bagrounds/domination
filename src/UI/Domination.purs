@@ -46,6 +46,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
+import Web.UIEvent.MouseEvent (MouseEvent)
 
 data InternalGameAction
   = WritePlayerIndex Int
@@ -184,14 +185,14 @@ renderPlayerN
 renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
   [ Util.incrementer
     { label: "Players: "
-    , mbMin: (Just 1)
+    , mbMin: Just 1
     , mbMax: Nothing
     , value: nextPlayerCount
     , setValue: WritePlayerCount
     }
   , Util.incrementer
     { label: "Player #: "
-    , mbMin: (Just 1)
+    , mbMin: Just 1
     , mbMax: Nothing
     , value: nextPlayerIndex + 1
     , setValue: (_ - 1) >>> WritePlayerIndex
@@ -206,7 +207,7 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
       [ HE.onClick \_ -> Just $ LoadGameRequest ]
       [ HH.text "Load Game" ]
     , HH.button
-      [ HE.onClick \_ -> x]
+      [ HE.onClick \_ -> x ]
       [ HH.text "Undo" ]
     ]
     , case cs.maybeGame of
@@ -249,27 +250,29 @@ renderSupply' cs@{ state, playerIndex } player =
           [ HP.class_ Css.handInfo ]
           [ HH.text $ (show $ player.buys) <> " Buys" ]
         ]
-      : [ HH.ul_ (renderSupply player cs) ]
+      : [ HH.ul_ $ renderSupply player cs ]
 
---renderSupply
---  :: forall widget
---  . Player
---  -> ActiveState
---  -> Array (HTML widget InternalGameAction)
+renderSupply
+  :: forall query r m
+  . Dom m
+  => Log m
+  => Player
+  -> ActiveState
+  -> Array (HTML (ChildComponents query r m) InternalGameAction)
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
     renderStackI stackIndex = renderStack onClick player stackIndex
       where
         onClick _ =
-          Just $ MakePlay $ Purchase { playerIndex,  stackIndex }
+          Just $ MakePlay $ Purchase { playerIndex, stackIndex }
 
 renderDeck :: forall widget input. Player -> HTML widget input
 renderDeck player = HH.button
   [ HE.onClick (const Nothing), HP.class_ Css.deck ]
   [ HH.ul_
     [ HH.li [] [ HH.text "Discard" ]
-    , HH.li [] [ HH.text $ show ((length player.discard) :: Int) ]
+    , HH.li [] [ HH.text $ show $ length player.discard ]
     ]
   ]
 
@@ -278,16 +281,19 @@ renderDiscard player = HH.button
   [ HE.onClick (const Nothing), HP.class_ Css.discard ]
   [ HH.ul_
     [ HH.li [] [ HH.text "Deck" ]
-    , HH.li [] [ HH.text $ show ((length player.deck) :: Int) ]
+    , HH.li [] [ HH.text $ show $ length player.deck ]
     ]
   ]
 
---renderCard
---  :: forall widget input
---  . (MouseEvent -> Maybe input)
---  -> Player
---  -> Card
---  -> HTML widget input
+renderCard
+  :: forall query r m
+  . Dom m
+  => Log m
+  => (MouseEvent -> Maybe InternalGameAction)
+  -> Player
+  -> Card
+  -> Int
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderCard onClick player card slotNumber =
   Card.render onClick extraClasses card slotNumber
   where
@@ -297,12 +303,15 @@ renderCard onClick player card slotNumber =
       else Css.cantPlay
     ]
 
---renderStack
---  :: forall widget input
---  . (MouseEvent -> Maybe input)
---  -> Player
---  -> Stack
---  -> HTML widget input
+renderStack
+  :: forall query r m
+  . Dom m
+  => Log m
+  => (MouseEvent -> Maybe InternalGameAction)
+  -> Player
+  -> Int
+  -> Stack
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderStack onClick player slotNumber stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
@@ -405,7 +414,7 @@ renderPlayer cs@{ state, playerIndex } player =
         , renderSupply' cs player
         , renderNextPhaseButton cs
         , renderStats cs
-        , renderAtPlay currentPlayer (length cs.state.supply)
+        , renderAtPlay currentPlayer $ length cs.state.supply
         , renderBuying currentPlayer $ length cs.state.supply
           + length currentPlayer.atPlay
         , renderHand player cs
@@ -546,7 +555,13 @@ renderStats cs = HH.ul
   [ HP.class_ Css.stats ]
   (playerStats cs `mapWithIndex` cs.state.players)
 
---renderAtPlay :: forall w i. Player -> HTML w i
+renderAtPlay
+  :: forall query r m
+  . Dom m
+  => Log m
+  => Player
+  -> Int
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderAtPlay currentPlayer baseSlotNumber =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
@@ -564,7 +579,13 @@ stackCards cards = catMaybes (foldr f [] names)
       where
         cards' = (_.name >>> (_ == name)) `filter` cards
 
---renderBuying :: forall w i. Player -> HTML w i
+renderBuying
+  :: forall query r m
+  . Dom m
+  => Log m
+  => Player
+  -> Int
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderBuying currentPlayer baseSlotNumber =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
@@ -572,7 +593,13 @@ renderBuying currentPlayer baseSlotNumber =
     stacks = (\i -> renderStack (const Nothing) currentPlayer (i + baseSlotNumber))
       `mapWithIndex` stackCards currentPlayer.buying
 
---renderHand :: forall w. Player -> ActiveState -> HTML w InternalGameAction
+renderHand
+  :: forall query r m
+  . Dom m
+  => Log m
+  => Player
+  -> ActiveState
+  -> HTML (ChildComponents query r m) InternalGameAction
 renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
@@ -591,6 +618,9 @@ renderHand player { playerIndex, state } = HH.ul
     [ HH.ul_
       [ HH.li
         [ HP.class_ Css.handInfo ]
+        [ HH.text $ "Deck: " <> (show $ length player.deck) ]
+      , HH.li
+        [ HP.class_ Css.handInfo ]
         [ HH.text $ (show $ player.actions) <> " Actions" ]
       , HH.li
         [ HP.class_ Css.handInfo ]
@@ -598,13 +628,14 @@ renderHand player { playerIndex, state } = HH.ul
       , HH.li
         [ HP.class_ Css.handInfo ]
         [ HH.text $ (show $ player.buys) <> " Buys" ]
+      , HH.li
+        [ HP.class_ Css.handInfo ]
+        [ HH.text $ "Discard: " <> (show $ length player.discard) ]
       ]
     ]
-  , renderDiscard player
   ]
   <> (\i s -> renderStack (onClick s player.hand) player (baseSlotNumber + i) s)
     `mapWithIndex` (stackCards player.hand)
-  <> [ renderDeck player ]
   where
     onClick stack hand = const $ Just $ MakePlay
       $ PlayCard { playerIndex,  cardIndex }
