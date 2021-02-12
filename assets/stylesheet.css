@@ -207,8 +207,6 @@ main ul {
 .hand-info {
   display: inline-block;
   width: 4.8em;
-  border: 1px solid white;
-  border-radius: 0.2em;
 }
 .curse-card {
   display: inline-block;
