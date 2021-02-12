@@ -471,16 +471,22 @@ resolveChoice { playerIndex, choice } state =
         $ over _destination (selected <> _)
         $ state
 
-    GainCards { n, cardName, resolution: Just unit } -> do
+    GainCards { n, cardName, destination, resolution: Just unit } -> do
+      let _destination = _pile destination playerIndex
       stack <- stackByName cardName state
       stackIndex <- indexOfStack stack.card state
       let cardsToGain = min n stack.count
       let newCount = max 0 (stack.count - n)
       let stackUpdate = Stack._count .~ newCount
       let cards = replicate cardsToGain stack.card
-      let playerUpdate = Player._discard <>~ cards
-      modifyPlayer playerIndex playerUpdate state
-        >>= modifyStack stackIndex stackUpdate
+      let
+        playerUpdate = case destination of
+          Pile.Hand -> Player._discard <>~ cards
+          Pile.Discard -> Player._discard <>~ cards
+          Pile.Deck -> Player._discard <>~ cards
+          Pile.Trash -> Player._discard <>~ cards
+      over _destination (cards <> _)
+        <$> modifyStack stackIndex stackUpdate state
     GainActions { n, resolution: Just unit } ->
       modifyPlayer playerIndex (Player.gainActions n) state
     GainBuys { n, resolution: Just unit } ->

@@ -61,10 +61,11 @@ data Choice
     , attack :: Boolean
     }
   | GainCards
-    { n :: Int
+    { attack :: Boolean
     , cardName :: String
+    , destination :: Pile
+    , n :: Int
     , resolution :: Maybe Unit
-    , attack :: Boolean
     }
   | GainActions
     { n :: Int
@@ -116,7 +117,7 @@ data WireChoice
   | WireOption Boolean WireChoice (Maybe Boolean)
   | WireMoveFromTo Boolean Pile (Maybe Filter) Constraint
     (Maybe (Array WireInt)) Pile
-  | WireGainCards Boolean String WireInt (Maybe Unit)
+  | WireGainCards Boolean String Pile WireInt (Maybe Unit)
   | WireGainActions Boolean WireInt (Maybe Unit)
   | WireGainBuys Boolean WireInt (Maybe Unit)
   | WireDiscard Boolean (Maybe Unit) SelectCards
@@ -140,8 +141,8 @@ _toWire = iso to from where
       WireOption attack (choice ^. _toWire) resolution
     MoveFromTo { attack, destination, filter, n, resolution, source } ->
       WireMoveFromTo attack destination filter n ((map $ view _WireInt) <$> resolution) source
-    GainCards { attack, cardName, n, resolution } ->
-      WireGainCards attack cardName (n ^. _WireInt) resolution
+    GainCards { attack, cardName, destination, n, resolution } ->
+      WireGainCards attack cardName destination (n ^. _WireInt) resolution
     GainActions { attack, n, resolution } ->
       WireGainActions attack (n ^. _WireInt) resolution
     GainBuys { attack, n, resolution } ->
@@ -165,8 +166,8 @@ _toWire = iso to from where
       Option { attack, choice: review _toWire choice, resolution }
     WireMoveFromTo attack destination filter n resolution source ->
       MoveFromTo { attack, destination, filter, n, resolution: (map $ review _WireInt) <$> resolution, source }
-    WireGainCards attack cardName n resolution ->
-      GainCards { attack, cardName, n: review _WireInt n, resolution }
+    WireGainCards attack cardName destination n resolution ->
+      GainCards { attack, cardName, destination, n: review _WireInt n, resolution }
     WireGainActions attack n resolution ->
       GainActions { attack, n: review _WireInt n, resolution }
     WireGainBuys attack n resolution ->

@@ -205,6 +205,7 @@ witch = let attack = true in
 witchChoice :: Choice
 witchChoice = let attack = true in GainCards
   { cardName: "Curse"
+  , destination: Pile.Discard
   , n: 1
   , resolution: Nothing
   , attack
@@ -445,6 +446,7 @@ torturerChoice = let attack = true in
     , GainCards
       { n: 1
       , cardName: "Curse"
+      , destination: Pile.Discard
       , attack
       , resolution: Nothing
       }
@@ -581,6 +583,7 @@ gain1Estate :: Choice
 gain1Estate = GainCards
   { cardName: "Estate"
   , n: 1
+  , destination: Pile.Discard
   , attack: false
   , resolution: Nothing
   }
@@ -629,7 +632,8 @@ baronSpecial =
 goldfish :: Card
 goldfish = Card.action
   { name = "Goldfish"
-  , cost = 3
+  , cost = 4
+  , buys = 1
   , special = Just goldfishSpecial
   }
 
@@ -637,7 +641,7 @@ goldfishSpecial :: Special
 goldfishSpecial =
   { target: Self
   , command: Choose goldfishChoice
-  , description: "You might gain a gold"
+  , description: "50% chance to gain a gold to your hand"
   }
 
 goldfishChoice :: Choice
@@ -645,6 +649,7 @@ goldfishChoice = let attack = false in If
   { condition: Randomly $ 50 ^. _WireInt
   , choice: GainCards
     { cardName: "Gold"
+    , destination: Pile.Hand
     , n: 1
     , resolution: Nothing
     , attack
