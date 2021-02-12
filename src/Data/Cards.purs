@@ -64,6 +64,7 @@ cardMap =
   , councilRoom
   , scholar
   , torturer
+  , mountebank
   , harem
   , nobles
   ]
@@ -655,6 +656,64 @@ goldfishChoice = let attack = false in If
     , attack
     }
   , otherwise: Nothing
+  , attack
+  , resolution: Nothing
+  }
+
+mountebank :: Card
+mountebank = Card.action
+  { name = "Mountebank"
+  , cost = 5
+  , treasure = 2
+  , special = Just
+    { target: EveryoneElse
+    , command: Choose mountebankChoice
+    , description: "Each other player may discard a Curse."
+      <> "If they don't, they gain a Curse and a Copper."
+    }
+  }
+
+mountebankChoice :: Choice
+mountebankChoice = let attack = true in If
+  { condition: HasCard "Curse"
+  , choice: Or
+    { choices:
+      [ MoveFromTo
+        { n: Exactly $ 1 ^. _WireInt
+        , filter: Just $ HasName "Curse"
+        , source: Pile.Hand
+        , destination: Pile.Discard
+        , attack
+        , resolution: Nothing
+        }
+      , gainCurseAndCopper
+      ]
+    , attack
+    , resolution: Nothing
+    }
+  , attack
+  , resolution: Nothing
+  , otherwise: Just gainCurseAndCopper
+  }
+
+gainCurseAndCopper :: Choice
+gainCurseAndCopper = let attack = true in And
+  { choices:
+    [ GainCards
+      { cardName: "Copper"
+      , destination: Pile.Discard
+      , n: 1
+      , attack
+      , resolution: Nothing
+      }
+    , GainCards
+      { cardName: "Curse"
+      , destination: Pile.Discard
+      , n: 1
+      , attack
+      , resolution: Nothing
+      }
+    ]
   , attack
   , resolution: Nothing
   }
