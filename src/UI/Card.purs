@@ -13,6 +13,7 @@ import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
+import Domination.UI.Icons as Icons
 import Effect.Class (liftEffect)
 import Halogen as H
 import Halogen.HTML (HTML)
@@ -58,29 +59,49 @@ render onClick extraClasses card slotNumber = HH.div
             (const Nothing)
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardCards ] ]
-            [ HH.text (if card.cards > 0 then " +" <> show card.cards <> " Card" else "") ]
+              if card.cards > 0
+              then
+                [ HH.text $ show card.cards
+                , Icons.cards
+                ]
+              else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardActions ] ]
-            [ HH.text $ (if card.actions > 0 then " +" <> show card.actions <> " Action" else "") ]
+              if card.actions > 0
+              then
+                [ HH.text $ show card.actions
+                , Icons.actions
+                ]
+              else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardBuys ] ]
-            [ HH.text (if card.buys > 0 then " +" <> show card.buys <> " Buy" else "") ]
+              if card.buys > 0
+              then
+                [ HH.text $ show card.buys
+                , Icons.buys
+                ]
+              else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
-            [ HH.text (if card.treasure > 0 then " +$" <> show card.treasure else "") ]
+              if card.treasure > 0
+              then
+                [ HH.text $ show card.treasure
+                , Icons.money
+                ]
+              else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
-            [ HH.text
-              ( if card.victoryPoints > 0
-                then " +" <> show card.victoryPoints <> " VP"
-                else if card.victoryPoints < 0
-                  then show card.victoryPoints
-                  else ""
-              )
-            ]
+              if card.victoryPoints /= 0
+              then
+                [ HH.text $ show card.victoryPoints
+                , Icons.points
+                ]
+              else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardCost ] ]
-            [ HH.text $ "Cost $" <> show card.cost ]
+            [ HH.text $ show card.cost
+            , Icons.money
+            ]
           ]
         ]
       ]

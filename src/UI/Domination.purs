@@ -34,6 +34,7 @@ import Domination.Data.Stack (Stack)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
+import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
 import Domination.UI.Util (acknowledge, h1__, h2__, h3__, chooseOne)
@@ -245,10 +246,14 @@ renderSupply' cs@{ state, playerIndex } player =
       : HH.ul_
         [ HH.li
           [ HP.class_ Css.handInfo ]
-          [ HH.text $ "$" <> (show $ Player.cash player) ]
+          [ HH.text $ show $ Player.cash player
+          , Icons.money
+          ]
         , HH.li
           [ HP.class_ Css.handInfo ]
-          [ HH.text $ (show $ player.buys) <> " Buys" ]
+          [ HH.text $ show $ player.buys
+          , Icons.buys
+          ]
         ]
       : [ HH.ul_ $ renderSupply player cs ]
 
@@ -357,9 +362,11 @@ playerStats
 playerStats { state, playerIndex: me } playerIndex player = HH.li
   [ HP.class_ Css.stat ]
   [ HH.text $ "Player " <> show (playerIndex + 1)
-    <> " | Actions: " <> show player.actions
-    <> " | Buys: " <> show player.buys
-    <> " | $"
+  , HH.text $ " | " <> show player.actions
+  , Icons.actions
+  , HH.text $ " | " <> show player.buys
+  , Icons.buys
+  , HH.text $ " | "
     <>
     ( if state.turn == playerIndex
       && state.phase == BuyPhase
@@ -368,8 +375,10 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
       then show (Card.value player.atPlay)
       else "_"
     )
-    <> " | VP: " <> show (Player.score player)
-    <>
+  , Icons.money
+  , HH.text $ " | " <> show (Player.score player)
+  , Icons.points
+  , HH.text $
     ( if state.turn == playerIndex
       then " | " <> renderText state.phase
       else ""
@@ -618,19 +627,29 @@ renderHand player { playerIndex, state } = HH.ul
     [ HH.ul_
       [ HH.li
         [ HP.class_ Css.handInfo ]
-        [ HH.text $ "Deck: " <> (show $ length player.deck) ]
+        [ HH.text $ show $ length player.deck
+        , Icons.cards
+        ]
       , HH.li
         [ HP.class_ Css.handInfo ]
-        [ HH.text $ (show $ player.actions) <> " Actions" ]
+        [ HH.text $ (show $ player.actions)
+        , Icons.actions
+        ]
       , HH.li
         [ HP.class_ Css.handInfo ]
-        [ HH.text $ "$" <> (show $ Player.cash player) ]
+        [ HH.text $ show $ Player.cash player
+        , Icons.money
+        ]
       , HH.li
         [ HP.class_ Css.handInfo ]
-        [ HH.text $ (show $ player.buys) <> " Buys" ]
+        [ HH.text $ show $ player.buys
+        , Icons.buys
+        ]
       , HH.li
         [ HP.class_ Css.handInfo ]
-        [ HH.text $ "Discard: " <> (show $ length player.discard) ]
+        [ HH.text $ show $ length player.discard
+        , Icons.cards
+        ]
       ]
     ]
   ]

@@ -105,16 +105,6 @@ main ul {
 .stack {
   display: inline-block;
   vertical-align: top;
-  width: 4.5em;
-  height: 7.05em;
-}
-.supply .stack {
-  width: 6em;
-  height: 10.4em;
-}
-.hand .stack {
-  width: 6em;
-  height: 10.4em;
 }
 .stack {
   position: relative;
@@ -148,7 +138,6 @@ main ul {
   display: inline-block;
   text-color: inherit;
   width: 6em;
-  height: 10.2em;
   padding: 0;
 }
 .supply {
@@ -158,17 +147,16 @@ main ul {
 .supply, .hand {
   border-radius: 0.6em;
   border: 1px solid white;
-  min-height: 14em;
+  min-height: 18em;
 }
 .play, .buying {
   border-radius: 0.6em;
   border: 1px solid white;
-  min-height: 11em;
+  min-height: 12em;
 }
 .play, .buying {
   display: inline-block;
   overflow: hidden;
-  min-height: 10em;
 }
 .buying .card-text,
 .play .card-text {
@@ -198,15 +186,26 @@ main ul {
   margin: 1em;
 }
 .card-text {
-  height: 1.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5em;
+  vertical-align: center;
+  line-height: 1.5em;
 }
 .card-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 3em;
-  font-weight: bold;
+  line-height: 1em;
 }
 .hand-info {
+  font-size: 18pt;
   display: inline-block;
-  width: 4.8em;
+  width: 20%;
+  height: 1.4em;
+  line-height: 1.4em;
 }
 .curse-card {
   display: inline-block;
@@ -286,6 +285,9 @@ main ul {
 .curse-card .card-victory-points:not(:empty) {
   background: magenta;
 }
+.card-cost:not(:empty) {
+  background: darkgoldenrod;
+}
 .active {
   background-color: white;
   color: black;
@@ -294,11 +296,20 @@ main ul {
   border: 3px solid dimgray;
   background-color: dimgray;
 }
+
 button {
   background-color: white;
+  border-style: solid;
+  border-color: black;
   padding: 0.6em;
   border-radius: 0.6em;
 }
+
+button.card-name {
+  border: none;
+  border-bottom: 0.1em solid;
+}
+
 .next-phase {
   background-color: white;
   font-weight: bold;
@@ -365,3 +376,33 @@ button.tool-tip {
   left: -2em;
 }
 
+.icon {
+  display: inline-block;
+  border-radius: 0.2em;
+  background-color: white;
+  transform-origin: center;
+  opacity: 0.8;
+  margin-left: 0.5em;
+  width: 1.4em;
+  height: 1.4em;
+}
+
+.icon.actions {
+  background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="black" viewBox="0 0 15 15"><path d="M12.555 1C10.41 1 7.534 2.471 5.602 5H4c-1.157 0-1.82.864-2.277 1.777L1.11 8H4l1.5 1.5L7 11V13.889l1.223-.612C9.136 12.821 10 12.157 10 11V9.398c2.529-1.932 4-4.809 4-6.953V1h-1.445zM10 4a1 1 0 110 2 1 1 0 110-2zm-6.5 6l-.5.5c-.722.722-1 2.5-1 2.5s1.698-.198 2.5-1l.5-.5L3.5 10z"/></svg>');
+}
+
+.icon.buys {
+  background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 28 28" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>');
+}
+
+.icon.cards {
+  background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="black" viewBox="2 0 32 32"><path d="M27.316 10H24V7c0-1.654-1.346-3-3-3H11C9.346 4 8 5.346 8 7v15c0 1.654 1.346 3 3 3h5v.315C16 26.796 17.204 28 18.684 28h8.632C28.796 28 30 26.796 30 25.315v-12.63C30 11.204 28.796 10 27.316 10zM11 23c-.551 0-1-.448-1-1V7c0-.552.449-1 1-1h10c.551 0 1 .448 1 1v15c0 .552-.449 1-1 1H11z"/></svg>');
+}
+
+.icon.money {
+  background-image: url('data:image/svg+xml;charset=utf8,<svg version="1.1" id="Icons" xmlns="http://www.w3.org/2000/svg" x="0" y="0" viewBox="0 0 32 32" xml:space="preserve"><style>.st0{fill:none;stroke:black;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10}</style><path class="st0" d="M18.7 9.6l-.3-.6h-4.8l-.2.7c-.6 1.7-1.8 3.2-3.4 4.3-6.1 4.1-5 12.5 2 15.2 2.6 1 5.5 1 8 0 7-2.7 8.1-11.2 2.1-15.3-1.6-1.1-2.8-2.5-3.4-4.3zM10.4 3.5L13.8 9M11.6 4.6l1.1-1.1c.6-.6 1.6-.6 2.2 0 .6.6 1.6.6 2.2 0 .6-.6 1.6-.6 2.2 0l1.1 1.1"/><path class="st0" d="M21.6 9h-3.4l3.4-5.5M16 16v1M16 23v1M17 17h-1.5c-.8 0-1.5.7-1.5 1.5s.7 1.5 1.5 1.5h1c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5H15"/></svg>');
+}
+
+.icon.points {
+  background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" stroke-width="25" viewBox="-32 -32 512 544"><path d="M466.45 49.374c-7.065-8.308-17.368-13.071-28.267-13.071H402.41v-11.19C402.41 11.266 391.143 0 377.297 0H134.705c-13.848 0-25.112 11.266-25.112 25.112v11.19H73.816c-10.899 0-21.203 4.764-28.267 13.071-6.992 8.221-10.014 19.019-8.289 29.624 9.4 57.8 45.775 108.863 97.4 136.872 4.717 11.341 10.059 22.083 16.008 32.091 19.002 31.975 42.625 54.073 68.627 64.76 2.635 26.644-15.094 51.885-41.794 57.9-.057.013-.097.033-.153.046-5.211 1.245-9.09 5.921-9.09 11.513v54.363h-21.986c-19.602 0-35.549 15.947-35.549 35.549v28.058c0 6.545 5.305 11.85 11.85 11.85H390.56c6.545 0 11.85-5.305 11.85-11.85v-28.058c0-19.602-15.947-35.549-35.549-35.549h-21.988V382.18c0-5.603-3.893-10.286-9.118-11.52-.049-.012-.096-.028-.145-.04-26.902-6.055-44.664-31.55-41.752-58.394 25.548-10.86 48.757-32.761 67.479-64.264 5.949-10.009 11.29-20.752 16.008-32.095 51.622-28.01 87.995-79.072 97.395-136.87 1.725-10.605-1.297-21.402-8.29-29.623zM60.652 75.192c-.616-3.787.431-7.504 2.949-10.466C66.156 61.722 69.878 60 73.815 60h35.777v21.802c0 34.186 4.363 67.3 12.632 97.583-32.496-25.679-54.87-62.982-61.572-104.193zm306.209 385.051c6.534 0 11.85 5.316 11.85 11.85v16.208H134.422v-16.208c0-6.534 5.316-11.85 11.85-11.85h220.589zm-45.688-66.213v42.513H191.96V394.03h129.213zm-98.136-23.699c2.929-3.224 5.607-6.719 8.002-10.46 7.897-12.339 12.042-26.357 12.228-40.674 4.209.573 8.457.88 12.741.88 4.661 0 9.279-.358 13.852-1.036.27 19.239 7.758 37.45 20.349 51.289h-67.172zM378.709 81.803c0 58.379-13.406 113.089-37.747 154.049-23.192 39.03-53.364 60.525-84.956 60.525-31.597 0-61.771-21.494-84.966-60.523-24.342-40.961-37.748-95.671-37.748-154.049V25.112c0-.78.634-1.413 1.412-1.413h242.591c.78 0 1.414.634 1.414 1.413v56.691zm72.639-6.611c-6.702 41.208-29.074 78.51-61.569 104.191 8.268-30.283 12.631-63.395 12.631-97.58V60.001h35.773c3.938 0 7.66 1.723 10.214 4.726 2.518 2.961 3.566 6.678 2.951 10.465z"/><path d="M327.941 121.658c-1.395-4.288-5.103-7.414-9.566-8.064l-35.758-5.196-15.991-32.402c-1.997-4.044-6.116-6.605-10.626-6.605-4.511 0-8.63 2.561-10.626 6.605l-15.991 32.402-35.758 5.196c-4.464.648-8.172 3.775-9.566 8.065-1.393 4.291-.231 8.999 2.999 12.148l25.875 25.221-6.109 35.613c-.763 4.446 1.064 8.938 4.714 11.59 3.648 2.651 8.487 3 12.479.902L256 190.32l31.982 16.813c1.734.911 3.627 1.36 5.512 1.36 2.456 0 4.902-.763 6.966-2.263 3.65-2.652 5.477-7.144 4.714-11.59l-6.109-35.613 25.875-25.221c3.232-3.148 4.394-7.857 3.001-12.148zm-49.877 24.747c-2.793 2.722-4.068 6.644-3.408 10.489l3.102 18.09-16.245-8.541c-1.725-.908-3.62-1.36-5.514-1.36-1.894 0-3.788.454-5.514 1.36l-16.245 8.541 3.102-18.09c.66-3.844-.615-7.766-3.408-10.489l-13.141-12.81 18.162-2.64c3.859-.56 7.196-2.985 8.922-6.482L256 108.015l8.122 16.458c1.727 3.497 5.062 5.921 8.922 6.482l18.162 2.64-13.142 12.81z"/></svg>');
+}

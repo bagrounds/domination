@@ -53,3 +53,9 @@ toggle = ClassName "toggle"
 
 incrementer = ClassName "incrementer"
 
+icon = ClassName "icon"
+actions = ClassName "actions"
+buys = ClassName "buys"
+money = ClassName "money"
+points = ClassName "points"
+cards = ClassName "cards"
