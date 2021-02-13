@@ -65,6 +65,7 @@ cardMap =
   , scholar
   , torturer
   , mountebank
+  , margrave
   , harem
   , nobles
   ]
@@ -229,8 +230,8 @@ councilRoom = let attack = false in
   , special = Just councilRoomSpecial
   }
 
-councilRoomChoice :: Choice
-councilRoomChoice = let attack = false in Draw
+draw1Card :: Choice
+draw1Card = let attack = false in Draw
   { n: 1
   , resolution: Nothing
   , attack
@@ -239,7 +240,7 @@ councilRoomChoice = let attack = false in Draw
 councilRoomSpecial :: Special
 councilRoomSpecial = let attack = false in
   { target: EveryoneElse
-  , command: Choose councilRoomChoice
+  , command: Choose draw1Card
   , description: "Each other player draws a card."
   }
 
@@ -310,8 +311,8 @@ militia = let attack = true in
   , special = Just militiaSpecial
   }
 
-militiaChoice :: Choice
-militiaChoice = let attack = true in MoveFromTo
+discardDownTo3 :: Choice
+discardDownTo3 = let attack = true in MoveFromTo
   { n: DownTo $ 3 ^. _WireInt
   , filter: Nothing
   , source: Pile.Hand
@@ -323,7 +324,7 @@ militiaChoice = let attack = true in MoveFromTo
 militiaSpecial :: Special
 militiaSpecial = let attack = true in
   { target: EveryoneElse
-  , command: Choose militiaChoice
+  , command: Choose discardDownTo3
   , description: "Each other player discards down to 3 cards"
   }
 
@@ -716,5 +717,26 @@ gainCurseAndCopper = let attack = true in And
     ]
   , attack
   , resolution: Nothing
+  }
+
+margrave :: Card
+margrave = let attack = true in Card.action
+  { name = "Margrave"
+  , cost = 5
+  , cards = 3
+  , buys = 1
+  , special = Just
+    { target: EveryoneElse
+    , command: Choose $ And
+      { choices:
+        [ draw1Card
+        , discardDownTo3
+        ]
+      , attack
+      , resolution: Nothing
+      }
+    , description: "Each other player draws a card"
+      <> ", then discards down to 3 cards in hand."
+    }
   }
 
