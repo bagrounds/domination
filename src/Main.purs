@@ -23,6 +23,7 @@ import Domination.Capability.Random (class Random, randomElement)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.UI.Chat as Chat
+import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination (GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
@@ -39,7 +40,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
-import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope, WireMessage)
+import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (Event, EventType(..))
@@ -156,7 +157,7 @@ render state = HH.main_ $
     }
   , HH.slot
     Domination._component
-    0
+    (AreaSlot GameArea)
     Domination.component
     unit
     (Just <<< HandleGameEvent)
@@ -172,7 +173,7 @@ data AppAction
   | HandleGameEvent GameEvent
 
 type ChildComponents o r =
-  ("Domination" :: H.Slot GameQuery o Int | r)
+  ("Domination" :: H.Slot GameQuery o DomSlot | r)
 
 handleAction
   :: forall output m t1 r
@@ -230,7 +231,6 @@ handleAction = case _ of
       ConnectionsMessage count ->
         H.modify_ $ set _connectionCount count
 
-
   ReceiveRemoteMessage customEvent -> do
     let detail = FFI.detail customEvent
     log $ "ReceiveRemoteMessage: " <> detail
@@ -241,12 +241,14 @@ handleAction = case _ of
         (review Message._toWire))
         <$> eWireEnvelope
     case eMessage of
-      Left e -> log $ "problem receiving message: " <> e
-      Right (Tuple _ (msg :: RemoteMessage)) -> do
+      Left e -> error $ "problem receiving message: " <> e
+      Right (Tuple _ msg) -> do
         case msg of
           UsernameMessage { username, id } -> do
-            log $ "username incoming: " <> username
-            H.modify_ $ over _usernames (HashMap.insert id username)
+            log $ "username incoming: "
+              <> username
+            H.modify_ $ over _usernames
+              $ HashMap.insert id username
           ChatMessage { message, username } -> do
             H.modify_ $ _messages :~ msg
             if message == "PING"
@@ -295,7 +297,7 @@ handleAction = case _ of
       log $ "Main: LoadGame"
       mbGameState <- load key
       case mbGameState of
-        Left e -> log e
+        Left e -> error e
         Right activeState -> do
           log $ "Main: LoadGame successful as player"
             <> show activeState.playerIndex
@@ -306,38 +308,43 @@ handleAction = case _ of
             , playMade: Nothing
             }
     saveGame activeState = do
-      log $ "saving state as player" <> show activeState.playerIndex
+      log $ "saving state as player"
+        <> show activeState.playerIndex
       let
         saveNumber = activeState.i `mod` 10
         key = "game_state_" <> show saveNumber
       save key activeState
       save "game_state" activeState
     queryGame state = do
-      _ <- H.query Domination._component 0 (state unit)
+      _ <- H.query
+        Domination._component
+        (AreaSlot GameArea)
+        (state unit)
       pure unit
     sendChatMessage = do
       { id, message } <- H.get
-      let (chat :: RemoteMessage) = ChatMessage { username: id, message }
+      let
+        chat = ChatMessage
+          { username: id, message }
       sendMessage chat
-      H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
+      H.modify_ $ (_message .~ "")
+        <<< (_messages :~ chat)
 
     sendMessage
       :: RemoteMessage
       -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
     sendMessage message' = do
-      let (message :: WireMessage) = view Message._toWire message'
+      let message = view Message._toWire message'
       log "Main: sending message"
       { maybeBroadcaster, id } <- H.get
-      let (wireEnvelope :: WireEnvelope) = Tuple id message
+      let wireEnvelope = Tuple id message
       case maybeBroadcaster of
-        Nothing -> do
-          error "no broadcaster; cannot send message"
+        Nothing ->
+          error "no broadcaster to send message"
         Just broadcaster -> do
-          log $ "Encoding message: " <> show wireEnvelope
-          (eString :: Either String String) <- writeWire wireEnvelope
+          eString <- writeWire wireEnvelope
           case eString of
             Left e -> error e
-            Right string -> do
-              log $ "Sending message: " <> string
+            Right string ->
               broadcast broadcaster string
 

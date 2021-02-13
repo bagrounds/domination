@@ -15,6 +15,7 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.Data.WireInt (_WireInt)
 import Domination.UI.CardChooser as CardChooser
+import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
 import Halogen (Component)
 import Halogen.HTML (HTML)
@@ -25,7 +26,7 @@ component
   => Log m
   => Player
   -> Choice
-  -> Int
+  -> (Int -> DomSlot)
   -> Component HTML query input Choice m
 component player choice baseSlotNumber =
   CardChooser.component

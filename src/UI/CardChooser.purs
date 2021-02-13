@@ -17,6 +17,7 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
+import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Util (h2__)
 import Halogen as H
 import Halogen.HTML as HH
@@ -42,7 +43,7 @@ type ComponentSpec =
   , player :: Player
   , choice :: Choice
   , pile :: Pile
-  , baseSlotNumber :: Int
+  , baseSlotNumber :: (Int -> DomSlot)
   }
 --component
 --  :: forall query input m
@@ -105,7 +106,7 @@ component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pi
 --      -> Tuple Card Boolean
 --      -> HTML w Action
     renderCardToTrash cardIndex (Tuple card selected) =
-      Card.render onClick extraClasses card (baseSlotNumber + cardIndex)
+      Card.render onClick extraClasses card (baseSlotNumber cardIndex)
       where
         onClick _ = Just (Toggle cardIndex)
         extraClasses =

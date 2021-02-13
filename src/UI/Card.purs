@@ -4,30 +4,31 @@ module Domination.UI.Card
 
 import Prelude
 
-import Data.Array (intercalate, null)
+import Data.Array (intercalate)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Dom (class Dom, stopPropagation)
-import Domination.Capability.Log (class Log, log)
+import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
+import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Icons as Icons
-import Effect.Class (liftEffect)
 import Halogen as H
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
+import Halogen.HTML.Events (onClick) as HP
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Events as HP
-import Halogen.HTML.Properties as HP
-import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
+import Halogen.HTML.Properties (class_, classes) as HP
+import Web.UIEvent.MouseEvent (toEvent)
 
 --render
 --  :: forall w i
 --  . (MouseEvent -> Maybe i)
 --  -> Array H.ClassName
 --  -> Card
+--  -> DomSlot
 --  -> HTML w i
 render onClick extraClasses card slotNumber = HH.div
   ( if Card.isTreasure card
@@ -61,7 +62,7 @@ render onClick extraClasses card slotNumber = HH.div
             [ HP.classes [ Css.cardText, Css.cardCards ] ]
               if card.cards > 0
               then
-                [ HH.text $ show card.cards
+                [ HH.text $ "+" <> show card.cards
                 , Icons.cards
                 ]
               else []
@@ -69,7 +70,7 @@ render onClick extraClasses card slotNumber = HH.div
             [ HP.classes [ Css.cardText, Css.cardActions ] ]
               if card.actions > 0
               then
-                [ HH.text $ show card.actions
+                [ HH.text $ "+" <> show card.actions
                 , Icons.actions
                 ]
               else []
@@ -77,7 +78,7 @@ render onClick extraClasses card slotNumber = HH.div
             [ HP.classes [ Css.cardText, Css.cardBuys ] ]
               if card.buys > 0
               then
-                [ HH.text $ show card.buys
+                [ HH.text $ "+" <> show card.buys
                 , Icons.buys
                 ]
               else []
@@ -85,7 +86,7 @@ render onClick extraClasses card slotNumber = HH.div
             [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
               if card.treasure > 0
               then
-                [ HH.text $ show card.treasure
+                [ HH.text $ "+" <> show card.treasure
                 , Icons.money
                 ]
               else []
@@ -93,7 +94,9 @@ render onClick extraClasses card slotNumber = HH.div
             [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
               if card.victoryPoints /= 0
               then
-                [ HH.text $ show card.victoryPoints
+                [ HH.text
+                  $ (if card.victoryPoints > 0 then "+" else "")
+                  <> show card.victoryPoints
                 , Icons.points
                 ]
               else []
@@ -112,14 +115,14 @@ descriptionComponent
   :: forall query output m
   . Dom m
   => Log m
-  => Int
+  => DomSlot
   -> Card
   -> H.Component HTML query Card output m
-descriptionComponent slotNumber card =
-  H.mkComponent { initialState, render, eval }
+descriptionComponent slotNumber card' =
+  H.mkComponent { initialState, render: render', eval }
   where
-    initialState _ = { card, visible: false }
-    render { visible, card } =
+    initialState _ = { card: card', visible: false }
+    render' { visible, card } =
       case card.special of
       Nothing -> HH.li
         [ HP.classes [ Css.cardText, Css.cardName ] ]
@@ -148,13 +151,8 @@ descriptionComponent slotNumber card =
           Nothing -> pure unit
           Just e -> stopPropagation $ toEvent e
         if reset
-          then do
-            log $ "(" <> card.name <> ") " <> "reset slotNumber: "
-              <> show slotNumber
-            H.put { card, visible: false }
-          else do
-            log $ "(" <> card.name <> ") " <> "toggle slotNumber: "
-              <> show slotNumber
+          then H.put { card, visible: false }
+          else
             H.modify_ \{ visible } -> { visible: not visible, card: card }
       , receive = \card -> Just { event: Nothing, reset: true, card }
       }

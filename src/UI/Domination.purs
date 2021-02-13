@@ -34,6 +34,7 @@ import Domination.Data.Stack (Stack)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
+import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
@@ -103,7 +104,7 @@ _component = SProxy
 type Component query r m action =
   ComponentSlot
   HTML
-  ("Domination" :: Slot query GameEvent Int | r)
+  ("Domination" :: Slot query GameEvent DomSlot | r)
   m
   action
 
@@ -169,9 +170,9 @@ handleQuery = case _ of
 type ChildComponents query r m =
   ComponentSlot
   HTML
-  ( "MoveFromTo" :: H.Slot query Choice Int
-  , "PickN" :: H.Slot query (Array Choice) Int
-  , "description" :: H.Slot query Unit Int
+  ( "MoveFromTo" :: H.Slot query Choice DomSlot
+  , "PickN" :: H.Slot query (Array Choice) DomSlot
+  , "description" :: H.Slot query Unit DomSlot
   | r
   )
   m
@@ -243,7 +244,7 @@ renderSupply' cs@{ state, playerIndex } player =
         else []
     ]
     $ HH.li_ [ h3__ "Supply" ]
-      : HH.ul_
+      : HH.ul [ HP.class_ Css.handInfos ]
         [ HH.li
           [ HP.class_ Css.handInfo ]
           [ HH.text $ show $ Player.cash player
@@ -267,7 +268,7 @@ renderSupply
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
-    renderStackI stackIndex = renderStack onClick player stackIndex
+    renderStackI stackIndex = renderStack onClick player (CardSlot SupplyArea stackIndex)
       where
         onClick _ =
           Just $ MakePlay $ Purchase { playerIndex, stackIndex }
@@ -297,7 +298,7 @@ renderCard
   => (MouseEvent -> Maybe InternalGameAction)
   -> Player
   -> Card
-  -> Int
+  -> DomSlot
   -> HTML (ChildComponents query r m) InternalGameAction
 renderCard onClick player card slotNumber =
   Card.render onClick extraClasses card slotNumber
@@ -314,7 +315,7 @@ renderStack
   => Log m
   => (MouseEvent -> Maybe InternalGameAction)
   -> Player
-  -> Int
+  -> DomSlot
   -> Stack
   -> HTML (ChildComponents query r m) InternalGameAction
 renderStack onClick player slotNumber stack =
@@ -403,13 +404,7 @@ renderPlayer cs@{ state, playerIndex } player =
     in
     if isAttacked && hasReaction
     then renderReaction
-    else
-      let
-        baseSlotNumber = length state.supply
-          + length player.atPlay
-          + length player.buying
-          + length player.hand
-      in renderChoice baseSlotNumber choice
+    else renderChoice (CardSlot ChoiceArea) choice
   else
     case state.players !! state.turn of
       Nothing -> h1__ "Something has gone terribly wrong!"
@@ -423,9 +418,8 @@ renderPlayer cs@{ state, playerIndex } player =
         , renderSupply' cs player
         , renderNextPhaseButton cs
         , renderStats cs
-        , renderAtPlay currentPlayer $ length cs.state.supply
-        , renderBuying currentPlayer $ length cs.state.supply
-          + length currentPlayer.atPlay
+        , renderAtPlay currentPlayer
+        , renderBuying currentPlayer
         , renderHand player cs
         ]
     where
@@ -444,7 +438,7 @@ renderPlayer cs@{ state, playerIndex } player =
             }
           ]
       renderChoice
-        :: Int
+        :: (Int -> DomSlot)
         -> Maybe Choice
         -> Maybe (HTML (ChildComponents query r m) InternalGameAction)
       renderChoice baseSlotNumber = map \choice -> case choice of
@@ -461,7 +455,7 @@ renderPlayer cs@{ state, playerIndex } player =
           PickN x@{ n, choices } -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "PickN")
-              0
+              (AreaSlot ChoiceArea)
               ( PickN.component
                 { title: "Choose " <> show n
                 , n
@@ -495,7 +489,7 @@ renderPlayer cs@{ state, playerIndex } player =
           MoveFromTo _ -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "MoveFromTo")
-              0
+              (AreaSlot ChoiceArea)
               (MoveFromTo.component player choice baseSlotNumber)
               unit
               $ Just
@@ -569,13 +563,12 @@ renderAtPlay
   . Dom m
   => Log m
   => Player
-  -> Int
   -> HTML (ChildComponents query r m) InternalGameAction
-renderAtPlay currentPlayer baseSlotNumber =
+renderAtPlay currentPlayer =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
     title = HH.li_ [ h3__ "At Play" ]
-    stacks = (\i -> renderStack (const Nothing) currentPlayer (baseSlotNumber + i))
+    stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot AtPlayArea i))
       `mapWithIndex` stackCards currentPlayer.atPlay
 
 stackCards :: Array Card -> Array Stack
@@ -593,13 +586,12 @@ renderBuying
   . Dom m
   => Log m
   => Player
-  -> Int
   -> HTML (ChildComponents query r m) InternalGameAction
-renderBuying currentPlayer baseSlotNumber =
+renderBuying currentPlayer =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
     title = HH.li_ [ h3__ "Buying" ]
-    stacks = (\i -> renderStack (const Nothing) currentPlayer (i + baseSlotNumber))
+    stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot BuyingArea i))
       `mapWithIndex` stackCards currentPlayer.buying
 
 renderHand
@@ -624,7 +616,7 @@ renderHand player { playerIndex, state } = HH.ul
   ] $
   [ HH.li_ [ h3__ "Hand" ]
   , HH.li_
-    [ HH.ul_
+    [ HH.ul [ HP.class_ Css.handInfos ] $
       [ HH.li
         [ HP.class_ Css.handInfo ]
         [ HH.text $ show $ length player.deck
@@ -653,7 +645,7 @@ renderHand player { playerIndex, state } = HH.ul
       ]
     ]
   ]
-  <> (\i s -> renderStack (onClick s player.hand) player (baseSlotNumber + i) s)
+  <> (\i s -> renderStack (onClick s player.hand) player (CardSlot HandArea i) s)
     `mapWithIndex` (stackCards player.hand)
   where
     onClick stack hand = const $ Just $ MakePlay
@@ -661,9 +653,6 @@ renderHand player { playerIndex, state } = HH.ul
       where
         cardIndex = fromMaybe (-1)
           $ findIndex (_.name >>> (_ == stack.card.name)) hand
-    baseSlotNumber = length state.supply
-      + length player.atPlay
-      + length player.buying
 
 handleAction
   :: forall s p m
