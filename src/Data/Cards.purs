@@ -662,7 +662,7 @@ goldfishChoice = let attack = false in If
   }
 
 mountebank :: Card
-mountebank = Card.action
+mountebank = Card.actionAttack
   { name = "Mountebank"
   , cost = 5
   , treasure = 2
@@ -720,7 +720,7 @@ gainCurseAndCopper = let attack = true in And
   }
 
 margrave :: Card
-margrave = let attack = true in Card.action
+margrave = let attack = true in Card.actionAttack
   { name = "Margrave"
   , cost = 5
   , cards = 3
