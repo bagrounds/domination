@@ -5,7 +5,7 @@ module Domination.UI.Card
 import Prelude
 
 import Data.Array (intercalate)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Dom (class Dom, stopPropagation)
 import Domination.Capability.Log (class Log)
@@ -15,6 +15,7 @@ import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Icons as Icons
+import Domination.UI.RenderText (renderText)
 import Halogen as H
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
@@ -123,15 +124,16 @@ descriptionComponent slotNumber card' =
   where
     initialState _ = { card: card', visible: false }
     render' { visible, card } =
-      case card.special of
-      Nothing -> HH.li
+      if not (isJust card.special || isJust card.reaction)
+      then HH.li
         [ HP.classes [ Css.cardText, Css.cardName ] ]
         [ HH.text card.name ]
-      Just _ -> HH.li
+      else HH.li
         [ HP.classes [ Css.description ] ] $
         [ HH.button
           [ HP.classes [ Css.cardText, Css.cardName, Css.toggle ]
-          , HP.onClick \event -> Just  { card, event: Just event, reset: false }
+          , HP.onClick \event ->
+            Just { card, event: Just event, reset: false }
           ]
           [ HH.text card.name ]
         ] <>
@@ -139,9 +141,16 @@ descriptionComponent slotNumber card' =
         then
           [ HH.button
             [ HP.class_ Css.toolTip
-            , HP.onClick \event -> Just { card, event: Just event, reset: false }
-            ]
+            , HP.onClick \event ->
+              Just { card, event: Just event, reset: false }
+            ] $
             [ HH.text $ description card.special ]
+            <> case card.reaction of
+              Nothing -> []
+              Just reaction ->
+                [ HH.hr_
+                , HH.text $ renderText reaction
+                ]
           ]
         else []
     description special = intercalate ". " (_.description <$> special)

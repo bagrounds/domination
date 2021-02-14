@@ -15,6 +15,7 @@ import Domination.Data.GameState as GameState
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
+import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.WireInt (_WireInt)
 import Util ((.^))
@@ -29,6 +30,11 @@ instance phaseRenderText :: RenderText Phase where
   renderText ActionPhase = "Action Phase"
   renderText BuyPhase = "Buy Phase"
   renderText CleanupPhase = "Cleanup Phase"
+
+instance reactionRenderText :: RenderText Reaction where
+  renderText = case _ of
+    BlockAttack -> "When another player plays an Attack card"
+      <> ", you may first reveal this from your hand, to be unaffected by it."
 
 instance bonusRenderText :: RenderText Bonus where
   renderText = case _ of
