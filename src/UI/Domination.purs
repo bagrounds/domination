@@ -361,7 +361,16 @@ playerStats
   -> Player
   -> HTML a i
 playerStats { state, playerIndex: me } playerIndex player = HH.li
-  [ HP.class_ Css.stat ]
+  [ HP.class_ Css.stat ] $
+  ( if state.turn == playerIndex
+    then
+      [ case state.phase of
+           ActionPhase -> Icons.actions
+           BuyPhase -> Icons.buys
+           CleanupPhase -> Icons.cards
+      ]
+    else [ HH.i [ HP.class_ Css.icon ] [] ]
+  ) <>
   [ HH.text $ "Player " <> show (playerIndex + 1)
   , HH.text $ " | " <> show player.actions
   , Icons.actions
@@ -379,11 +388,6 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
   , Icons.money
   , HH.text $ " | " <> show (Player.score player)
   , Icons.points
-  , HH.text $
-    ( if state.turn == playerIndex
-      then " | " <> renderText state.phase
-      else ""
-    )
   ]
 
 renderPlayer

@@ -439,7 +439,6 @@ button {
   display: inline-block;
   border: 1px solid black;
   border-radius: 0.2em;
-  background-color: white;
   margin-left: 0.2em;
   width: 1.45em;
   height: 1.45em;
@@ -469,6 +468,7 @@ button {
 }
 
 .icon.cards {
+  background-color: white;
   background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="black" viewBox="2 0 32 32"><path d="M27.316 10H24V7c0-1.654-1.346-3-3-3H11C9.346 4 8 5.346 8 7v15c0 1.654 1.346 3 3 3h5v.315C16 26.796 17.204 28 18.684 28h8.632C28.796 28 30 26.796 30 25.315v-12.63C30 11.204 28.796 10 27.316 10zM11 23c-.551 0-1-.448-1-1V7c0-.552.449-1 1-1h10c.551 0 1 .448 1 1v15c0 .552-.449 1-1 1H11z"/></svg>');
 }
 
