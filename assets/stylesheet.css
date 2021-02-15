@@ -190,6 +190,7 @@ button span {
 
 .play,
 .buying {
+  font-size: 0.75em;
   display: inline-block;
   overflow: hidden;
   border-radius: 0.6em;
@@ -203,11 +204,6 @@ button span {
   padding-right: 0.2em;
   height: 1.55em;
   line-height: 1.55em;
-}
-
-.buying,
-.play {
-  font-size: 0.75em;
 }
 
 .play {
