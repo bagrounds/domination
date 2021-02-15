@@ -431,14 +431,14 @@ renderPlayer cs@{ state, playerIndex } player =
         :: forall widget
         . Maybe (HTML widget InternalGameAction)
       renderReaction =
-        Just $ chooseOne "Block attack?"
+        Just $ chooseOne (HH.text "Block attack?")
           [ { clickEvent: MakePlay $
               React { playerIndex, reaction: Just BlockAttack }
-            , text: "Yes"
+            , text: HH.text "Yes"
             }
           , { clickEvent: MakePlay $
               React { playerIndex, reaction: Nothing }
-            , text: "No"
+            , text: HH.text "No"
             }
           ]
       renderChoice
@@ -447,12 +447,16 @@ renderPlayer cs@{ state, playerIndex } player =
         -> Maybe (HTML (ChildComponents query r m) InternalGameAction)
       renderChoice baseSlotNumber = map \choice -> case choice of
           If x ->
-            acknowledge (renderText choice) (playEvent If x unit)
+            acknowledge
+              (renderText choice)
+              (playEvent If x unit)
           And x@{ choices } ->
-            acknowledge (renderText choice) (playEvent And x unit)
+            acknowledge
+              (renderText choice)
+              (playEvent And x unit)
           Or x@{ choices } ->
-            chooseOne "Choose one" $
-              choices <#> \choice' ->
+            chooseOne (HH.text "Choose one")
+              $ choices <#> \choice' ->
                 { clickEvent: playEvent Or x choice'
                 , text: renderText choice'
                 }
@@ -476,18 +480,18 @@ renderPlayer cs@{ state, playerIndex } player =
               <<< Just
             ]
           Option x ->
-            chooseOne (renderText x.choice <> "?")
+            chooseOne (renderText x.choice)
               [ { clickEvent: MakePlay $ ResolveChoice
                   { playerIndex
                   , choice: Option x { resolution = Just true }
                   }
-                , text: "Yes"
+                , text: HH.text "Yes"
                 }
               , { clickEvent: MakePlay $ ResolveChoice
                   { playerIndex
                   , choice: Option x { resolution = Just false }
                   }
-                , text: "No"
+                , text: HH.text "No"
                 }
               ]
           MoveFromTo _ -> HH.div_
@@ -544,17 +548,29 @@ renderNextPhaseButton { playerIndex, state } =
     [ HP.class_ (Css.nextPhase)
     , HE.onClick $ const $ Just $ MakePlay $ EndPhase { playerIndex }
     ]
-    [ HH.text if state.turn == playerIndex
+    [ HH.span_ if state.turn == playerIndex
       then if Dom.choicesOutstanding state
-        then "Waiting for Player "
+        then [ HH.text $ "Waiting for Player "
           <> show (Dom.choiceTurn state + 1)
-          <> " to Choose"
+          <> " to Choose" ]
         else case state.phase of
-          ActionPhase -> "Complete Action Phase"
-          BuyPhase -> "Complete Buy Phase"
-          CleanupPhase -> "Complete Turn"
-      else "Waiting for Player " <> show (state.turn + 1)
-        <> " | " <> renderText state.phase
+          ActionPhase ->
+            [ HH.text "Complete "
+            , Icons.actions
+            , HH.text " Phase"
+            ]
+          BuyPhase ->
+            [ HH.text "Complete "
+            , Icons.buys
+            , HH.text " Phase"
+            ]
+          CleanupPhase ->
+            pure $ HH.text "Complete Turn"
+      else
+        [ HH.text $ "Waiting for Player "
+          <> show (state.turn + 1) <> " | "
+        , renderText state.phase
+        ]
     ]
 
 renderStats :: forall w i. ActiveState -> HTML w i

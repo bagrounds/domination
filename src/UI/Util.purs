@@ -21,23 +21,24 @@ type IncrementerInput i =
 
 chooseOne
   :: forall w i
-  . String
-  -> Array { clickEvent :: i, text :: String }
+  . HTML w i
+  -> Array { clickEvent :: i, text :: HTML w i }
   -> HTML w i
 chooseOne title bs = HH.div_ $
-  h2__ title : map mkButton bs
+  title : map mkButton bs
   where
     mkButton { clickEvent, text } = HH.button
       [ HE.onClick \_ -> Just clickEvent ]
-      [ HH.text text ]
+      [ text ]
 
 acknowledge
   :: forall w i
-  . String
+  . HTML w i
   -> i
   -> HTML w i
-acknowledge message clickEvent = HH.div_
-  [ h2__ message
+acknowledge message clickEvent = HH.div
+  [ HP.class_ Css.dialogue ]
+  [ HH.div_ [ message ]
   , HH.button
     [ HE.onClick \_ -> Just clickEvent ]
     [ HH.text "OK" ]

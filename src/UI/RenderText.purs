@@ -3,10 +3,12 @@ module Domination.UI.RenderText where
 import Prelude
 
 import Data.Array (intercalate)
-import Data.Lens ((^?))
+import Data.Lens ((^?), (^.))
 import Data.Lens.Index (ix)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Bonus (Bonus(..))
+import Domination.Data.Buy (Buy(..))
+import Domination.Data.Buy as Buy
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
@@ -18,102 +20,161 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.WireInt (_WireInt)
+import Domination.UI.Icons as Icons
+import Halogen.HTML (HTML(..))
+import Halogen.HTML as HH
 import Util ((.^))
 
 class RenderTextInContext a where
-  renderTextInContext :: Int -> GameState -> a -> String
+  renderTextInContext
+    :: forall w i
+    . Int
+    -> GameState
+    -> a
+    -> HTML w i
 
 class RenderText a where
-  renderText :: a -> String
+  renderText :: forall w i. a -> HTML w i
 
 instance phaseRenderText :: RenderText Phase where
-  renderText ActionPhase = "Action Phase"
-  renderText BuyPhase = "Buy Phase"
-  renderText CleanupPhase = "Cleanup Phase"
+  renderText  = case _ of
+    ActionPhase -> Icons.actions
+    BuyPhase -> Icons.buys
+    CleanupPhase -> Icons.cards
 
 instance reactionRenderText :: RenderText Reaction where
   renderText = case _ of
-    BlockAttack -> "When another player plays an Attack card"
+    BlockAttack -> HH.text
+      $ "When another player plays an Attack card"
       <> ", you may first reveal this from your hand, to be unaffected by it."
 
 instance bonusRenderText :: RenderText Bonus where
-  renderText = case _ of
-    Cash n -> "$" <> show (n .^ _WireInt)
+  renderText bonus = HH.span_ case bonus of
+    Cash n ->
+      [ HH.text $ "+" <> show (n .^ _WireInt)
+      , Icons.money
+      ]
 
 instance conditionRenderText :: RenderText Condition where
-  renderText = case _ of
+  renderText condition = HH.text $ case condition of
     HasCard name -> "hand contains " <> name
     HasDiscard -> "discard pile is not empty"
     Randomly percent -> "randomly (" <> percentString <> "% chance)"
       where
         percentString = show $ percent .^ _WireInt
 
-instance choiceRenderTextInContext :: RenderTextInContext Choice where
-  renderTextInContext :: Int -> GameState -> Choice -> String
+instance choiceRenderTextInContext
+  :: RenderTextInContext Choice where
   renderTextInContext playerIndex state c =
-    case c of
+    HH.span_ case c of
       If { choice, condition } ->
-        "if " <> renderText condition <> " then " <> renderText choice
+        [ HH.text "if "
+        , renderText condition
+        , HH.text " then "
+        , renderText choice
+        ]
       And { choices } ->
-        intercalate " and " (renderText <$> choices)
+        intercalate [HH.text " and "] (pure <<< renderText <$> choices)
       Or { choices } ->
-        "chose one of: "
-        <> (intercalate ", " $ renderText <$> choices)
+        [ HH.text "chose one of: " ]
+          <> (intercalate [ HH.text ", " ]
+          $ (pure <<< renderText) <$> choices)
       PickN { n, choices, resolution } ->
-        "chose " <> show n <> " of: "
-        <> (intercalate ", " $ renderText <$> choices)
+        [ HH.text $ "chose " <> show n <> " of: " ]
+          <> (intercalate [ HH.text ", " ]
+          $ (pure <<< renderText) <$> choices)
       Option { choice } ->
-        "chose to optionally " <> renderText choice
+        [ HH.text "chose to optionally "
+        , renderText choice
+        ]
       MoveFromTo { source, destination, resolution: (Just cardIndices) } ->
         case destination of
-            Pile.Trash -> "trashed: " <> cards
-            Pile.Discard -> "discarded: " <> cards
-            Pile.Hand -> "gained: " <> cards <> " to their hand"
-            Pile.Deck -> "gained: " <> cards <> " to their deck"
+            Pile.Trash ->
+              [ HH.text $ "trashed: " ] <> cards
+            Pile.Discard ->
+              [ HH.text $ "discarded: " ] <> cards
+            Pile.Hand ->
+              [ HH.text $ "gained: " ]
+                <> cards
+                <> [ HH.text " to their hand" ]
+            Pile.Deck ->
+              [ HH.text $ "gained: " ]
+                <> cards
+                <> [ HH.text " to their deck" ]
         where
-          cards = intercalate ", "
-            $ getCardName source playerIndex state <$> cardIndices
+          cards = intercalate [ HH.text ", " ]
+            $ pure
+            <<< getCardName source playerIndex state
+            <$> cardIndices
       GainCards { n, cardName } ->
-        "gained " <> show n <> "x " <> cardName
+        [ HH.text $ "+" <> show n <> "x " <> cardName ]
       GainActions { n, resolution } ->
-        "gained " <> show n <> " actions"
+        [ HH.text $ "+ " <> show n
+        , Icons.actions
+        ]
       GainBuys { n, resolution } ->
-        "gained " <> show n <> " buys"
+        [ HH.text $ "gained +" <> show n
+        , Icons.buys
+        ]
       GainBonus { bonus, resolution } ->
-        "gained " <> renderText bonus
+        [ HH.text "gained"
+        , renderText bonus
+        ]
       Discard { selection: SelectAll } ->
-        "discarded their hand"
+        [ HH.text "discarded their hand" ]
       Draw { n, resolution } ->
-        "drew " <> show n <> " cards"
+        [ HH.text $ "+" <> show n
+        , Icons.cards
+        ]
       MoveFromTo { resolution: Nothing } ->
-        unresolved
+        [ unresolved ]
       where
-        unresolved :: String
-        unresolved = "unresolved choice? (" <> show c <> ")"
+        unresolved :: forall w i. HTML w i
+        unresolved = HH.text
+          $ "unresolved choice? (" <> show c <> ")"
 
 instance choiceRenderText :: RenderText Choice where
-  renderText = case _ of
+  renderText choice = HH.span_ case choice of
     If { condition, choice, otherwise } ->
-      "If (" <> renderText condition <> ") then ("
-      <> renderText choice <> ")"
-      <> case otherwise of
-        Nothing -> ""
-        Just o -> " otherwise (" <> renderText o <> ")"
+      [ HH.text "If ("
+      , renderText condition
+      , HH.text ") then ("
+      , renderText choice
+      , HH.text ")"
+      ] <> case otherwise of
+        Nothing -> []
+        Just o ->
+          [ HH.text " otherwise ("
+          , renderText o
+          , HH.text ")"
+          ]
     And { choices } ->
-      intercalate " and " (parenthesize <<< renderText <$> choices)
+      intercalate [ HH.text " and " ]
+        (parenthesize <<< renderText <$> choices)
     Or { choices } ->
-      intercalate " or " (parenthesize <<< renderText <$> choices)
+      intercalate [HH.text " or " ]
+        (parenthesize <<< renderText <$> choices)
     PickN { n, choices } ->
-      show n <> " of: " <> intercalate " or " (renderText <$> choices)
+      [ HH.text $ show n <> " of: " ]
+        <> intercalate [ HH.text " or " ]
+        (pure <<< renderText <$> choices)
     Option { choice } ->
-      "optionally " <> renderText choice
+      [ HH.text "optionally "
+      , renderText choice
+      ]
     MoveFromTo { n, destination } -> case n of
       UpTo n ->
-        verb <> " up to " <> show (n .^ _WireInt)
+        [ HH.text $ verb <> " up to "
+          <> show (n .^ _WireInt)
+        ]
       Exactly n ->
-        verb <> " " <> show (n .^ _WireInt)
+        [ HH.text $ verb <> " "
+          <> show (n .^ _WireInt)
+        ]
       DownTo n ->
-        verb <> " down to " <> show (n .^ _WireInt)
+        [ HH.text $ verb <> " down to "
+          <> show (n .^ _WireInt)
+        ]
       where
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
@@ -121,22 +182,43 @@ instance choiceRenderText :: RenderText Choice where
           Pile.Deck -> "Put onto your deck"
           Pile.Trash -> "Trash"
     GainCards { n, cardName } ->
-      "Gain " <> cardName <> " x" <> show n
+      [ HH.text $ "Gain " <> cardName <> " x"
+        <> show n
+      ]
     GainActions { n } ->
-      "+" <> show n <> " actions"
+      [ HH.text $ "+" <> show n
+      , Icons.actions
+      ]
     GainBuys { n } ->
-      "+" <> show n <> " buys"
-    GainBonus { bonus } ->
-      "+" <> renderText bonus
+      [ HH.text $ "+" <> show n
+      , Icons.buys
+      ]
+    GainBonus { bonus } -> [ renderText bonus ]
     Discard { selection: SelectAll } ->
-      "Discard your hand"
+      [ HH.text "Discard your hand" ]
     Draw { n } ->
-      "Draw " <> show n <> " cards"
+      [ HH.text $ "+" <> show n
+      , Icons.cards
+      ]
 
-getCardName :: Pile -> Int -> GameState -> Int -> String
-getCardName source playerIndex state cardIndex =
-  fromMaybe "???" $ _.name <$> state
-  ^? GameState._pile source playerIndex <<< ix cardIndex
+instance renderTextBuy :: RenderText Buy where
+  renderText buy = HH.span_
+    [ HH.text $ show (buy ^. Buy._int)
+    , Icons.buys
+    ]
 
-parenthesize :: String -> String
-parenthesize s = "(" <> s <> ")"
+getCardName
+  :: forall w i
+  . Pile
+  -> Int
+  -> GameState
+  -> Int
+  -> HTML w i
+getCardName source playerIndex state cardIndex = HH.text
+  $ fromMaybe "???"
+  $ _.name
+  <$> state
+  ^? GameState._pile source playerIndex
+  <<< ix cardIndex
+
+parenthesize s = [ HH.text "(", s, HH.text ")" ]

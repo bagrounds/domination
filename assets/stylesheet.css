@@ -1,7 +1,6 @@
 
 * {
   -webkit-appearance: none;
-  font-size: 12pt;
   margin: 0;
   padding: 0;
   font-family: sans-serif;
@@ -18,15 +17,15 @@ body {
 }
 
 h1 {
-  font-size: 22pt;
+  font-size: 1.6em;
 }
 
 h2 {
-  font-size: 20pt;
+  font-size: 1.4em;
 }
 
 h3 {
-  font-size: 16pt;
+  font-size: 1.2em;
 }
 
 a {
@@ -38,7 +37,13 @@ header {
   height: 3em;
 }
 
+button,
+input {
+  font-size: 1em;
+}
+
 main {
+  font-size: 12pt;
   text-align: center;
   vertical-align: middle;
   margin: 0 auto;
@@ -58,6 +63,12 @@ button {
   border-color: black;
   padding: 0.6em;
   border-radius: 0.6em;
+}
+
+button span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tool-tip {
@@ -144,27 +155,19 @@ button {
 
 .stack-count {
   position: absolute;
-  top: 3em;
+  top: 3.1em;
   left: 0.6em;
-  width: 1.6em;
+  width: 1.5em;
   height: 1.5em;
   line-height: 1.5em;
   font-weight: bold;
   text-align: center;
   vertical-align: center;
-  font-size: 12pt;
+  font-size: 1.25em;
   color: white;
   border-radius: 1em;
   background-color: black;
   opacity: 0.5;
-}
-
-.supply .stack-count {
-  font-size: 16pt;
-}
-
-.hand .stack-count {
-  font-size: 16pt;
 }
 
 .card {
@@ -202,14 +205,9 @@ button {
   line-height: 1.55em;
 }
 
-.buying .card-text,
-.play .card-text {
-  font-size: 8pt;
-}
-
-.buying .card,
-.play .card {
-  font-size: 9pt;
+.buying,
+.play {
+  font-size: 0.75em;
 }
 
 .play {
@@ -257,7 +255,7 @@ button {
   align-items: center;
   height: 2em;
   line-height: 2em;
-  font-size: 14pt;
+  font-size: 1.2em;
 }
 
 .supply .hand-info {
@@ -423,7 +421,7 @@ button {
 .stat {
   display: flex;
   align-items: center;
-  font-size: 14pt;
+  font-size: 1.2em;
   text-align: left;
   height: 1.5em;
   line-height: 1.5em;
@@ -437,24 +435,23 @@ button {
 
 .icon {
   display: inline-block;
-  border: 1px solid black;
+  width: 1.5em;
+  height: 1.5em;
   border-radius: 0.2em;
   margin-left: 0.2em;
-  width: 1.45em;
-  height: 1.45em;
   margin-right: 0.2em;
   background-repeat: no-repeat;
   background-position: center;
 }
 
+.chat-history .icon {
+  width: 0.85em;
+  height: 0.85em;
+}
+
 .hand-info .icon {
   width: 2em;
   height: 2em;
-}
-
-.play .icon {
-  width: 1em;
-  height: 1em;
 }
 
 .icon.actions {

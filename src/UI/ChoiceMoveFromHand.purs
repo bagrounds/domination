@@ -19,6 +19,7 @@ import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
 import Halogen (Component)
 import Halogen.HTML (HTML)
+import Halogen.HTML as HH
 
 component
   :: forall query input m
@@ -42,10 +43,11 @@ component player choice baseSlotNumber =
     renderChoice = case _ of
       x@(MoveFromTo { n, resolution: Nothing }) -> Just
         { title: renderText x
-        , buttonText: "Done"
+        , buttonText: HH.text "Done"
         }
       _ -> Nothing
-    canToggle { selected, total } = selected || total < maxSelected
+    canToggle { selected, total } =
+      selected || total < maxSelected
     maxSelected = case choice of
       MoveFromTo { n } ->
         case n of
@@ -54,7 +56,8 @@ component player choice baseSlotNumber =
           DownTo n -> length cards - (review _WireInt n)
       _ -> 0
     resolve resolution = case choice of
-      MoveFromTo x -> MoveFromTo x { resolution = resolution }
+      MoveFromTo x ->
+        MoveFromTo x { resolution = resolution }
       y -> y
     pile = case choice of
       MoveFromTo { source } -> source

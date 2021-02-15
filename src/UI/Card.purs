@@ -149,7 +149,7 @@ descriptionComponent slotNumber card' =
               Nothing -> []
               Just reaction ->
                 [ HH.hr_
-                , HH.text $ renderText reaction
+                , renderText reaction
                 ]
           ]
         else []

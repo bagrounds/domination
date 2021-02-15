@@ -53,7 +53,7 @@ component { n, title, choices } =
               then Css.toTrash
               else Css.toKeep
             ]
-            [ HH.text $ renderText choice ]
+            [ renderText choice ]
 
     eval
       :: forall a

@@ -1,6 +1,4 @@
-module Domination.UI.CardChooser
-  ( component
-  ) where
+module Domination.UI.CardChooser where
 
 import Prelude
 
@@ -20,6 +18,7 @@ import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Util (h2__)
 import Halogen as H
+import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -31,8 +30,11 @@ data Action
   | Done
 
 type RenderChoice
-  = Choice
-  -> Maybe { title :: String, buttonText :: String }
+  = forall w. Choice
+  -> Maybe
+    { title :: HTML w Action
+    , buttonText :: HTML w Action
+    }
 
 type CanToggle = { selected :: Boolean, total :: Int } -> Boolean
 
@@ -48,7 +50,7 @@ type ComponentSpec =
 --component
 --  :: forall query input m
 --  . ComponentSpec
---  -> Component HTML query input Choice m
+--  -> Component HTML query Action Choice m
 component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pile } =
   H.mkComponent { initialState, render, eval }
     where
@@ -63,13 +65,13 @@ component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pi
     render xs =
       case Player.firstChoice player >>= renderChoice of
         Just { title, buttonText } -> HH.div_ $
-          [ h2__ title
+          [ title
           , HH.p_
             [ HH.button
               [ HP.class_ Css.resolveChoice
               , HE.onClick \_ -> Just $ Done
               ]
-              [ HH.text buttonText ]
+              [ buttonText ]
             ]
           ]
           <> renderCardToTrash `mapWithIndex` xs

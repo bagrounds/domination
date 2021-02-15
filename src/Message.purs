@@ -27,7 +27,7 @@ import Domination.Data.WireInt (WireInt, _WireInt)
 import Domination.UI.RenderText (renderTextInContext)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
-import Halogen.HTML.Elements (div, span) as HH
+import Halogen.HTML.Elements (div, span, span_) as HH
 import Halogen.HTML.Properties (class_) as HH
 
 type Envelope = { id :: String, message :: RemoteMessage }
@@ -164,33 +164,33 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
     Nothing -> HH.span [] []
     Just text -> HH.div
       [ HH.class_ $ ClassName "play-made-message" ]
-      [ HH.text $ "Player " <> show (player + 1) <> " "
-      , HH.span [ HH.class_ $ ClassName "play-made" ] [ HH.text text ]
+      [ HH.text $ "Player " <> show (player + 1) <> ": "
+      , HH.span
+        [ HH.class_ $ ClassName "play-made" ]
+        [ text ]
       ]
   where
-      play' :: Maybe String
+      play' :: forall w i. Maybe (HTML w i)
       play' = case play of
         NewGame { playerCount } -> Just $
-          "created a new " <> show playerCount <> " player game"
+          HH.span_
+            [ HH.text $ "created a new "
+              <> show playerCount <> " player game"
+            ]
         EndPhase { playerIndex } -> Nothing
         PlayCard { playerIndex, cardIndex } -> Just $
-          "played: " <> getPlayerCardName playerIndex state cardIndex
+          HH.text $ "played: "
+            <> getPlayerCardName playerIndex state cardIndex
         Purchase { playerIndex, stackIndex } -> Just $
-          "purchased: " <> text
+          HH.text $ "purchased: " <> text
           where
             text = case preview (GameState._stack stackIndex) state of
               Nothing -> "???"
               Just { card } -> card.name
-                <>
-                case card.special of
-                Nothing -> ""
-                Just _ -> " ("
-                  <> intercalate ", " (_.description <$> card.special)
-                  <> ")"
         ResolveChoice { playerIndex, choice } ->
           Just $ renderTextInContext playerIndex state choice
         React { playerIndex, reaction } -> Just $
-          case reaction of
+          HH.text $ case reaction of
             Nothing -> "did not react"
             Just BlockAttack -> "blocked an attack"
 

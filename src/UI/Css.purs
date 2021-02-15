@@ -53,6 +53,7 @@ toolTip = ClassName "tool-tip"
 toggle = ClassName "toggle"
 
 incrementer = ClassName "incrementer"
+dialogue = ClassName "dialogue"
 
 icon = ClassName "icon"
 actions = ClassName "actions"
