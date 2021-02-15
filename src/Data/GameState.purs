@@ -226,7 +226,7 @@ defaultSupply playerCount = Cards.cardMap <#> \card ->
       else if Card.hasType Treasure card
       then treasureCount
       else kingdomCount
-    curseCount = 10 * (playerCount - 1)
+    curseCount = 10 * (playerCount - one)
     victoryCount = 4 * playerCount
     kingdomCount = 4 * playerCount
     treasureCount = 10 * playerCount
@@ -317,7 +317,7 @@ nextPhase playerIndex state =
     nextPlayer s = s
       { turn =
         if s.phase == CleanupPhase
-        then (s.turn + 1) `mod` (length s.players)
+        then (s.turn + one) `mod` (length s.players)
         else s.turn
       }
 
@@ -619,8 +619,8 @@ newPlayer =
   , toDiscard: []
   , atPlay: []
   , buying: []
-  , actions: 1
-  , buys: 1
+  , actions: one
+  , buys: one
   , choices: []
   , reaction : Nothing
   , bonuses : []

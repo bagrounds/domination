@@ -117,8 +117,8 @@ component
 component = H.mkComponent { initialState, render, eval }
   where
   initialState _ =
-    { nextPlayerCount: 1
-    , nextPlayerIndex: 0
+    { nextPlayerCount: one
+    , nextPlayerIndex: zero
     , maybeGame: Nothing
     }
   render = renderPlayerN
@@ -143,7 +143,7 @@ handleQuery = case _ of
         log "I should ask the user if they want to load this state"
         let
           previousI = activeGame.i
-          expectedI = previousI + 1
+          expectedI = previousI + one
           isExpected = i == expectedI
         log
           $ "Expected i = " <> show expectedI
@@ -187,23 +187,23 @@ renderPlayerN
 renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
   [ Util.incrementer
     { label: "Players: "
-    , mbMin: Just 1
+    , mbMin: Just one
     , mbMax: Nothing
     , value: nextPlayerCount
     , setValue: WritePlayerCount
     }
   , Util.incrementer
     { label: "Player #: "
-    , mbMin: Just 1
+    , mbMin: Just one
     , mbMax: Nothing
-    , value: nextPlayerIndex + 1
-    , setValue: (_ - 1) >>> WritePlayerIndex
+    , value: nextPlayerIndex + one
+    , setValue: (_ - one) >>> WritePlayerIndex
     }
   , HH.div_
     [ HH.button
       [ HE.onClick \_ -> Just $ StartNewGame ]
       [ HH.text $ "Start New " <> show nextPlayerCount
-        <> " Player Game as Player " <> show (nextPlayerIndex + 1)
+        <> " Player Game as Player " <> show (nextPlayerIndex + one)
       ]
     , HH.button
       [ HE.onClick \_ -> Just $ LoadGameRequest ]
@@ -239,7 +239,7 @@ renderSupply' cs@{ state, playerIndex } player =
         && state.phase == BuyPhase
         then Css.active
         else Css.inactive
-      ] <> if player.buys < 1
+      ] <> if player.buys < one
         then [ Css.waiting ]
         else []
     ]
@@ -304,7 +304,7 @@ renderCard onClick player card slotNumber =
   Card.render onClick extraClasses card slotNumber
   where
     extraClasses = [
-      if player.actions > 0 && Card.isAction card
+      if player.actions > zero && Card.isAction card
       then Css.canPlay
       else Css.cantPlay
     ]
@@ -327,9 +327,9 @@ renderStack onClick player slotNumber stack =
       , HH.li
         [ HP.classes
           [ Css.stackCard
-          , if player.buys > 0
+          , if player.buys > zero
             && Player.cash player >= stack.card.cost
-            && stack.count > 0
+            && stack.count > zero
             then Css.canBuy
             else Css.cantBuy
           ]
@@ -371,7 +371,7 @@ playerStats { state, playerIndex: me } playerIndex player = HH.li
       ]
     else [ HH.i [ HP.class_ Css.icon ] [] ]
   ) <>
-  [ HH.text $ "Player " <> show (playerIndex + 1)
+  [ HH.text $ "Player " <> show (playerIndex + one)
   , HH.text $ " | " <> show player.actions
   , Icons.actions
   , HH.text $ " | " <> show player.buys
@@ -418,7 +418,7 @@ renderPlayer cs@{ state, playerIndex } player =
           then [ HP.class_ Css.waiting ]
           else []
         )
-        [ h2__ $ "Player " <> show (playerIndex + 1)
+        [ h2__ $ "Player " <> show (playerIndex + one)
         , renderSupply' cs player
         , renderNextPhaseButton cs
         , renderStats cs
@@ -551,7 +551,7 @@ renderNextPhaseButton { playerIndex, state } =
     [ HH.span_ if state.turn == playerIndex
       then if Dom.choicesOutstanding state
         then [ HH.text $ "Waiting for Player "
-          <> show (Dom.choiceTurn state + 1)
+          <> show (Dom.choiceTurn state + one)
           <> " to Choose" ]
         else case state.phase of
           ActionPhase ->
@@ -568,7 +568,7 @@ renderNextPhaseButton { playerIndex, state } =
             pure $ HH.text "Complete Turn"
       else
         [ HH.text $ "Waiting for Player "
-          <> show (state.turn + 1) <> " | "
+          <> show (state.turn + one) <> " | "
         , renderText state.phase
         ]
     ]
@@ -629,8 +629,8 @@ renderHand player { playerIndex, state } = HH.ul
       then Css.active
       else Css.inactive
     ] <>
-    if player.actions < 1
-    || (length $ Card.isAction `filter` player.hand) < 1
+    if player.actions < one
+    || (length $ Card.isAction `filter` player.hand) < one
     then [ Css.waiting ]
     else []
   ] $
@@ -671,7 +671,7 @@ renderHand player { playerIndex, state } = HH.ul
     onClick stack hand = const $ Just $ MakePlay
       $ PlayCard { playerIndex,  cardIndex }
       where
-        cardIndex = fromMaybe (-1)
+        cardIndex = fromMaybe (-one)
           $ findIndex (_.name >>> (_ == stack.card.name)) hand
 
 handleAction
@@ -685,20 +685,20 @@ handleAction = case _ of
     { nextPlayerIndex, nextPlayerCount } <- H.get
     log $ "Domination: updating playerIndex from "
       <> show nextPlayerIndex <> " -> " <> show index
-    H.modify_ $ (_nextPlayerIndex .~ (max index 0))
-      >>> (_nextPlayerCount .~ (max (index + 1) nextPlayerCount))
+    H.modify_ $ (_nextPlayerIndex .~ (max index zero))
+      >>> (_nextPlayerCount .~ (max (index + one) nextPlayerCount))
   WritePlayerCount count -> do
     { nextPlayerIndex, nextPlayerCount } <- H.get
     log $ "Domination: updating playerCount from "
       <> show nextPlayerCount <> " -> " <> show count
-    H.modify_ $ (_nextPlayerCount .~ (max count 1))
-      <<< (_nextPlayerIndex .~ (min (count - 1) nextPlayerIndex))
+    H.modify_ $ (_nextPlayerCount .~ (max count one))
+      <<< (_nextPlayerIndex .~ (min (count - one) nextPlayerIndex))
   StartNewGame -> do
     { nextPlayerIndex: playerIndex, nextPlayerCount: playerCount } <- H.get
     log $ "Domination: StartNewGame as player " <> show playerIndex
     playAndReport playerIndex $ NewGame { playerCount }
   MakePlay play -> do
-    let playerIndex = fromMaybe 0 $ play ^? Play._playerIndex
+    let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
     log "Domination: MakePlay"
     playAndReport playerIndex play
   LoadGameRequest -> H.raise LoadGame
@@ -718,7 +718,7 @@ playAndReport playerIndex play = do
     Nothing -> case play of
       NewGame { playerCount } -> doTheRest
       -- TODO: WritePlayerCount here
-        { i: 0
+        { i: zero
         , state: Dom.newGame playerCount
         , playerCount: nextPlayerCount
         , playerIndex: nextPlayerIndex
@@ -740,8 +740,8 @@ playAndReport playerIndex play = do
                 , state: activeState.state
                 }
             newI = case play of
-              NewGame _ -> 0
-              _ -> activeState.i + 1
+              NewGame _ -> zero
+              _ -> activeState.i + one
           H.modify_
             $ (_state .~ gs)
             >>> (_maybeGame <<< _Just <<< _playerIndex .~ activeState.playerIndex)

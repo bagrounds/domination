@@ -19,6 +19,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, shuffle)
+import Domination.Data.Actions (Actions(..))
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus as Bonus
 import Domination.Data.Card (Card)
@@ -33,22 +34,22 @@ import Rule (Rule, check, (!>), (<@!))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
 
 type Player =
-  { deck :: Array Card
-  , hand :: Array Card
-  , discard :: Array Card
-  , toDiscard :: Array Card
+  { actions :: Actions
   , atPlay :: Array Card
+  , bonuses :: Array Bonus
   , buying :: Array Card
-  , actions :: Int
   , buys :: Int
   , choices :: Array Choice
+  , deck :: Array Card
+  , discard :: Array Card
+  , hand :: Array Card
   , reaction :: Maybe Reaction
-  , bonuses :: Array Bonus
+  , toDiscard :: Array Card
   }
 
 type WirePlayer =
-  (Tuple WireInt
-  (Tuple (Array WireInt)
+  (Tuple Actions
+  (Tuple (Array WireInt) -- atPlay
   (Tuple (Array Bonus) -- bonuses
   (Tuple (Array WireInt)
   (Tuple WireInt
@@ -61,7 +62,6 @@ type WirePlayer =
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
   to = (prop _buys %~ view _WireInt)
-    >>> (prop _actions %~ view _WireInt)
     >>> (prop _choices <$>~ view Choice._toWire)
     >>> (prop _deck <$>~ view Cards._toWire)
     >>> (prop _hand <$>~ view Cards._toWire)
@@ -72,7 +72,6 @@ _toWire = iso to from where
     >>> toTuple
   from = fromTuple
     >>> (prop _buys %~ review _WireInt)
-    >>> (prop _actions %~ review _WireInt)
     >>> (prop _choices <$>~ review Choice._toWire)
     >>> (prop _deck <$>~ review Cards._toWire)
     >>> (prop _hand <$>~ review Cards._toWire)
@@ -148,7 +147,7 @@ _atPlay :: Lens' Player (Array Card)
 _atPlay = prop (SProxy :: SProxy "atPlay")
 _buying :: Lens' Player (Array Card)
 _buying = prop (SProxy :: SProxy "buying")
-_actions :: Lens' Player Int
+_actions :: Lens' Player Actions
 _actions = prop (SProxy :: SProxy "actions")
 _buys :: Lens' Player Int
 _buys = prop (SProxy :: SProxy "buys")
@@ -190,7 +189,7 @@ play cardIndex player = do
   player' <- drawCards playedCard.cards (_hand .~ hand' $ player)
   check $ playedCard <@! Card.isAction !> "must play action cards"
   pure $ player' # (_atPlay :~ playedCard)
-    >>> (_actions +~ (playedCard.actions - 1))
+    >>> (_actions +~ playedCard.actions - one)
     >>> (_buys +~ playedCard.buys)
 
 firstChoice :: Player -> Maybe Choice
@@ -207,7 +206,7 @@ dropChoice = fromJust "failed to drop choice"
 gainBonus :: Bonus -> Player -> Player
 gainBonus = prependOver _bonuses
 
-gainActions :: Int -> Player -> Player
+gainActions :: Actions -> Player -> Player
 gainActions n = over _actions (_ + n)
 
 gainBuys :: Int -> Player -> Player
@@ -247,7 +246,7 @@ purchase :: Card -> Player -> Player
 purchase card = decOver _buys >>> prependOver _buying card
 
 hasActions :: Player -> Boolean
-hasActions = (_ > 0) <<< _.actions
+hasActions = (_ > zero) <<< _.actions
 
 hasActionCardsInHand :: Player -> Boolean
 hasActionCardsInHand = not null <<< filter Card.isAction <<< _.hand
@@ -302,8 +301,8 @@ cleanup player = drawCards 5 player
   , hand = []
   , toDiscard = []
   , buying = []
-  , actions = 1
-  , buys = 1
+  , actions = one
+  , buys = one
   , bonuses = []
   }
 
@@ -323,7 +322,7 @@ assertHasBuys :: forall m. MonadError String m => Player -> m Player
 assertHasBuys = assert (_.buys >>> (_ > 0)) "no buys!"
 
 assertHasActions :: forall m. MonadError String m => Player -> m Player
-assertHasActions = assert (_.actions >>> (_ > 0)) "no actions!"
+assertHasActions = assert (_.actions >>> (_ > zero)) "no actions!"
 
 assertHasCash
   :: forall m

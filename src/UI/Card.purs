@@ -61,7 +61,7 @@ render onClick extraClasses card slotNumber = HH.div
             (const Nothing)
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardCards ] ]
-              if card.cards > 0
+              if card.cards > zero
               then
                 [ HH.text $ "+" <> show card.cards
                 , Icons.cards
@@ -69,7 +69,7 @@ render onClick extraClasses card slotNumber = HH.div
               else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardActions ] ]
-              if card.actions > 0
+              if card.actions > zero
               then
                 [ HH.text $ "+" <> show card.actions
                 , Icons.actions
@@ -77,7 +77,7 @@ render onClick extraClasses card slotNumber = HH.div
               else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardBuys ] ]
-              if card.buys > 0
+              if card.buys > zero
               then
                 [ HH.text $ "+" <> show card.buys
                 , Icons.buys
@@ -85,7 +85,7 @@ render onClick extraClasses card slotNumber = HH.div
               else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
-              if card.treasure > 0
+              if card.treasure > zero
               then
                 [ HH.text $ "+" <> show card.treasure
                 , Icons.money
@@ -93,10 +93,10 @@ render onClick extraClasses card slotNumber = HH.div
               else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
-              if card.victoryPoints /= 0
+              if card.victoryPoints /= zero
               then
                 [ HH.text
-                  $ (if card.victoryPoints > 0 then "+" else "")
+                  $ (if card.victoryPoints > zero then "+" else "")
                   <> show card.victoryPoints
                 , Icons.points
                 ]

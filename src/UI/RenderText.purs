@@ -6,8 +6,10 @@ import Data.Array (intercalate)
 import Data.Lens ((^?), (^.))
 import Data.Lens.Index (ix)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Domination.Data.Actions (Actions)
+import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
-import Domination.Data.Buy (Buy(..))
+import Domination.Data.Buy (Buy)
 import Domination.Data.Buy as Buy
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
@@ -21,7 +23,7 @@ import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.WireInt (_WireInt)
 import Domination.UI.Icons as Icons
-import Halogen.HTML (HTML(..))
+import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Util ((.^))
 
@@ -54,6 +56,12 @@ instance bonusRenderText :: RenderText Bonus where
       [ HH.text $ "+" <> show (n .^ _WireInt)
       , Icons.money
       ]
+
+instance actionsRenderText :: RenderText Actions where
+  renderText actions = HH.span_
+    [ HH.text $ show (actions ^. Actions._int)
+    , Icons.actions
+    ]
 
 instance conditionRenderText :: RenderText Condition where
   renderText condition = HH.text $ case condition of
@@ -109,8 +117,8 @@ instance choiceRenderTextInContext
       GainCards { n, cardName } ->
         [ HH.text $ "+" <> show n <> "x " <> cardName ]
       GainActions { n, resolution } ->
-        [ HH.text $ "+ " <> show n
-        , Icons.actions
+        [ HH.text "+"
+        , renderText n
         ]
       GainBuys { n, resolution } ->
         [ HH.text $ "gained +" <> show n
@@ -186,8 +194,8 @@ instance choiceRenderText :: RenderText Choice where
         <> show n
       ]
     GainActions { n } ->
-      [ HH.text $ "+" <> show n
-      , Icons.actions
+      [ HH.text "+"
+      , renderText n
       ]
     GainBuys { n } ->
       [ HH.text $ "+" <> show n

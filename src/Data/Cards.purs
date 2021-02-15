@@ -7,6 +7,7 @@ import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Domination.Data.Actions (actions)
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
@@ -78,7 +79,7 @@ emptyChoice = GainBonus
   }
 
 copper :: Card
-copper = Card.treasure { name = "Copper", treasure = 1 }
+copper = Card.treasure { name = "Copper", treasure = one }
 
 silver :: Card
 silver = Card.treasure { name = "Silver", cost = 3, treasure = 2 }
@@ -90,7 +91,11 @@ platinum :: Card
 platinum = Card.treasure { name = "Platinum", cost = 9, treasure = 5 }
 
 estate :: Card
-estate = Card.victory { name = "Estate", cost = 2, victoryPoints  = 1 }
+estate = Card.victory
+  { name = "Estate"
+  , cost = 2
+  , victoryPoints = one
+  }
 
 duchy :: Card
 duchy = Card.victory { name = "Duchy", cost = 5, victoryPoints = 3 }
@@ -105,27 +110,31 @@ colony =
 
 curse :: Card
 curse =
-  Card.card { types = [Curse], name = "Curse", victoryPoints = -1 }
+  Card.card { types = [Curse], name = "Curse", victoryPoints = -one }
 
 greatHall :: Card
 greatHall = Card.victory
   { types = [Action, Victory]
   , name = "Great Hall"
   , cost = 3
-  , cards = 1
-  , actions = 1
-  , victoryPoints = 1
+  , cards = one
+  , actions = one
+  , victoryPoints = one
   }
 
 village :: Card
-village =
-  Card.action { name = "Village", cost = 3, cards = 1, actions = 2 }
+village = Card.action
+  { name = "Village"
+  , cost = 3
+  , cards = one
+  , actions = actions 2
+  }
 
 woodCutter :: Card
 woodCutter = Card.action
   { name = "Wood Cutter"
   , cost = 3
-  , buys = 1
+  , buys = one
   , treasure = 2
   }
 
@@ -134,7 +143,7 @@ laboratory = Card.action
   { name = "Laboratory"
   , cost = 5
   , cards = 2
-  , actions = 1
+  , actions = one
   }
 
 smithy :: Card
@@ -144,8 +153,8 @@ festival :: Card
 festival = Card.action
   { name = "Festival"
   , cost = 5
-  , actions = 2
-  , buys = 1
+  , actions = actions 2
+  , buys = one
   , treasure = 2
   }
 
@@ -153,10 +162,10 @@ market :: Card
 market = Card.action
   { name = "Market"
   , cost = 5
-  , actions = 1
-  , cards = 1
-  , buys = 1
-  , treasure = 1
+  , actions = one
+  , cards = one
+  , buys = one
+  , treasure = one
   }
 
 harem :: Card
@@ -172,9 +181,9 @@ bazaar :: Card
 bazaar = Card.action
   { name = "Bazaar"
   , cost = 5
-  , cards = 1
-  , actions = 2
-  , treasure = 1
+  , cards = one
+  , actions = actions 2
+  , treasure = one
   }
 
 monument :: Card
@@ -183,16 +192,16 @@ monument = Card.action
   , name = "Monument"
   , cost = 4
   , treasure = 2
-  , victoryPoints = 1
+  , victoryPoints = one
   }
 
 workersVillage :: Card
 workersVillage = Card.action
   { name = "Worker's Village"
   , cost = 4
-  , cards = 1
-  , actions = 2
-  , buys = 1
+  , cards = one
+  , actions = actions 2
+  , buys = one
   }
 
 witch :: Card
@@ -208,7 +217,7 @@ witchChoice :: Choice
 witchChoice = let attack = true in GainCards
   { cardName: "Curse"
   , destination: Pile.Discard
-  , n: 1
+  , n: one
   , resolution: Nothing
   , attack
   }
@@ -226,13 +235,13 @@ councilRoom = let attack = false in
   { name = "Council Room"
   , cost = 5
   , cards = 4
-  , buys = 1
+  , buys = one
   , special = Just councilRoomSpecial
   }
 
 draw1Card :: Choice
 draw1Card = let attack = false in Draw
-  { n: 1
+  { n: one
   , resolution: Nothing
   , attack
   }
@@ -350,7 +359,7 @@ noblesChoice :: Choice
 noblesChoice = let attack = false in Or
   { choices:
     [ Draw { n: 3, attack, resolution: Nothing }
-    , GainActions { n: 2, attack, resolution: Nothing }
+    , GainActions { n: actions 2, attack, resolution: Nothing }
     ]
   , resolution: Nothing
   , attack
@@ -408,10 +417,10 @@ pawnChoice :: Choice
 pawnChoice = let attack = false in PickN
   { n: 2
   , choices:
-    [ Draw { n: 1, attack, resolution: Nothing }
-    , GainBonus { bonus: Cash $ 1 ^. _WireInt, attack, resolution: Nothing }
-    , GainActions { n: 1, attack, resolution: Nothing }
-    , GainBuys { n: 1, attack, resolution: Nothing }
+    [ Draw { n: one, attack, resolution: Nothing }
+    , GainBonus { bonus: Cash one, attack, resolution: Nothing }
+    , GainActions { n: one, attack, resolution: Nothing }
+    , GainBuys { n: one, attack, resolution: Nothing }
     ]
   , resolution: Nothing
   , attack
@@ -435,7 +444,7 @@ torturer = Card.actionAttack
 torturerChoice :: Choice
 torturerChoice = let attack = true in
   PickN
-  { n: 1
+  { n: one
   , choices:
     [ MoveFromTo
       { n: Exactly $ 2 ^. _WireInt
@@ -446,7 +455,7 @@ torturerChoice = let attack = true in
       , resolution: Nothing
       }
     , GainCards
-      { n: 1
+      { n: one
       , cardName: "Curse"
       , destination: Pile.Discard
       , attack
@@ -508,7 +517,7 @@ moneyLenderChoice = let attack = false in
     { choice: And
       { choices:
         [ MoveFromTo
-          { n: Exactly $ 1 ^. _WireInt
+          { n: Exactly one
           , filter: Just (HasName "Copper")
           , source: Pile.Hand
           , destination: Pile.Trash
@@ -543,14 +552,14 @@ harbinger :: Card
 harbinger = Card.action
   { name = "Harbinger"
   , cost = 3
-  , cards = 1
-  , actions = 1
+  , cards = one
+  , actions = one
   , special = Just harbingerSpecial
   }
 
 harbingerChoice :: Choice
 harbingerChoice = MoveFromTo
-  { n: UpTo $ 1 ^. _WireInt
+  { n: UpTo one
   , filter: Nothing
   , source: Pile.Discard
   , destination: Pile.Deck
@@ -570,7 +579,7 @@ baron :: Card
 baron = Card.action
   { name = "Baron"
   , cost = 4
-  , buys = 1
+  , buys = one
   , special = Just baronSpecial
   }
 
@@ -584,7 +593,7 @@ gain4Cash = GainBonus
 gain1Estate :: Choice
 gain1Estate = GainCards
   { cardName: "Estate"
-  , n: 1
+  , n: one
   , destination: Pile.Discard
   , attack: false
   , resolution: Nothing
@@ -593,7 +602,7 @@ gain1Estate = GainCards
 discard1Estate :: Choice
 discard1Estate = MoveFromTo
   { filter: Just $ HasName "Estate"
-  , n: Exactly $ 1 ^. _WireInt
+  , n: Exactly one
   , source: Pile.Hand
   , destination: Pile.Discard
   , attack: false
@@ -635,7 +644,7 @@ goldfish :: Card
 goldfish = Card.action
   { name = "Goldfish"
   , cost = 4
-  , buys = 1
+  , buys = one
   , special = Just goldfishSpecial
   }
 
@@ -652,7 +661,7 @@ goldfishChoice = let attack = false in If
   , choice: GainCards
     { cardName: "Gold"
     , destination: Pile.Hand
-    , n: 1
+    , n: one
     , resolution: Nothing
     , attack
     }
@@ -680,7 +689,7 @@ mountebankChoice = let attack = true in If
   , choice: Or
     { choices:
       [ MoveFromTo
-        { n: Exactly $ 1 ^. _WireInt
+        { n: Exactly one
         , filter: Just $ HasName "Curse"
         , source: Pile.Hand
         , destination: Pile.Discard
@@ -703,14 +712,14 @@ gainCurseAndCopper = let attack = true in And
     [ GainCards
       { cardName: "Copper"
       , destination: Pile.Discard
-      , n: 1
+      , n: one
       , attack
       , resolution: Nothing
       }
     , GainCards
       { cardName: "Curse"
       , destination: Pile.Discard
-      , n: 1
+      , n: one
       , attack
       , resolution: Nothing
       }
@@ -724,7 +733,7 @@ margrave = let attack = true in Card.actionAttack
   { name = "Margrave"
   , cost = 5
   , cards = 3
-  , buys = 1
+  , buys = one
   , special = Just
     { target: EveryoneElse
     , command: Choose $ And

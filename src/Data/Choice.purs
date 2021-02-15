@@ -15,6 +15,7 @@ import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Maybe (Maybe)
+import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Condition (Condition)
 import Domination.Data.Constraint (Constraint)
@@ -68,7 +69,7 @@ data Choice
     , resolution :: Maybe Unit
     }
   | GainActions
-    { n :: Int
+    { n :: Actions
     , resolution :: Maybe Unit
     , attack :: Boolean
     }
@@ -118,7 +119,7 @@ data WireChoice
   | WireMoveFromTo Boolean Pile (Maybe Filter) Constraint
     (Maybe (Array WireInt)) Pile
   | WireGainCards Boolean String Pile WireInt (Maybe Unit)
-  | WireGainActions Boolean WireInt (Maybe Unit)
+  | WireGainActions Boolean Actions (Maybe Unit)
   | WireGainBuys Boolean WireInt (Maybe Unit)
   | WireDiscard Boolean (Maybe Unit) SelectCards
   | WireDraw Boolean WireInt (Maybe Unit)
@@ -144,7 +145,7 @@ _toWire = iso to from where
     GainCards { attack, cardName, destination, n, resolution } ->
       WireGainCards attack cardName destination (n ^. _WireInt) resolution
     GainActions { attack, n, resolution } ->
-      WireGainActions attack (n ^. _WireInt) resolution
+      WireGainActions attack n resolution
     GainBuys { attack, n, resolution } ->
       WireGainBuys attack (n ^. _WireInt) resolution
     Discard { attack, resolution, selection } ->
@@ -169,7 +170,7 @@ _toWire = iso to from where
     WireGainCards attack cardName destination n resolution ->
       GainCards { attack, cardName, destination, n: review _WireInt n, resolution }
     WireGainActions attack n resolution ->
-      GainActions { attack, n: review _WireInt n, resolution }
+      GainActions { attack, n, resolution }
     WireGainBuys attack n resolution ->
       GainBuys { attack, n: review _WireInt n, resolution }
     WireDiscard attack resolution selection ->
