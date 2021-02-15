@@ -3,32 +3,33 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, deleteAt, filter, head, length, reverse, (:))
+import Data.Array (catMaybes, deleteAt, filter, head, length, reverse)
 import Data.Foldable (foldr, null)
 import Data.Lens.Fold (firstOf, preview)
-import Data.Lens.Getter (view, viewOn)
+import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso (Iso', iso)
-import Data.Lens.Lens (Lens')
+import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set, (+~), (.~), (%~))
+import Data.Lens.Setter (over, (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, shuffle)
-import Domination.Data.Actions (Actions(..))
+import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus as Bonus
+import Domination.Data.Buys (Buys)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice, WireChoice)
 import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
-import Domination.Data.WireInt (WireInt(..), _WireInt)
+import Domination.Data.WireInt (WireInt)
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
@@ -38,7 +39,7 @@ type Player =
   , atPlay :: Array Card
   , bonuses :: Array Bonus
   , buying :: Array Card
-  , buys :: Int
+  , buys :: Buys
   , choices :: Array Choice
   , deck :: Array Card
   , discard :: Array Card
@@ -51,44 +52,32 @@ type WirePlayer =
   (Tuple Actions
   (Tuple (Array WireInt) -- atPlay
   (Tuple (Array Bonus) -- bonuses
-  (Tuple (Array WireInt)
-  (Tuple WireInt
+  (Tuple (Array WireInt) -- buying
+  (Tuple Buys
   (Tuple (Array WireChoice) -- choices
-  (Tuple (Array WireInt)
-  (Tuple (Array WireInt)
-  (Tuple (Array WireInt)
+  (Tuple (Array WireInt) -- deck
+  (Tuple (Array WireInt) -- discard
+  (Tuple (Array WireInt) -- hand
   (Tuple (Maybe Reaction) (Array WireInt)))))))))))
 
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
-  to = (prop _buys %~ view _WireInt)
-    >>> (prop _choices <$>~ view Choice._toWire)
-    >>> (prop _deck <$>~ view Cards._toWire)
-    >>> (prop _hand <$>~ view Cards._toWire)
-    >>> (prop _discard <$>~ view Cards._toWire)
-    >>> (prop _toDiscard <$>~ view Cards._toWire)
-    >>> (prop _atPlay <$>~ view Cards._toWire)
-    >>> (prop _buying <$>~ view Cards._toWire)
+  to = (_choices <$>~ view Choice._toWire)
+    >>> (_deck <$>~ view Cards._toWire)
+    >>> (_hand <$>~ view Cards._toWire)
+    >>> (_discard <$>~ view Cards._toWire)
+    >>> (_toDiscard <$>~ view Cards._toWire)
+    >>> (_atPlay <$>~ view Cards._toWire)
+    >>> (_buying <$>~ view Cards._toWire)
     >>> toTuple
   from = fromTuple
-    >>> (prop _buys %~ review _WireInt)
-    >>> (prop _choices <$>~ review Choice._toWire)
-    >>> (prop _deck <$>~ review Cards._toWire)
-    >>> (prop _hand <$>~ review Cards._toWire)
-    >>> (prop _discard <$>~ review Cards._toWire)
-    >>> (prop _toDiscard <$>~ review Cards._toWire)
-    >>> (prop _atPlay <$>~ review Cards._toWire)
-    >>> (prop _buying <$>~ review Cards._toWire)
-  _buys = SProxy :: SProxy "buys"
-  _bonuses = SProxy :: SProxy "bonuses"
-  _actions = SProxy :: SProxy "actions"
-  _choices = SProxy :: SProxy "choices"
-  _deck = SProxy :: SProxy "deck"
-  _hand = SProxy :: SProxy "hand"
-  _discard = SProxy :: SProxy "discard"
-  _toDiscard = SProxy :: SProxy "toDiscard"
-  _atPlay = SProxy :: SProxy "atPlay"
-  _buying = SProxy :: SProxy "buying"
+    >>> (_choices <$>~ review Choice._toWire)
+    >>> (_deck <$>~ review Cards._toWire)
+    >>> (_hand <$>~ review Cards._toWire)
+    >>> (_discard <$>~ review Cards._toWire)
+    >>> (_toDiscard <$>~ review Cards._toWire)
+    >>> (_atPlay <$>~ review Cards._toWire)
+    >>> (_buying <$>~ review Cards._toWire)
   toTuple
     { actions
     , atPlay
@@ -135,23 +124,41 @@ _toWire = iso to from where
     , toDiscard
     }
 
-_deck :: Lens' Player (Array Card)
+_deck
+  :: forall a b r
+  . Lens { deck :: a | r } { deck :: b | r } a b
 _deck = prop (SProxy :: SProxy "deck")
-_hand :: Lens' Player (Array Card)
+_hand
+  :: forall a b r
+  . Lens { hand :: a | r } { hand :: b | r } a b
 _hand = prop (SProxy :: SProxy "hand")
-_discard :: Lens' Player (Array Card)
+_discard
+  :: forall a b r
+  . Lens { discard :: a | r } { discard :: b | r } a b
 _discard = prop (SProxy :: SProxy "discard")
-_toDiscard :: Lens' Player (Array Card)
+_toDiscard
+  :: forall a b r
+  . Lens { toDiscard :: a | r } { toDiscard :: b | r } a b
 _toDiscard = prop (SProxy :: SProxy "toDiscard")
-_atPlay :: Lens' Player (Array Card)
+_atPlay
+  :: forall a b r
+  . Lens { atPlay :: a | r } { atPlay :: b | r } a b
 _atPlay = prop (SProxy :: SProxy "atPlay")
-_buying :: Lens' Player (Array Card)
+_buying
+  :: forall a b r
+  . Lens { buying :: a | r } { buying :: b | r } a b
 _buying = prop (SProxy :: SProxy "buying")
-_actions :: Lens' Player Actions
+_actions
+  :: forall a b r
+  . Lens { actions :: a | r } { actions :: b | r } a b
 _actions = prop (SProxy :: SProxy "actions")
-_buys :: Lens' Player Int
+_buys
+  :: forall a b r
+  . Lens { buys :: a | r } { buys :: b | r } a b
 _buys = prop (SProxy :: SProxy "buys")
-_choices :: Lens' Player (Array Choice)
+_choices
+  :: forall a b r
+  . Lens { choices :: a | r } { choices :: b | r } a b
 _choices = prop (SProxy :: SProxy "choices")
 _reaction :: Traversal' Player Reaction
 _reaction = prop (SProxy :: SProxy "reaction") <<< _Just
@@ -201,7 +208,7 @@ dropChoice
   => Player
   -> m Player
 dropChoice = fromJust "failed to drop choice"
-  <<< traverseOf _choices (deleteAt 0)
+  <<< traverseOf _choices (deleteAt zero)
 
 gainBonus :: Bonus -> Player -> Player
 gainBonus = prependOver _bonuses
@@ -209,7 +216,7 @@ gainBonus = prependOver _bonuses
 gainActions :: Actions -> Player -> Player
 gainActions n = over _actions (_ + n)
 
-gainBuys :: Int -> Player -> Player
+gainBuys :: Buys -> Player -> Player
 gainBuys n = over _buys (_ + n)
 
 gainChoices :: Array Choice -> Player -> Player
@@ -262,8 +269,8 @@ drawCards
   . MonadError String m
   => Random m
   => Int -> Player -> m Player
-drawCards n p = if n > 0
-  then drawCard p >>= drawCards (n - 1)
+drawCards n p = if n > zero
+  then drawCard p >>= drawCards (n - one)
   else pure p
 
 drawCard
@@ -316,10 +323,10 @@ allCards player
   <> player.buying
 
 score :: Player -> Int
-score player = foldr (+) 0 $ _.victoryPoints <$> allCards player
+score player = foldr (+) zero $ _.victoryPoints <$> allCards player
 
 assertHasBuys :: forall m. MonadError String m => Player -> m Player
-assertHasBuys = assert (_.buys >>> (_ > 0)) "no buys!"
+assertHasBuys = assert (_.buys >>> (_ > zero)) "no buys!"
 
 assertHasActions :: forall m. MonadError String m => Player -> m Player
 assertHasActions = assert (_.actions >>> (_ > zero)) "no actions!"

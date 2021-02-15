@@ -21,6 +21,7 @@ import Data.Lens.Prism (Review', Review, review)
 import Data.Lens.Setter (Setter', over, set, subOver)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
+import Data.Ring (class Ring)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 
@@ -126,8 +127,8 @@ infixr 4 mapOver as <$>~
 preAppendOver :: forall s a. ArrayLens' s a -> Array a -> s -> s
 preAppendOver lens xs = over lens (xs <> _)
 
-decOver :: forall s. Setter' s Int -> s -> s
-decOver = flip subOver 1
+decOver :: forall s n. Ring n => Setter' s n -> s -> s
+decOver = flip subOver one
 
 nthOf :: forall s a. Int -> ArrayLens' s a -> s -> Maybe a
 nthOf i lens = view lens >>> (_ !! i)

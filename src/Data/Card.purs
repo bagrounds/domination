@@ -17,6 +17,7 @@ import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Data.Actions (Actions)
+import Domination.Data.Buys (Buys)
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
 import Domination.Data.Reaction (Reaction)
@@ -29,7 +30,7 @@ type Card =
   , cost :: Int
   , victoryPoints :: Int
   , treasure :: Int
-  , buys :: Int
+  , buys :: Buys
   , cards :: Int
   , actions :: Actions
   , special :: Maybe Special
@@ -46,7 +47,7 @@ _victoryPoints :: Lens' Card Int
 _victoryPoints = prop (SProxy :: SProxy "victoryPoints")
 _treasure :: Lens' Card Int
 _treasure = prop (SProxy :: SProxy "treasure")
-_buys :: Lens' Card Int
+_buys :: Lens' Card Buys
 _buys = prop (SProxy :: SProxy "buys")
 _cards :: Lens' Card Int
 _cards = prop (SProxy :: SProxy "cards")

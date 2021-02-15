@@ -9,8 +9,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
-import Domination.Data.Buy (Buy)
-import Domination.Data.Buy as Buy
+import Domination.Data.Buys (Buys)
+import Domination.Data.Buys as Buys
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
@@ -61,6 +61,12 @@ instance actionsRenderText :: RenderText Actions where
   renderText actions = HH.span_
     [ HH.text $ show (actions ^. Actions._int)
     , Icons.actions
+    ]
+
+instance buysRenderText :: RenderText Buys where
+  renderText buy = HH.span_
+    [ HH.text $ show (buy ^. Buys._int)
+    , Icons.buys
     ]
 
 instance conditionRenderText :: RenderText Condition where
@@ -121,8 +127,8 @@ instance choiceRenderTextInContext
         , renderText n
         ]
       GainBuys { n, resolution } ->
-        [ HH.text $ "gained +" <> show n
-        , Icons.buys
+        [ HH.text "gained +"
+        , renderText n
         ]
       GainBonus { bonus, resolution } ->
         [ HH.text "gained"
@@ -198,8 +204,8 @@ instance choiceRenderText :: RenderText Choice where
       , renderText n
       ]
     GainBuys { n } ->
-      [ HH.text $ "+" <> show n
-      , Icons.buys
+      [ HH.text "+"
+      , renderText n
       ]
     GainBonus { bonus } -> [ renderText bonus ]
     Discard { selection: SelectAll } ->
@@ -208,12 +214,6 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text $ "+" <> show n
       , Icons.cards
       ]
-
-instance renderTextBuy :: RenderText Buy where
-  renderText buy = HH.span_
-    [ HH.text $ show (buy ^. Buy._int)
-    , Icons.buys
-    ]
 
 getCardName
   :: forall w i

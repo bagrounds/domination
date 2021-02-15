@@ -49,11 +49,11 @@ import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (.^), (<$>~))
 
 type GameState =
-  { turn :: Int
-  , phase :: Phase
+  { phase :: Phase
   , players :: Array Player
   , supply :: Supply
   , trash :: Array Card
+  , turn :: Int
   }
 
 type WireGameState = Tuple Phase
@@ -233,7 +233,7 @@ defaultSupply playerCount = Cards.cardMap <#> \card ->
 
 newGame :: Int -> GameState
 newGame playerCount =
-  { turn: 0
+  { turn: zero
   , phase: ActionPhase
   , players: replicate playerCount newPlayer
   , supply: defaultSupply playerCount
@@ -279,7 +279,8 @@ autoAdvance
   :: forall m
   . MonadError String m
   => Random m
-  => GameState -> m GameState
+  => GameState
+  -> m GameState
 autoAdvance gameState = do
     player <- getCurrentPlayer gameState
     case gameState.phase of
@@ -289,7 +290,7 @@ autoAdvance gameState = do
         then pure gameState
         else advancePhase >>= autoAdvance
       BuyPhase ->
-        if player.buys > 0
+        if player.buys > zero
         then pure gameState
         else advancePhase >>= autoAdvance
       CleanupPhase ->
@@ -454,7 +455,7 @@ resolveChoice { playerIndex, choice } state =
           forRemaining (lengthIs EQ $ review _WireInt n)
           ||
           ( forSource (lengthIs LT $ review _WireInt n)
-          && forSelected (lengthIs EQ 0)
+          && forSelected (lengthIs EQ zero)
           )
         Exactly n -> check $
           forSelected (lengthIs EQ $ review _WireInt n)
@@ -476,7 +477,7 @@ resolveChoice { playerIndex, choice } state =
       stack <- stackByName cardName state
       stackIndex <- indexOfStack stack.card state
       let cardsToGain = min n stack.count
-      let newCount = max 0 (stack.count - n)
+      let newCount = max zero (stack.count - n)
       let stackUpdate = Stack._count .~ newCount
       let cards = replicate cardsToGain stack.card
       let
@@ -609,7 +610,7 @@ choiceTurn state =
   let suffix = dropWhile (fst >>> (_ /= state.turn)) players' in
   let rotated = suffix <> prefix in
   let withChoices = (snd >>> Player.hasChoices) `filter` rotated in
-  fromMaybe 0 $ fst <$> (head withChoices)
+  fromMaybe zero $ fst <$> (head withChoices)
 
 newPlayer :: Player
 newPlayer =
@@ -631,7 +632,7 @@ describes = case _ of
   HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
   HasDiscard -> pure <<< _.discard >>> (not <<< null)
   Randomly percent ->
-    const $ (_ > (percent .^ _WireInt)) <$> randomIntBetween 0 100
+    const $ (_ > (percent .^ _WireInt)) <$> randomIntBetween zero 100
 
 passFilter :: Filter -> Card -> Boolean
 passFilter (HasName name) = _.name >>> (_ == name)
