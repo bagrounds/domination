@@ -206,6 +206,19 @@ button span,
   opacity: 0.5;
 }
 
+.treasure-card,
+.no-treasure-card,
+.reaction-card,
+.no-reaction-card,
+.action-card,
+.no-action-card,
+.attack-card,
+.no-attack-card,
+.victory-card,
+.no-victory-card {
+  display: inline-block;
+}
+
 .card {
   display: inline-block;
   vertical-align: top;
@@ -378,6 +391,7 @@ button span,
 
 .next-phase {
   width: 18em;
+  height: 100%;
   float: right;
   background-color: white;
   font-weight: bold;
