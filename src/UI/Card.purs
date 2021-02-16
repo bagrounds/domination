@@ -36,7 +36,11 @@ render onClick extraClasses card slotNumber = HH.div
     then [ HP.class_ Css.treasureCard ]
     else [ HP.class_ Css.noTreasureCard ]
   )
-  [ HH.div (if Card.isVictory card then [ HP.class_ Css.victoryCard ] else [ HP.class_ Css.noVictoryCard ])
+  [ HH.div
+    ( if Card.isVictory card
+      then [ HP.class_ Css.victoryCard ]
+      else [ HP.class_ Css.noVictoryCard ]
+    )
     [ HH.div
       ( if Card.hasType CardType.Attack card
         then [ HP.class_ Css.attackCard ]
@@ -71,16 +75,16 @@ render onClick extraClasses card slotNumber = HH.div
             [ HP.classes [ Css.cardText, Css.cardActions ] ]
               if card.actions > zero
               then
-                [ HH.text $ "+" <> show card.actions
-                , Icons.actions
+                [ HH.text "+"
+                , renderText card.actions
                 ]
               else []
           , HH.li
             [ HP.classes [ Css.cardText, Css.cardBuys ] ]
               if card.buys > zero
               then
-                [ HH.text $ "+" <> show card.buys
-                , Icons.buys
+                [ HH.text "+"
+                , renderText card.buys
                 ]
               else []
           , HH.li

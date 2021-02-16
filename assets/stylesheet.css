@@ -43,13 +43,14 @@ input {
 }
 
 main {
+  padding-top: 6em;
   font-size: 12pt;
   text-align: center;
   vertical-align: middle;
   margin: 0 auto;
   max-width: 48em;
   overflow-x: hidden;
-  padding-bottom: 6.5em;
+  padding-bottom: 9.5em;
 }
 
 main ul {
@@ -65,7 +66,29 @@ button {
   border-radius: 0.6em;
 }
 
-button span {
+.title {
+  min-width: 6em;
+  float: left;
+}
+
+.player-name {
+  min-width: 6em;
+  float: left;
+}
+
+.iteration {
+  min-width: 2em;
+  float: right;
+}
+
+.title,
+.player-name,
+.iteration {
+  display: inline-block;
+}
+
+button span,
+.hud span {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -81,6 +104,19 @@ button span {
 .container {
   display: inline-block;
   margin: 0 auto;
+}
+
+.hud {
+  position: fixed;
+  top: 0;
+  height: 5em;
+  width: 100%;
+  max-width: 48em;
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+  z-index: 100;
+  background-color: black;
 }
 
 .chat {
@@ -155,8 +191,8 @@ button span {
 
 .stack-count {
   position: absolute;
-  top: 3.1em;
-  left: 0.6em;
+  top: 2.5em;
+  left: 0.1em;
   width: 1.5em;
   height: 1.5em;
   line-height: 1.5em;
@@ -176,6 +212,7 @@ button span {
   overflow: hidden;
   width: 6em;
   padding: 0;
+  border: 1px solid black;
 }
 
 .supply {
@@ -232,7 +269,7 @@ button span {
   border-bottom: 0.1em solid;
   align-items: center;
   justify-content: center;
-  min-height: 3em;
+  min-height: 2.2em;
   line-height: 1em;
 }
 
@@ -240,7 +277,8 @@ button span {
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 2em;
+  height: 3em;
+  width: 100%;
   margin-bottom: 0.5em;
 }
 
@@ -258,102 +296,58 @@ button span {
   width: 50%;
 }
 
-.hand .hand-info {
+.hud .hand-info {
   width: 20%;
 }
 
-.curse-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid magenta;
-  background-color: magenta;
+.card-cost:not(:empty) {
+  border-top: 1px solid black;
+  justify-content: flex-start;
+  padding-left: 0.2em;
 }
 
-.curse-card .card-victory-points:not(:empty) {
-  background: magenta;
+.curse-card .card-cost,
+.curse-card .card-name {
+  background-color: mediumpurple;
 }
 
-.no-curse-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid black;
-  background-color: black;
-}
-
-.attack-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid red;
-  background-color: red;
-}
-
-.no-attack-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid black;
-  background-color: black;
-}
-
-.action-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid white;
-  background-color: white;
-}
-
-.no-action-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid black;
-  background-color: black;
-}
-
-.reaction-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid blue;
-  background-color: blue;
-}
-
-.no-reaction-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 2px solid black;
-  background-color: black;
-}
-
-.victory-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 3px solid lightgreen;
-  background-color: lightgreen;
-}
-
-.no-victory-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 3px solid black;
-  background-color: black;
-}
-
-.treasure-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 4px solid yellow;
+.treasure-card .card-cost,
+.treasure-card .card-name {
   background-color: yellow;
 }
 
-.no-treasure-card {
-  display: inline-block;
-  border-radius: 0.6em;
-  border: 4px solid black;
-  background-color: black;
+.victory-card .card-cost,
+.victory-card .card-name {
+  background-color: lightgreen;
 }
 
-.card-cost:not(:empty) {
-  background: darkgoldenrod;
-  justify-content: flex-start;
-  padding-left: 0.2em;
+.reaction-card .card-cost,
+.reaction-card .card-name {
+  background-color: lightblue;
+}
+
+.attack-card .card-cost,
+.attack-card .card-name {
+  background-color: rgb(255, 56, 56);
+}
+
+.action-card .card-cost,
+.action-card .card-name {
+  background-color: white;
+}
+
+.treasure-card .victory-card .card-cost,
+.treasure-card .victory-card .card-name {
+  background-image: linear-gradient(yellow, lightgreen);
+}
+
+.victory-card .action-card .card-cost,
+.victory-card .action-card .card-name {
+  background-image: linear-gradient(lightgreen, white);
+}
+
+.curse-card .card-victory-points:not(:empty) {
+  background: mediumpurple;
 }
 
 .active {
@@ -366,16 +360,48 @@ button span {
   background-color: dimgray;
 }
 
+.controls {
+  position: fixed;
+  bottom: 6.5em;
+  height: 3em;
+  width: 100%;
+  max-width: 48em;
+  z-index: 100;
+  background-color: black;
+}
+
+.undo {
+  width: 6em;
+  height: 100%;
+  float: left;
+}
+
 .next-phase {
+  width: 18em;
+  float: right;
   background-color: white;
   font-weight: bold;
-  width: 54%;
   border-color: black;
+  -webkit-animation: color_change 2s infinite alternate;
+  -moz-animation: color_change 2s infinite alternate;
+  -ms-animation: color_change 2s infinite alternate;
+  -o-animation: color_change 2s infinite alternate;
+  animation: color_change 2s infinite alternate;
+}
+
+@keyframes color_change {
+  from { background-color: white; }
+  to { background-color: red; }
 }
 
 .waiting .next-phase {
   background-color: dimgray;
   font-weight: normal;
+  -webkit-animation: none;
+  -moz-animation: none;
+  -ms-animation: none;
+  -o-animation: none;
+  animation: none;
 }
 
 .to-keep {
@@ -383,7 +409,7 @@ button span {
 }
 
 .to-trash {
-  background-color: red;
+  background-color: rgb(255, 56, 56);
 }
 
 .hand.active .can-play.card {
@@ -411,16 +437,38 @@ button span {
 }
 
 .stats {
-  margin: 0.2em;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 2.5em;
+}
+
+.current-player {
+  width: 28%;
+}
+
+.current-player span {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  font-size: 1.2em;
+  height: 100%;
+  line-height: 100%;
 }
 
 .stat {
+  width: 18%;
+}
+
+.stat span {
   display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
   align-items: center;
   font-size: 1.2em;
-  text-align: left;
-  height: 1.5em;
-  line-height: 1.5em;
+  height: 100%;
+  line-height: 100%;
 }
 
 .description .toggle {
@@ -456,7 +504,7 @@ button span {
 }
 
 .icon.buys {
-  background-color: brown;
+  background-color: saddlebrown;
   background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 28 28" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>');
 }
 

@@ -54,6 +54,13 @@ toggle = ClassName "toggle"
 
 incrementer = ClassName "incrementer"
 dialogue = ClassName "dialogue"
+domination = ClassName "domination"
+title = ClassName "title"
+playerName = ClassName "player-name"
+iteration = ClassName "iteration"
+controls = ClassName "controls"
+undo = ClassName "undo"
+currentPlayer = ClassName "current-player"
 
 icon = ClassName "icon"
 actions = ClassName "actions"
@@ -61,3 +68,4 @@ buys = ClassName "buys"
 money = ClassName "money"
 points = ClassName "points"
 cards = ClassName "cards"
+

@@ -35,10 +35,11 @@ import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
+import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
-import Domination.UI.Util (acknowledge, h1__, h2__, h3__, chooseOne)
+import Domination.UI.Util (acknowledge, h1__, h3__, chooseOne)
 import Domination.UI.Util as Util
 import Halogen as H
 import Halogen.Component (ComponentSlot)
@@ -184,7 +185,8 @@ renderPlayerN
   => Log m
   => ComponentState
   -> HTML (ChildComponents query r m) InternalGameAction
-renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
+renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div
+  [ HP.class_ Css.domination ]
   [ Util.incrementer
     { label: "Players: "
     , mbMin: Just one
@@ -208,21 +210,12 @@ renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div_ $
     , HH.button
       [ HE.onClick \_ -> Just $ LoadGameRequest ]
       [ HH.text "Load Game" ]
-    , HH.button
-      [ HE.onClick \_ -> x ]
-      [ HH.text "Undo" ]
     ]
     , case cs.maybeGame of
       Nothing -> HH.div_ []
-      Just activeState -> HH.div_
-        [ h1__ $ "Domination (" <> show activeState.i <> ")"
-        , HH.div_ $ renderPlayers activeState
-        ]
+      Just activeState ->
+        HH.div_ [ HH.div_ $ renderPlayers activeState ]
   ]
-  where
-    x = case cs.maybeGame of
-      Just activeState -> Just $ UndoRequest activeState
-      Nothing -> Nothing
 
 renderSupply'
   :: forall query r m
@@ -244,18 +237,6 @@ renderSupply' cs@{ state, playerIndex } player =
         else []
     ]
     $ HH.li_ [ h3__ "Supply" ]
-      : HH.ul [ HP.class_ Css.handInfos ]
-        [ HH.li
-          [ HP.class_ Css.handInfo ]
-          [ HH.text $ show $ Player.cash player
-          , Icons.money
-          ]
-        , HH.li
-          [ HP.class_ Css.handInfo ]
-          [ HH.text $ show $ player.buys
-          , Icons.buys
-          ]
-        ]
       : [ HH.ul_ $ renderSupply player cs ]
 
 renderSupply
@@ -360,34 +341,42 @@ playerStats
   -> Int
   -> Player
   -> HTML a i
-playerStats { state, playerIndex: me } playerIndex player = HH.li
-  [ HP.class_ Css.stat ] $
-  ( if state.turn == playerIndex
-    then
+playerStats { state, playerIndex: me } playerIndex player = HH.ul
+  [ HP.class_ Css.stats ]
+  [ HH.li
+    [ HP.class_ Css.currentPlayer ]
+    [ HH.span_
       [ case state.phase of
-           ActionPhase -> Icons.actions
-           BuyPhase -> Icons.buys
-           CleanupPhase -> Icons.cards
+        ActionPhase -> Icons.actions
+        BuyPhase -> Icons.buys
+        CleanupPhase -> Icons.cards
+      , HH.text $ "Player " <> show (playerIndex + one)
       ]
-    else [ HH.i [ HP.class_ Css.icon ] [] ]
-  ) <>
-  [ HH.text $ "Player " <> show (playerIndex + one)
-  , HH.text $ " | " <> show player.actions
-  , Icons.actions
-  , HH.text $ " | " <> show player.buys
-  , Icons.buys
-  , HH.text $ " | "
-    <>
-    ( if state.turn == playerIndex
-      && state.phase == BuyPhase
-      then show (Player.cash player)
-      else if state.turn == playerIndex
-      then show (Card.value player.atPlay)
-      else "_"
-    )
-  , Icons.money
-  , HH.text $ " | " <> show (Player.score player)
-  , Icons.points
+    ]
+  , HH.li
+    [ HP.class_ Css.stat ]
+    [ renderText player.actions ]
+  , HH.li
+    [ HP.class_ Css.stat ]
+    [ renderText player.buys ]
+  , HH.li
+    [ HP.class_ Css.stat ]
+    [ HH.span_
+      [ HH.text
+        case state.phase of
+          ActionPhase -> show $ Card.value player.atPlay
+          BuyPhase -> show $ Player.cash player
+          CleanupPhase -> "_"
+      , Icons.money
+      ]
+    ]
+  , HH.li
+    [ HP.class_ Css.stat ]
+    [ HH.span_
+      [ HH.text $ show (Player.score player)
+      , Icons.points
+      ]
+    ]
   ]
 
 renderPlayer
@@ -397,35 +386,44 @@ renderPlayer
   => ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
-renderPlayer cs@{ state, playerIndex } player =
-  if Player.hasChoices player
-  && playerIndex == Dom.choiceTurn state
-  then fromMaybe (HH.div_ []) $
-    let
-      choice = Player.firstChoice player
-      hasReaction = Dom.hasReaction playerIndex state
-      isAttacked = Dom.isAttacked playerIndex state
-    in
-    if isAttacked && hasReaction
-    then renderReaction
-    else renderChoice (CardSlot ChoiceArea) choice
-  else
-    case state.players !! state.turn of
-      Nothing -> h1__ "Something has gone terribly wrong!"
-      Just currentPlayer -> HH.div
-        ( if state.turn /= playerIndex
-          || Dom.choicesOutstanding state
-          then [ HP.class_ Css.waiting ]
-          else []
-        )
-        [ h2__ $ "Player " <> show (playerIndex + one)
-        , renderSupply' cs player
-        , renderNextPhaseButton cs
-        , renderStats cs
-        , renderAtPlay currentPlayer
-        , renderBuying currentPlayer
-        , renderHand player cs
-        ]
+renderPlayer cs@{ state, playerIndex } player = HH.div_
+  [ Hud.render cs
+  , if Player.hasChoices player
+    && playerIndex == Dom.choiceTurn state
+    then fromMaybe (HH.div_ []) $
+      let
+        choice = Player.firstChoice player
+        hasReaction = Dom.hasReaction playerIndex state
+        isAttacked = Dom.isAttacked playerIndex state
+      in
+      if isAttacked && hasReaction
+      then renderReaction
+      else renderChoice (CardSlot ChoiceArea) choice
+    else
+      case state.players !! state.turn of
+        Nothing -> h1__ "Something has gone terribly wrong!"
+        Just currentPlayer -> HH.div
+          ( if state.turn /= playerIndex
+            || Dom.choicesOutstanding state
+            then [ HP.class_ Css.waiting ]
+            else []
+          )
+          [ renderSupply' cs player
+          , renderStats cs
+          , renderAtPlay currentPlayer
+          , renderBuying currentPlayer
+          , renderHand player cs
+          , HH.div
+            [ HP.class_ Css.controls ]
+            [ HH.button
+              [ HP.class_ Css.undo
+              , HE.onClick \_ -> Just $ UndoRequest cs
+              ]
+              [ HH.text "Undo" ]
+            , renderNextPhaseButton cs
+            ]
+          ]
+  ]
     where
       renderReaction
         :: forall widget
@@ -545,7 +543,7 @@ renderNextPhaseButton
   -> HTML w InternalGameAction
 renderNextPhaseButton { playerIndex, state } =
   HH.button
-    [ HP.class_ (Css.nextPhase)
+    [ HP.class_ Css.nextPhase
     , HE.onClick $ const $ Just $ MakePlay $ EndPhase { playerIndex }
     ]
     [ HH.span_ if state.turn == playerIndex
@@ -574,9 +572,10 @@ renderNextPhaseButton { playerIndex, state } =
     ]
 
 renderStats :: forall w i. ActiveState -> HTML w i
-renderStats cs = HH.ul
-  [ HP.class_ Css.stats ]
-  (playerStats cs `mapWithIndex` cs.state.players)
+renderStats cs =
+  case cs.state.players !! cs.state.turn of
+    Nothing -> HH.div_ []
+    Just player -> playerStats cs cs.state.turn player
 
 renderAtPlay
   :: forall query r m
@@ -634,37 +633,7 @@ renderHand player { playerIndex, state } = HH.ul
     then [ Css.waiting ]
     else []
   ] $
-  [ HH.li_ [ h3__ "Hand" ]
-  , HH.li_
-    [ HH.ul [ HP.class_ Css.handInfos ] $
-      [ HH.li
-        [ HP.class_ Css.handInfo ]
-        [ HH.text $ show $ length player.deck
-        , Icons.cards
-        ]
-      , HH.li
-        [ HP.class_ Css.handInfo ]
-        [ HH.text $ (show $ player.actions)
-        , Icons.actions
-        ]
-      , HH.li
-        [ HP.class_ Css.handInfo ]
-        [ HH.text $ show $ Player.cash player
-        , Icons.money
-        ]
-      , HH.li
-        [ HP.class_ Css.handInfo ]
-        [ HH.text $ show $ player.buys
-        , Icons.buys
-        ]
-      , HH.li
-        [ HP.class_ Css.handInfo ]
-        [ HH.text $ show $ length player.discard
-        , Icons.cards
-        ]
-      ]
-    ]
-  ]
+  [ HH.li_ [ h3__ "Hand" ] ]
   <> (\i s -> renderStack (onClick s player.hand) player (CardSlot HandArea i) s)
     `mapWithIndex` (stackCards player.hand)
   where
