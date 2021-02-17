@@ -2,9 +2,12 @@ module Domination.UI.Hud where
 
 import Prelude
 
-import Data.Array (length, (!!))
+import Data.Array (length, mapWithIndex, (!!))
 import Data.Maybe (Maybe(..))
+import Domination.Data.Card as Card
 import Domination.Data.GameState (GameState)
+import Domination.Data.Phase (Phase(..))
+import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Css as Css
 import Domination.UI.Icons as Icons
@@ -19,10 +22,11 @@ type ActiveState =
   , playerIndex :: Int
   , playerCount :: Int
   , state :: GameState
+  , showSupply :: Boolean
   }
 
 render :: forall w i. ActiveState -> HTML w i
-render { i, playerIndex, state } =
+render cs@{ i, playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> HH.text $ "cannot find player " <> show playerIndex
       <> " in players: " <> show state.players
@@ -37,6 +41,7 @@ render { i, playerIndex, state } =
             [ HP.class_ Css.iteration ]
             [ HH.text $ "(" <> show i <> ")" ]
           ]
+        , renderStats cs
         , HH.ul [ HP.class_ Css.handInfos ] $
           [ HH.li
             [ HP.class_ Css.handInfo ]
@@ -44,16 +49,40 @@ render { i, playerIndex, state } =
             , Icons.cards
             ]
           , HH.li
-            [ HP.class_ Css.handInfo ]
+            ( [ HP.classes $
+                [ Css.handInfo ] <>
+                  ( if playerIndex == state.turn
+                    && state.phase == ActionPhase
+                    then [ Css.drawAttention ]
+                    else []
+                  )
+              ]
+            )
             [ renderText player.actions
             ]
           , HH.li
-            [ HP.class_ Css.handInfo ]
+            ( [ HP.classes $
+                [ Css.handInfo ] <>
+                  ( if playerIndex == state.turn
+                    && state.phase == BuyPhase
+                    then [ Css.drawAttention ]
+                    else []
+                  )
+              ]
+            )
             [ HH.text $ show $ Player.cash player
             , Icons.money
             ]
           , HH.li
-            [ HP.class_ Css.handInfo ]
+            ( [ HP.classes $
+                [ Css.handInfo ] <>
+                  ( if playerIndex == state.turn
+                    && state.phase == BuyPhase
+                    then [ Css.drawAttention ]
+                    else []
+                  )
+              ]
+            )
             [ renderText player.buys
             ]
           , HH.li
@@ -64,3 +93,56 @@ render { i, playerIndex, state } =
           ]
         ]
 
+renderStats :: forall w i. ActiveState -> HTML w i
+renderStats cs = HH.div
+  [ HP.class_ Css.statsContainer ]
+  $ playerStats cs `mapWithIndex` cs.state.players
+
+playerStats
+  :: forall w i
+  . ActiveState
+  -> Int
+  -> Player
+  -> HTML w i
+playerStats { state, playerIndex: me } playerIndex player =
+  HH.ul
+    [ HP.class_ Css.stats ]
+    [ HH.li
+      [ HP.class_ Css.currentPlayer ]
+      [ HH.span_
+        [ if state.turn == playerIndex
+          then case state.phase of
+            ActionPhase -> Icons.actions
+            BuyPhase -> Icons.buys
+            CleanupPhase -> Icons.cards
+          else Icons.empty
+        , HH.text $ "Player " <> show (playerIndex + one)
+        ]
+      ]
+    , HH.li
+      [ HP.class_ Css.stat ]
+      [ renderText player.actions ]
+    , HH.li
+      [ HP.class_ Css.stat ]
+      [ renderText player.buys ]
+    , HH.li
+      [ HP.class_ Css.stat ]
+      [ HH.span_
+        [ HH.text
+          case state.phase, playerIndex of
+            ActionPhase, i | i == state.turn ->
+              show $ Card.value player.atPlay
+            BuyPhase, i | i == state.turn ->
+              show $ Player.cash player
+            _, _ -> "_"
+        , Icons.money
+        ]
+      ]
+    , HH.li
+      [ HP.class_ Css.stat ]
+      [ HH.span_
+        [ HH.text $ show (Player.score player)
+        , Icons.points
+        ]
+      ]
+    ]

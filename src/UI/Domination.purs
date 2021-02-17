@@ -3,23 +3,24 @@ module Domination.UI.Domination where
 import Prelude
 
 import Data.Array (catMaybes, filter, findIndex, head, length, nub, reverse, (!!), (:))
-import Data.Either (Either(..))
+import Data.Either (Either(..), hush)
 import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Lens (Lens')
+import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter ((.~))
+import Data.Lens.Setter ((%~), (.~))
 import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
+import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Data.Card (Card)
-import Domination.Data.Card (isAction, value) as Card
+import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
@@ -39,7 +40,7 @@ import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
-import Domination.UI.Util (acknowledge, h1__, h3__, chooseOne)
+import Domination.UI.Util (acknowledge, chooseOne, h1__)
 import Domination.UI.Util as Util
 import Halogen as H
 import Halogen.Component (ComponentSlot)
@@ -58,6 +59,8 @@ data InternalGameAction
   | MakePlay Play
   | LoadGameRequest
   | UndoRequest ActiveState
+  | ToggleSupply
+  | ToggleMenu
 
 data GameEvent
   = NewState
@@ -78,12 +81,24 @@ type ActiveState =
   , playerIndex :: Int
   , playerCount :: Int
   , state :: GameState
+  , showSupply :: Boolean
   }
+
+_i
+  :: forall a b r
+  . Lens { i :: a | r } { i :: b | r } a b
+_i = prop (SProxy :: SProxy "i")
+
+_state'
+  :: forall a b r
+  . Lens { state :: a | r } { state :: b | r } a b
+_state' = prop (SProxy :: SProxy "state")
 
 type ComponentState =
   { nextPlayerIndex :: Int
   , nextPlayerCount :: Int
   , maybeGame :: Maybe ActiveState
+  , showMenu :: Boolean
   }
 
 _nextPlayerIndex :: Lens' ComponentState Int
@@ -98,6 +113,14 @@ _maybeGame :: Lens' ComponentState (Maybe ActiveState)
 _maybeGame = prop (SProxy :: SProxy "maybeGame")
 _state :: Traversal' ComponentState GameState
 _state = _maybeGame <<< _Just <<< prop (SProxy :: SProxy "state")
+_showSupply
+  :: forall a b r
+  . Lens { showSupply :: a | r } { showSupply :: b | r } a b
+_showSupply = prop (SProxy :: SProxy "showSupply")
+_showMenu
+  :: forall a b r
+  . Lens { showMenu :: a | r } { showMenu :: b | r } a b
+_showMenu = prop (SProxy :: SProxy "showMenu")
 
 _component :: SProxy "Domination"
 _component = SProxy
@@ -112,6 +135,7 @@ type Component query r m action =
 component
   :: forall input m
   . Log m
+  => Storage m
   => Dom m
   => Random m
   => H.Component HTML GameQuery input GameEvent m
@@ -121,6 +145,7 @@ component = H.mkComponent { initialState, render, eval }
     { nextPlayerCount: one
     , nextPlayerIndex: zero
     , maybeGame: Nothing
+    , showMenu: false
     }
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
@@ -131,6 +156,7 @@ component = H.mkComponent { initialState, render, eval }
 handleQuery
   :: forall action slots m a
   . Log m
+  => Storage m
   => Random m
   => GameQuery a
   -> H.HalogenM ComponentState action slots GameEvent m (Maybe a)
@@ -151,21 +177,66 @@ handleQuery = case _ of
           <> ". Received i = " <> show i
         pure isExpected
     let
+      newShowSupply =
+        case cs.maybeGame, cs.nextPlayerIndex, state.turn, state.phase of
+          Nothing, me, nt, BuyPhase | me == nt -> true
+          Nothing, me, nt, _ -> me /= nt
+          Just { state: { turn } }, me, nt, BuyPhase
+            | me == turn && me /= nt -> false
+            | me == nt -> true
+          Just { state: { turn } }, me, nt, ActionPhase
+            | me == nt -> false
+          Just { showSupply }, _, _, _ -> showSupply
       newActiveState =
         { playerIndex: cs.nextPlayerIndex
         , playerCount: length state.players
         , state
         , i
+        , showSupply: newShowSupply
         }
     H.modify_ $ _maybeGame .~ (Just newActiveState)
     H.raise $ SaveGame newActiveState
     pure $ Just a
-  LoadActiveState activeState a -> do
-    { nextPlayerIndex } <- H.get
-    let newActiveState = activeState { playerIndex = nextPlayerIndex }
-    log $ "LoadActiveState as player " <> show nextPlayerIndex
-    H.modify_
-      $ (_maybeGame .~ (Just newActiveState))
+  LoadActiveState activeState@{ showSupply, state, playerIndex } a -> do
+    { nextPlayerIndex, nextPlayerCount, maybeGame } <- H.get
+
+    loadedPlayerIndex <- load "player_index"
+    loadedPlayerCount <- load "player_count"
+    log $ "loaded player_index: " <> show loadedPlayerIndex
+    log $ "loaded player_count: " <> show loadedPlayerCount
+    let
+      newPlayerIndex = fromMaybe nextPlayerIndex
+        $ hush loadedPlayerIndex
+      newPlayerCount = fromMaybe nextPlayerCount
+        $ hush loadedPlayerCount
+
+    let
+      newShowSupply =
+        case maybeGame, playerIndex, state.turn, state.phase of
+          Nothing, me, nt, BuyPhase | me == nt -> true
+          Nothing, me, nt, _ -> me /= nt
+          Just { state: { turn } }, me, nt, BuyPhase
+            | me == turn && me /= nt -> false
+            | me == nt -> true
+          Just { state: { turn } }, me, nt, ActionPhase
+            | me == nt -> false
+          Just { showSupply }, _, _, _ -> showSupply
+      newActiveState =
+        ( (_playerIndex .~ newPlayerIndex)
+        >>> (_playerCount .~ newPlayerCount)
+        >>> (_showSupply .~ newShowSupply)
+        ) activeState
+    log $ "LoadActiveState as player " <> show newPlayerIndex
+    log $ "playerIndex:" <> show playerIndex
+      <> "\nlastTurn:"
+      <> (fromMaybe "???" (show <<< (_.state.turn) <$> maybeGame))
+      <> "\nnextTurn:" <> show state.turn
+      <> "\nnextPhase:" <> show state.phase
+    log $ "LoadActiveState.newShowSupply: " <> show newShowSupply
+
+    H.modify_ $ (_maybeGame .~ Just newActiveState)
+      >>> (_nextPlayerIndex .~ newPlayerIndex)
+      >>> (_nextPlayerCount .~ newPlayerCount)
     pure $ Just a
 
 type ChildComponents query r m =
@@ -187,29 +258,46 @@ renderPlayerN
   -> HTML (ChildComponents query r m) InternalGameAction
 renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div
   [ HP.class_ Css.domination ]
-  [ Util.incrementer
-    { label: "Players: "
-    , mbMin: Just one
-    , mbMax: Nothing
-    , value: nextPlayerCount
-    , setValue: WritePlayerCount
-    }
-  , Util.incrementer
-    { label: "Player #: "
-    , mbMin: Just one
-    , mbMax: Nothing
-    , value: nextPlayerIndex + one
-    , setValue: (_ - one) >>> WritePlayerIndex
-    }
-  , HH.div_
+  [ HH.div
+    []
     [ HH.button
-      [ HE.onClick \_ -> Just $ StartNewGame ]
-      [ HH.text $ "Start New " <> show nextPlayerCount
-        <> " Player Game as Player " <> show (nextPlayerIndex + one)
+      [ HP.class_ Css.settingsButton
+      , HE.onClick \_ -> Just ToggleMenu
       ]
-    , HH.button
-      [ HE.onClick \_ -> Just $ LoadGameRequest ]
-      [ HH.text "Load Game" ]
+      [ HH.text "Settings" ]
+    ]
+  , HH.div
+    [ HP.classes
+      [ Css.settingsMenu
+      , if cs.showMenu
+        then Css.showing
+        else Css.collapsed
+      ]
+    ]
+    [ Util.incrementer
+      { label: "Players: "
+      , mbMin: Just one
+      , mbMax: Nothing
+      , value: nextPlayerCount
+      , setValue: WritePlayerCount
+      }
+    , Util.incrementer
+      { label: "Player #: "
+      , mbMin: Just one
+      , mbMax: Nothing
+      , value: nextPlayerIndex + one
+      , setValue: (_ - one) >>> WritePlayerIndex
+      }
+    , HH.div_
+      [ HH.button
+        [ HE.onClick \_ -> Just $ StartNewGame ]
+        [ HH.text $ "Start New " <> show nextPlayerCount
+          <> " Player Game as Player " <> show (nextPlayerIndex + one)
+        ]
+      , HH.button
+        [ HE.onClick \_ -> Just $ LoadGameRequest ]
+        [ HH.text "Load Game" ]
+      ]
     ]
     , case cs.maybeGame of
       Nothing -> HH.div_ []
@@ -224,10 +312,13 @@ renderSupply'
   => ActiveState
   -> Player
   -> HTML (ChildComponents query r m) InternalGameAction
-renderSupply' cs@{ state, playerIndex } player =
+renderSupply' cs@{ showSupply, state, playerIndex } player =
   HH.ul
     [ HP.classes $
       [ Css.supply
+      , if showSupply
+        then Css.showing
+        else Css.collapsed
       , if state.turn == playerIndex
         && state.phase == BuyPhase
         then Css.active
@@ -236,8 +327,8 @@ renderSupply' cs@{ state, playerIndex } player =
         then [ Css.waiting ]
         else []
     ]
-    $ HH.li_ [ h3__ "Supply" ]
-      : [ HH.ul_ $ renderSupply player cs ]
+    [ HH.ul_ $ renderSupply player cs
+    ]
 
 renderSupply
   :: forall query r m
@@ -335,50 +426,6 @@ renderPlayers cs@{ playerIndex, state } =
     Nothing -> []
     Just player -> [ renderPlayer cs player ]
 
-playerStats
-  :: forall a i
-  . ActiveState
-  -> Int
-  -> Player
-  -> HTML a i
-playerStats { state, playerIndex: me } playerIndex player = HH.ul
-  [ HP.class_ Css.stats ]
-  [ HH.li
-    [ HP.class_ Css.currentPlayer ]
-    [ HH.span_
-      [ case state.phase of
-        ActionPhase -> Icons.actions
-        BuyPhase -> Icons.buys
-        CleanupPhase -> Icons.cards
-      , HH.text $ "Player " <> show (playerIndex + one)
-      ]
-    ]
-  , HH.li
-    [ HP.class_ Css.stat ]
-    [ renderText player.actions ]
-  , HH.li
-    [ HP.class_ Css.stat ]
-    [ renderText player.buys ]
-  , HH.li
-    [ HP.class_ Css.stat ]
-    [ HH.span_
-      [ HH.text
-        case state.phase of
-          ActionPhase -> show $ Card.value player.atPlay
-          BuyPhase -> show $ Player.cash player
-          CleanupPhase -> "_"
-      , Icons.money
-      ]
-    ]
-  , HH.li
-    [ HP.class_ Css.stat ]
-    [ HH.span_
-      [ HH.text $ show (Player.score player)
-      , Icons.points
-      ]
-    ]
-  ]
-
 renderPlayer
   :: forall query r m
   . Dom m
@@ -390,17 +437,17 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
   [ Hud.render cs
   , if Player.hasChoices player
     && playerIndex == Dom.choiceTurn state
-    then fromMaybe (HH.div_ []) $
+    then HH.div [ HP.class_ Css.dialogue ] $ fromMaybe [] $
       let
         choice = Player.firstChoice player
         hasReaction = Dom.hasReaction playerIndex state
         isAttacked = Dom.isAttacked playerIndex state
       in
       if isAttacked && hasReaction
-      then renderReaction
-      else renderChoice (CardSlot ChoiceArea) choice
-    else
-      case state.players !! state.turn of
+      then pure <$> renderReaction
+      else pure <$> renderChoice (CardSlot ChoiceArea) choice
+    else HH.div_ []
+  ,   case state.players !! state.turn of
         Nothing -> h1__ "Something has gone terribly wrong!"
         Just currentPlayer -> HH.div
           ( if state.turn /= playerIndex
@@ -408,8 +455,9 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
             then [ HP.class_ Css.waiting ]
             else []
           )
-          [ renderSupply' cs player
-          , renderStats cs
+          [ HH.div
+            [ HP.class_ Css.supplyContainer ]
+            [ renderSupply' cs player ]
           , renderAtPlay currentPlayer
           , renderBuying currentPlayer
           , renderHand player cs
@@ -420,6 +468,11 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
               , HE.onClick \_ -> Just $ UndoRequest cs
               ]
               [ HH.text "Undo" ]
+            , HH.button
+              [ HP.class_ Css.supplyToggle
+              , HE.onClick \_ -> Just ToggleSupply
+              ]
+              [ HH.text "Supply" ]
             , renderNextPhaseButton cs
             ]
           ]
@@ -571,12 +624,6 @@ renderNextPhaseButton { playerIndex, state } =
         ]
     ]
 
-renderStats :: forall w i. ActiveState -> HTML w i
-renderStats cs =
-  case cs.state.players !! cs.state.turn of
-    Nothing -> HH.div_ []
-    Just player -> playerStats cs cs.state.turn player
-
 renderAtPlay
   :: forall query r m
   . Dom m
@@ -586,7 +633,9 @@ renderAtPlay
 renderAtPlay currentPlayer =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
-    title = HH.li_ [ h3__ "At Play" ]
+    title = HH.li
+      [ HP.class_ Css.playTitle ]
+      [ HH.text "At Play" ]
     stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot AtPlayArea i))
       `mapWithIndex` stackCards currentPlayer.atPlay
 
@@ -609,7 +658,9 @@ renderBuying
 renderBuying currentPlayer =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
-    title = HH.li_ [ h3__ "Buying" ]
+    title = HH.li
+      [ HP.class_ Css.buyingTitle ]
+      [ HH.text "Buying" ]
     stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot BuyingArea i))
       `mapWithIndex` stackCards currentPlayer.buying
 
@@ -633,10 +684,12 @@ renderHand player { playerIndex, state } = HH.ul
     then [ Css.waiting ]
     else []
   ] $
-  [ HH.li_ [ h3__ "Hand" ] ]
-  <> (\i s -> renderStack (onClick s player.hand) player (CardSlot HandArea i) s)
+  title : (\i s -> renderStack (onClick s player.hand) player (CardSlot HandArea i) s)
     `mapWithIndex` (stackCards player.hand)
   where
+    title = HH.li
+      [ HP.class_ Css.handTitle ]
+      [ HH.text "Hand" ]
     onClick stack hand = const $ Just $ MakePlay
       $ PlayCard { playerIndex,  cardIndex }
       where
@@ -646,6 +699,7 @@ renderHand player { playerIndex, state } = HH.ul
 handleAction
   :: forall s p m
   . Log m
+  => Storage m
   => Random m
   => InternalGameAction
   -> HalogenM ComponentState p s GameEvent m Unit
@@ -654,14 +708,30 @@ handleAction = case _ of
     { nextPlayerIndex, nextPlayerCount } <- H.get
     log $ "Domination: updating playerIndex from "
       <> show nextPlayerIndex <> " -> " <> show index
-    H.modify_ $ (_nextPlayerIndex .~ (max index zero))
-      >>> (_nextPlayerCount .~ (max (index + one) nextPlayerCount))
+    let
+      newPlayerIndex = max index zero
+      newPlayerCount = max (index + one) nextPlayerCount
+    H.modify_ $ (_nextPlayerIndex .~ newPlayerIndex)
+      >>> (_nextPlayerCount .~ newPlayerCount)
+      >>> (_maybeGame <<< _Just <<< _playerIndex .~ newPlayerIndex)
+    log $ "saving player_index: " <> show newPlayerIndex
+    save "player_index" newPlayerIndex
+    log $ "saving player_count: " <> show newPlayerCount
+    save "player_count" newPlayerCount
   WritePlayerCount count -> do
     { nextPlayerIndex, nextPlayerCount } <- H.get
     log $ "Domination: updating playerCount from "
       <> show nextPlayerCount <> " -> " <> show count
-    H.modify_ $ (_nextPlayerCount .~ (max count one))
-      <<< (_nextPlayerIndex .~ (min (count - one) nextPlayerIndex))
+    let
+      newPlayerIndex = min (count - one) nextPlayerIndex
+      newPlayerCount = max count one
+    H.modify_ $ (_nextPlayerCount .~ newPlayerCount)
+      >>> (_nextPlayerIndex .~ newPlayerIndex)
+      >>> (_maybeGame <<< _Just <<< _playerIndex .~ newPlayerIndex)
+    log $ "saving player_index: " <> show newPlayerIndex
+    save "player_index" newPlayerIndex
+    log $ "saving player_count: " <> show newPlayerCount
+    save "player_count" newPlayerCount
   StartNewGame -> do
     { nextPlayerIndex: playerIndex, nextPlayerCount: playerCount } <- H.get
     log $ "Domination: StartNewGame as player " <> show playerIndex
@@ -672,6 +742,10 @@ handleAction = case _ of
     playAndReport playerIndex play
   LoadGameRequest -> H.raise LoadGame
   UndoRequest as -> H.raise $ Undo as
+  ToggleSupply -> H.modify_
+    $ (_maybeGame <<< _Just <<< _showSupply %~ not)
+    >>> (_showMenu .~ false)
+  ToggleMenu -> H.modify_ $ _showMenu %~ not
 
 playAndReport
   :: forall s p m
@@ -691,16 +765,31 @@ playAndReport playerIndex play = do
         , state: Dom.newGame playerCount
         , playerCount: nextPlayerCount
         , playerIndex: nextPlayerIndex
+        , showSupply: false
         }
       _ -> error "Domination: playing with no game state?"
     Just activeState -> doTheRest activeState
   where
-    doTheRest activeState = do
+    doTheRest activeState@{ state, showSupply } = do
+      let
+        lastPhase = state.phase
+        lastTurn = state.turn
       result <- Dom.makeAutoPlay play activeState.state
       case result of
         Left e -> error e
-        Right gs -> do
+        Right gameState -> do
           let
+            phase = gameState.phase
+            turn = gameState.turn
+            newShowSupply =
+              case play, playerIndex, lastPhase, phase, lastTurn, turn of
+              NewGame _, me, _, _, _, t
+                | me == t -> true
+              _, me, BuyPhase, _, lt, t
+                | me == lt && me /= t -> false
+              _, me, _, ActionPhase, _, t
+                | me == t -> false
+              _, _, _, _, _, _ -> showSupply
             playMade = case play of
               EndPhase _ -> Nothing
               _ -> Just
@@ -711,10 +800,18 @@ playAndReport playerIndex play = do
             newI = case play of
               NewGame _ -> zero
               _ -> activeState.i + one
+          log $ "playAndReport.newShowSupply: "
+            <> show newShowSupply
           H.modify_
-            $ (_state .~ gs)
-            >>> (_maybeGame <<< _Just <<< _playerIndex .~ activeState.playerIndex)
-            >>> (_maybeGame <<< _Just <<< prop (SProxy :: SProxy "i") .~ newI)
-          H.raise
-            $ NewState (activeState { i = newI, state = gs }) playMade
+            $ (_state .~ gameState)
+            >>> (_maybeGame <<< _Just
+              <<< _playerIndex .~ activeState.playerIndex)
+            >>> (_maybeGame <<< _Just
+              <<< _i .~ newI)
+            >>> (_maybeGame <<< _Just
+              <<< _showSupply .~ newShowSupply)
+            >>> (_showMenu .~ false)
+          H.raise $ NewState
+            (((_i .~ newI) >>> (_state' .~ gameState)) activeState)
+            playMade
 

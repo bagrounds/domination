@@ -23,11 +23,11 @@ import Domination.Capability.Random (class Random, randomElement)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.UI.Chat as Chat
+import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination (GameEvent(..), GameQuery(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
-import Domination.UI.Util (h1__)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import FFI as FFI
@@ -131,6 +131,7 @@ component = H.mkComponent { eval, initialState, render } where
 render
   :: forall c m
   . Log m
+  => Storage m
   => Dom m
   => Random m
   => AppState
@@ -149,7 +150,9 @@ render state = HH.main_ $
     ]
     []
   , UsernameInput.render { onInput: WriteUsername, state }
-  , h1__ $ show state.connectionCount <> " Users Connected"
+  , HH.span
+    [ HP.class_ Css.connections ]
+    [ HH.text $ show state.connectionCount <> " users connected" ]
   , Chat.render
     { sendEvent: SendMessage
     , onInput: Write _message

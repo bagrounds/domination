@@ -1,12 +1,15 @@
 module Domination.UI.Icons where
 
 import Domination.UI.Css as Css
-import Halogen.HTML (ClassName(..), HTML)
+import Halogen.HTML (ClassName, HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 
 icon :: forall w i. ClassName -> HTML w i
 icon i = HH.i [ HP.classes [ Css.icon, i ] ] []
+
+empty :: forall w i. HTML w i
+empty = HH.i [ HP.classes [ Css.icon ] ] []
 
 actions :: forall w i. HTML w i
 actions = icon Css.actions
@@ -22,4 +25,7 @@ money = icon Css.money
 
 points :: forall w i. HTML w i
 points = icon Css.points
+
+settings :: forall w i. HTML w i
+settings = icon Css.settings
 

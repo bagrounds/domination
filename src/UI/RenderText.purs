@@ -14,6 +14,7 @@ import Domination.Data.Buys as Buys
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Filter (Filter(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as GameState
 import Domination.Data.Phase (Phase(..))
@@ -176,20 +177,27 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text "optionally "
       , renderText choice
       ]
-    MoveFromTo { n, destination } -> case n of
+    MoveFromTo { n, filter, destination } -> case n of
       UpTo n ->
         [ HH.text $ verb <> " up to "
           <> show (n .^ _WireInt)
+          <> suffix
         ]
       Exactly n ->
         [ HH.text $ verb <> " "
           <> show (n .^ _WireInt)
+          <> suffix
         ]
       DownTo n ->
         [ HH.text $ verb <> " down to "
           <> show (n .^ _WireInt)
+          <> suffix
         ]
       where
+        suffix = case filter of
+          Nothing -> "x cards"
+          Just (HasName name) -> "x " <> name
+
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
           Pile.Discard -> "Discard"

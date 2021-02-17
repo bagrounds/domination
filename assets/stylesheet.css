@@ -43,17 +43,25 @@ input {
 }
 
 main {
-  padding-top: 6em;
+  position: absolute;
+  top: 2em;
+  left: 0;
+  right: 0;
   font-size: 12pt;
   text-align: center;
   vertical-align: middle;
   margin: 0 auto;
+  width: 100vw;
   max-width: 48em;
-  overflow-x: hidden;
-  padding-bottom: 9.5em;
+  overflow: hidden;
+  bottom: 8.5em;
 }
 
-main ul {
+*::-webkit-scrollbar {
+  display: none;
+}
+
+li {
   margin: 0 auto;
   list-style-type: none;
 }
@@ -95,8 +103,9 @@ button span,
 }
 
 .tool-tip {
+  white-space: normal;
   position: absolute;
-  z-index: 200;
+  z-index: 110;
   width: 10em;
   left: -2em;
 }
@@ -107,12 +116,8 @@ button span,
 }
 
 .hud {
-  position: fixed;
-  top: 0;
-  height: 5em;
   width: 100%;
   max-width: 48em;
-  display: table-cell;
   text-align: center;
   vertical-align: middle;
   z-index: 100;
@@ -128,7 +133,7 @@ button span,
   display: table-cell;
   text-align: center;
   vertical-align: middle;
-  z-index: 100;
+  z-index: 400;
   background-color: black;
 }
 
@@ -228,24 +233,101 @@ button span,
   border: 1px solid black;
 }
 
-.supply {
-  padding-bottom: 1em;
+.username-input {
+  position: fixed;
+  height: 2em;
+  line-height: 2em;
+  top: 0;
+  left: 0;
+  width: 60%;
 }
 
-.supply,
+.username-input input {
+  width: 9em;
+}
+
+.connections {
+  position: fixed;
+  height: 2em;
+  line-height: 2em;
+  top: 0;
+  right: 0;
+  width: 40%;
+}
+
+.settings-button {
+  width: 100%;
+  height: 3em;
+  padding: 0;
+}
+
+.settings-menu {
+  position: absolute;
+  width: 100%;
+  z-index: 200;
+  background-color: black;
+  transition: max-height 1s ease;
+}
+
+.settings-menu.showing {
+  max-height: 9em;
+}
+
+.settings-menu.collapsed {
+  max-height: 0;
+  overflow: hidden;
+}
+
+.supply-toggle {
+  display: inline-block;
+  width: 25%;
+  height: 3em;
+  padding: 0;
+}
+
+.supply-container {
+  max-height: 0;
+}
+
+.supply.collapsed {
+  overflow-y: hidden;
+  max-height: 0;
+  padding: 0;
+}
+
+.supply.showing {
+  position: absolute;
+  max-height: 20em;
+  padding-bottom: 9.5em;
+  overflow-y: scroll;
+}
+
+.supply {
+  padding-bottom: 1em;
+  transition: max-height 1s ease;
+  z-index: 100;
+}
+
+.hand-title {
+  position: absolute;
+  font-size: 3em;
+  transform: rotate(-90deg) translate(-1.3em, -0.5em);
+}
+
 .hand {
-  border-radius: 0.6em;
-  border: 1px solid white;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 9.5em;
+  overflow-x: scroll;
+  white-space: nowrap;
 }
 
 .play,
 .buying {
   font-size: 0.75em;
   display: inline-block;
-  overflow: hidden;
   border-radius: 0.6em;
-  border: 1px solid white;
-  min-height: 11.2em;
 }
 
 .card-text {
@@ -256,28 +338,43 @@ button span,
   line-height: 1.55em;
 }
 
+.play-title {
+  position: absolute;
+  font-size: 3em;
+  transform: rotate(-90deg) translate(-1.3em, -1em);
+}
+
 .play {
+  position: fixed;
+  left: 0;
+  right: 30%;
+  bottom: 28.5em;
+  overflow-x: scroll;
+  white-space: nowrap;
   width: 69%;
+  height: 12em;
+}
+
+.buying-title {
+  position: absolute;
+  font-size: 3em;
+  transform: rotate(-90deg) translate(-1.3em, -1em);
 }
 
 .buying {
+  position: fixed;
+  left: 70;
+  right: 0%;
+  bottom: 28.5em;
+  overflow-x: scroll;
+  white-space: nowrap;
   width: 29%;
-}
-
-.deck {
-  width: 4em;
-  height: 6em;
-  margin: 1em;
-}
-
-.discard {
-  width: 4em;
-  height: 6em;
-  margin: 1em;
+  height: 12em;
 }
 
 .card-name {
   display: flex;
+  white-space: normal;
   border: none;
   border-bottom: 0.1em solid;
   align-items: center;
@@ -292,7 +389,6 @@ button span,
   align-items: center;
   height: 3em;
   width: 100%;
-  margin-bottom: 0.5em;
 }
 
 .hand-info {
@@ -379,28 +475,31 @@ button span,
   height: 3em;
   width: 100%;
   max-width: 48em;
-  z-index: 100;
-  background-color: black;
+  z-index: 400;
 }
 
 .undo {
-  width: 6em;
+  display: inline-block;
+  width: 15%;
   height: 100%;
   float: left;
+  padding: 0;
 }
 
 .next-phase {
-  width: 18em;
+  display: inline-block;
+  width: 60%;
   height: 100%;
   float: right;
   background-color: white;
   font-weight: bold;
   border-color: black;
-  -webkit-animation: color_change 2s infinite alternate;
-  -moz-animation: color_change 2s infinite alternate;
-  -ms-animation: color_change 2s infinite alternate;
-  -o-animation: color_change 2s infinite alternate;
-  animation: color_change 2s infinite alternate;
+  padding: 0;
+  -webkit-animation: color_change 1s infinite alternate;
+  -moz-animation: color_change 1s infinite alternate;
+  -ms-animation: color_change 1s infinite alternate;
+  -o-animation: color_change 1s infinite alternate;
+  animation: color_change 1s infinite alternate;
 }
 
 @keyframes color_change {
@@ -442,19 +541,35 @@ button span,
   background-color: dimgray;
 }
 
+.supply.active {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
 .supply.active .can-buy .card {
   background-color: white;
+}
+
+.supply.inactive {
+  background-color: rgba(0, 0, 0, 0.8);
 }
 
 .supply.inactive .can-buy .card {
   background-color: lightgray;
 }
 
+.stats-container {
+  max-height: 6em;
+  width: 100%;
+  overflow-y: scroll;
+}
+
 .stats {
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 2.5em;
+  height: 1.5em;
+  width: 100%;
+  background-color: black;
 }
 
 .current-player {
@@ -466,7 +581,6 @@ button span,
   flex-direction: row;
   justify-content: flex-start;
   align-items: center;
-  font-size: 1.2em;
   height: 100%;
   line-height: 100%;
 }
@@ -480,7 +594,7 @@ button span,
   flex-direction: row;
   justify-content: flex-end;
   align-items: center;
-  font-size: 1.2em;
+  font-size: 1em;
   height: 100%;
   line-height: 100%;
 }
@@ -489,6 +603,18 @@ button span,
   margin: 0;
   padding: 0.1em;
   width: 100%;
+}
+
+.dialogue {
+  position: fixed;
+  overflow-y: scroll;
+  left: 0;
+  right: 0;
+  top: 5em;
+  bottom: 9.5em;
+  z-index: 300;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: auto;
 }
 
 .icon {
@@ -535,4 +661,29 @@ button span,
 .icon.points {
   background-color: lightgreen;
   background-image: url('data:image/svg+xml;charset=utf8,<svg xmlns="http://www.w3.org/2000/svg" id="Icons" x="0" y="0" version="1.1" viewBox="0 0 32 32" xml:space="preserve"><style>.st0{fill:none;stroke:black;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10}</style><path d="M25 6.7c-3.4 0-6.6-1.4-9-3.7-2.4 2.3-5.6 3.7-9 3.7-1.4 0-2.7-.3-4-.7 0 14 5.5 19.6 13 23 7.5-3.4 13-9 13-23-1.3.4-2.6.7-4 .7z" class="st0"/><path d="M16 9.5l1.5 4.5h4.7l-3.8 2.8 1.4 4.4-3.8-2.7-3.8 2.7 1.4-4.4L9.8 14h4.7z" class="st0"/></svg>');
+}
+
+.draw-attention {
+  animation-name: shake;
+  animation-duration: 1s;
+  animation-timing-function: linear;
+  animation-delay: 1s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes shake {
+  0% { transform: translate(2px, 2px) rotate(0); }
+  1% { transform: translate(-2px, -4px) rotate(-2deg); }
+  2% { transform: translate(-5px, 0) rotate(2deg); }
+  3% { transform: translate(5px, 4px) rotate(0deg); }
+  4% { transform: translate(2px, -2px) rotate(2deg); }
+  5% { transform: translate(-2px, 4px) rotate(-2deg); }
+  6% { transform: translate(-5px, 2px) rotate(0); }
+  7% { transform: translate(5px, 2px) rotate(-2deg); }
+  8% { transform: translate(-2px, -2px) rotate(2deg); }
+  9% { transform: translate(2px, 4px) rotate(0); }
+  10% { transform: translate(2px, -4px) rotate(-2deg); }
+  11% { transform: translate(0, 0) rotate(0); }
+  100% { transform: translate(0, 0) rotate(0); }
 }
