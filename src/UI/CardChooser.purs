@@ -45,7 +45,7 @@ type ComponentSpec =
   , player :: Player
   , choice :: Choice
   , pile :: Pile
-  , baseSlotNumber :: (Int -> DomSlot)
+  , baseSlotNumber :: Int -> DomSlot
   }
 --component
 --  :: forall query input m

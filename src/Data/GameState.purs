@@ -215,7 +215,13 @@ indexOfStack card = fromJust "card not in supply!"
 type Supply = Array Stack
 
 defaultSupply :: Int -> Array { card :: Card, count :: Int }
-defaultSupply playerCount = Cards.cardMap <#> \card ->
+defaultSupply i = makeSupply i Cards.cardMap
+
+makeSupply
+  :: Int
+  -> Array Card
+  -> Array { card :: Card, count :: Int }
+makeSupply playerCount cards = cards <#> \card ->
   { card, count: countOf card }
   where
     countOf card =
@@ -231,12 +237,12 @@ defaultSupply playerCount = Cards.cardMap <#> \card ->
     kingdomCount = 4 * playerCount
     treasureCount = 10 * playerCount
 
-newGame :: Int -> GameState
-newGame playerCount =
+newGame :: Int -> Array Card -> GameState
+newGame playerCount supply =
   { turn: zero
   , phase: ActionPhase
   , players: replicate playerCount newPlayer
-  , supply: defaultSupply playerCount
+  , supply: makeSupply playerCount supply
   , trash: []
   }
 
@@ -261,7 +267,8 @@ makePlay
   -> GameState
   -> m GameState
 makePlay = case _ of
-  NewGame { playerCount } -> const $ setup (newGame playerCount)
+  NewGame { playerCount, supply } ->
+    const $ setup (newGame playerCount supply)
   EndPhase { playerIndex } -> nextPhase playerIndex
   PlayCard x -> play x
   Purchase x -> purchase x

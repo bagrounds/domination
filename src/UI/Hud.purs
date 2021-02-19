@@ -10,10 +10,12 @@ import Domination.Data.Phase (Phase(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Css as Css
+import Domination.UI.Domination.Action (Action(..))
 import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
 -- TODO: move ActiveState to own module to prevent cycle/duplication
@@ -25,22 +27,28 @@ type ActiveState =
   , showSupply :: Boolean
   }
 
-render :: forall w i. ActiveState -> HTML w i
+render :: forall w. ActiveState -> HTML w Action
 render cs@{ i, playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> HH.text $ "cannot find player " <> show playerIndex
       <> " in players: " <> show state.players
     Just player -> HH.div
       [ HP.class_ $ ClassName "hud" ]
-        [ HH.div_
-          [ HH.h1 [ HP.class_ Css.title ] [ HH.text "Domination" ]
-          , HH.h1
-            [ HP.class_ Css.playerName ]
-            [ HH.text $ "Player " <> show (playerIndex + one) ]
-          , HH.h2
-            [ HP.class_ Css.iteration ]
-            [ HH.text $ "(" <> show i <> ")" ]
+      [ HH.div
+        [ HP.class_ $ ClassName "title-bar" ]
+        [ HH.button
+          [ HP.class_ Css.settingsButton
+          , HE.onClick \_ -> Just ToggleMenu
           ]
+          [ Icons.settings ]
+        , HH.h1 [ HP.class_ Css.title ] [ HH.text "Domination" ]
+        , HH.h1
+          [ HP.class_ Css.playerName ]
+          [ HH.text $ "Player " <> show (playerIndex + one) ]
+        , HH.span
+          [ HP.class_ Css.iteration ]
+          [ HH.text $ "(" <> show i <> ")" ]
+        ]
         , renderStats cs
         , HH.ul [ HP.class_ Css.handInfos ] $
           [ HH.li
@@ -124,9 +132,6 @@ playerStats { state, playerIndex: me } playerIndex player =
       [ renderText player.actions ]
     , HH.li
       [ HP.class_ Css.stat ]
-      [ renderText player.buys ]
-    , HH.li
-      [ HP.class_ Css.stat ]
       [ HH.span_
         [ HH.text
           case state.phase, playerIndex of
@@ -138,6 +143,9 @@ playerStats { state, playerIndex: me } playerIndex player =
         , Icons.money
         ]
       ]
+    , HH.li
+      [ HP.class_ Css.stat ]
+      [ renderText player.buys ]
     , HH.li
       [ HP.class_ Css.stat ]
       [ HH.span_

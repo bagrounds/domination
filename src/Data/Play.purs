@@ -19,13 +19,15 @@ import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
+import Domination.Data.Card (Card)
+import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice, WireChoice)
 import Domination.Data.Choice as Choice
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.WireInt (WireInt, _WireInt)
 
 data Play
-  = NewGame { playerCount :: Int }
+  = NewGame { playerCount :: Int, supply :: Array Card }
   | EndPhase { playerIndex :: Int }
   | PlayCard { playerIndex :: Int, cardIndex :: Int }
   | Purchase { playerIndex :: Int,  stackIndex :: Int }
@@ -35,8 +37,10 @@ data Play
 _toWire :: Iso' Play WirePlay
 _toWire = iso to from where
   to = case _ of
-    NewGame { playerCount } ->
-      WireNewGame $ view _WireInt playerCount
+    NewGame { playerCount, supply } ->
+      WireNewGame
+        (view _WireInt playerCount)
+        (view Cards._toWire <$> supply)
     EndPhase { playerIndex } ->
       WireEndPhase $ view _WireInt playerIndex
     PlayCard { playerIndex, cardIndex } ->
@@ -54,8 +58,11 @@ _toWire = iso to from where
     React { playerIndex, reaction } ->
       WireReact $ Tuple (view _WireInt playerIndex) reaction
   from = case _ of
-    WireNewGame playerCount ->
-      NewGame { playerCount: review _WireInt playerCount }
+    WireNewGame playerCount supply ->
+      NewGame
+        { playerCount: review _WireInt playerCount
+        , supply: review Cards._toWire <$> supply
+        }
     WireEndPhase playerIndex ->
       EndPhase { playerIndex: review _WireInt playerIndex }
     WirePlayCard (Tuple playerIndex cardIndex) ->
@@ -101,7 +108,7 @@ instance showPlay :: Show Play where
   show = genericShow
 
 data WirePlay
-  = WireNewGame WireInt
+  = WireNewGame WireInt (Array WireInt)
   | WireEndPhase WireInt
   | WirePlayCard (Tuple WireInt WireInt)
   | WirePurchase (Tuple WireInt WireInt)

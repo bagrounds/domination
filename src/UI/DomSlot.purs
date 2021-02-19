@@ -23,6 +23,7 @@ data Area
   | BuyingArea
   | HandArea
   | ChoiceArea
+  | KingdomConfigArea
 
 derive instance genericArea :: Generic Area _
 derive instance eqArea :: Eq Area

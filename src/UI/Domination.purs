@@ -21,6 +21,7 @@ import Domination.Capability.Random (class Random)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (isAction) as Card
+import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState as Dom
@@ -36,6 +37,9 @@ import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
+import Domination.UI.Domination.Action (Action(..))
+import Domination.UI.Domination.ActiveState (ActiveState, _i, _playerCount, _playerIndex, _showSupply, _state')
+import Domination.UI.Domination.Settings as Settings
 import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
@@ -52,16 +56,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-data InternalGameAction
-  = WritePlayerIndex Int
-  | WritePlayerCount Int
-  | StartNewGame
-  | MakePlay Play
-  | LoadGameRequest
-  | UndoRequest ActiveState
-  | ToggleSupply
-  | ToggleMenu
-
 data GameEvent
   = NewState
     ActiveState
@@ -76,51 +70,33 @@ data GameQuery a
 
 derive instance genericGameQuery :: Generic (GameQuery a) _
 
-type ActiveState =
-  { i :: Int
-  , playerIndex :: Int
-  , playerCount :: Int
-  , state :: GameState
-  , showSupply :: Boolean
-  }
-
-_i
-  :: forall a b r
-  . Lens { i :: a | r } { i :: b | r } a b
-_i = prop (SProxy :: SProxy "i")
-
-_state'
-  :: forall a b r
-  . Lens { state :: a | r } { state :: b | r } a b
-_state' = prop (SProxy :: SProxy "state")
-
 type ComponentState =
   { nextPlayerIndex :: Int
   , nextPlayerCount :: Int
+  , kingdom :: Array { card :: Card, selected :: Boolean }
   , maybeGame :: Maybe ActiveState
   , showMenu :: Boolean
   }
+
+defaultKingdom :: Array { card :: Card, selected :: Boolean }
+defaultKingdom = ({ card: _, selected: true }) <$> Cards.cardMap
 
 _nextPlayerIndex :: Lens' ComponentState Int
 _nextPlayerIndex = prop (SProxy :: SProxy "nextPlayerIndex")
 _nextPlayerCount :: Lens' ComponentState Int
 _nextPlayerCount = prop (SProxy :: SProxy "nextPlayerCount")
-_playerIndex :: Lens' ActiveState Int
-_playerIndex = prop (SProxy :: SProxy "playerIndex")
-_playerCount :: Lens' ActiveState Int
-_playerCount = prop (SProxy :: SProxy "playerCount")
 _maybeGame :: Lens' ComponentState (Maybe ActiveState)
 _maybeGame = prop (SProxy :: SProxy "maybeGame")
 _state :: Traversal' ComponentState GameState
 _state = _maybeGame <<< _Just <<< prop (SProxy :: SProxy "state")
-_showSupply
-  :: forall a b r
-  . Lens { showSupply :: a | r } { showSupply :: b | r } a b
-_showSupply = prop (SProxy :: SProxy "showSupply")
 _showMenu
   :: forall a b r
   . Lens { showMenu :: a | r } { showMenu :: b | r } a b
 _showMenu = prop (SProxy :: SProxy "showMenu")
+_kingdom
+  :: forall a b r
+  . Lens { kingdom :: a | r } { kingdom :: b | r } a b
+_kingdom = prop (SProxy :: SProxy "kingdom")
 
 _component :: SProxy "Domination"
 _component = SProxy
@@ -145,12 +121,14 @@ component = H.mkComponent { initialState, render, eval }
     { nextPlayerCount: one
     , nextPlayerIndex: zero
     , maybeGame: Nothing
+    , kingdom: defaultKingdom
     , showMenu: false
     }
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
     { handleAction = handleAction
     , handleQuery = handleQuery
+    , initialize = Just Initialize
     }
 
 handleQuery
@@ -248,57 +226,17 @@ type ChildComponents query r m =
   | r
   )
   m
-  InternalGameAction
+  Action
 
 renderPlayerN
   :: forall query r m
   . Dom m
   => Log m
   => ComponentState
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderPlayerN cs@{ nextPlayerIndex, nextPlayerCount } = HH.div
   [ HP.class_ Css.domination ]
-  [ HH.div
-    []
-    [ HH.button
-      [ HP.class_ Css.settingsButton
-      , HE.onClick \_ -> Just ToggleMenu
-      ]
-      [ HH.text "Settings" ]
-    ]
-  , HH.div
-    [ HP.classes
-      [ Css.settingsMenu
-      , if cs.showMenu
-        then Css.showing
-        else Css.collapsed
-      ]
-    ]
-    [ Util.incrementer
-      { label: "Players: "
-      , mbMin: Just one
-      , mbMax: Nothing
-      , value: nextPlayerCount
-      , setValue: WritePlayerCount
-      }
-    , Util.incrementer
-      { label: "Player #: "
-      , mbMin: Just one
-      , mbMax: Nothing
-      , value: nextPlayerIndex + one
-      , setValue: (_ - one) >>> WritePlayerIndex
-      }
-    , HH.div_
-      [ HH.button
-        [ HE.onClick \_ -> Just $ StartNewGame ]
-        [ HH.text $ "Start New " <> show nextPlayerCount
-          <> " Player Game as Player " <> show (nextPlayerIndex + one)
-        ]
-      , HH.button
-        [ HE.onClick \_ -> Just $ LoadGameRequest ]
-        [ HH.text "Load Game" ]
-      ]
-    ]
+  [ Settings.render cs
     , case cs.maybeGame of
       Nothing -> HH.div_ []
       Just activeState ->
@@ -311,7 +249,7 @@ renderSupply'
   => Log m
   => ActiveState
   -> Player
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderSupply' cs@{ showSupply, state, playerIndex } player =
   HH.ul
     [ HP.classes $
@@ -336,7 +274,7 @@ renderSupply
   => Log m
   => Player
   -> ActiveState
-  -> Array (HTML (ChildComponents query r m) InternalGameAction)
+  -> Array (HTML (ChildComponents query r m) Action)
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
@@ -367,11 +305,11 @@ renderCard
   :: forall query r m
   . Dom m
   => Log m
-  => (MouseEvent -> Maybe InternalGameAction)
+  => (MouseEvent -> Maybe Action)
   -> Player
   -> Card
   -> DomSlot
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderCard onClick player card slotNumber =
   Card.render onClick extraClasses card slotNumber
   where
@@ -385,11 +323,11 @@ renderStack
   :: forall query r m
   . Dom m
   => Log m
-  => (MouseEvent -> Maybe InternalGameAction)
+  => (MouseEvent -> Maybe Action)
   -> Player
   -> DomSlot
   -> Stack
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderStack onClick player slotNumber stack =
   HH.li [ HP.class_ Css.stack ]
     [ HH.ul_
@@ -420,7 +358,7 @@ renderPlayers
   . Dom m
   => Log m
   => ActiveState
-  -> Array (HTML (ChildComponents query r m) InternalGameAction)
+  -> Array (HTML (ChildComponents query r m) Action)
 renderPlayers cs@{ playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> []
@@ -432,7 +370,7 @@ renderPlayer
   => Log m
   => ActiveState
   -> Player
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderPlayer cs@{ state, playerIndex } player = HH.div_
   [ Hud.render cs
   , if Player.hasChoices player
@@ -480,7 +418,7 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
     where
       renderReaction
         :: forall widget
-        . Maybe (HTML widget InternalGameAction)
+        . Maybe (HTML widget Action)
       renderReaction =
         Just $ chooseOne (HH.text "Block attack?")
           [ { clickEvent: MakePlay $
@@ -495,7 +433,7 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
       renderChoice
         :: (Int -> DomSlot)
         -> Maybe Choice
-        -> Maybe (HTML (ChildComponents query r m) InternalGameAction)
+        -> Maybe (HTML (ChildComponents query r m) Action)
       renderChoice baseSlotNumber = map \choice -> case choice of
           If x ->
             acknowledge
@@ -584,7 +522,7 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
             . ({ resolution :: Maybe a | r2 } -> Choice)
             -> { resolution :: Maybe a | r2 }
             -> a
-            -> InternalGameAction
+            -> Action
           playEvent mk x r = MakePlay $ ResolveChoice
             { playerIndex
             , choice: mk x { resolution = Just r }
@@ -593,7 +531,7 @@ renderPlayer cs@{ state, playerIndex } player = HH.div_
 renderNextPhaseButton
   :: forall w
   . ActiveState
-  -> HTML w InternalGameAction
+  -> HTML w Action
 renderNextPhaseButton { playerIndex, state } =
   HH.button
     [ HP.class_ Css.nextPhase
@@ -629,7 +567,7 @@ renderAtPlay
   . Dom m
   => Log m
   => Player
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderAtPlay currentPlayer =
   HH.ul [ HP.class_ Css.play ] $ title : stacks
   where
@@ -654,7 +592,7 @@ renderBuying
   . Dom m
   => Log m
   => Player
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderBuying currentPlayer =
   HH.ul [ HP.class_ Css.buying ] $ title : stacks
   where
@@ -670,7 +608,7 @@ renderHand
   => Log m
   => Player
   -> ActiveState
-  -> HTML (ChildComponents query r m) InternalGameAction
+  -> HTML (ChildComponents query r m) Action
 renderHand player { playerIndex, state } = HH.ul
   [ HP.classes $
     [ Css.hand
@@ -701,9 +639,17 @@ handleAction
   . Log m
   => Storage m
   => Random m
-  => InternalGameAction
+  => Action
   -> HalogenM ComponentState p s GameEvent m Unit
 handleAction = case _ of
+  Initialize -> do
+    eKingdom <- load "kingdom"
+    case eKingdom of
+      Left e -> error $ "failed to load kingdom."
+        <> "falling back to default."
+        <> "Error: " <> e
+      Right k -> H.modify_ $ _kingdom .~ k
+
   WritePlayerIndex index -> do
     { nextPlayerIndex, nextPlayerCount } <- H.get
     log $ "Domination: updating playerIndex from "
@@ -733,9 +679,10 @@ handleAction = case _ of
     log $ "saving player_count: " <> show newPlayerCount
     save "player_count" newPlayerCount
   StartNewGame -> do
-    { nextPlayerIndex: playerIndex, nextPlayerCount: playerCount } <- H.get
+    { kingdom, nextPlayerIndex: playerIndex, nextPlayerCount: playerCount } <- H.get
+    let supply = _.card <$> _.selected `filter` kingdom
     log $ "Domination: StartNewGame as player " <> show playerIndex
-    playAndReport playerIndex $ NewGame { playerCount }
+    playAndReport playerIndex $ NewGame { playerCount, supply }
   MakePlay play -> do
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
     log "Domination: MakePlay"
@@ -746,6 +693,9 @@ handleAction = case _ of
     $ (_maybeGame <<< _Just <<< _showSupply %~ not)
     >>> (_showMenu .~ false)
   ToggleMenu -> H.modify_ $ _showMenu %~ not
+  ChooseKingdom kingdom -> do
+    save "kingdom" kingdom
+    H.modify_ $ _kingdom .~ kingdom
 
 playAndReport
   :: forall s p m
@@ -759,10 +709,10 @@ playAndReport playerIndex play = do
   { maybeGame, nextPlayerCount, nextPlayerIndex } <- H.get
   case maybeGame of
     Nothing -> case play of
-      NewGame { playerCount } -> doTheRest
+      NewGame { playerCount, supply } -> doTheRest
       -- TODO: WritePlayerCount here
         { i: zero
-        , state: Dom.newGame playerCount
+        , state: Dom.newGame playerCount supply
         , playerCount: nextPlayerCount
         , playerIndex: nextPlayerIndex
         , showSupply: false

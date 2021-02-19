@@ -31,7 +31,7 @@ import Web.UIEvent.MouseEvent (toEvent)
 --  -> Card
 --  -> DomSlot
 --  -> HTML w i
-render onClick extraClasses card slotNumber = HH.div
+render onClick extraClasses card slot = HH.div
   ( if Card.isTreasure card
     then [ HP.class_ Css.treasureCard ]
     else [ HP.class_ Css.noTreasureCard ]
@@ -59,8 +59,8 @@ render onClick extraClasses card slotNumber = HH.div
         [ HH.ul_
           [ HH.slot
             (SProxy :: SProxy "description")
-            slotNumber
-            (descriptionComponent slotNumber card)
+            slot
+            (descriptionComponent card)
             card
             (const Nothing)
           , HH.li
@@ -120,10 +120,9 @@ descriptionComponent
   :: forall query output m
   . Dom m
   => Log m
-  => DomSlot
-  -> Card
+  => Card
   -> H.Component HTML query Card output m
-descriptionComponent slotNumber card' =
+descriptionComponent card' =
   H.mkComponent { initialState, render: render', eval }
   where
     initialState _ = { card: card', visible: false }

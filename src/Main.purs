@@ -25,7 +25,7 @@ import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
-import Domination.UI.Domination (GameEvent(..), GameQuery(..))
+import Domination.UI.Domination (GameEvent(..), GameQuery(..), defaultKingdom)
 import Domination.UI.Domination as Domination
 import Domination.UI.UsernameInput as UsernameInput
 import Effect (Effect)
@@ -124,7 +124,7 @@ component
 component = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval
     { handleAction = handleAction
-    , initialize = Just $ Initialize
+    , initialize = Just Initialize
     }
   initialState _ = newApp
 
