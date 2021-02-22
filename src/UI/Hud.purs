@@ -10,12 +10,11 @@ import Domination.Data.Phase (Phase(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Css as Css
-import Domination.UI.Domination.Action (Action(..))
+import Domination.UI.Domination.Action (Action)
 import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
 -- TODO: move ActiveState to own module to prevent cycle/duplication
@@ -36,12 +35,7 @@ render cs@{ i, playerIndex, state } =
       [ HP.class_ $ ClassName "hud" ]
       [ HH.div
         [ HP.class_ $ ClassName "title-bar" ]
-        [ HH.button
-          [ HP.class_ Css.settingsButton
-          , HE.onClick \_ -> Just ToggleMenu
-          ]
-          [ Icons.settings ]
-        , HH.h1 [ HP.class_ Css.title ] [ HH.text "Domination" ]
+        [ HH.h1 [ HP.class_ Css.title ] [ HH.text "Domination" ]
         , HH.h1
           [ HP.class_ Css.playerName ]
           [ HH.text $ "Player " <> show (playerIndex + one) ]
@@ -50,56 +44,68 @@ render cs@{ i, playerIndex, state } =
           [ HH.text $ "(" <> show i <> ")" ]
         ]
         , renderStats cs
-        , HH.ul [ HP.class_ Css.handInfos ] $
-          [ HH.li
-            [ HP.class_ Css.handInfo ]
-            [ HH.text $ show $ length player.deck
-            , Icons.cards
-            ]
-          , HH.li
-            ( [ HP.classes $
-                [ Css.handInfo ] <>
-                  ( if playerIndex == state.turn
-                    && state.phase == ActionPhase
-                    then [ Css.drawAttention ]
-                    else []
-                  )
-              ]
-            )
-            [ renderText player.actions
-            ]
-          , HH.li
-            ( [ HP.classes $
-                [ Css.handInfo ] <>
-                  ( if playerIndex == state.turn
-                    && state.phase == BuyPhase
-                    then [ Css.drawAttention ]
-                    else []
-                  )
-              ]
-            )
-            [ HH.text $ show $ Player.cash player
-            , Icons.money
-            ]
-          , HH.li
-            ( [ HP.classes $
-                [ Css.handInfo ] <>
-                  ( if playerIndex == state.turn
-                    && state.phase == BuyPhase
-                    then [ Css.drawAttention ]
-                    else []
-                  )
-              ]
-            )
-            [ renderText player.buys
-            ]
-          , HH.li
-            [ HP.class_ Css.handInfo ]
-            [ HH.text $ show $ length player.discard
-            , Icons.cards
-            ]
+        ]
+
+renderHandInfos :: forall w. ActiveState -> HTML w Action
+renderHandInfos cs@{ i, playerIndex, state } =
+  case state.players !! playerIndex of
+    Nothing -> HH.text $ "cannot find player " <> show playerIndex
+      <> " in players: " <> show state.players
+    Just player -> HH.ul
+      [ HP.class_ Css.handInfos ] $
+      [ HH.li
+        [ HP.class_ Css.handInfo ]
+        [ HH.span_
+          [ HH.text $ show $ length player.deck
+          , Icons.cards
           ]
         ]
+      , HH.li
+        ( [ HP.classes $
+            [ Css.handInfo ] <>
+              ( if playerIndex == state.turn
+                && state.phase == ActionPhase
+                then [ Css.drawAttention ]
+                else []
+              )
+          ]
+        )
+        [ renderText player.actions ]
+      , HH.li
+        ( [ HP.classes $
+            [ Css.handInfo ] <>
+              ( if playerIndex == state.turn
+                && state.phase == BuyPhase
+                then [ Css.drawAttention ]
+                else []
+              )
+          ]
+        )
+        [ HH.span_
+          [ HH.text $ show $ Player.cash player
+          , Icons.money
+          ]
+        ]
+      , HH.li
+        ( [ HP.classes $
+            [ Css.handInfo ] <>
+              ( if playerIndex == state.turn
+                && state.phase == BuyPhase
+                then [ Css.drawAttention ]
+                else []
+              )
+          ]
+        )
+        [ renderText player.buys
+        ]
+      , HH.li
+        [ HP.class_ Css.handInfo ]
+        [ HH.span_
+          [ HH.text $ show $ length player.discard
+          , Icons.cards
+          ]
+        ]
+      ]
 
 renderStats :: forall w i. ActiveState -> HTML w i
 renderStats cs = HH.div

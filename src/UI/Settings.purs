@@ -1,7 +1,9 @@
-module Domination.UI.Domination.Settings where
+module Domination.UI.Settings where
 
 import Prelude
 
+import AppAction (AppAction(..))
+import AppState (AppState)
 import Data.Array (mapWithIndex)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
@@ -10,11 +12,10 @@ import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
-import Domination.Data.Card (Card)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
-import Domination.UI.Domination.Action (Action(..))
+import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
 import Halogen.Component (ComponentSlot)
 import Halogen.Data.Slot (Slot)
@@ -24,20 +25,15 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
 render
-  :: forall r t1 t2 t3 m
+  :: forall t1 t2 t3 m
   . Dom m
   => Log m
-  => { nextPlayerIndex :: Int
-    , nextPlayerCount :: Int
-    , kingdom :: Array { card :: Card, selected :: Boolean }
-    , showMenu :: Boolean
-    | r
-    }
-  -> HTML (ComponentSlot HTML (description :: Slot t1 t2 DomSlot | t3) m Action) Action
-render cs@{ nextPlayerIndex, nextPlayerCount, kingdom } = HH.div
+  => AppState
+  -> HTML (ComponentSlot HTML (description :: Slot t1 t2 DomSlot | t3) m AppAction) AppAction
+render cs@{ showMenu, dominationConfig: { nextPlayerIndex, nextPlayerCount, kingdom } } = HH.div
   [ HP.classes
     [ Css.settingsMenu
-    , if cs.showMenu
+    , if showMenu
       then Css.showing
       else Css.collapsed
     ]
@@ -49,6 +45,7 @@ render cs@{ nextPlayerIndex, nextPlayerCount, kingdom } = HH.div
       ]
       [ HH.text "Back" ]
     ]
+  , UsernameInput.render { onInput: WriteUsername, state: cs }
   , Util.incrementer
     { label: "Players: "
     , mbMin: Just one
@@ -65,13 +62,17 @@ render cs@{ nextPlayerIndex, nextPlayerCount, kingdom } = HH.div
     }
   , HH.div_
     [ HH.button
-      [ HE.onClick \_ -> Just $ StartNewGame ]
+      [ HE.onClick \_ -> Just $ StartNewGame
+      , HP.class_ Css.newGameButton
+      ]
       [ HH.text $ "Start New " <> show nextPlayerCount
         <> " Player Game as Player "
         <> show (nextPlayerIndex + one)
       ]
     , HH.button
-      [ HE.onClick \_ -> Just $ LoadGameRequest ]
+      [ HE.onClick \_ -> Just $ LoadGameRequest
+      , HP.class_ Css.loadGameButton
+      ]
       [ HH.text "Load Game" ]
     ]
   , renderKingdom kingdom

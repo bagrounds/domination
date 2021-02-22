@@ -53,18 +53,16 @@ render { sendEvent, onInput, state } =
       , HP.class_ $ ClassName "send-chat"
       ]
       [ HH.text "Send" ]
-    , HH.span_
-      [ HH.input
-        [ HP.type_ HP.InputText
-        , HP.class_ $ ClassName "chat-input"
-        , HP.value message
-        , HP.required true
-        , HE.onValueInput $ Just <<< onInput
-        , HE.onKeyDown \e ->
-          if (KE.key e) == "Enter"
-          then Just sendEvent
-          else Nothing
-        ]
+    , HH.input
+      [ HP.type_ HP.InputText
+      , HP.class_ $ ClassName "chat-input"
+      , HP.value message
+      , HP.required true
+      , HE.onValueInput $ Just <<< onInput
+      , HE.onKeyDown \e ->
+        if (KE.key e) == "Enter"
+        then Just sendEvent
+        else Nothing
       ]
     ]
   ]

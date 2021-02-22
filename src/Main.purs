@@ -2,20 +2,18 @@ module Main where
 
 import Prelude
 
+import AppAction (AppAction(..))
+import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
-import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Lens.Getter (view)
-import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (review)
-import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
-import Domination.Capability.Broadcast (class Broadcast, Broadcaster, broadcast, create)
+import Domination.Capability.Broadcast (class Broadcast, broadcast, create)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
@@ -25,9 +23,12 @@ import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
-import Domination.UI.Domination (GameEvent(..), GameQuery(..), defaultKingdom)
+import Domination.UI.Domination (GameQuery(..))
 import Domination.UI.Domination as Domination
-import Domination.UI.UsernameInput as UsernameInput
+import Domination.UI.Domination.ActiveState (_playerIndex)
+import Domination.UI.Domination.GameEvent (GameEvent(..))
+import Domination.UI.Icons as Icons
+import Domination.UI.Settings as Settings
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import FFI as FFI
@@ -43,50 +44,7 @@ import Halogen.VDom.Driver (runUI)
 import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
-import Web.Event.Event (Event, EventType(..))
-
-type AppState =
-  { connectionCount :: Int
-  , id :: String
-  , username :: String
-  , usernames :: HashMap String String
-  , message :: String
-  , messages :: Array RemoteMessage
-  , gameOn :: Boolean
-  , maybeBroadcaster :: Maybe Broadcaster
-  , roomCode :: String
-  }
-
-_id :: Lens' AppState String
-_id = prop (SProxy :: SProxy "id")
-_messages :: Lens' AppState (Array RemoteMessage)
-_messages = prop (SProxy :: SProxy "messages")
-_message :: Lens' AppState String
-_message = prop (SProxy :: SProxy "message")
-_connectionCount :: Lens' AppState Int
-_connectionCount = prop (SProxy :: SProxy "connectionCount")
-_usernames :: Lens' AppState (HashMap String String)
-_usernames = prop (SProxy :: SProxy "usernames")
-_username :: Lens' AppState String
-_username = prop (SProxy :: SProxy "username")
-_maybeBroadcaster :: Lens' AppState (Maybe Broadcaster)
-_maybeBroadcaster = prop (SProxy :: SProxy "maybeBroadcaster")
-
-newApp :: AppState
-newApp =
-  { connectionCount: 0
-  , id: ""
-  , username: ""
-  , usernames: HashMap.empty
-  , message: ""
-  , messages: []
-  , gameOn: false
-  , maybeBroadcaster: Nothing
-  , roomCode: globalRoomCode
-  }
-
-globalRoomCode :: String
-globalRoomCode = "global-dev"
+import Web.Event.Event (EventType(..))
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -128,14 +86,14 @@ component = H.mkComponent { eval, initialState, render } where
     }
   initialState _ = newApp
 
-render
-  :: forall c m
-  . Log m
-  => Storage m
-  => Dom m
-  => Random m
-  => AppState
-  -> HTML (Domination.Component GameQuery c m AppAction) AppAction
+--render
+--  :: forall c m
+--  . Log m
+--  => Storage m
+--  => Dom m
+--  => Random m
+--  => AppState
+--  -> HTML (Domination.Component GameQuery c m AppAction) AppAction
 render state = HH.main_ $
   [ HH.div
     [ HP.id_ $ remoteMessageTarget
@@ -149,44 +107,45 @@ render state = HH.main_ $
       (Just <<< ReceiveLocalMessage)
     ]
     []
-  , UsernameInput.render { onInput: WriteUsername, state }
-  , HH.span
-    [ HP.class_ Css.connections ]
-    [ HH.text $ show state.connectionCount <> " users connected" ]
+  , Settings.render state
+  , renderSettingsButton
+  , HH.slot
+      Domination._component
+      (AreaSlot GameArea)
+      (Domination.component state.dominationConfig)
+      unit
+      (Just <<< HandleGameEvent)
   , Chat.render
     { sendEvent: SendMessage
     , onInput: Write _message
     , state
     }
-  , HH.slot
-    Domination._component
-    (AreaSlot GameArea)
-    Domination.component
-    unit
-    (Just <<< HandleGameEvent)
+  , HH.i
+    [ HP.class_ Css.connections ]
+    [ HH.text $ show state.connectionCount ]
   ]
 
-data AppAction
-  = Initialize
-  | WriteUsername String
-  | Write (Lens' AppState String) String
-  | SendMessage
-  | ReceiveRemoteMessage Event
-  | ReceiveLocalMessage Event
-  | HandleGameEvent GameEvent
+renderSettingsButton :: forall w. HTML w AppAction
+renderSettingsButton = HH.button
+  [ HP.class_ Css.settingsButton
+  , HE.onClick \_ -> Just ToggleMenu
+  ]
+  [ Icons.settings ]
 
-type ChildComponents o r =
-  ("Domination" :: H.Slot GameQuery o DomSlot | r)
-
+type ChildComponents o r q1 o1 =
+  ( "Domination" :: H.Slot GameQuery o DomSlot
+  , "description" :: H.Slot q1 o1 DomSlot
+  | r
+  )
 handleAction
-  :: forall output m t1 r
+  :: forall output m t1 r o1 q1
   . Storage m
   => Log m
   => GenUuid m
   => Random m
   => Broadcast m
   => WireCodec m
-  => AppAction -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
+  => AppAction -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
 handleAction = case _ of
   Initialize -> do
     eUuid <- load uuidKey
@@ -206,15 +165,87 @@ handleAction = case _ of
         pure $ emoji <> "lurker" <> emoji
       Right u -> pure u
 
+    roomCode <- H.gets _.roomCode
+
     broadcaster <- create
-      globalRoomCode remoteMessageTarget localMessageTarget
+      roomCode remoteMessageTarget localMessageTarget
+
+    eKingdom <- load "kingdom"
+    kingdom <- case eKingdom of
+      Left e -> do
+        error $ "Failed to load kingdom. Falling back to default."
+          <> "Error: " <> e
+        pure defaultKingdom
+      Right k -> pure k
+
+    ePlayerIndex <- load "player_index"
+    nextPlayerIndex <- case ePlayerIndex of
+      Left e -> do
+        error $ "Failed to load playerIndex. Falling back to default."
+          <> "Error: " <> e
+        pure 0
+      Right i -> pure i
+
+    ePlayerCount <- load "player_count"
+    nextPlayerCount <- case ePlayerCount of
+      Left e -> do
+        error $ "Failed to load playerCount. Falling back to default."
+          <> "Error: " <> e
+        pure 1
+      Right i -> pure i
 
     H.modify_ $ (_id .~ uuid)
       >>> (_username .~ username)
       >>> (_usernames %~ HashMap.insert uuid username)
       >>> (_maybeBroadcaster .~ Just broadcaster)
+      >>> (_dominationConfig <<< _kingdom .~ kingdom)
+      >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
+      >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
 
     loadGame "game_state"
+
+  ToggleMenu -> H.modify_ $ _showMenu %~ not
+
+  WritePlayerIndex index -> do
+    { dominationConfig: { nextPlayerIndex, nextPlayerCount } } <- H.get
+    log $ "Domination: updating playerIndex from "
+      <> show nextPlayerIndex <> " -> " <> show index
+    let
+      newPlayerIndex = max index zero
+      newPlayerCount = max (index + one) nextPlayerCount
+    H.modify_ $ (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
+      >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
+    log $ "saving player_index: " <> show newPlayerIndex
+    save "player_index" newPlayerIndex
+    log $ "saving player_count: " <> show newPlayerCount
+    save "player_count" newPlayerCount
+
+  WritePlayerCount count -> do
+    { nextPlayerIndex, nextPlayerCount } <- H.gets _.dominationConfig
+    log $ "Domination: updating playerCount from "
+      <> show nextPlayerCount <> " -> " <> show count
+    let
+      newPlayerIndex = min (count - one) nextPlayerIndex
+      newPlayerCount = max count one
+    H.modify_ $ (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
+      >>> (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
+    log $ "saving player_index: " <> show newPlayerIndex
+    save "player_index" newPlayerIndex
+    log $ "saving player_count: " <> show newPlayerCount
+    save "player_count" newPlayerCount
+
+  ChooseKingdom kingdom -> do
+    save "kingdom" kingdom
+    H.modify_ $ _dominationConfig <<< _kingdom .~ kingdom
+
+  StartNewGame -> do
+    config <- H.gets _.dominationConfig
+    queryGame $ StartNewGameRequest config
+    H.modify_ $ _showMenu .~ false
+
+  LoadGameRequest -> do
+    loadGame "game_state"
+    H.modify_ $ _showMenu .~ false
 
   WriteUsername username -> do
     { id, usernames } <- H.get
@@ -288,7 +319,6 @@ handleAction = case _ of
       saveGame activeState
       queryGame $ LoadActiveState activeState
       log $ "Main: NewState"
-    LoadGame -> loadGame "game_state"
     SaveGame activeState -> saveGame activeState
     Undo { i } -> do
       let
@@ -297,14 +327,18 @@ handleAction = case _ of
       loadGame key
   where
     loadGame key = do
+      { nextPlayerIndex } <- H.gets _.dominationConfig
       log $ "Main: LoadGame"
       mbGameState <- load key
       case mbGameState of
         Left e -> error e
         Right activeState -> do
           log $ "Main: LoadGame successful as player"
-            <> show activeState.playerIndex
-          queryGame $ LoadActiveState activeState
+            <> show nextPlayerIndex
+          let
+            newActiveState =
+              (_playerIndex .~ nextPlayerIndex) activeState
+          queryGame $ LoadActiveState newActiveState
           sendMessage $ GameStateMessage
             { state: activeState.state
             , i: activeState.i
@@ -333,9 +367,9 @@ handleAction = case _ of
       H.modify_ $ (_message .~ "")
         <<< (_messages :~ chat)
 
-    sendMessage
-      :: RemoteMessage
-      -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
+--    sendMessage
+--      :: RemoteMessage
+--      -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
     sendMessage message' = do
       let message = view Message._toWire message'
       log "Main: sending message"

@@ -14,12 +14,13 @@ type State r =
   | r
   }
 
-type RenderInput r a =
+type RenderInput r1 r a =
   { state :: State r
   , onInput :: String -> a
+  | r1
   }
 
-render :: forall s r a. RenderInput r a -> HTML s a
+render :: forall s r a r1. RenderInput r1 r a -> HTML s a
 render { onInput, state: { username } } = HH.div
   [ HP.class_ Css.usernameInput ]
   [ HH.label_ [ HH.text "Username: " ]

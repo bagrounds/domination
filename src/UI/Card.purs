@@ -13,7 +13,6 @@ import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
-import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Halogen as H
@@ -31,90 +30,95 @@ import Web.UIEvent.MouseEvent (toEvent)
 --  -> Card
 --  -> DomSlot
 --  -> HTML w i
-render onClick extraClasses card slot = HH.div
-  ( if Card.isTreasure card
-    then [ HP.class_ Css.treasureCard ]
-    else [ HP.class_ Css.noTreasureCard ]
-  )
-  [ HH.div
-    ( if Card.isVictory card
-      then [ HP.class_ Css.victoryCard ]
-      else [ HP.class_ Css.noVictoryCard ]
-    )
-    [ HH.div
+render onClick extraClasses card slot =
+  HH.button properties children where
+  properties =
+    [ HE.onClick onClick
+    , HP.classes
+      $ [ Css.card ]
+      <> extraClasses <>
+      ( if Card.hasType CardType.Treasure card
+        then [ Css.treasureCard ]
+        else []
+      ) <>
+      ( if Card.hasType CardType.Victory card
+        then [ Css.victoryCard ]
+        else []
+      ) <>
       ( if Card.hasType CardType.Attack card
-        then [ HP.class_ Css.attackCard ]
-        else if Card.hasType CardType.Reaction card
-        then [ HP.class_ Css.reactionCard ]
-        else if Card.hasType CardType.Action card
-        then [ HP.class_ Css.actionCard ]
-        else if Card.hasType CardType.Curse card
-        then [ HP.class_ Css.curseCard ]
-        else [ HP.class_ Css.noActionCard ]
+        then [ Css.attackCard ]
+        else []
+      ) <>
+      ( if Card.hasType CardType.Reaction card
+        then [ Css.reactionCard ]
+        else []
+      ) <>
+      ( if Card.hasType CardType.Action card
+        then [ Css.actionCard ]
+        else []
+      ) <>
+      ( if Card.hasType CardType.Curse card
+        then [ Css.curseCard ]
+        else []
       )
-      [ HH.button
-        [ HE.onClick onClick
-        , HP.classes $ [ Css.card ] <> extraClasses
-        ]
-        [ HH.ul_
-          [ HH.slot
-            (SProxy :: SProxy "description")
-            slot
-            (descriptionComponent card)
-            card
-            (const Nothing)
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardCards ] ]
-              if card.cards > zero
-              then
-                [ HH.text $ "+" <> show card.cards
-                , Icons.cards
-                ]
-              else []
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardActions ] ]
-              if card.actions > zero
-              then
-                [ HH.text "+"
-                , renderText card.actions
-                ]
-              else []
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardBuys ] ]
-              if card.buys > zero
-              then
-                [ HH.text "+"
-                , renderText card.buys
-                ]
-              else []
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
-              if card.treasure > zero
-              then
-                [ HH.text $ "+" <> show card.treasure
-                , Icons.money
-                ]
-              else []
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
-              if card.victoryPoints /= zero
-              then
-                [ HH.text
-                  $ (if card.victoryPoints > zero then "+" else "")
-                  <> show card.victoryPoints
-                , Icons.points
-                ]
-              else []
-          , HH.li
-            [ HP.classes [ Css.cardText, Css.cardCost ] ]
-            [ HH.text $ show card.cost
+    ]
+  children =
+    [ HH.ul_
+      [ HH.slot
+        (SProxy :: SProxy "description")
+        slot
+        (descriptionComponent card)
+        card
+        (const Nothing)
+      , HH.li
+        [ HP.classes [ Css.cardText, Css.cardCards ] ]
+          if card.cards > zero
+          then
+            [ HH.text $ "+" <> show card.cards
+            , Icons.cards
+            ]
+          else []
+      , HH.li
+        [ HP.classes [ Css.cardText, Css.cardActions ] ]
+          if card.actions > zero
+          then
+            [ HH.text "+"
+            , renderText card.actions
+            ]
+          else []
+      , HH.li
+        [ HP.classes [ Css.cardText, Css.cardBuys ] ]
+          if card.buys > zero
+          then
+            [ HH.text "+"
+            , renderText card.buys
+            ]
+          else []
+      , HH.li
+        [ HP.classes [ Css.cardText, Css.cardTreasure ] ]
+          if card.treasure > zero
+          then
+            [ HH.text $ "+" <> show card.treasure
             , Icons.money
             ]
-          ]
+          else []
+      , HH.li
+        [ HP.classes [ Css.cardText, Css.cardVictoryPoints ] ]
+          if card.victoryPoints /= zero
+          then
+            [ HH.text
+              $ (if card.victoryPoints > zero then "+" else "")
+              <> show card.victoryPoints
+            , Icons.points
+            ]
+          else []
+      , HH.li
+        [ HP.classes [ Css.cardText, Css.cardCost ] ]
+        [ HH.text $ show card.cost
+        , Icons.money
         ]
       ]
     ]
-  ]
 
 descriptionComponent
   :: forall query output m
