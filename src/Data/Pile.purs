@@ -13,6 +13,7 @@ import Data.Generic.Rep.Show (genericShow)
 data Pile
   = Hand
   | Discard
+  | ToDiscard
   | Deck
   | Trash
 

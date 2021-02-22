@@ -60,6 +60,7 @@ component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pi
         cards = case pile of
           Pile.Hand -> player.hand
           Pile.Discard -> player.discard
+          Pile.ToDiscard -> player.toDiscard
           Pile.Deck -> player.deck
           Pile.Trash -> []
     render xs =

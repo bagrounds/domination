@@ -108,6 +108,8 @@ instance choiceRenderTextInContext
               [ HH.text $ "trashed: " ] <> cards
             Pile.Discard ->
               [ HH.text $ "discarded: " ] <> cards
+            Pile.ToDiscard ->
+              [ HH.text $ "will discard: " ] <> cards
             Pile.Hand ->
               [ HH.text $ "gained: " ]
                 <> cards
@@ -195,12 +197,13 @@ instance choiceRenderText :: RenderText Choice where
         ]
       where
         suffix = case filter of
-          Nothing -> "x cards"
-          Just (HasName name) -> "x " <> name
+          Nothing -> " cards"
+          Just (HasName name) -> " " <> name
 
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
           Pile.Discard -> "Discard"
+          Pile.ToDiscard -> "Discard"
           Pile.Deck -> "Put onto your deck"
           Pile.Trash -> "Trash"
     GainCards { n, cardName } ->

@@ -437,6 +437,7 @@ _pile pile playerIndex = case pile of
   Pile.Trash -> _trash
   Pile.Deck -> _player playerIndex <<< Player._deck
   Pile.Discard -> _player playerIndex <<< Player._discard
+  Pile.ToDiscard -> _player playerIndex <<< Player._toDiscard
 
 resolveChoice
   :: forall m
@@ -499,10 +500,12 @@ resolveChoice { playerIndex, choice } state =
       let cards = replicate cardsToGain stack.card
       let
         playerUpdate = case destination of
-          Pile.Hand -> Player._discard <>~ cards
+          Pile.Hand -> Player._hand <>~ cards
           Pile.Discard -> Player._discard <>~ cards
-          Pile.Deck -> Player._discard <>~ cards
-          Pile.Trash -> Player._discard <>~ cards
+          Pile.ToDiscard -> Player._toDiscard <>~ cards
+          Pile.Deck -> Player._deck <>~ cards
+          -- TODO: make this a state update so we can trash cards
+          Pile.Trash -> Player._hand <>~ cards
       over _destination (cards <> _)
         <$> modifyStack stackIndex stackUpdate state
     GainActions { n, resolution: Just unit } ->

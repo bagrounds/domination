@@ -63,9 +63,10 @@ component player choice baseSlotNumber =
       MoveFromTo { source } -> source
       _ -> Pile.Trash
     cards = case pile of
+      -- TODO pass in full game state so we can look at the trash
       Pile.Trash -> []
       Pile.Hand -> player.hand
       Pile.Discard -> player.discard
+      Pile.ToDiscard -> player.toDiscard
       Pile.Deck -> player.deck
-
 
