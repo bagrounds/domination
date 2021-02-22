@@ -4,7 +4,7 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, filter, find, findIndex, head, length, null, takeWhile, updateAt)
+import Data.Array (all, dropWhile, filter, find, findIndex, foldr, head, length, null, takeWhile, uncons, updateAt, (:))
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
@@ -298,11 +298,21 @@ autoAdvance gameState = do
         else advancePhase >>= autoAdvance
       BuyPhase ->
         if player.buys > zero
+        && canAffordSomething player
         then pure gameState
         else advancePhase >>= autoAdvance
       CleanupPhase ->
         advancePhase >>= autoAdvance
     where
+      canAffordSomething player = let
+        nonEmptyStacks =
+          (_.count >>> (_ > 0)) `filter` gameState.supply
+        costs = _.card.cost <$> nonEmptyStacks
+        in case uncons costs of
+          Nothing -> false
+          Just { head, tail } -> let minCost = foldr min head tail in
+            minCost <= Player.cash player
+
       advancePhase :: m GameState
       advancePhase = nextPhase gameState.turn gameState
 
