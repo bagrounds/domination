@@ -13,7 +13,8 @@ import Web.Event.Event as Event
 class Monad m <= Dom m where
   stopPropagation :: Event -> m Unit
 
-instance domHalogenM :: Dom m => Dom (HalogenM st act slots msg m) where
+instance domHalogenM
+  :: Dom m => Dom (HalogenM st act slots msg m) where
   stopPropagation  = lift <<< stopPropagation
 
 instance domAppM :: Dom AppM where
@@ -28,7 +29,7 @@ derive newtype instance bindDomM :: Bind DomM
 derive newtype instance monadDomM :: Monad DomM
 derive newtype instance monadEffectDomM :: MonadEffect DomM
 
-instance logDomM :: Dom DomM where
+instance domDomM :: Dom DomM where
   stopPropagation = liftEffect <<< Event.stopPropagation
 
 runDomM :: DomM ~> Effect

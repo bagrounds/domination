@@ -22,6 +22,7 @@ You can edit this file as you like.
   , "unordered-collections"
   , "arraybuffer-class"
   , "arraybuffer-types"
+  , "webaudio"
 
   -- test dependencies
   , "quickcheck"

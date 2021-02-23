@@ -129,6 +129,23 @@ let additions =
         , repo = "https://github.com/purescript-web/purescript-web-storage.git"
         , version = "v3.0.0"
         }
+      , webaudio =
+        { dependencies =
+          [ "effect"
+          , "arraybuffer-types"
+          , "arrays"
+          , "maybe"
+          , "aff"
+          , "foldable-traversable"
+          , "math"
+          , "tuples"
+          , "strings"
+          , "lists"
+          , "arraybuffer"
+          ]
+        , repo = "https://github.com/adkelley/purescript-webaudio.git"
+        , version = "v0.2.1"
+        }
       }
 
 in  upstream // overrides // additions

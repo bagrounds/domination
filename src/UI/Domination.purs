@@ -13,6 +13,7 @@ import Data.Lens.Fold ((^?))
 import Data.Lens.Setter ((%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
+import Domination.Capability.Audio (class Audio, beep)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
@@ -75,6 +76,7 @@ component
   => Storage m
   => Dom m
   => Random m
+  => Audio m
   => Config
   -> H.Component HTML GameQuery input GameEvent m
 component config = H.mkComponent { initialState, render, eval }
@@ -576,10 +578,12 @@ handleAction
   . Log m
   => Storage m
   => Random m
+  => Audio m
   => Action
   -> HalogenM ActiveState p s GameEvent m Unit
 handleAction = case _ of
   MakePlay play -> do
+    beep
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
     log "Domination: MakePlay"
     playAndReport playerIndex play

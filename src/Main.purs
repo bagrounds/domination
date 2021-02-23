@@ -13,6 +13,7 @@ import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
+import Domination.Capability.Audio (class Audio)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, create)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
@@ -78,6 +79,7 @@ component
   => GenUuid m
   => Broadcast m
   => WireCodec m
+  => Audio m
   => Component HTML query o s m
 component = H.mkComponent { eval, initialState, render } where
   eval = H.mkEval H.defaultEval
