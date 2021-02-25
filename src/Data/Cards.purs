@@ -325,7 +325,7 @@ discardDownTo3 = let attack = true in MoveFromTo
   { n: DownTo $ 3 ^. _WireInt
   , filter: Nothing
   , source: Pile.Hand
-  , destination: Pile.ToDiscard
+  , destination: Pile.Discard
   , resolution: Nothing
   , attack
   }
@@ -450,7 +450,7 @@ torturerChoice = let attack = true in
       { n: Exactly $ 2 ^. _WireInt
       , filter: Nothing
       , source: Pile.Hand
-      , destination: Pile.ToDiscard
+      , destination: Pile.Discard
       , attack
       , resolution: Nothing
       }
@@ -692,7 +692,7 @@ mountebankChoice = let attack = true in If
         { n: Exactly one
         , filter: Just $ HasName "Curse"
         , source: Pile.Hand
-        , destination: Pile.ToDiscard
+        , destination: Pile.Discard
         , attack
         , resolution: Nothing
         }
