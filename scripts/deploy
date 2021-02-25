@@ -4,10 +4,42 @@ set -uex
 main () (
   npm ci
   npm run bundle
+
+  rename_file_with_content_hash assets/stylesheet.css
+  rename_file_with_content_hash assets/manifest.webmanifest
+  rename_file_with_content_hash dist/app.js
+
   cp assets/* dist
   mv dist/prod-index.html dist/index.html
   rm -rf public
   mv dist public
+)
+
+rename_file_with_content_hash () (
+  file=$1
+  hash="$(hash_content "$file")"
+  new_file="$(echo -n "$file" | sed -En "s/^(.+)(\.[^.]+)"'$'"/\1-${hash}\2/p")"
+  find="$(basename "$file")"
+  replace="$(basename "$new_file")"
+  cp "$file" "$new_file"
+
+  sed -i "s|${find}|${replace}|" assets/{prod-,}index.html
+)
+
+hash_content () (
+  file=$1
+  checksum="$(cksum "$file" | awk '{ print $1 }')"
+
+  # convert base10 input to base16 output
+  bcprogram="ibase=10; obase=16; ${checksum}"
+
+  echo "$bcprogram" \
+    | bc \
+    | xxd --revert --plain \
+    | base64 \
+    | tr '+' '-' \
+    | tr '/' '_' \
+    | tr -d '='
 )
 
 main
