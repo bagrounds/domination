@@ -576,7 +576,6 @@ renderHand player { playerIndex, state } = HH.ul
 handleAction
   :: forall s p m
   . Log m
-  => Storage m
   => Random m
   => Audio m
   => Action

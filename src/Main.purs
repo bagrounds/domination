@@ -252,9 +252,9 @@ handleAction = case _ of
   WriteUsername username -> do
     { id, usernames } <- H.get
     save "username" username
-    sendMessage $ UsernameMessage { username, id }
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
+    sendMessage $ UsernameMessage { username, id }
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
   ReceiveLocalMessage customEvent -> do
@@ -307,20 +307,19 @@ handleAction = case _ of
             error "PlayMadeMessage should not be called"
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
-      sendMessage $ GameStateMessage
-        { state: activeState.state
-        , i: activeState.i
-        , playMade
-        }
       case playMade of
         Just x -> do
           log $ "Main: PlayMade"
           H.modify_ $ _messages :~ (PlayMadeMessage x)
         Nothing -> pure unit
       log $ "saving state as player" <> show activeState.playerIndex
-      saveGame activeState
       queryGame $ LoadActiveState activeState
-      log $ "Main: NewState"
+      sendMessage $ GameStateMessage
+        { state: activeState.state
+        , i: activeState.i
+        , playMade
+        }
+      saveGame activeState
     SaveGame activeState -> saveGame activeState
     Undo { i } -> do
       let
@@ -362,12 +361,9 @@ handleAction = case _ of
       pure unit
     sendChatMessage = do
       { id, message } <- H.get
-      let
-        chat = ChatMessage
-          { username: id, message }
+      let chat = ChatMessage { username: id, message }
+      H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
       sendMessage chat
-      H.modify_ $ (_message .~ "")
-        <<< (_messages :~ chat)
 
 --    sendMessage
 --      :: RemoteMessage
