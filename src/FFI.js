@@ -50,10 +50,10 @@ exports.makeBugoutFFI = tuple =>
     // heartbeat: 5000,
     // timeout: 10000,
     announce: [
+      "wss://domination-p2p-tracker.herokuapp.com",
       "wss://hub.bugout.link",
-      "wss://tracker.btorrent.xyz",
       "wss://tracker.openwebtorrent.com",
-      "wss://tracker.fastcast.nz"
+      "wss://tracker.btorrent.xyz"
     ]
   }
   const bugout = new Bugout(roomCode, options)
