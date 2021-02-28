@@ -4,9 +4,8 @@ import Prelude
 
 import AppState (Config)
 import AppState as AppState
-import Data.Array (catMaybes, filter, findIndex, head, length, nub, reverse, (!!), (:))
+import Data.Array (filter, findIndex, length, (!!), (:))
 import Data.Either (Either(..))
-import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
@@ -30,7 +29,7 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
-import Domination.Data.Stack (Stack)
+import Domination.Data.Stack (Stack, stackCards)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
@@ -515,16 +514,6 @@ renderAtPlay currentPlayer =
       [ HH.text "At Play" ]
     stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot AtPlayArea i))
       `mapWithIndex` stackCards currentPlayer.atPlay
-
-stackCards :: Array Card -> Array Stack
-stackCards cards = catMaybes (foldr f [] names)
-  where
-    names = nub $ _.name <$> reverse cards
-    f name stacks =
-      ({ card: _, count: length cards' } <$> head cards')
-        : stacks
-      where
-        cards' = (_.name >>> (_ == name)) `filter` cards
 
 renderBuying
   :: forall query r m

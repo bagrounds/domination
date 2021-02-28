@@ -3,7 +3,7 @@ module Domination.Data.Stack where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (replicate)
+import Data.Array (catMaybes, filter, foldr, head, length, nub, replicate, reverse, (:))
 import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens)
@@ -52,4 +52,13 @@ take = decOver _count
 
 assertNotEmpty :: forall m. MonadError String m => Stack -> m Stack
 assertNotEmpty = assert (_.count >>> (_ > 0)) "stack is empty!"
+
+stackCards :: Array Card -> Array Stack
+stackCards cards = catMaybes (foldr f [] names)
+  where
+    names = nub $ _.name <$> reverse cards
+    f name stacks =
+      ({ card: _, count: length cards' } <$> head cards') : stacks
+      where
+        cards' = (_.name >>> (_ == name)) `filter` cards
 
