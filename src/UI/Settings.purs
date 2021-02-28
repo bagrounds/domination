@@ -15,6 +15,7 @@ import Domination.Capability.Log (class Log)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
+import Domination.UI.RenderText (renderText)
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
 import Halogen.Component (ComponentSlot)
@@ -23,6 +24,7 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Version (version)
 
 render
   :: forall t1 t2 t3 m
@@ -45,6 +47,7 @@ render cs@{ showMenu, dominationConfig: { nextPlayerIndex, nextPlayerCount, king
       ]
       [ HH.text "Back" ]
     ]
+  , renderText version
   , UsernameInput.render { onInput: WriteUsername, state: cs }
   , Util.incrementer
     { label: "Players: "

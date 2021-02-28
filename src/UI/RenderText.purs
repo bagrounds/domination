@@ -27,6 +27,7 @@ import Domination.UI.Icons as Icons
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Util ((.^))
+import Version (Version(..))
 
 class RenderTextInContext a where
   renderTextInContext
@@ -38,6 +39,10 @@ class RenderTextInContext a where
 
 class RenderText a where
   renderText :: forall w i. a -> HTML w i
+
+instance versionRenderText :: RenderText Version where
+  renderText (Version major minor patch) = HH.text $ "v"
+    <> (intercalate "." $ show <$> [ major, minor, patch ])
 
 instance phaseRenderText :: RenderText Phase where
   renderText  = case _ of
