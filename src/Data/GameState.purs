@@ -657,3 +657,8 @@ describes = case _ of
 passFilter :: Filter -> Card -> Boolean
 passFilter (HasName name) = _.name >>> (_ == name)
 
+upgrade :: GameState -> GameState
+upgrade = (_supply %~ map Stack.upgrade)
+  >>> (_players %~ map Player.upgrade)
+  >>> (_trash %~ map Cards.upgrade)
+

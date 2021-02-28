@@ -3,6 +3,7 @@ module Domination.Data.Cards where
 import Prelude
 
 import Data.Array (findIndex, (!!))
+import Data.Foldable (find)
 import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
@@ -21,6 +22,10 @@ import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Target (Target(..))
 import Domination.Data.WireInt (WireInt, _WireInt)
+
+upgrade :: Card -> Card
+upgrade card = fromMaybe card
+  $ find ((_.name >>> (_ == card.name))) cardMap
 
 _toWire :: Iso' Card WireInt
 _toWire = iso to from where

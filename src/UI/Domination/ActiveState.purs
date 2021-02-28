@@ -2,8 +2,10 @@ module Domination.UI.Domination.ActiveState where
 
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
+import Data.Lens.Setter ((%~))
 import Data.Symbol (SProxy(..))
 import Domination.Data.GameState (GameState)
+import Domination.Data.GameState as GameState
 
 type ActiveState =
   { i :: Int
@@ -25,8 +27,10 @@ _showSupply
   :: forall a b r
   . Lens { showSupply :: a | r } { showSupply :: b | r } a b
 _showSupply = prop (SProxy :: SProxy "showSupply")
-_state'
+_state
   :: forall a b r
   . Lens { state :: a | r } { state :: b | r } a b
-_state' = prop (SProxy :: SProxy "state")
+_state = prop (SProxy :: SProxy "state")
 
+upgrade :: ActiveState -> ActiveState
+upgrade = _state %~ GameState.upgrade

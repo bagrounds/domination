@@ -13,7 +13,7 @@ import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, (+~), (.~))
+import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
@@ -345,4 +345,12 @@ hasCash i = cash >>> (_ >= i) !> ("need $" <> show i)
 handSizeIs :: Relation -> Int -> Rule Player
 handSizeIs r i = _.hand >>> length >>> is r i
   !> "must have " <> show r <> " " <> show i <> " cards in hand"
+
+upgrade :: Player -> Player
+upgrade = (_atPlay %~ map Cards.upgrade)
+  >>> (_buying %~ map Cards.upgrade)
+  >>> (_deck %~ map Cards.upgrade)
+  >>> (_discard %~ map Cards.upgrade)
+  >>> (_hand %~ map Cards.upgrade)
+  >>> (_toDiscard %~ map Cards.upgrade)
 

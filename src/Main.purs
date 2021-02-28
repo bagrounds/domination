@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp)
+import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -27,6 +27,7 @@ import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination (GameQuery(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.Domination.ActiveState (_playerIndex)
+import Domination.UI.Domination.ActiveState as ActiveState
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Icons as Icons
 import Domination.UI.Settings as Settings
@@ -178,7 +179,7 @@ handleAction = case _ of
         error $ "Failed to load kingdom. Falling back to default."
           <> "Error: " <> e
         pure defaultKingdom
-      Right k -> pure k
+      Right k -> pure $ upgradeSelection <$> k
 
     ePlayerIndex <- load "player_index"
     nextPlayerIndex <- case ePlayerIndex of
@@ -229,7 +230,8 @@ handleAction = case _ of
     let
       newPlayerIndex = min (count - one) nextPlayerIndex
       newPlayerCount = max count one
-    H.modify_ $ (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
+    H.modify_
+      $ (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
     log $ "saving player_index: " <> show newPlayerIndex
     save "player_index" newPlayerIndex
@@ -337,7 +339,7 @@ handleAction = case _ of
           log $ "Main: LoadGame successful as player"
             <> show nextPlayerIndex
           let
-            newActiveState =
+            newActiveState = ActiveState.upgrade $
               (_playerIndex .~ nextPlayerIndex) activeState
           queryGame $ LoadActiveState newActiveState
           sendMessage $ GameStateMessage

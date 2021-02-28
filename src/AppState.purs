@@ -1,17 +1,19 @@
 module AppState where
 
+import Prelude
+
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
+import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
-import Data.Ring (one, zero)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Broadcast (Broadcaster)
 import Domination.Data.Card (Card)
 import Domination.Data.Cards as Cards
+import Domination.Data.Stack (_card)
 import Message (RemoteMessage)
-import Prelude ((<$>))
 
 type AppState =
   { connectionCount :: Int
@@ -76,11 +78,19 @@ newConfig =
 defaultKingdom :: Array { card :: Card, selected :: Boolean }
 defaultKingdom = ({ card: _, selected: true }) <$> Cards.cardMap
 
+type Selection = { card :: Card, selected :: Boolean }
+
 type Config =
   { nextPlayerIndex :: Int
   , nextPlayerCount :: Int
-  , kingdom :: Array { card :: Card, selected :: Boolean }
+  , kingdom :: Array Selection
   }
+
+upgradeSelection :: Selection -> Selection
+upgradeSelection = _card %~ Cards.upgrade
+
+upgradeConfig :: Config -> Config
+upgradeConfig = _kingdom %~ map upgradeSelection
 
 _nextPlayerIndex :: Lens' Config Int
 _nextPlayerIndex = prop (SProxy :: SProxy "nextPlayerIndex")

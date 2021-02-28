@@ -35,7 +35,7 @@ import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination.Action (Action(..))
-import Domination.UI.Domination.ActiveState (ActiveState, _i, _playerIndex, _showSupply, _state')
+import Domination.UI.Domination.ActiveState (ActiveState, _i, _playerIndex, _showSupply, _state)
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
@@ -623,6 +623,6 @@ playAndReport playerIndex play = do
         >>> (_i .~ newI)
         >>> (_showSupply .~ newShowSupply)
       H.raise $ NewState
-        (((_i .~ newI) >>> (_state' .~ gameState)) activeState)
+        (((_i .~ newI) >>> (_state .~ gameState)) activeState)
         playMade
 

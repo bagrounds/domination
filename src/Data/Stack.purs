@@ -62,3 +62,6 @@ stackCards cards = catMaybes (foldr f [] names)
       where
         cards' = (_.name >>> (_ == name)) `filter` cards
 
+upgrade :: Stack -> Stack
+upgrade = _card %~ Cards.upgrade
+
