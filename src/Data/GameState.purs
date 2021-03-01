@@ -4,7 +4,7 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, filter, find, findIndex, foldr, head, length, null, takeWhile, uncons, updateAt, (:))
+import Data.Array (all, dropWhile, filter, foldr, head, length, null, takeWhile, uncons, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
@@ -23,8 +23,6 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unfoldable (replicate)
 import Domination.Capability.Random (class Random, randomIntBetween)
 import Domination.Data.Card (Card, Command(..), Special)
-import Domination.Data.Card as Card
-import Domination.Data.CardType (CardType(..))
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
@@ -42,6 +40,8 @@ import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
+import Domination.Data.Supply (Supply, getStack, indexOfStack, makeSupply, nonEmptyStacks, stackByName)
+import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
 import Domination.Data.WireInt (WireInt, _WireInt)
 import Relation (Relation(..))
@@ -68,13 +68,13 @@ _toWire :: Iso' GameState WireGameState
 _toWire = iso to from where
   to = (_turn %~ view _WireInt)
     >>> (_players <$>~ view Player._toWire)
-    >>> (_supply <$>~ view Stack._toWire)
+    >>> (_supply %~ view Supply._toWire)
     >>> (_trash <$>~ view Cards._toWire)
     >>> toTuple
   from = fromTuple
     >>> (_turn %~ review _WireInt)
     >>> (_players <$>~ review Player._toWire)
-    >>> (_supply <$>~ review Stack._toWire)
+    >>> (_supply %~ review Supply._toWire)
     >>> (_trash <$>~ (review Cards._toWire))
   toTuple { phase, players, supply, trash, turn } =
     Tuple phase $ Tuple players $ Tuple supply $ Tuple trash turn
@@ -104,7 +104,7 @@ _trash = prop (SProxy :: SProxy "trash")
 _player :: Int -> Traversal' GameState Player
 _player i = _players <<< (ix i)
 _stack :: Int -> Traversal' GameState Stack
-_stack i = _supply <<< (ix i)
+_stack i = _supply <<< Supply._stack i
 
 _ofPhase :: Phase -> Prism' GameState GameState
 _ofPhase phase = prism' identity $ justIf ((==) phase <<< _.phase)
@@ -116,15 +116,6 @@ getPlayer
   -> GameState
   -> m Player
 getPlayer i = fromJust "cannot get player!" <<< (_ ^? _player i)
-
-getPlayerHand
-  :: forall m
-  . MonadError String m
-  => Int
-  -> GameState
-  -> m (Array Card)
-getPlayerHand playerIndex = fromJust "cannot get player hand!"
-  <<< (_ ^? _player playerIndex <<< Player._hand)
 
 updatePlayer
   :: forall m
@@ -143,8 +134,7 @@ updateStack
   -> Stack
   -> GameState
   -> m GameState
-updateStack i stack state = fromJust "cannot update stack!"
-  $ updateAt i stack state.supply <#> flip (set _supply) state
+updateStack i = traverseOf _supply <<< Supply.updateStack i
 
 modifyStack
   :: forall m
@@ -154,7 +144,7 @@ modifyStack
   -> GameState
   -> m GameState
 modifyStack i f state =
-  getStack i state <#> f >>= flip (updateStack i) state
+  getStack i state.supply <#> f >>= flip (updateStack i) state
 
 modifyPlayer
   :: forall m
@@ -184,65 +174,14 @@ modifyStackM
   -> GameState
   -> m GameState
 modifyStackM i f state =
-  getStack i state >>= f >>= flip (updateStack i) state
-
-getStack
-  :: forall m
-  . MonadError String m
-  => Int
-  -> GameState
-  -> m Stack
-getStack i = fromJust "cannot get stack!" <<< (_ ^? _stack i)
-
-stackByName
-  :: forall m
-  . MonadError String m
-  => String
-  -> GameState
-  -> m Stack
-stackByName cardName { supply } = fromJust "card not in supply!" $
-  find (view (Stack._card <<< Card._name) >>> (_ == cardName)) supply
-
-indexOfStack
-  :: forall m
-  . MonadError String m
-  => Card
-  -> GameState
-  -> m Int
-indexOfStack card = fromJust "card not in supply!"
-  <<< findIndex (view Stack._card >>> (_ == card)) <<< _.supply
-
-type Supply = Array Stack
-
-defaultSupply :: Int -> Array { card :: Card, count :: Int }
-defaultSupply i = makeSupply i Cards.cardMap
-
-makeSupply
-  :: Int
-  -> Array Card
-  -> Array { card :: Card, count :: Int }
-makeSupply playerCount cards = cards <#> \card ->
-  { card, count: countOf card }
-  where
-    countOf card =
-      if Card.hasType Victory card
-      then victoryCount
-      else if Card.hasType Curse card
-      then curseCount
-      else if Card.hasType Treasure card
-      then treasureCount
-      else kingdomCount
-    curseCount = 10 * (playerCount - one)
-    victoryCount = 4 * playerCount
-    kingdomCount = 4 * playerCount
-    treasureCount = 10 * playerCount
+  getStack i state.supply >>= f >>= flip (updateStack i) state
 
 newGame :: Int -> Array Card -> GameState
-newGame playerCount supply =
+newGame playerCount cards =
   { turn: zero
   , phase: ActionPhase
   , players: replicate playerCount newPlayer
-  , supply: makeSupply playerCount supply
+  , supply: makeSupply playerCount cards
   , trash: []
   }
 
@@ -305,9 +244,7 @@ autoAdvance gameState = do
         advancePhase >>= autoAdvance
     where
       canAffordSomething player = let
-        nonEmptyStacks =
-          (_.count >>> (_ > 0)) `filter` gameState.supply
-        costs = _.card.cost <$> nonEmptyStacks
+        costs = _.card.cost <$> nonEmptyStacks gameState.supply
         in case uncons costs of
           Nothing -> false
           Just { head, tail } -> let minCost = foldr min head tail in
@@ -373,7 +310,7 @@ purchase { playerIndex, stackIndex } =
   where
     purchase' :: GameState -> m GameState
     purchase' state = do
-      stack <- getStack stackIndex state
+      stack <- getStack stackIndex state.supply
       modifyPlayer playerIndex (Player.purchase stack.card) state
         >>= modifyStack stackIndex Stack.take
 
@@ -385,7 +322,7 @@ assertPlayerCanAfford
   -> GameState
   -> m GameState
 assertPlayerCanAfford playerIndex stackIndex state = do
-  stack <- getStack stackIndex state
+  stack <- getStack stackIndex state.supply
   modifyPlayerM
     playerIndex
     (Player.assertHasCash stack.card.cost)
@@ -399,7 +336,7 @@ overStackM
   -> GameState
   -> m a
 overStackM assertion stackIndex state =
-  assertion =<< getStack stackIndex state
+  assertion =<< getStack stackIndex state.supply
 
 hasReaction :: Int -> GameState -> Boolean
 hasReaction playerIndex state =
@@ -492,8 +429,8 @@ resolveChoice { playerIndex, choice } state =
 
     GainCards { n, cardName, destination, resolution: Just unit } -> do
       let _destination = _pile destination playerIndex
-      stack <- stackByName cardName state
-      stackIndex <- indexOfStack stack.card state
+      stack <- stackByName cardName state.supply
+      stackIndex <- indexOfStack stack.card state.supply
       let cardsToGain = min n stack.count
       let newCount = max zero (stack.count - n)
       let stackUpdate = Stack._count .~ newCount
@@ -658,7 +595,7 @@ passFilter :: Filter -> Card -> Boolean
 passFilter (HasName name) = _.name >>> (_ == name)
 
 upgrade :: GameState -> GameState
-upgrade = (_supply %~ map Stack.upgrade)
+upgrade = (_supply %~ Supply.upgrade)
   >>> (_players %~ map Player.upgrade)
   >>> (_trash %~ map Cards.upgrade)
 
