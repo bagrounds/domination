@@ -30,6 +30,7 @@ import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
+import Domination.Data.Supply (negativePoints, positivePoints)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.Css as Css
@@ -196,7 +197,20 @@ renderSupply' cs@{ showSupply, state, playerIndex } player =
         then [ Css.waiting ]
         else []
     ]
-    [ HH.ul_ $ renderSupply player cs
+    [ HH.ul
+      [ HP.class_ Css.stats ]
+      [ HH.li
+        [ HP.class_ Css.stat ]
+        [ HH.text $ "+"
+        , renderText $ positivePoints cs.state.supply
+        ]
+      , HH.li
+        [ HP.class_ Css.stat ]
+        [ HH.text $ "-"
+        , renderText $ negativePoints cs.state.supply
+        ]
+      ]
+    , HH.ul_ $ renderSupply player cs
     ]
 
 renderSupply

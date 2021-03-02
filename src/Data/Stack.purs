@@ -14,8 +14,10 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Cards as Cards
+import Domination.Data.Points (Points)
+import Domination.Data.Points as Points
 import Domination.Data.WireInt (WireInt, _WireInt)
-import Util (assert, decOver)
+import Util (assert, decOver, (.^))
 
 type Stack =
   { card :: Card
@@ -51,17 +53,27 @@ take :: Stack -> Stack
 take = decOver _count
 
 assertNotEmpty :: forall m. MonadError String m => Stack -> m Stack
-assertNotEmpty = assert (_.count >>> (_ > 0)) "stack is empty!"
+assertNotEmpty = assert (_.count >>> (_ > zero)) "stack is empty!"
 
 stackCards :: Array Card -> Array Stack
 stackCards cards = catMaybes (foldr f [] names)
   where
     names = nub $ _.name <$> reverse cards
     f name stacks =
-      ({ card: _, count: length cards' } <$> head cards') : stacks
+      ({ card: _, count: length cards' } <$> head cards')
+        : stacks
       where
         cards' = (_.name >>> (_ == name)) `filter` cards
 
 upgrade :: Stack -> Stack
 upgrade = _card %~ Cards.upgrade
+
+points :: Stack -> Points
+points { card, count } = card.victoryPoints * Points.points count
+
+positivePoints :: Stack -> Points
+positivePoints = max zero <<< points
+
+negativePoints :: Stack -> Points
+negativePoints = min zero <<< points
 

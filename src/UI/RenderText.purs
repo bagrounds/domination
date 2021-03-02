@@ -20,6 +20,8 @@ import Domination.Data.GameState as GameState
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
+import Domination.Data.Points (Points)
+import Domination.Data.Points as Points
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.WireInt (_WireInt)
@@ -73,6 +75,12 @@ instance buysRenderText :: RenderText Buys where
   renderText buy = HH.span_
     [ HH.text $ show (buy ^. Buys._int)
     , Icons.buys
+    ]
+
+instance victoryPointsRenderText :: RenderText Points where
+  renderText points = HH.span_
+    [ HH.text $ show (points ^. Points._int)
+    , Icons.points
     ]
 
 instance conditionRenderText :: RenderText Condition where

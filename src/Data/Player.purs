@@ -28,6 +28,7 @@ import Domination.Data.Card as Card
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice, WireChoice)
 import Domination.Data.Choice as Choice
+import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.WireInt (WireInt)
 import Relation (Relation, is)
@@ -322,7 +323,7 @@ allCards player
   <> player.toDiscard
   <> player.buying
 
-score :: Player -> Int
+score :: Player -> Points
 score player = foldr (+) zero $ _.victoryPoints <$> allCards player
 
 assertHasBuys :: forall m. MonadError String m => Player -> m Player

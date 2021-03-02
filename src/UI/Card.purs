@@ -108,8 +108,7 @@ render onClick extraClasses card slot =
           then
             [ HH.text
               $ (if card.victoryPoints > zero then "+" else "")
-              <> show card.victoryPoints
-            , Icons.points
+            , renderText card.victoryPoints
             ]
           else []
       , HH.li

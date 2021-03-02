@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
 import Data.Array (filter, findIndex, updateAt)
-import Data.Foldable (find)
+import Data.Foldable (find, sum)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
@@ -15,6 +15,7 @@ import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Cards as Cards
+import Domination.Data.Points (Points)
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
 import Util (fromJust)
@@ -86,7 +87,7 @@ stackByName cardName supply =
   find (view (Stack._card <<< Card._name) >>> (_ == cardName)) supply
 
 nonEmptyStacks :: Supply -> Array Stack
-nonEmptyStacks = filter (_.count >>> (_ > 0))
+nonEmptyStacks = filter (_.count >>> (_ > zero))
 
 getStack
   :: forall m
@@ -95,4 +96,10 @@ getStack
   -> Supply
   -> m Stack
 getStack i = fromJust "cannot get stack!" <<< (_ ^? _stack i)
+
+positivePoints :: Supply -> Points
+positivePoints = sum <<< map Stack.positivePoints
+
+negativePoints :: Supply -> Points
+negativePoints = sum <<< map Stack.negativePoints
 

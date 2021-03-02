@@ -596,10 +596,12 @@ button span,
 
 .stat {
   width: 18%;
+  color: white;
 }
 
 .hand-info span,
-.stat span {
+.stat span,
+.stat {
   display: flex;
   flex-direction: row;
   justify-content: flex-end;

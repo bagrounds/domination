@@ -154,9 +154,6 @@ playerStats { state, playerIndex: me } playerIndex player =
       [ renderText player.buys ]
     , HH.li
       [ HP.class_ Css.stat ]
-      [ HH.span_
-        [ HH.text $ show (Player.score player)
-        , Icons.points
-        ]
+      [ renderText $ Player.score player
       ]
     ]

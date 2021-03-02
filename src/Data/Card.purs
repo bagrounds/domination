@@ -20,6 +20,7 @@ import Domination.Data.Actions (Actions)
 import Domination.Data.Buys (Buys)
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
+import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.Target (Target)
 import Util (justIf)
@@ -28,7 +29,7 @@ type Card =
   { types :: Array CardType
   , name :: String
   , cost :: Int
-  , victoryPoints :: Int
+  , victoryPoints :: Points
   , treasure :: Int
   , buys :: Buys
   , cards :: Int
@@ -43,7 +44,7 @@ _name :: Lens' Card String
 _name = prop (SProxy :: SProxy "name")
 _cost :: Lens' Card Int
 _cost = prop (SProxy :: SProxy "cost")
-_victoryPoints :: Lens' Card Int
+_victoryPoints :: Lens' Card Points
 _victoryPoints = prop (SProxy :: SProxy "victoryPoints")
 _treasure :: Lens' Card Int
 _treasure = prop (SProxy :: SProxy "treasure")

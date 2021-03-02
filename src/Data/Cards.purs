@@ -18,6 +18,7 @@ import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Filter (Filter(..))
 import Domination.Data.Pile as Pile
+import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Target (Target(..))
@@ -103,15 +104,25 @@ estate = Card.victory
   }
 
 duchy :: Card
-duchy = Card.victory { name = "Duchy", cost = 5, victoryPoints = 3 }
+duchy = Card.victory
+  { name = "Duchy"
+  , cost = 5
+  , victoryPoints = points 3
+  }
 
 province :: Card
-province =
-  Card.victory { name = "Province", cost = 8, victoryPoints = 6 }
+province = Card.victory
+  { name = "Province"
+  , cost = 8
+  , victoryPoints = points 6
+  }
 
 colony :: Card
-colony =
-  Card.victory { name = "Colony", cost = 11, victoryPoints = 10 }
+colony = Card.victory
+  { name = "Colony"
+  , cost = 11
+  , victoryPoints = points 10
+  }
 
 curse :: Card
 curse =
@@ -179,7 +190,7 @@ harem = Card.treasure
   , name = "Harem"
   , cost = 6
   , treasure = 2
-  , victoryPoints = 2
+  , victoryPoints = points 2
   }
 
 bazaar :: Card
@@ -356,7 +367,7 @@ nobles = let attack = false in
   Card.actionVictory
   { name = "Nobles"
   , cost = 6
-  , victoryPoints = 2
+  , victoryPoints = points 2
   , special = Just noblesSpecial
   }
 
