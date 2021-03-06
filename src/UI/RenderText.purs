@@ -23,9 +23,11 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Points (Points)
 import Domination.Data.Points as Points
 import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.WireInt (_WireInt)
 import Domination.UI.Icons as Icons
+import Domination.UI.Util (h2__)
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Util ((.^))
@@ -41,6 +43,13 @@ class RenderTextInContext a where
 
 class RenderText a where
   renderText :: forall w i. a -> HTML w i
+
+instance resultRenderText :: RenderText Result where
+  renderText result = h2__ case result of
+    Victory playerIndex ->
+      "Victory: Player " <> show (playerIndex + one)
+    Tie playerIndices ->
+      "Tie: Players " <> (intercalate ", " $ show <$> playerIndices)
 
 instance versionRenderText :: RenderText Version where
   renderText (Version major minor patch) = HH.text $ "v"

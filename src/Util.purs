@@ -10,20 +10,17 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array (deleteAt, drop, filter, length, nub, take, zip, (!!), (:))
-import Data.ArrayBuffer.Class (class DynamicByteLength, class EncodeArrayBuffer, decodeArrayBuffer, encodeArrayBuffer)
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens', Lens)
-import Data.Lens.Prism (Review', Review, review)
+import Data.Lens.Prism (Review, review)
 import Data.Lens.Setter (Setter', over, set, subOver)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
-import Data.Ring (class Ring)
 import Data.Tuple (Tuple(..), fst, snd)
-import Effect (Effect)
 
 class RenderText a where
   renderText :: a -> String
@@ -115,8 +112,9 @@ prependOver lens x = over lens (x : _)
 infixr 4 prependOver as :~
 
 mapOver
-  :: forall s t a b
-  . Lens s t (Array a) (Array b)
+  :: forall f s t a b
+  . Functor f
+  => Lens s t (f a) (f b)
   -> (a -> b)
   -> s
   -> t

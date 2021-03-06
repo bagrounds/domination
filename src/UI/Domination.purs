@@ -172,8 +172,10 @@ renderPlayerN
   => ActiveState
   -> HTML (ChildComponents query r m) Action
 renderPlayerN activeState = HH.div
-  [ HP.class_ Css.domination ]
-  $ renderPlayers activeState
+  [ HP.class_ Css.domination ] $
+  case activeState.state.result of
+    Nothing -> renderPlayers activeState
+    Just result -> [ renderText result ]
 
 renderSupply'
   :: forall query r m
@@ -206,8 +208,7 @@ renderSupply' cs@{ showSupply, state, playerIndex } player =
         ]
       , HH.li
         [ HP.class_ Css.stat ]
-        [ HH.text $ "-"
-        , renderText $ negativePoints cs.state.supply
+        [ renderText $ negativePoints cs.state.supply
         ]
       ]
     , HH.ul_ $ renderSupply player cs

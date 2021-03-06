@@ -4,7 +4,7 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, filter, foldr, head, length, null, takeWhile, uncons, updateAt)
+import Data.Array (all, dropWhile, filter, findIndex, foldr, head, length, mapWithIndex, null, reverse, sort, takeWhile, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM)
 import Data.Lens.Fold ((^?))
@@ -37,10 +37,12 @@ import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player, WirePlayer)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Result (Result(..), WireResult)
+import Domination.Data.Result as Result
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
-import Domination.Data.Supply (Supply, getStack, indexOfStack, makeSupply, nonEmptyStacks, stackByName)
+import Domination.Data.Supply (Supply, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
 import Domination.Data.WireInt (WireInt, _WireInt)
@@ -54,12 +56,14 @@ type GameState =
   , supply :: Supply
   , trash :: Array Card
   , turn :: Int
+  , result :: Maybe Result
   }
 
 type WireGameState = Tuple Phase
   (Tuple (Array WirePlayer)
   (Tuple (Array WireStack)
-  (Tuple (Array WireInt) WireInt)))
+  (Tuple (Array WireInt)
+  (Tuple WireInt (Maybe WireResult)))))
 
 fromWire :: WireGameState -> GameState
 fromWire = review _toWire
@@ -70,17 +74,20 @@ _toWire = iso to from where
     >>> (_players <$>~ view Player._toWire)
     >>> (_supply %~ view Supply._toWire)
     >>> (_trash <$>~ view Cards._toWire)
+    >>> (_result <$>~ view Result._toWire)
     >>> toTuple
   from = fromTuple
     >>> (_turn %~ review _WireInt)
     >>> (_players <$>~ review Player._toWire)
     >>> (_supply %~ review Supply._toWire)
     >>> (_trash <$>~ (review Cards._toWire))
-  toTuple { phase, players, supply, trash, turn } =
-    Tuple phase $ Tuple players $ Tuple supply $ Tuple trash turn
+    >>> (_result <$>~ review Result._toWire)
+  toTuple { phase, players, result, supply, trash, turn } =
+    Tuple phase $ Tuple players $ Tuple supply $ Tuple trash $ Tuple turn result
   fromTuple
-    (Tuple phase (Tuple players (Tuple supply (Tuple trash turn)))) =
-    { phase, players, supply, trash, turn }
+    (Tuple phase (Tuple players (Tuple supply (Tuple trash
+    (Tuple turn result))))) =
+    { phase, players, result, supply, trash, turn }
 
 _turn
   :: forall a b r
@@ -100,6 +107,10 @@ _trash
   :: forall a b r
   . Lens { trash :: a | r } { trash :: b | r } a b
 _trash = prop (SProxy :: SProxy "trash")
+_result
+  :: forall a b r
+  . Lens { result :: a | r } { result :: b | r } a b
+_result = prop (SProxy :: SProxy "result")
 
 _player :: Int -> Traversal' GameState Player
 _player i = _players <<< (ix i)
@@ -181,6 +192,7 @@ newGame playerCount cards =
   { turn: zero
   , phase: ActionPhase
   , players: replicate playerCount newPlayer
+  , result: Nothing
   , supply: makeSupply playerCount cards
   , trash: []
   }
@@ -205,14 +217,17 @@ makePlay
   => Play
   -> GameState
   -> m GameState
-makePlay = case _ of
+makePlay play' = map maybeGameOver <<< case play' of
   NewGame { playerCount, supply } ->
-    const $ setup (newGame playerCount supply)
+    const (setup (newGame playerCount supply))
   EndPhase { playerIndex } -> nextPhase playerIndex
   PlayCard x -> play x
   Purchase x -> purchase x
   ResolveChoice x -> resolveChoice x
   React x -> react x
+  where
+    maybeGameOver :: GameState -> GameState
+    maybeGameOver state = (_result .~ (gameOver state)) state
 
 getCurrentPlayer
   :: forall m
@@ -598,4 +613,30 @@ upgrade :: GameState -> GameState
 upgrade = (_supply %~ Supply.upgrade)
   >>> (_players %~ map Player.upgrade)
   >>> (_trash %~ map Cards.upgrade)
+
+gameOver :: GameState -> Maybe Result
+gameOver state = let
+  playerPoints = reverse $ sort $ Player.score <$> state.players
+  positivePoints' = positivePoints state.supply
+  negativePoints' = negativePoints state.supply
+  in
+  if length state.players == one
+  then
+    if positivePoints' > zero
+    then Nothing
+    else Just $ Victory zero
+  else do
+    p1Score <- head playerPoints
+    p2Score <- playerPoints !! one
+    let
+      p1Worst = p1Score + negativePoints'
+      p2Best = p2Score + positivePoints'
+    if p1Worst > p2Best
+    then Victory
+      <$> findIndex (Player.score >>> (_ == p1Score)) state.players
+    else if positivePoints' == zero && negativePoints' == zero
+    then Just $ Tie $ fst
+      <$> filter (snd >>> Player.score >>> (_ == p1Score))
+      (Tuple `mapWithIndex` state.players)
+    else Nothing
 
