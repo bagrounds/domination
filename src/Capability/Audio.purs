@@ -1,11 +1,12 @@
 module Domination.Capability.Audio where
 
-import Prelude
+import Prelude hiding (compose)
 
 import Audio.WebAudio.AudioParam (setValueAtTime)
-import Audio.WebAudio.BaseAudioContext (createOscillator, destination, newAudioContext)
+import Audio.WebAudio.BaseAudioContext (createGain, createOscillator, destination, newAudioContext)
+import Audio.WebAudio.GainNode (setGain)
 import Audio.WebAudio.Oscillator (frequency, startOscillator, stopOscillator)
-import Audio.WebAudio.Types (connect)
+import Audio.WebAudio.Types (AudioContext, connect)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (drop, head)
 import Data.Maybe (Maybe(..))
@@ -39,8 +40,18 @@ instance audioAudioM :: Audio AudioM where
 runAudioM :: AudioM ~> Effect
 runAudioM (AudioM m) = liftEffect m
 
-beep :: forall m. Audio m => m Unit
-beep = note a4 0.0 0.05
+data Sound
+  = Acknowledge
+  | Purchase
+  | Error
+  | Attacked
+
+beep :: forall m. Audio m => Sound -> m Unit
+beep = case _ of
+  Acknowledge -> note c5 0.0 0.05
+  Purchase -> marioCoin
+  Error -> note ab4 0.0 0.05
+  Attacked -> suspense
 
 note'
   :: Number
@@ -49,13 +60,42 @@ note'
   -> Effect Unit
 note' freq start stop = do
   audioContext <- newAudioContext
+  note'' freq start stop audioContext
+
+note''
+  :: Number
+  -> Number
+  -> Number
+  -> AudioContext
+  -> Effect Unit
+note'' freq start stop audioContext = do
   oscillatorNode <- createOscillator audioContext
+  gainNode <- createGain audioContext
+  setGain 0.5 gainNode
   f <- frequency oscillatorNode
   value <- setValueAtTime freq start f
   dest <- destination audioContext
-  connect oscillatorNode dest
   startOscillator start oscillatorNode
+  setGain 0.0 gainNode
   stopOscillator stop oscillatorNode
+  connect oscillatorNode dest
+
+compose
+  :: forall m
+  . Audio m
+  => Array
+  { frequency :: Number
+  , duration :: Number
+  , start :: Number
+  }
+  -> m Unit
+compose notes =
+  case head notes of
+    Nothing -> pure unit
+    Just { frequency, duration, start } -> do
+      let tail = drop 1 notes
+      note frequency start (start + duration)
+      compose tail
 
 arpeggio
   :: forall m
@@ -79,6 +119,19 @@ c5_1'4'5 = do
   arpeggio f5Major 0.1 0.0 0.3
   arpeggio g5Major 0.1 0.0 0.6
 
+marioCoin :: forall m. Audio m => m Unit
+marioCoin = compose
+  [ { frequency: b5, duration: 0.1, start: 0.0 }
+  , { frequency: e6, duration: 0.2, start: 0.1 }
+  ]
+
+suspense :: forall m. Audio m => m Unit
+suspense = compose
+  [ { frequency: eb4, duration: 0.1, start: 0.0 }
+  , { frequency: c4, duration: 0.1, start: 0.2 }
+  , { frequency: fH4, duration: 0.3, start: 0.4 }
+  ]
+
 a4Minor :: Array Number
 a4Minor = [a4, c5, e5]
 
@@ -94,10 +147,20 @@ f5Major = [f5, a5, c6]
 g5Major :: Array Number
 g5Major = [g5, b5, d6]
 
+fH3 :: Number
+fH3 = 185.00
+c4 :: Number
+c4 = 261.63
+eb4 :: Number
+eb4 = 311.13
+ab4 :: Number
+ab4 = 415.30
 a4 :: Number
 a4 = 440.0
 b4 :: Number
 b4 = 493.88
+fH4 :: Number
+fH4 = 369.99
 c5 :: Number
 c5 = 523.25
 cH5 :: Number
@@ -116,7 +179,8 @@ b5 :: Number
 b5 = 987.77
 c6 :: Number
 c6 = 1046.50
-
+e6 :: Number
+e6 = 1318.51
 g6 :: Number
 g6 = 1567.98
 a6 :: Number

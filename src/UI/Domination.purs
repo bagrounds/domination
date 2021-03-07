@@ -13,6 +13,7 @@ import Data.Lens.Setter ((%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Audio (class Audio, beep)
+import Domination.Capability.Audio as Sound
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
@@ -109,12 +110,18 @@ handleQuery
   :: forall action slots m a
   . Log m
   => Storage m
+  => Audio m
   => Random m
   => GameQuery a
   -> H.HalogenM ActiveState action slots GameEvent m (Maybe a)
 handleQuery = case _ of
   ReceiveGameState { state, i } a -> do
     activeGame <- H.get
+
+    if Dom.isAttacked activeGame.playerIndex state
+    then beep Sound.Attacked
+    else pure unit
+
     log "Domination: UpdateState"
     log "I should ask the user if they want to load this state"
     let
@@ -586,7 +593,6 @@ handleAction
   -> HalogenM ActiveState p s GameEvent m Unit
 handleAction = case _ of
   MakePlay play -> do
-    beep
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
     log "Domination: MakePlay"
     playAndReport playerIndex play
@@ -597,6 +603,7 @@ playAndReport
   :: forall s p m
   . Log m
   => Random m
+  => Audio m
   => Int
   -> Play
   -> HalogenM ActiveState p s GameEvent m Unit
@@ -608,8 +615,13 @@ playAndReport playerIndex play = do
     lastTurn = state.turn
   result <- Dom.makeAutoPlay play activeState.state
   case result of
-    Left e -> error e
+    Left e -> do
+      beep Sound.Error
+      error e
     Right gameState -> do
+      case play of
+        Purchase _ -> beep Sound.Purchase
+        _ -> beep Sound.Acknowledge
       let
         phase = gameState.phase
         turn = gameState.turn
