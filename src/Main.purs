@@ -4,6 +4,7 @@ import Prelude
 
 import AppAction (AppAction(..))
 import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import Data.Array (length)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -179,7 +180,10 @@ handleAction = case _ of
         error $ "Failed to load kingdom. Falling back to default."
           <> "Error: " <> e
         pure defaultKingdom
-      Right k -> pure $ upgradeSelection <$> k
+      Right k ->
+        if length k == length defaultKingdom
+        then pure $ upgradeSelection <$> k
+        else pure defaultKingdom
 
     ePlayerIndex <- load "player_index"
     nextPlayerIndex <- case ePlayerIndex of
