@@ -73,6 +73,8 @@ cardMap =
   , torturer
   , mountebank
   , margrave
+  , huntingLodge
+  , oldWitch
   , harem
   , nobles
   ]
@@ -229,8 +231,8 @@ witch = let attack = true in
   , special = Just witchSpecial
   }
 
-witchChoice :: Choice
-witchChoice = let attack = true in GainCards
+gainCurse :: Choice
+gainCurse = let attack = true in GainCards
   { cardName: "Curse"
   , destination: Pile.Discard
   , n: one
@@ -241,7 +243,7 @@ witchChoice = let attack = true in GainCards
 witchSpecial :: Special
 witchSpecial = let attack = true in
   { target: EveryoneElse
-  , command: Choose witchChoice
+  , command: Choose gainCurse
   , description: "Each other player gains a Curse."
   }
 
@@ -277,14 +279,17 @@ scholar = let attack = false in
   , special = Just scholarSpecial
   }
 
+discardYourHand :: Boolean -> Choice
+discardYourHand attack = Discard
+  { selection: SelectAll
+  , resolution: Nothing
+  , attack
+  }
+
 scholarChoice :: Choice
 scholarChoice = let attack = false in And
   { choices:
-    [ Discard
-      { selection: SelectAll
-      , resolution: Nothing
-      , attack
-      }
+    [ discardYourHand attack
     , Draw
       { n: 7
       , resolution: Nothing
@@ -762,6 +767,68 @@ margrave = let attack = true in Card.actionAttack
       }
     , description: "Each other player draws a card"
       <> ", then discards down to 3 cards in hand."
+    }
+  }
+
+huntingLodge :: Card
+huntingLodge = let attack = false in Card.action
+  { name = "Hunting Lodge"
+  , cost = 5
+  , actions = actions 2
+  , cards = 1
+  , special = Just
+    { target: Self
+    , command: Choose $ Option
+      { choice: And
+        { choices:
+          [ discardYourHand attack
+          , Draw
+            { n: 5
+            , resolution: Nothing
+            , attack
+            }
+          ]
+          , resolution: Nothing
+          , attack
+        }
+      , attack
+      , resolution: Nothing
+      }
+    , description: "You may discard your hand for +5 Cards"
+    }
+  }
+
+oldWitch :: Card
+oldWitch = let attack = true in
+  Card.actionAttack
+  { name = "Old Witch"
+  , cost = 5
+  , cards = 3
+  , special = Just
+    { target: EveryoneElse
+    , command: Choose $ And
+      { choices:
+        [ gainCurse
+        , If
+          { condition: HasCard "Curse"
+          , choice: MoveFromTo
+            { n: UpTo one
+            , filter: Just (HasName "Curse")
+            , source: Pile.Hand
+            , destination: Pile.Trash
+            , attack
+            , resolution: Nothing
+            }
+          , otherwise: Nothing
+          , attack: false
+          , resolution: Nothing
+          }
+        ]
+      , resolution: Nothing
+      , attack
+      }
+    , description: "Each other player gains a Curse"
+      <> " and may trash a Curse from their hand."
     }
   }
 
