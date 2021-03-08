@@ -95,6 +95,8 @@ instance victoryPointsRenderText :: RenderText Points where
 instance conditionRenderText :: RenderText Condition where
   renderText condition = HH.text $ case condition of
     HasCard name -> "hand contains " <> name
+    HasCardType cardType -> "hand contains a card of type "
+      <> show cardType
     HasDiscard -> "discard pile is not empty"
     Randomly percent -> "randomly (" <> percentString <> "% chance)"
       where
@@ -221,6 +223,7 @@ instance choiceRenderText :: RenderText Choice where
         suffix = case filter of
           Nothing -> " cards"
           Just (HasName name) -> " " <> name
+          Just (HasType cardType) -> " " <> show cardType
 
         verb = case destination of
           Pile.Hand -> "Gain to your hand"

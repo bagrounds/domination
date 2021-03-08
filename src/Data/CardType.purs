@@ -6,6 +6,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
@@ -26,4 +27,10 @@ instance encodeJsonCardType :: EncodeJson CardType where
   encodeJson = genericEncodeJson
 instance decodeJsonCardType :: DecodeJson CardType where
   decodeJson = genericDecodeJson
+instance dynamicByteLengthCardType :: DynamicByteLength CardType where
+  byteLength = genericByteLength
+instance encodeArrayBuffeCardType :: EncodeArrayBuffer CardType where
+  putArrayBuffer = genericPutArrayBuffer
+instance decodeArrayBuffeCardType :: DecodeArrayBuffer CardType where
+  readArrayBuffer = genericReadArrayBuffer
 

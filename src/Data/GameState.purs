@@ -22,7 +22,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unfoldable (replicate)
 import Domination.Capability.Random (class Random, randomIntBetween)
-import Domination.Data.Card (Card, Command(..), Special)
+import Domination.Data.Card (Card, Command(..), Special, hasType)
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
@@ -602,12 +602,15 @@ newPlayer =
 describes :: forall m. Random m => Condition -> Player -> m Boolean
 describes = case _ of
   HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
+  HasCardType cardType -> pure <<< _.hand >>> any (hasType cardType)
   HasDiscard -> pure <<< _.discard >>> (not <<< null)
   Randomly percent ->
     const $ (_ > (percent .^ _WireInt)) <$> randomIntBetween zero 100
 
 passFilter :: Filter -> Card -> Boolean
-passFilter (HasName name) = _.name >>> (_ == name)
+passFilter = case _ of
+  HasName name -> _.name >>> (_ == name)
+  HasType cardType -> hasType cardType
 
 upgrade :: GameState -> GameState
 upgrade = (_supply %~ Supply.upgrade)

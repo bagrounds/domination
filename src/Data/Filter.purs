@@ -9,9 +9,11 @@ import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Domination.Data.CardType (CardType)
 
 data Filter
   = HasName String
+  | HasType CardType
 
 derive instance genericFilter :: Generic Filter _
 derive instance eqFilter :: Eq Filter

@@ -51,6 +51,7 @@ cardMap =
   , moat
   , pawn
   , consolation
+  , settlers
   , greatHall
   , village
   , woodCutter
@@ -75,6 +76,8 @@ cardMap =
   , margrave
   , huntingLodge
   , oldWitch
+  , junkDealer
+  , stables
   , harem
   , nobles
   ]
@@ -820,7 +823,7 @@ oldWitch = let attack = true in
             , resolution: Nothing
             }
           , otherwise: Nothing
-          , attack: false
+          , attack
           , resolution: Nothing
           }
         ]
@@ -829,6 +832,93 @@ oldWitch = let attack = true in
       }
     , description: "Each other player gains a Curse"
       <> " and may trash a Curse from their hand."
+    }
+  }
+
+settlers :: Card
+settlers = Card.action
+  { name = "Settlers"
+  , cost = 2
+  , cards = one
+  , actions = one
+  , special = Just
+    { target: Self
+    , command: Choose $ MoveFromTo
+      { n: UpTo one
+      , filter: Just $ HasName "Copper"
+      , source: Pile.Discard
+      , destination: Pile.Hand
+      , resolution: Nothing
+      , attack: false
+      }
+    , description: "Look through your discard pile."
+      <> "You may reveal a Copper from it and put it into your hand."
+    }
+  }
+
+junkDealer :: Card
+junkDealer = Card.action
+  { name = "Junk Dealer"
+  , cost = 5
+  , cards = one
+  , actions = one
+  , treasure = one
+  , special = Just
+    { target: Self
+    , command: Choose $ MoveFromTo
+      { n: Exactly one
+      , filter: Nothing
+      , source: Pile.Hand
+      , destination: Pile.Trash
+      , resolution: Nothing
+      , attack: false
+      }
+    , description: "Trash a card from your hand."
+    }
+  }
+
+stables :: Card
+stables = let attack = false in Card.action
+  { name = "Stables"
+  , cost = 5
+  , special = Just
+    { target: Self
+    , command: Choose $ Option
+      { choice: If
+        { condition: HasCardType Treasure
+        , otherwise: Nothing
+        , choice: And
+          { choices:
+            [ MoveFromTo
+              { filter: Just $ HasType Treasure
+              , n: Exactly one
+              , source: Pile.Hand
+              , destination: Pile.ToDiscard
+              , attack
+              , resolution: Nothing
+              }
+            , Draw
+              { n: 3
+              , resolution: Nothing
+              , attack
+              }
+            , GainActions
+              { n: one
+              , resolution: Nothing
+              , attack
+              }
+            ]
+            , resolution: Nothing
+            , attack
+          }
+        , attack
+        , resolution: Nothing
+        }
+      , attack
+      , resolution: Nothing
+      }
+    , description: "You may discard a treasure for +3 Cards"
+      <> " and +1 Action."
     }
   }
 
