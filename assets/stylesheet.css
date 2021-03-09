@@ -286,9 +286,22 @@ button span,
   height: 7vh;
 }
 
+.toggle-long-game {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-long-game input {
+  -webkit-appearance: checkbox;
+  width: 2em;
+  height: 2em;
+  margin-right: 0.5em;
+}
+
 .kingdom {
   overflow-y: scroll;
-  height: 70vh;
+  height: 65vh;
 }
 
 .kingdom .inactive {

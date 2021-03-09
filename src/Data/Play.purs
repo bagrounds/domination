@@ -27,7 +27,11 @@ import Domination.Data.Reaction (Reaction)
 import Domination.Data.WireInt (WireInt, _WireInt)
 
 data Play
-  = NewGame { playerCount :: Int, supply :: Array Card }
+  = NewGame
+    { playerCount :: Int
+    , supply :: Array Card
+    , longGame :: Boolean
+    }
   | EndPhase { playerIndex :: Int }
   | PlayCard { playerIndex :: Int, cardIndex :: Int }
   | Purchase { playerIndex :: Int,  stackIndex :: Int }
@@ -37,10 +41,11 @@ data Play
 _toWire :: Iso' Play WirePlay
 _toWire = iso to from where
   to = case _ of
-    NewGame { playerCount, supply } ->
+    NewGame { playerCount, supply, longGame } ->
       WireNewGame
         (view _WireInt playerCount)
         (view Cards._toWire <$> supply)
+        longGame
     EndPhase { playerIndex } ->
       WireEndPhase $ view _WireInt playerIndex
     PlayCard { playerIndex, cardIndex } ->
@@ -58,10 +63,11 @@ _toWire = iso to from where
     React { playerIndex, reaction } ->
       WireReact $ Tuple (view _WireInt playerIndex) reaction
   from = case _ of
-    WireNewGame playerCount supply ->
+    WireNewGame playerCount supply longGame ->
       NewGame
         { playerCount: review _WireInt playerCount
         , supply: review Cards._toWire <$> supply
+        , longGame
         }
     WireEndPhase playerIndex ->
       EndPhase { playerIndex: review _WireInt playerIndex }
@@ -108,7 +114,7 @@ instance showPlay :: Show Play where
   show = genericShow
 
 data WirePlay
-  = WireNewGame WireInt (Array WireInt)
+  = WireNewGame WireInt (Array WireInt) Boolean
   | WireEndPhase WireInt
   | WirePlayCard (Tuple WireInt WireInt)
   | WirePurchase (Tuple WireInt WireInt)

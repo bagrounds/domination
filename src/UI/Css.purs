@@ -71,6 +71,8 @@ drawAttention = ClassName "draw-attention"
 kingdom = ClassName "kingdom"
 newGameButton = ClassName "new-game-button"
 loadGameButton = ClassName "load-game-button"
+toggleLongGame = ClassName "toggle-long-game"
+check = ClassName "check"
 
 incrementer = ClassName "incrementer"
 dialogue = ClassName "dialogue"

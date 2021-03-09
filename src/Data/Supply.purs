@@ -89,6 +89,9 @@ stackByName cardName supply =
 nonEmptyStacks :: Supply -> Array Stack
 nonEmptyStacks = filter (_.count >>> (_ > zero))
 
+emptyStacks :: Supply -> Array Stack
+emptyStacks = filter (_.count >>> (_ <= zero))
+
 getStack
   :: forall m
   . MonadError String m

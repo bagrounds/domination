@@ -83,10 +83,10 @@ component
 component config = H.mkComponent { initialState, render, eval }
   where
   initialState _ =
-    { i: 0
+    { i: zero
     , playerIndex: config.nextPlayerIndex
     , playerCount: config.nextPlayerCount
-    , state: newGame 1 kingdom
+    , state: newGame one kingdom config.longGame
     , showSupply: true
     }
   kingdom = _.card <$> _.selected `filter` config.kingdom
@@ -153,12 +153,18 @@ handleQuery = case _ of
     pure $ Just a
 
   StartNewGameRequest config a -> do
-    let { kingdom, nextPlayerIndex: playerIndex, nextPlayerCount: playerCount } = config
+    let
+      { kingdom
+      , nextPlayerIndex: playerIndex
+      , nextPlayerCount: playerCount
+      , longGame
+      } = config
 
     H.modify_ $ _playerIndex .~ playerIndex
     log $ "Domination: StartNewGame as player " <> show playerIndex
     let supply = _.card <$> _.selected `filter` kingdom
-    playAndReport playerIndex $ NewGame { playerCount, supply }
+    playAndReport playerIndex
+      $ NewGame { playerCount, supply, longGame }
     pure $ Just a
 
 type ChildComponents query r m =

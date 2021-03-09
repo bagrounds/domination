@@ -29,3 +29,6 @@ points = icon Css.points
 settings :: forall w i. HTML w i
 settings = icon Css.settings
 
+check :: forall w i. HTML w i
+check = icon Css.check
+

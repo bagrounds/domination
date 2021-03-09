@@ -66,7 +66,7 @@ write_read x = do
         Right x' -> pure $ x' == x
 
 game_wire_iso :: Int -> Boolean
-game_wire_iso n = iso_prop Dom._toWire (newGame n Cards.cardMap)
+game_wire_iso n = iso_prop Dom._toWire (newGame n Cards.cardMap true)
 
 -- examples
 
@@ -75,10 +75,10 @@ examples = game_wire_iso <$> (1 .. 10)
 
 exampleGame :: Effect Boolean
 exampleGame = do
-  let g0 = newGame 1 Cards.cardMap
+  let g0 = newGame 1 Cards.cardMap true
   g1 <- runRandomM
     $ Dom.makeAutoPlay
-      (NewGame { playerCount: 1, supply: Cards.cardMap })
+      (NewGame { playerCount: 1, supply: Cards.cardMap, longGame: true })
       g0
   pure case g1 of
     Left _ -> false

@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
 import Data.Array (length)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
@@ -245,6 +245,9 @@ handleAction = case _ of
   ChooseKingdom kingdom -> do
     save "kingdom" kingdom
     H.modify_ $ _dominationConfig <<< _kingdom .~ kingdom
+
+  ToggleLongGame ->
+    H.modify_ $ _dominationConfig <<< _longGame %~ not
 
   StartNewGame -> do
     config <- H.gets _.dominationConfig

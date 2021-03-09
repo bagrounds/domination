@@ -42,7 +42,7 @@ import Domination.Data.Result as Result
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
-import Domination.Data.Supply (Supply, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
+import Domination.Data.Supply (Supply, emptyStacks, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
 import Domination.Data.WireInt (WireInt, _WireInt)
@@ -57,13 +57,15 @@ type GameState =
   , trash :: Array Card
   , turn :: Int
   , result :: Maybe Result
+  , longGame :: Boolean
   }
 
 type WireGameState = Tuple Phase
   (Tuple (Array WirePlayer)
   (Tuple (Array WireStack)
   (Tuple (Array WireInt)
-  (Tuple WireInt (Maybe WireResult)))))
+  (Tuple WireInt
+  (Tuple (Maybe WireResult) Boolean)))))
 
 fromWire :: WireGameState -> GameState
 fromWire = review _toWire
@@ -82,12 +84,13 @@ _toWire = iso to from where
     >>> (_supply %~ review Supply._toWire)
     >>> (_trash <$>~ (review Cards._toWire))
     >>> (_result <$>~ review Result._toWire)
-  toTuple { phase, players, result, supply, trash, turn } =
-    Tuple phase $ Tuple players $ Tuple supply $ Tuple trash $ Tuple turn result
+  toTuple { phase, players, result, supply, trash, turn, longGame } =
+    Tuple phase $ Tuple players $ Tuple supply $ Tuple trash
+      $ Tuple turn $ Tuple result longGame
   fromTuple
     (Tuple phase (Tuple players (Tuple supply (Tuple trash
-    (Tuple turn result))))) =
-    { phase, players, result, supply, trash, turn }
+    (Tuple turn (Tuple result longGame)))))) =
+    { phase, players, result, supply, trash, turn, longGame }
 
 _turn
   :: forall a b r
@@ -187,14 +190,15 @@ modifyStackM
 modifyStackM i f state =
   getStack i state.supply >>= f >>= flip (updateStack i) state
 
-newGame :: Int -> Array Card -> GameState
-newGame playerCount cards =
+newGame :: Int -> Array Card -> Boolean -> GameState
+newGame playerCount cards longGame =
   { turn: zero
   , phase: ActionPhase
   , players: replicate playerCount newPlayer
   , result: Nothing
   , supply: makeSupply playerCount cards
   , trash: []
+  , longGame
   }
 
 makeAutoPlay
@@ -218,8 +222,8 @@ makePlay
   -> GameState
   -> m GameState
 makePlay play' = map maybeGameOver <<< case play' of
-  NewGame { playerCount, supply } ->
-    const (setup (newGame playerCount supply))
+  NewGame { playerCount, supply, longGame } ->
+    const (setup (newGame playerCount supply longGame))
   EndPhase { playerIndex } -> nextPhase playerIndex
   PlayCard x -> play x
   Purchase x -> purchase x
@@ -622,24 +626,33 @@ gameOver state = let
   playerPoints = reverse $ sort $ Player.score <$> state.players
   positivePoints' = positivePoints state.supply
   negativePoints' = negativePoints state.supply
+  emptyPiles = length $ emptyStacks state.supply
+  shortGameOver = not state.longGame && emptyPiles >= 3
   in
   if length state.players == one
   then
-    if positivePoints' > zero
-    then Nothing
-    else Just $ Victory zero
+    if positivePoints' <= zero || shortGameOver
+    then Just $ Victory zero
+    else Nothing
   else do
     p1Score <- head playerPoints
+    p2 <- state.players !! one
     p2Score <- playerPoints !! one
     let
+      p2Positive = Player.positivePoints p2
       p1Worst = p1Score + negativePoints'
-      p2Best = p2Score + positivePoints'
-    if p1Worst > p2Best
-    then Victory
+      p2Best = p2Positive + positivePoints'
+      longGameOver = p1Worst > p2Best
+    if longGameOver || shortGameOver
+    then
+      if longGameOver
+      then Victory
       <$> findIndex (Player.score >>> (_ == p1Score)) state.players
-    else if positivePoints' == zero && negativePoints' == zero
-    then Just $ Tie $ fst
-      <$> filter (snd >>> Player.score >>> (_ == p1Score))
-      (Tuple `mapWithIndex` state.players)
+      else
+        if positivePoints' == zero && negativePoints' == zero
+        then Just $ Tie $ fst
+          <$> filter (snd >>> Player.score >>> (_ == p1Score))
+          (Tuple `mapWithIndex` state.players)
+        else Nothing
     else Nothing
 

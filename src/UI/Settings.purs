@@ -15,6 +15,7 @@ import Domination.Capability.Log (class Log)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
+import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
@@ -32,7 +33,13 @@ render
   => Log m
   => AppState
   -> HTML (ComponentSlot HTML (description :: Slot t1 t2 DomSlot | t3) m AppAction) AppAction
-render cs@{ showMenu, dominationConfig: { nextPlayerIndex, nextPlayerCount, kingdom } } = HH.div
+render cs@{ showMenu, dominationConfig } = let
+  { nextPlayerIndex
+  , nextPlayerCount
+  , longGame
+  , kingdom
+  } = dominationConfig
+  in HH.div
   [ HP.classes
     [ Css.settingsMenu
     , if showMenu
@@ -68,7 +75,9 @@ render cs@{ showMenu, dominationConfig: { nextPlayerIndex, nextPlayerCount, king
       [ HE.onClick \_ -> Just $ StartNewGame
       , HP.class_ Css.newGameButton
       ]
-      [ HH.text $ "Start New " <> show nextPlayerCount
+      [ HH.text $ "Start "
+        <> (if longGame then "Long " else "Short ")
+        <> show nextPlayerCount
         <> " Player Game as Player "
         <> show (nextPlayerIndex + one)
       ]
@@ -77,6 +86,17 @@ render cs@{ showMenu, dominationConfig: { nextPlayerIndex, nextPlayerCount, king
       , HP.class_ Css.loadGameButton
       ]
       [ HH.text "Load Game" ]
+    ]
+  , HH.div_
+    [ HH.label
+      [ HP.class_ Css.toggleLongGame ]
+      [ HH.input
+        [ HP.type_ HP.InputCheckbox
+        , HP.checked longGame
+        , HE.onChecked \_ -> Just ToggleLongGame
+        ]
+      , HH.text "Don't end the game when 3 piles are empty"
+      ]
     ]
   , renderKingdom kingdom
   ]

@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
 import Data.Array (catMaybes, deleteAt, filter, head, length, reverse)
-import Data.Foldable (foldr, null)
+import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
@@ -354,4 +354,10 @@ upgrade = (_atPlay %~ map Cards.upgrade)
   >>> (_discard %~ map Cards.upgrade)
   >>> (_hand %~ map Cards.upgrade)
   >>> (_toDiscard %~ map Cards.upgrade)
+
+positivePoints :: Player -> Points
+positivePoints = sum <<< (map Card.positivePoints) <<< allCards
+
+negativePoints :: Player -> Points
+negativePoints = sum <<< (map Card.negativePoints) <<< allCards
 

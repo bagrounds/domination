@@ -27,6 +27,7 @@ type AppState =
   , roomCode :: String
   , dominationConfig :: Config
   , showMenu :: Boolean
+  , longGame :: Boolean
   }
 
 _id :: Lens' AppState String
@@ -66,6 +67,7 @@ newApp =
   , roomCode: globalRoomCode
   , dominationConfig: newConfig
   , showMenu: false
+  , longGame: false
   }
 
 newConfig :: Config
@@ -73,6 +75,7 @@ newConfig =
   { nextPlayerCount: one
   , nextPlayerIndex: zero
   , kingdom: defaultKingdom
+  , longGame: false
   }
 
 defaultKingdom :: Array { card :: Card, selected :: Boolean }
@@ -84,6 +87,7 @@ type Config =
   { nextPlayerIndex :: Int
   , nextPlayerCount :: Int
   , kingdom :: Array Selection
+  , longGame :: Boolean
   }
 
 upgradeSelection :: Selection -> Selection
@@ -96,6 +100,10 @@ _nextPlayerIndex :: Lens' Config Int
 _nextPlayerIndex = prop (SProxy :: SProxy "nextPlayerIndex")
 _nextPlayerCount :: Lens' Config Int
 _nextPlayerCount = prop (SProxy :: SProxy "nextPlayerCount")
+_longGame
+  :: forall a b r
+  . Lens { longGame :: a | r } { longGame :: b | r } a b
+_longGame = prop (SProxy :: SProxy "longGame")
 _kingdom
   :: forall a b r
   . Lens { kingdom :: a | r } { kingdom :: b | r } a b

@@ -148,3 +148,9 @@ _toChoose :: Prism' Command Choice
 _toChoose = prism' Choose case _ of
   Choose s -> Just s
 
+positivePoints :: Card -> Points
+positivePoints = max zero <<< _.victoryPoints
+
+negativePoints :: Card -> Points
+negativePoints = min zero <<< _.victoryPoints
+

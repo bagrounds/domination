@@ -13,6 +13,7 @@ data AppAction
   | WritePlayerCount Int
   | LoadGameRequest
   | ToggleMenu
+  | ToggleLongGame
   | ChooseKingdom (Array { card :: Card, selected :: Boolean })
   | WriteUsername String
   | Write (Lens' AppState String) String
