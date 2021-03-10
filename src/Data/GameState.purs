@@ -4,9 +4,9 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, filter, findIndex, foldr, head, length, mapWithIndex, null, reverse, sort, takeWhile, uncons, updateAt, (!!))
+import Data.Array (all, dropWhile, filter, foldr, head, length, mapWithIndex, null, takeWhile, uncons, updateAt)
 import Data.Either (Either(..))
-import Data.Foldable (any, foldM)
+import Data.Foldable (any, foldM, maximum)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
@@ -42,7 +42,7 @@ import Domination.Data.Result as Result
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, WireStack)
 import Domination.Data.Stack as Stack
-import Domination.Data.Supply (Supply, emptyStacks, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
+import Domination.Data.Supply (Supply, emptyStackCount, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
 import Domination.Data.WireInt (WireInt, _WireInt)
@@ -221,17 +221,18 @@ makePlay
   => Play
   -> GameState
   -> m GameState
-makePlay play' = map maybeGameOver <<< case play' of
+makePlay play' = maybeGameOver <=< case play' of
   NewGame { playerCount, supply, longGame } ->
-    const (setup (newGame playerCount supply longGame))
+    const (setup $ newGame playerCount supply longGame)
   EndPhase { playerIndex } -> nextPhase playerIndex
   PlayCard x -> play x
   Purchase x -> purchase x
   ResolveChoice x -> resolveChoice x
   React x -> react x
   where
-    maybeGameOver :: GameState -> GameState
-    maybeGameOver state = (_result .~ (gameOver state)) state
+    maybeGameOver :: GameState -> m GameState
+    maybeGameOver state =
+      set _result <$> finalResult state <*> pure state
 
 getCurrentPlayer
   :: forall m
@@ -581,11 +582,13 @@ choicesOutstanding = view _players >>> any Player.hasChoices
 -- or should players be a non-empty list?
 choiceTurn :: GameState -> Int
 choiceTurn state =
-  let players' = withIndices state.players in
-  let prefix = takeWhile (fst >>> (_ /= state.turn)) players' in
-  let suffix = dropWhile (fst >>> (_ /= state.turn)) players' in
-  let rotated = suffix <> prefix in
-  let withChoices = (snd >>> Player.hasChoices) `filter` rotated in
+  let
+   players' = withIndices state.players
+   prefix = takeWhile (fst >>> (_ /= state.turn)) players'
+   suffix = dropWhile (fst >>> (_ /= state.turn)) players'
+   rotated = suffix <> prefix
+   withChoices = (snd >>> Player.hasChoices) `filter` rotated
+  in
   fromMaybe zero $ fst <$> (head withChoices)
 
 newPlayer :: Player
@@ -621,38 +624,71 @@ upgrade = (_supply %~ Supply.upgrade)
   >>> (_players %~ map Player.upgrade)
   >>> (_trash %~ map Cards.upgrade)
 
-gameOver :: GameState -> Maybe Result
-gameOver state = let
-  playerPoints = reverse $ sort $ Player.score <$> state.players
-  positivePoints' = positivePoints state.supply
-  negativePoints' = negativePoints state.supply
-  emptyPiles = length $ emptyStacks state.supply
-  shortGameOver = not state.longGame && emptyPiles >= 3
-  in
-  if length state.players == one
-  then
-    if positivePoints' <= zero || shortGameOver
-    then Just $ Victory zero
-    else Nothing
+gameResult :: GameState -> Maybe Result
+gameResult { players } =
+  if length players == one
+  then Just $ Victory 0
   else do
-    p1Score <- head playerPoints
-    p2 <- state.players !! one
-    p2Score <- playerPoints !! one
-    let
-      p2Positive = Player.positivePoints p2
-      p1Worst = p1Score + negativePoints'
-      p2Best = p2Positive + positivePoints'
-      longGameOver = p1Worst > p2Best
-    if longGameOver || shortGameOver
-    then
-      if longGameOver
-      then Victory
-      <$> findIndex (Player.score >>> (_ == p1Score)) state.players
-      else
-        if positivePoints' == zero && negativePoints' == zero
-        then Just $ Tie $ fst
-          <$> filter (snd >>> Player.score >>> (_ == p1Score))
-          (Tuple `mapWithIndex` state.players)
-        else Nothing
-    else Nothing
+    currentBest <- maximum $ Player.score <$> players
+    let winners' = winners currentBest
+    if length winners' == 1
+    then Victory <$> head winners'
+    else Just $ Tie $ winners'
+  where
+    winners currentBest = fst
+      <$> filter
+      ((_ == currentBest) <<< Player.score <<< snd)
+      (Tuple `mapWithIndex` players)
+
+data GameMode
+  = Solo Player
+  | Short Player Player
+  | Long Player Player
+
+gameMode
+  :: forall m
+  . MonadError String m
+  => GameState
+  -> m GameMode
+gameMode { players, longGame } =
+  case uncons players, longGame of
+    Just { head: player, tail: [] }, _ -> pure $ Solo player
+    Just { head: p1, tail }, true -> Long p1 <$> p2 tail
+    Just { head: p1, tail }, _ -> Short p1 <$> p2 tail
+    Nothing, _ -> throwError "There should never be zero players!"
+  where
+    p2 = head >>> case _ of
+      Nothing -> throwError "Where is player 2???"
+      Just player2 -> pure player2
+
+finalResult
+  :: forall m
+  . MonadError String m
+  => GameState
+  -> m (Maybe Result)
+finalResult state@{ players, supply, longGame } =
+  (if _ then gameResult state else Nothing)
+    <<< gameIsOver
+    <$> gameMode state
+  where
+    gameIsOver = case _ of
+      Solo _ ->
+        positivePoints supply <= zero
+      Short p1 p2 ->
+        emptyStackCount supply >= 3
+      Long p1 p2 ->
+        clearWinner || noRemainingPoints
+        where
+          clearWinner =
+            worstOutcomeForCurrentLeader > bestOutcomeForSecondPlace
+          noRemainingPoints =
+            remainingPoints == zero && remainingCurses == zero
+          worstOutcomeForCurrentLeader = currentBest + remainingCurses
+          bestOutcomeForSecondPlace =
+            Player.positivePoints p2 + remainingPoints
+          remainingPoints = positivePoints supply
+          remainingCurses = negativePoints supply
+          currentBest = max p1Score
+            $ fromMaybe p1Score (maximum $ Player.score <$> players)
+          p1Score = Player.score p1
 

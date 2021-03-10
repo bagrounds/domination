@@ -3,7 +3,7 @@ module Domination.Data.Supply where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (filter, findIndex, updateAt)
+import Data.Array (filter, findIndex, length, updateAt)
 import Data.Foldable (find, sum)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view)
@@ -91,6 +91,9 @@ nonEmptyStacks = filter (_.count >>> (_ > zero))
 
 emptyStacks :: Supply -> Array Stack
 emptyStacks = filter (_.count >>> (_ <= zero))
+
+emptyStackCount :: Supply -> Int
+emptyStackCount = length <<< emptyStacks
 
 getStack
   :: forall m
