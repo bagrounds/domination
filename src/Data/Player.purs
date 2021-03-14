@@ -26,10 +26,12 @@ import Domination.Data.Buys (Buys)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.Cards as Cards
-import Domination.Data.Choice (Choice, WireChoice)
-import Domination.Data.Choice as Choice
+import Domination.Data.Choice (Choice)
+import Domination.Data.Choice (isAttack) as Choice
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.Wire.Choice (WireChoice)
+import Domination.Data.Wire.Choice (_toWire) as Choice
 import Domination.Data.WireInt (WireInt)
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))

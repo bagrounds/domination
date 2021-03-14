@@ -21,9 +21,10 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Cards as Cards
-import Domination.Data.Choice (Choice, WireChoice)
-import Domination.Data.Choice as Choice
+import Domination.Data.Choice (Choice)
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.Wire.Choice (WireChoice)
+import Domination.Data.Wire.Choice as Choice
 import Domination.Data.WireInt (WireInt, _WireInt)
 
 data Play
