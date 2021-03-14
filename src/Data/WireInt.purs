@@ -5,13 +5,13 @@ import Prelude
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer)
-import Data.ArrayBuffer.Class.Types (Int8(..))
+import Data.ArrayBuffer.Class.Types (Int16LE(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Iso (Iso', iso)
 import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
 
-newtype WireInt = WireInt Int8
+newtype WireInt = WireInt Int16LE
 
 derive instance genericWireInt :: Generic WireInt _
 derive instance eqWireInt :: Eq WireInt
@@ -22,9 +22,9 @@ derive newtype instance ringWireInt
   :: Ring WireInt
 instance showWireInt :: Show WireInt where show = genericShow
 instance encodeJsonWireInt :: EncodeJson WireInt where
-  encodeJson (WireInt (Int8 i)) = encodeJson i
+  encodeJson (WireInt (Int16LE i)) = encodeJson i
 instance decodeJsonWireInt :: DecodeJson WireInt where
-  decodeJson i = (WireInt <<< Int8) <$> decodeJson i
+  decodeJson i = (WireInt <<< Int16LE) <$> decodeJson i
 derive newtype instance encodeArrayBufferWireInt
   :: EncodeArrayBuffer WireInt
 derive newtype instance decodeArrayBufferWireInt
@@ -32,8 +32,8 @@ derive newtype instance decodeArrayBufferWireInt
 derive newtype instance dynamicByteLengthWireInt
   :: DynamicByteLength WireInt
 instance arbitraryWireInt :: Arbitrary WireInt where
-  arbitrary = (WireInt <<< Int8 <<< (_ `mod` 256)) <$> arbitrary
+  arbitrary = (WireInt <<< Int16LE <<< (_ `mod` 256)) <$> arbitrary
 
 _WireInt :: Iso' Int WireInt
-_WireInt = iso (WireInt <<< Int8) $ \(WireInt (Int8 i)) -> i
+_WireInt = iso (WireInt <<< Int16LE) $ \(WireInt (Int16LE i)) -> i
 

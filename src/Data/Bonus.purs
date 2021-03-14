@@ -8,7 +8,7 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Array (foldr)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
-import Data.ArrayBuffer.Class.Types (Int8(..))
+import Data.ArrayBuffer.Class.Types (Int16LE(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Domination.Data.WireInt (WireInt(..))
@@ -21,7 +21,7 @@ cashValue = foldr (\a b -> cashValue1 a + b) 0
 
 cashValue1 :: Bonus -> Int
 cashValue1 = case _ of
-  Cash (WireInt (Int8 c)) -> c
+  Cash (WireInt (Int16LE c)) -> c
 
 derive instance genericBonus :: Generic Bonus _
 derive instance eqBonus :: Eq Bonus
