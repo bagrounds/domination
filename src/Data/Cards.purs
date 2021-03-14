@@ -57,6 +57,7 @@ cardMap =
   , woodCutter
   , steward
   , harbinger
+  , workshop
   , goldfish
   , baron
   , monument
@@ -64,6 +65,7 @@ cardMap =
   , workersVillage
   , militia
   , moneyLender
+  , armory
   , bazaar
   , festival
   , laboratory
@@ -80,6 +82,8 @@ cardMap =
   , stables
   , harem
   , nobles
+  , artisan
+  , altar
   ]
 
 emptyChoice :: Choice
@@ -919,6 +923,100 @@ stables = let attack = false in Card.action
       }
     , description: "You may discard a treasure for +3 Cards"
       <> " and +1 Action."
+    }
+  }
+
+workshop :: Card
+workshop = let attack = false in Card.action
+  { name = "Workshop"
+  , cost = 3
+  , special = Just
+    { target: Self
+    , command: Choose $ GainCard
+      { filter: Just $ CostUpTo (4 ^. _WireInt)
+      , destination: Pile.ToDiscard
+      , attack
+      , resolution: Nothing
+      }
+    , description: "Gain a card costing up to 4."
+    }
+  }
+
+artisan :: Card
+artisan = let attack = false in Card.action
+  { name = "Artisan"
+  , cost = 6
+  , special = Just
+    { target: Self
+    , command: Choose $ And
+      { choices:
+        [ GainCard
+          { filter: Just $ CostUpTo (5 ^. _WireInt)
+          , destination: Pile.Hand
+          , attack
+          , resolution: Nothing
+          }
+        , MoveFromTo
+          { n: Exactly (1 ^. _WireInt)
+          , filter: Nothing
+          , source: Pile.Hand
+          , destination: Pile.Deck
+          , attack
+          , resolution: Nothing
+          }
+        ]
+      , attack
+      , resolution: Nothing
+      }
+    , description: "Gain a card to your hand costing up to 5."
+      <> "Put a card from your hand onto your deck."
+    }
+  }
+
+armory :: Card
+armory = let attack = false in Card.action
+  { name = "Armory"
+  , cost = 4
+  , special = Just
+    { target: Self
+    , command: Choose $ GainCard
+      { filter: Just $ CostUpTo (4 ^. _WireInt)
+      , destination: Pile.Deck
+      , attack
+      , resolution: Nothing
+      }
+    , description: "Gain a card onto your deck costing up to 4."
+    }
+  }
+
+altar :: Card
+altar = let attack = false in Card.action
+  { name = "Altar"
+  , cost = 6
+  , special = Just
+    { target: Self
+    , command: Choose $ And
+      { choices:
+        [ MoveFromTo
+          { n: Exactly (1 ^. _WireInt)
+          , filter: Nothing
+          , source: Pile.Hand
+          , destination: Pile.Trash
+          , attack
+          , resolution: Nothing
+          }
+        , GainCard
+          { filter: Just $ CostUpTo (5 ^. _WireInt)
+          , destination: Pile.ToDiscard
+          , attack
+          , resolution: Nothing
+          }
+        ]
+      , attack
+      , resolution: Nothing
+      }
+    , description: "Trash a card from your hand."
+      <> "Gain a card costing up to 5."
     }
   }
 

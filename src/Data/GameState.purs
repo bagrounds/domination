@@ -21,7 +21,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unfoldable (replicate)
 import Domination.Capability.Random (class Random, randomIntBetween)
-import Domination.Data.Card (Card, Command(..), Special, hasType)
+import Domination.Data.Card (Card, Command(..), Special, _cost, hasType)
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
@@ -413,6 +413,22 @@ resolveChoice { playerIndex, choice } state =
         $ over _destination (selected <> _)
         $ state
 
+    GainCard { filter, destination, resolution: Just cardName } -> do
+      let _destination = _pile destination playerIndex
+      stack <- stackByName cardName state.supply
+      stackIndex <- indexOfStack stack.card state.supply
+      let newCount = stack.count - one
+      let cards = [ stack.card ]
+      let
+        playerUpdate = case destination of
+          Pile.Hand -> Player._hand <>~ cards
+          Pile.Discard -> Player._discard <>~ cards
+          Pile.ToDiscard -> Player._toDiscard <>~ cards
+          Pile.Deck -> Player._deck <>~ cards
+          Pile.Trash -> Player._hand <>~ cards
+      over _destination (cards <> _)
+        <$> modifyStack stackIndex Stack.take state
+
     GainCards { n, cardName, destination, resolution: Just unit } -> do
       let _destination = _pile destination playerIndex
       stack <- stackByName cardName state.supply
@@ -474,6 +490,7 @@ resolveChoice { playerIndex, choice } state =
     Option { resolution: Nothing } -> unresolved
     MoveFromTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
+    GainCard { resolution: Nothing } -> unresolved
     GainActions { resolution: Nothing } -> unresolved
     GainBuys { resolution: Nothing } -> unresolved
     Discard { resolution: Nothing } -> unresolved
@@ -584,6 +601,7 @@ passFilter :: Filter -> Card -> Boolean
 passFilter = case _ of
   HasName name -> _.name >>> (_ == name)
   HasType cardType -> hasType cardType
+  CostUpTo cost -> (_ <= cost) <<< (view (_cost <<< _WireInt))
 
 upgrade :: GameState -> GameState
 upgrade = (_supply %~ Supply.upgrade)

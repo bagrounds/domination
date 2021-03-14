@@ -10,10 +10,12 @@ import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength,
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Domination.Data.CardType (CardType)
+import Domination.Data.WireInt (WireInt)
 
 data Filter
   = HasName String
   | HasType CardType
+  | CostUpTo WireInt
 
 derive instance genericFilter :: Generic Filter _
 derive instance eqFilter :: Eq Filter

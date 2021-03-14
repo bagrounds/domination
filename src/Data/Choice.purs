@@ -55,6 +55,12 @@ data Choice
     , resolution :: Maybe (Array Int)
     , attack :: Boolean
     }
+  | GainCard
+    { attack :: Boolean
+    , filter :: Maybe Filter
+    , destination :: Pile
+    , resolution :: Maybe String
+    }
   | GainCards
     { attack :: Boolean
     , cardName :: String
@@ -97,6 +103,7 @@ isAttack = case _ of
   Option { attack } -> attack
   MoveFromTo { attack } -> attack
   GainCards { attack } -> attack
+  GainCard { attack } -> attack
   GainActions { attack } -> attack
   GainBuys { attack } -> attack
   Discard { attack } -> attack

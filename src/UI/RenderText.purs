@@ -2,8 +2,9 @@ module Domination.UI.RenderText where
 
 import Prelude
 
-import Data.Array (intercalate)
+import Data.Array (intercalate, (!!))
 import Data.Lens ((^?), (^.))
+import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Actions (Actions)
@@ -11,6 +12,7 @@ import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Buys (Buys)
 import Domination.Data.Buys as Buys
+import Domination.Data.Card (_name)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
@@ -25,6 +27,7 @@ import Domination.Data.Points as Points
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
+import Domination.Data.Stack (_card)
 import Domination.Data.WireInt (_WireInt)
 import Domination.UI.Icons as Icons
 import Domination.UI.Util (h2__)
@@ -148,7 +151,17 @@ instance choiceRenderTextInContext
             <<< getCardName source playerIndex state
             <$> cardIndices
       GainCards { n, cardName } ->
-        [ HH.text $ "+" <> show n <> "x " <> cardName ]
+        [ HH.text $ "gain a card " <> show n <> "x " <> cardName ]
+      GainCard { destination, resolution: Just cardName } ->
+        let
+          suffix = case destination of
+            Pile.Hand -> " to their hand"
+            Pile.Discard -> ""
+            Pile.ToDiscard -> ""
+            Pile.Deck -> " onto their deck"
+            Pile.Trash -> " into the trash for some reason"
+        in
+         [ HH.text $ "gained a " <> cardName <> " " <> suffix ]
       GainActions { n, resolution } ->
         [ HH.text "+"
         , renderText n
@@ -168,6 +181,8 @@ instance choiceRenderTextInContext
         , Icons.cards
         ]
       MoveFromTo { resolution: Nothing } ->
+        [ unresolved ]
+      GainCard { resolution: Nothing } ->
         [ unresolved ]
       where
         unresolved :: forall w i. HTML w i
@@ -224,6 +239,8 @@ instance choiceRenderText :: RenderText Choice where
           Nothing -> " cards"
           Just (HasName name) -> " " <> name
           Just (HasType cardType) -> " " <> show cardType
+          Just (CostUpTo cost) -> " cards costing up to "
+            <> show (cost .^ _WireInt)
 
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
@@ -235,6 +252,17 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text $ "Gain " <> cardName <> " x"
         <> show n
       ]
+    GainCard { filter } ->
+      let
+        card = case filter of
+          Nothing -> "card"
+          Just (HasName name) -> name
+          Just (HasType cardType) -> "card of type "
+            <> show cardType
+          Just (CostUpTo cost) -> " card costing up to "
+            <> show (cost .^ _WireInt)
+      in
+        [ HH.text $ "gain a " <> card <> " from the supply" ]
     GainActions { n } ->
       [ HH.text "+"
       , renderText n

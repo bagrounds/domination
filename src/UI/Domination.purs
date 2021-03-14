@@ -21,7 +21,7 @@ import Domination.Capability.Storage (class Storage)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
-import Domination.Data.GameState (GameState, newGame)
+import Domination.Data.GameState (GameState, newGame, passFilter)
 import Domination.Data.GameState as Dom
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
@@ -31,9 +31,10 @@ import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
-import Domination.Data.Supply (negativePoints, positivePoints)
+import Domination.Data.Supply (negativePoints, nonEmptyStacks, positivePoints)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
+import Domination.UI.ChooseFromSupply as ChooseFromSupply
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination.Action (Action(..))
@@ -173,6 +174,7 @@ type ChildComponents query r m =
   ( "MoveFromTo" :: H.Slot query Choice DomSlot
   , "PickN" :: H.Slot query (Array Choice) DomSlot
   , "description" :: H.Slot query Unit DomSlot
+  , "ChooseFromSupply" :: H.Slot query (Maybe String) DomSlot
   | r
   )
   m
@@ -396,6 +398,7 @@ renderPlayer cs@{ state, playerIndex } player =
             , text: HH.text "No"
             }
           ]
+
       renderChoice
         :: (Int -> DomSlot)
         -> Maybe Choice
@@ -464,6 +467,30 @@ renderPlayer cs@{ state, playerIndex } player =
             acknowledge
             (renderText choice)
             (playEvent GainCards x unit)
+          GainCard x@{ filter: cardFilter } ->
+            let
+              predicate :: Card -> Boolean
+              predicate = case cardFilter of
+                Nothing -> \_ -> true
+                Just f -> passFilter f
+              unfiltered :: Array Card
+              unfiltered = _.card <$> nonEmptyStacks state.supply
+              cards :: Array Card
+              cards = predicate `filter` unfiltered
+            in
+            HH.div_
+              [ HH.slot
+                (SProxy :: SProxy "ChooseFromSupply")
+                (AreaSlot ChoiceArea)
+                (ChooseFromSupply.component { cards, baseSlotNumber })
+                unit
+                $ Just
+                <<< MakePlay
+                <<< ResolveChoice
+                <<< { playerIndex, choice: _ }
+                <<< GainCard
+                <<< (x { resolution = _ })
+              ]
           GainActions x@{ n } ->
             acknowledge
             (renderText choice)
