@@ -10,7 +10,6 @@ import Data.Foldable (any, foldM, maximum)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
-import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (Prism', prism', review)
 import Data.Lens.Record (prop)
@@ -34,21 +33,20 @@ import Domination.Data.Phase as Phase
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
-import Domination.Data.Player (Player, WirePlayer)
+import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
-import Domination.Data.Result (Result(..), WireResult)
-import Domination.Data.Result as Result
+import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
-import Domination.Data.Stack (Stack, WireStack)
+import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
 import Domination.Data.Supply (Supply, emptyStackCount, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
-import Domination.Data.WireInt (WireInt, _WireInt)
+import Domination.Data.WireInt (_WireInt)
 import Relation (Relation(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
-import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (.^), (<$>~))
+import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (.^))
 
 type GameState =
   { phase :: Phase
@@ -59,38 +57,6 @@ type GameState =
   , result :: Maybe Result
   , longGame :: Boolean
   }
-
-type WireGameState = Tuple Phase
-  (Tuple (Array WirePlayer)
-  (Tuple (Array WireStack)
-  (Tuple (Array WireInt)
-  (Tuple WireInt
-  (Tuple (Maybe WireResult) Boolean)))))
-
-fromWire :: WireGameState -> GameState
-fromWire = review _toWire
-
-_toWire :: Iso' GameState WireGameState
-_toWire = iso to from where
-  to = (_turn %~ view _WireInt)
-    >>> (_players <$>~ view Player._toWire)
-    >>> (_supply %~ view Supply._toWire)
-    >>> (_trash <$>~ view Cards._toWire)
-    >>> (_result <$>~ view Result._toWire)
-    >>> toTuple
-  from = fromTuple
-    >>> (_turn %~ review _WireInt)
-    >>> (_players <$>~ review Player._toWire)
-    >>> (_supply %~ review Supply._toWire)
-    >>> (_trash <$>~ (review Cards._toWire))
-    >>> (_result <$>~ review Result._toWire)
-  toTuple { phase, players, result, supply, trash, turn, longGame } =
-    Tuple phase $ Tuple players $ Tuple supply $ Tuple trash
-      $ Tuple turn $ Tuple result longGame
-  fromTuple
-    (Tuple phase (Tuple players (Tuple supply (Tuple trash
-    (Tuple turn (Tuple result longGame)))))) =
-    { phase, players, result, supply, trash, turn, longGame }
 
 _turn
   :: forall a b r

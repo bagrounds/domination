@@ -14,8 +14,9 @@ import Domination.Capability.Random (runRandomM)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Cards as Cards
 import Domination.Data.GameState (newGame)
-import Domination.Data.GameState as Dom
+import Domination.Data.GameState (makeAutoPlay) as Dom
 import Domination.Data.Play (Play(..))
+import Domination.Data.Wire.GameState (_toWire) as Dom
 import Effect (Effect)
 import Test.QuickCheck (quickCheck')
 

@@ -16,12 +16,14 @@ import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card as Card
-import Domination.Data.GameState (GameState, WireGameState)
-import Domination.Data.GameState as GameState
+import Domination.Data.GameState (GameState)
+import Domination.Data.GameState (_player, _stack) as GameState
 import Domination.Data.Play (Play(..), WirePlay)
 import Domination.Data.Play as Play
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Wire.GameState (WireGameState)
+import Domination.Data.Wire.GameState (_toWire) as GameState
 import Domination.Data.WireInt (WireInt, _WireInt)
 import Domination.UI.RenderText (renderTextInContext)
 import Halogen.HTML (ClassName(..), HTML)
