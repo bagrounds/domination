@@ -490,7 +490,17 @@ resolveChoice { playerIndex, choice } state =
     Option { resolution: Nothing } -> unresolved
     MoveFromTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
-    GainCard { resolution: Nothing } -> unresolved
+    GainCard { filter: cardFilter, resolution: Nothing } -> do
+      let
+        unfiltered :: Array Card
+        unfiltered = _.card <$> nonEmptyStacks state.supply
+        cards :: Array Card
+        cards = case cardFilter of
+          Nothing -> unfiltered
+          Just f -> passFilter f `filter` unfiltered
+      case cards of
+        [] -> pure state
+        xs -> unresolved
     GainActions { resolution: Nothing } -> unresolved
     GainBuys { resolution: Nothing } -> unresolved
     Discard { resolution: Nothing } -> unresolved
