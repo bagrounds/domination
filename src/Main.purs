@@ -4,7 +4,7 @@ import Prelude
 
 import AppAction (AppAction(..))
 import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
-import Data.Array (length)
+import Data.Array (length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -295,7 +295,9 @@ handleAction = case _ of
             H.modify_ $ over _usernames
               $ HashMap.insert id username
           ChatMessage { message, username } -> do
-            H.modify_ $ _messages :~ msg
+            H.modify_
+              $ (_messages :~ msg)
+              >>> (_messages %~ take 250)
             if message == "PING"
               then do
                 H.modify_ $ _message .~ "PONG"

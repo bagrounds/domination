@@ -2,7 +2,6 @@ module Domination.UI.Chat where
 
 import Prelude
 
-import Data.Array (take)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -44,7 +43,7 @@ render { sendEvent, onInput, state } =
             , message
             }
         y -> y
-      <$> take 1000 messages
+      <$> messages
     )
   , HH.div
     [ HP.class_ $ ClassName "chat-form"]
