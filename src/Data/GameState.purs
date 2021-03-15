@@ -43,7 +43,8 @@ import Domination.Data.Stack as Stack
 import Domination.Data.Supply (Supply, emptyStackCount, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
-import Domination.Data.WireInt (_WireInt)
+import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Int as Int
 import Relation (Relation(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (.^))
@@ -391,17 +392,17 @@ resolveChoice { playerIndex, choice } state =
         forSource = ("source cards" <>! _) >>> (sourcePile <@! _)
       case constraint of
         UpTo n -> check $
-          forSelected $ lengthIs LTE (review _WireInt n)
+          forSelected $ lengthIs LTE (review Int._toWire n)
         DownTo n -> check $
-          forRemaining (lengthIs EQ $ review _WireInt n)
+          forRemaining (lengthIs EQ $ review Int._toWire n)
           ||
-          ( forSource (lengthIs LT $ review _WireInt n)
+          ( forSource (lengthIs LT $ review Int._toWire n)
           && forSelected (lengthIs EQ zero)
           )
         Exactly n -> check $
-          forSelected (lengthIs EQ $ review _WireInt n)
+          forSelected (lengthIs EQ $ review Int._toWire n)
           ||
-          ( forSource (lengthIs LT $ review _WireInt n)
+          ( forSource (lengthIs LT $ review Int._toWire n)
           && forSelected (lengthIs EQ $ length sourcePile)
           )
       case filter of
@@ -605,13 +606,13 @@ describes = case _ of
   HasCardType cardType -> pure <<< _.hand >>> any (hasType cardType)
   HasDiscard -> pure <<< _.discard >>> (not <<< null)
   Randomly percent ->
-    const $ (_ > (percent .^ _WireInt)) <$> randomIntBetween zero 100
+    const $ (_ > (percent .^ Int._toWire)) <$> randomIntBetween zero 100
 
 passFilter :: Filter -> Card -> Boolean
 passFilter = case _ of
   HasName name -> _.name >>> (_ == name)
   HasType cardType -> hasType cardType
-  CostUpTo cost -> (_ <= cost) <<< (view (_cost <<< _WireInt))
+  CostUpTo cost -> (_ <= cost) <<< (view (_cost <<< Int._toWire))
 
 upgrade :: GameState -> GameState
 upgrade = (_supply %~ Supply.upgrade)

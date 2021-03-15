@@ -2,11 +2,8 @@ module Domination.Data.Cards where
 
 import Prelude
 
-import Data.Array (findIndex, (!!))
 import Data.Foldable (find)
-import Data.Lens.Getter (view, (^.))
-import Data.Lens.Iso (Iso', iso)
-import Data.Lens.Prism (review)
+import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Actions (actions)
 import Domination.Data.Bonus (Bonus(..))
@@ -22,19 +19,12 @@ import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Target (Target(..))
-import Domination.Data.WireInt (WireInt, _WireInt)
+import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Int as Int
 
 upgrade :: Card -> Card
 upgrade card = fromMaybe card
   $ find ((_.name >>> (_ == card.name))) cardMap
-
-_toWire :: Iso' Card WireInt
-_toWire = iso to from where
-  to card = view _WireInt
-    <<< fromMaybe (-1) $ findIndex (_ == card) cardMap
-  from = fromMaybe Card.card
-    <<< (cardMap !! _)
-    <<< review _WireInt
 
 cardMap :: Array Card
 cardMap =
@@ -88,7 +78,7 @@ cardMap =
 
 emptyChoice :: Choice
 emptyChoice = GainBonus
-  { bonus: Cash $ 100 ^. _WireInt
+  { bonus: Cash $ 100 ^. Int._toWire
   , attack: false
   , resolution: Nothing
   }
@@ -324,7 +314,7 @@ chapel = let attack = false in
 
 chapelChoice :: Choice
 chapelChoice = let attack = false in MoveFromTo
-  { n: UpTo $ 4 ^. _WireInt
+  { n: UpTo $ 4 ^. Int._toWire
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Trash
@@ -350,7 +340,7 @@ militia = let attack = true in
 
 discardDownTo3 :: Choice
 discardDownTo3 = let attack = true in MoveFromTo
-  { n: DownTo $ 3 ^. _WireInt
+  { n: DownTo $ 3 ^. Int._toWire
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Discard
@@ -412,12 +402,12 @@ stewardChoice :: Choice
 stewardChoice = let attack = false in Or
   { choices:
     [ Draw { n: 2, attack, resolution: Nothing }
-    , GainBonus { bonus: Cash $ 2 ^. _WireInt, attack, resolution: Nothing }
+    , GainBonus { bonus: Cash $ 2 ^. Int._toWire, attack, resolution: Nothing }
     , MoveFromTo
       { source: Pile.Hand
       , destination: Pile.Trash
       , filter: Nothing
-      , n: Exactly $ 2 ^. _WireInt
+      , n: Exactly $ 2 ^. Int._toWire
       , attack
       , resolution: Nothing
       }
@@ -475,7 +465,7 @@ torturerChoice = let attack = true in
   { n: one
   , choices:
     [ MoveFromTo
-      { n: Exactly $ 2 ^. _WireInt
+      { n: Exactly $ 2 ^. Int._toWire
       , filter: Nothing
       , source: Pile.Hand
       , destination: Pile.Discard
@@ -514,7 +504,7 @@ consolationChoice = let attack = false in
   If
   { condition: HasCard "Estate"
   , choice: GainBonus
-    { bonus: Cash $ 2 ^. _WireInt
+    { bonus: Cash $ 2 ^. Int._toWire
     , attack
     , resolution: Nothing
     }
@@ -553,7 +543,7 @@ moneyLenderChoice = let attack = false in
           , resolution: Nothing
           }
         , GainBonus
-          { bonus: Cash $ 3 ^. _WireInt
+          { bonus: Cash $ 3 ^. Int._toWire
           , attack
           , resolution: Nothing
           }
@@ -613,7 +603,7 @@ baron = Card.action
 
 gain4Cash :: Choice
 gain4Cash = GainBonus
-  { bonus: Cash $ 4 ^. _WireInt
+  { bonus: Cash $ 4 ^. Int._toWire
   , attack: false
   , resolution: Nothing
   }
@@ -685,7 +675,7 @@ goldfishSpecial =
 
 goldfishChoice :: Choice
 goldfishChoice = let attack = false in If
-  { condition: Randomly $ 50 ^. _WireInt
+  { condition: Randomly $ 50 ^. Int._toWire
   , choice: GainCards
     { cardName: "Gold"
     , destination: Pile.Hand
@@ -933,7 +923,7 @@ workshop = let attack = false in Card.action
   , special = Just
     { target: Self
     , command: Choose $ GainCard
-      { filter: Just $ CostUpTo (4 ^. _WireInt)
+      { filter: Just $ CostUpTo (4 ^. Int._toWire)
       , destination: Pile.ToDiscard
       , attack
       , resolution: Nothing
@@ -951,13 +941,13 @@ artisan = let attack = false in Card.action
     , command: Choose $ And
       { choices:
         [ GainCard
-          { filter: Just $ CostUpTo (5 ^. _WireInt)
+          { filter: Just $ CostUpTo (5 ^. Int._toWire)
           , destination: Pile.Hand
           , attack
           , resolution: Nothing
           }
         , MoveFromTo
-          { n: Exactly (1 ^. _WireInt)
+          { n: Exactly (1 ^. Int._toWire)
           , filter: Nothing
           , source: Pile.Hand
           , destination: Pile.Deck
@@ -980,7 +970,7 @@ armory = let attack = false in Card.action
   , special = Just
     { target: Self
     , command: Choose $ GainCard
-      { filter: Just $ CostUpTo (4 ^. _WireInt)
+      { filter: Just $ CostUpTo (4 ^. Int._toWire)
       , destination: Pile.Deck
       , attack
       , resolution: Nothing
@@ -998,7 +988,7 @@ altar = let attack = false in Card.action
     , command: Choose $ And
       { choices:
         [ MoveFromTo
-          { n: Exactly (1 ^. _WireInt)
+          { n: Exactly (1 ^. Int._toWire)
           , filter: Nothing
           , source: Pile.Hand
           , destination: Pile.Trash
@@ -1006,7 +996,7 @@ altar = let attack = false in Card.action
           , resolution: Nothing
           }
         , GainCard
-          { filter: Just $ CostUpTo (5 ^. _WireInt)
+          { filter: Just $ CostUpTo (5 ^. Int._toWire)
           , destination: Pile.ToDiscard
           , attack
           , resolution: Nothing

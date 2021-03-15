@@ -18,13 +18,15 @@ import Data.Tuple (Tuple(..))
 import Domination.Data.Card as Card
 import Domination.Data.GameState (GameState)
 import Domination.Data.GameState (_player, _stack) as GameState
-import Domination.Data.Play (Play(..), WirePlay)
-import Domination.Data.Play as Play
+import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Wire.GameState (WireGameState)
 import Domination.Data.Wire.GameState (_toWire) as GameState
-import Domination.Data.WireInt (WireInt, _WireInt)
+import Domination.Data.Wire.Play (WirePlay)
+import Domination.Data.Wire.Play (_toWire) as Play
+import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Int as Int
 import Domination.UI.RenderText (renderTextInContext)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
@@ -90,7 +92,7 @@ _toWire = iso to from where
       UsernameWireMessage (Tuple username id)
     GameStateMessage { i, state, playMade } ->
       GameStateWireMessage
-      $ Tuple (view _WireInt i)
+      $ Tuple (view Int._toWire i)
       $ Tuple (view GameState._toWire state) (pmm <$> playMade)
     PlayMadeMessage x ->
       PlayMadeWireMessage $ pmm x
@@ -98,7 +100,7 @@ _toWire = iso to from where
       pmm { play, playerIndex, state } =
         Tuple (view Play._toWire play)
         $ Tuple
-          (view _WireInt playerIndex)
+          (view Int._toWire playerIndex)
           (view GameState._toWire state)
   from = case _ of
     ChatWireMessage (Tuple username message) ->
@@ -107,7 +109,7 @@ _toWire = iso to from where
       UsernameMessage { username, id}
     GameStateWireMessage (Tuple i (Tuple state maybePlayMade)) ->
       GameStateMessage
-        { i: review _WireInt i
+        { i: review Int._toWire i
         , state: review GameState._toWire state
         , playMade: pmm <$> maybePlayMade
         }
@@ -116,7 +118,7 @@ _toWire = iso to from where
     where
       pmm (Tuple play (Tuple playerIndex state)) =
         { play: review Play._toWire play
-        , playerIndex: review _WireInt playerIndex
+        , playerIndex: review Int._toWire playerIndex
         , state: review GameState._toWire state
         }
 
@@ -171,7 +173,7 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
         [ text ]
       ]
   where
-      play' :: forall w i. Maybe (HTML w i)
+      play' :: Maybe (HTML w i)
       play' = case play of
         NewGame { playerCount } -> Just $
           HH.span_

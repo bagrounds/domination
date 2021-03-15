@@ -10,7 +10,7 @@ import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength,
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Domination.Data.CardType (CardType)
-import Domination.Data.WireInt (WireInt)
+import Domination.Data.Wire.Int (WireInt)
 
 data Filter
   = HasName String

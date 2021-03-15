@@ -28,7 +28,8 @@ import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (_card)
-import Domination.Data.WireInt (_WireInt)
+import Domination.Data.Wire.Int (_toWire)
+import Domination.Data.Wire.Int as Int
 import Domination.UI.Icons as Icons
 import Domination.UI.Util (h2__)
 import Halogen.HTML (HTML)
@@ -73,7 +74,7 @@ instance reactionRenderText :: RenderText Reaction where
 instance bonusRenderText :: RenderText Bonus where
   renderText bonus = HH.span_ case bonus of
     Cash n ->
-      [ HH.text $ "+" <> show (n .^ _WireInt)
+      [ HH.text $ "+" <> show (n .^ Int._toWire)
       , Icons.money
       ]
 
@@ -103,7 +104,7 @@ instance conditionRenderText :: RenderText Condition where
     HasDiscard -> "discard pile is not empty"
     Randomly percent -> "randomly (" <> percentString <> "% chance)"
       where
-        percentString = show $ percent .^ _WireInt
+        percentString = show $ percent .^ Int._toWire
 
 instance choiceRenderTextInContext
   :: RenderTextInContext Choice where
@@ -221,17 +222,17 @@ instance choiceRenderText :: RenderText Choice where
     MoveFromTo { n, filter, destination } -> case n of
       UpTo n ->
         [ HH.text $ verb <> " up to "
-          <> show (n .^ _WireInt)
+          <> show (n .^ Int._toWire)
           <> suffix
         ]
       Exactly n ->
         [ HH.text $ verb <> " "
-          <> show (n .^ _WireInt)
+          <> show (n .^ Int._toWire)
           <> suffix
         ]
       DownTo n ->
         [ HH.text $ verb <> " down to "
-          <> show (n .^ _WireInt)
+          <> show (n .^ Int._toWire)
           <> suffix
         ]
       where
@@ -240,7 +241,7 @@ instance choiceRenderText :: RenderText Choice where
           Just (HasName name) -> " " <> name
           Just (HasType cardType) -> " " <> show cardType
           Just (CostUpTo cost) -> " cards costing up to "
-            <> show (cost .^ _WireInt)
+            <> show (cost .^ Int._toWire)
 
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
@@ -260,7 +261,7 @@ instance choiceRenderText :: RenderText Choice where
           Just (HasType cardType) -> "card of type "
             <> show cardType
           Just (CostUpTo cost) -> " card costing up to "
-            <> show (cost .^ _WireInt)
+            <> show (cost .^ Int._toWire)
       in
         [ HH.text $ "gain a " <> card <> " from the supply" ]
     GainActions { n } ->

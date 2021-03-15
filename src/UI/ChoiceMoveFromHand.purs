@@ -13,7 +13,7 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
-import Domination.Data.WireInt (_WireInt)
+import Domination.Data.Wire.Int as Int
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
@@ -51,9 +51,9 @@ component player choice baseSlotNumber =
     maxSelected = case choice of
       MoveFromTo { n } ->
         case n of
-          UpTo n -> review _WireInt n
-          Exactly n -> review _WireInt n
-          DownTo n -> length cards - (review _WireInt n)
+          UpTo n -> review Int._toWire n
+          Exactly n -> review Int._toWire n
+          DownTo n -> length cards - (review Int._toWire n)
       _ -> 0
     resolve resolution = case choice of
       MoveFromTo x ->

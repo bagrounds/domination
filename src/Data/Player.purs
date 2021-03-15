@@ -24,15 +24,16 @@ import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus as Bonus
 import Domination.Data.Buys (Buys)
 import Domination.Data.Card (Card)
-import Domination.Data.Card as Card
+import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positivePoints, value) as Card
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice (isAttack) as Choice
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.Wire.Card (_toWire) as Card
 import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
-import Domination.Data.WireInt (WireInt)
+import Domination.Data.Wire.Int (WireInt)
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
@@ -66,21 +67,21 @@ type WirePlayer =
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
   to = (_choices <$>~ view Choice._toWire)
-    >>> (_deck <$>~ view Cards._toWire)
-    >>> (_hand <$>~ view Cards._toWire)
-    >>> (_discard <$>~ view Cards._toWire)
-    >>> (_toDiscard <$>~ view Cards._toWire)
-    >>> (_atPlay <$>~ view Cards._toWire)
-    >>> (_buying <$>~ view Cards._toWire)
+    >>> (_deck <$>~ view Card._toWire)
+    >>> (_hand <$>~ view Card._toWire)
+    >>> (_discard <$>~ view Card._toWire)
+    >>> (_toDiscard <$>~ view Card._toWire)
+    >>> (_atPlay <$>~ view Card._toWire)
+    >>> (_buying <$>~ view Card._toWire)
     >>> toTuple
   from = fromTuple
     >>> (_choices <$>~ review Choice._toWire)
-    >>> (_deck <$>~ review Cards._toWire)
-    >>> (_hand <$>~ review Cards._toWire)
-    >>> (_discard <$>~ review Cards._toWire)
-    >>> (_toDiscard <$>~ review Cards._toWire)
-    >>> (_atPlay <$>~ review Cards._toWire)
-    >>> (_buying <$>~ review Cards._toWire)
+    >>> (_deck <$>~ review Card._toWire)
+    >>> (_hand <$>~ review Card._toWire)
+    >>> (_discard <$>~ review Card._toWire)
+    >>> (_toDiscard <$>~ review Card._toWire)
+    >>> (_atPlay <$>~ review Card._toWire)
+    >>> (_buying <$>~ review Card._toWire)
   toTuple
     { actions
     , atPlay

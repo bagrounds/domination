@@ -1,4 +1,4 @@
-module Domination.Data.WireInt where
+module Domination.Data.Wire.Int where
 
 import Prelude
 
@@ -34,6 +34,6 @@ derive newtype instance dynamicByteLengthWireInt
 instance arbitraryWireInt :: Arbitrary WireInt where
   arbitrary = (WireInt <<< Int16LE <<< (_ `mod` 256)) <$> arbitrary
 
-_WireInt :: Iso' Int WireInt
-_WireInt = iso (WireInt <<< Int16LE) $ \(WireInt (Int16LE i)) -> i
+_toWire :: Iso' Int WireInt
+_toWire = iso (WireInt <<< Int16LE) $ \(WireInt (Int16LE i)) -> i
 

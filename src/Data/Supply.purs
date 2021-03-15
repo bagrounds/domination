@@ -8,29 +8,20 @@ import Data.Foldable (find, sum)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
-import Data.Lens.Iso (Iso', iso)
-import Data.Lens.Prism (review)
 import Data.Lens.Traversal (Traversal')
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Cards as Cards
 import Domination.Data.Points (Points)
-import Domination.Data.Stack (Stack, WireStack)
-import Domination.Data.Stack as Stack
+import Domination.Data.Stack (Stack)
+import Domination.Data.Stack (_card, negativePoints, positivePoints, upgrade) as Stack
 import Util (fromJust)
 
 type Supply = Array Stack
 
-type WireSupply = Array WireStack
-
 _stack :: Int -> Traversal' Supply Stack
 _stack i = ix i
-
-_toWire :: Iso' Supply WireSupply
-_toWire = iso to from where
-  to = map $ view Stack._toWire
-  from = map $ review Stack._toWire
 
 defaultSupply :: Int -> Supply
 defaultSupply i = makeSupply i Cards.cardMap

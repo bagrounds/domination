@@ -24,7 +24,8 @@ import Domination.Data.Constraint (Constraint)
 import Domination.Data.Filter (Filter)
 import Domination.Data.Pile (Pile)
 import Domination.Data.SelectCards (SelectCards)
-import Domination.Data.WireInt (WireInt, _WireInt)
+import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Int as Int
 
 data WireChoice
   = WireIf Boolean WireChoice Condition (Maybe WireChoice) (Maybe Unit)
@@ -54,14 +55,14 @@ _toWire = iso to from where
     Or { attack, choices, resolution } ->
       WireOr attack ((_ ^. _toWire) <$> choices) (resolution ^? (_Just <<< _toWire))
     PickN { attack, choices, n, resolution } ->
-      WirePickN attack ((_ ^. _toWire) <$> choices) (n ^. _WireInt)
+      WirePickN attack ((_ ^. _toWire) <$> choices) (n ^. Int._toWire)
         (map (_ ^. _toWire) <$> resolution)
     Option { attack, choice, resolution } ->
       WireOption attack (choice ^. _toWire) resolution
     MoveFromTo { attack, destination, filter, n, resolution, source } ->
-      WireMoveFromTo attack destination filter n ((map $ view _WireInt) <$> resolution) source
+      WireMoveFromTo attack destination filter n ((map $ view Int._toWire) <$> resolution) source
     GainCards { attack, cardName, destination, n, resolution } ->
-      WireGainCards attack cardName destination (n ^. _WireInt) resolution
+      WireGainCards attack cardName destination (n ^. Int._toWire) resolution
     GainCard { attack, destination, filter, resolution } ->
       WireGainCard attack destination filter resolution
     GainActions { attack, n, resolution } ->
@@ -71,7 +72,7 @@ _toWire = iso to from where
     Discard { attack, resolution, selection } ->
       WireDiscard attack resolution selection
     Draw { attack, n, resolution } ->
-      WireDraw attack (n ^. _WireInt) resolution
+      WireDraw attack (n ^. Int._toWire) resolution
     GainBonus { attack, bonus, resolution } ->
       WireGainBonus attack bonus resolution
   from = case _ of
@@ -82,13 +83,13 @@ _toWire = iso to from where
     WireOr attack choices resolution ->
       Or { attack, choices: review _toWire <$> choices, resolution: review _toWire <$> resolution }
     WirePickN attack choices n resolution ->
-      PickN { attack, choices: review _toWire <$> choices, n: review _WireInt n, resolution: (map $ review _toWire) <$> resolution }
+      PickN { attack, choices: review _toWire <$> choices, n: review Int._toWire n, resolution: (map $ review _toWire) <$> resolution }
     WireOption attack choice resolution ->
       Option { attack, choice: review _toWire choice, resolution }
     WireMoveFromTo attack destination filter n resolution source ->
-      MoveFromTo { attack, destination, filter, n, resolution: (map $ review _WireInt) <$> resolution, source }
+      MoveFromTo { attack, destination, filter, n, resolution: (map $ review Int._toWire) <$> resolution, source }
     WireGainCards attack cardName destination n resolution ->
-      GainCards { attack, cardName, destination, n: review _WireInt n, resolution }
+      GainCards { attack, cardName, destination, n: review Int._toWire n, resolution }
     WireGainCard attack destination filter resolution ->
       GainCard { attack, destination, filter, resolution }
     WireGainActions attack n resolution ->
@@ -98,7 +99,7 @@ _toWire = iso to from where
     WireDiscard attack resolution selection ->
       Discard { attack, resolution, selection }
     WireDraw attack n resolution ->
-      Draw { attack, n: review _WireInt n, resolution }
+      Draw { attack, n: review Int._toWire n, resolution }
     WireGainBonus attack bonus resolution ->
       GainBonus { attack, bonus, resolution }
 

@@ -17,7 +17,8 @@ import Data.Lens.Iso (Iso', re)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Prism (review)
 import Data.Newtype (class Newtype)
-import Domination.Data.WireInt (WireInt, _WireInt)
+import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Int as Int
 
 newtype Points = Points WireInt
 
@@ -44,5 +45,5 @@ derive newtype instance dynamicByteLengthPoints
   :: DynamicByteLength Points
 
 _int :: Iso' Points Int
-_int = _Newtype <<< (re _WireInt)
+_int = _Newtype <<< (re Int._toWire)
 

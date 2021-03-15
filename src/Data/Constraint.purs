@@ -11,7 +11,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens.Lens (Lens', lens')
 import Data.Tuple (Tuple(..))
-import Domination.Data.WireInt (WireInt)
+import Domination.Data.Wire.Int (WireInt)
 
 data Constraint
   = UpTo WireInt
