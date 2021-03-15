@@ -73,6 +73,7 @@ newGameButton = ClassName "new-game-button"
 loadGameButton = ClassName "load-game-button"
 toggleLongGame = ClassName "toggle-long-game"
 check = ClassName "check"
+randomizeKingdomButton = ClassName "randomize-kingdom-button"
 
 incrementer = ClassName "incrementer"
 dialogue = ClassName "dialogue"

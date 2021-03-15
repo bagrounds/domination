@@ -10,19 +10,21 @@ import Data.Tuple (Tuple(..), fst)
 import Domination.AppM (AppM)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Random (randomInt)
+import Effect.Random (randomBool, randomInt)
 import Halogen.Query.HalogenM (HalogenM)
 import Util (dropIndex)
 
 class Monad m <= Random m where
   shuffle :: forall a. Eq a => Array a -> m (Array a)
   randomElement :: forall a. Array a -> m (Maybe a)
-  randomIntBetween :: Int -> Int -> m (Int)
+  randomIntBetween :: Int -> Int -> m Int
+  randomBoolean :: m Boolean
 
 instance randomHalogenM :: Random m => Random (HalogenM st act slots msg m) where
   shuffle = lift <<< shuffle
   randomElement = lift <<< randomElement
   randomIntBetween a = lift <<< randomIntBetween a
+  randomBoolean = lift randomBoolean
 
 newtype RandomM a = RandomM (Effect a)
 
@@ -37,11 +39,13 @@ instance exceptTStringRandomM :: Random m => Random (ExceptT String m) where
   shuffle xs = pure xs >>= lift <<< shuffle
   randomElement xs = pure xs >>= lift <<< randomElement
   randomIntBetween a = lift <<< randomIntBetween a
+  randomBoolean = lift randomBoolean
 
 instance randomRandomM :: Random RandomM where
   shuffle = liftEffect <<< randomShuffle
   randomElement = liftEffect <<< pickRandomElement
   randomIntBetween a = liftEffect <<< randomInt a
+  randomBoolean = liftEffect randomBool
 
 runRandomM :: RandomM ~> Effect
 runRandomM (RandomM m) = liftEffect m
@@ -50,6 +54,7 @@ instance randomAppM :: Random AppM where
   shuffle = liftEffect <<< randomShuffle
   randomElement = liftEffect <<< pickRandomElement
   randomIntBetween a = liftEffect <<< randomInt a
+  randomBoolean = liftEffect randomBool
 
 randomShuffle
   :: forall a m

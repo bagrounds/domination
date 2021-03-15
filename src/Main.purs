@@ -4,7 +4,7 @@ import Prelude
 
 import AppAction (AppAction(..))
 import AppState (AppState, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
-import Data.Array (length, take)
+import Data.Array (foldM, length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -19,7 +19,7 @@ import Domination.Capability.Broadcast (class Broadcast, broadcast, create)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
-import Domination.Capability.Random (class Random, randomElement)
+import Domination.Capability.Random (class Random, randomBoolean, randomElement)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.UI.Chat as Chat
@@ -241,6 +241,17 @@ handleAction = case _ of
     save "player_index" newPlayerIndex
     log $ "saving player_count: " <> show newPlayerCount
     save "player_count" newPlayerCount
+
+  RandomizeKingdom -> do
+    { kingdom } <- H.gets _.dominationConfig
+    newKingdom <- foldM f [] kingdom
+    H.modify_ $ _dominationConfig <<< _kingdom .~ newKingdom
+    save "kingdom" newKingdom
+    where
+      f xs { card } = (xs <> _ )
+        <<< pure
+        <<< ({ card, selected: _ })
+        <$> randomBoolean
 
   ChooseKingdom kingdom -> do
     save "kingdom" kingdom

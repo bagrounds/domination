@@ -14,6 +14,7 @@ data AppAction
   | LoadGameRequest
   | ToggleMenu
   | ToggleLongGame
+  | RandomizeKingdom
   | ChooseKingdom (Array { card :: Card, selected :: Boolean })
   | WriteUsername String
   | Write (Lens' AppState String) String

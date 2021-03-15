@@ -98,6 +98,11 @@ render cs@{ showMenu, dominationConfig } = let
       , HH.text "Don't end the game when 3 piles are empty"
       ]
     ]
+  , HH.button
+    [ HE.onClick \_ -> Just $ RandomizeKingdom
+    , HP.class_ Css.randomizeKingdomButton
+    ]
+    [ HH.text "Randomize Kingdom" ]
   , renderKingdom kingdom
   ]
 
