@@ -51,7 +51,7 @@ type ComponentSpec =
 --  :: forall query input m
 --  . ComponentSpec
 --  -> Component HTML query Action Choice m
-component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pile } =
+component { baseSlotNumber, renderChoice, canToggle, resolve, state, player, choice, pile } =
   H.mkComponent { initialState, render, eval }
     where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
@@ -62,7 +62,7 @@ component { baseSlotNumber, renderChoice, canToggle, resolve, player, choice, pi
           Pile.Discard -> player.discard
           Pile.ToDiscard -> player.toDiscard
           Pile.Deck -> player.deck
-          Pile.Trash -> []
+          Pile.Trash -> state.trash
     render xs =
       case Player.firstChoice player >>= renderChoice of
         Just { title, buttonText } -> HH.div_ $

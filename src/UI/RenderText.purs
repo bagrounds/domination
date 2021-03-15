@@ -219,29 +219,38 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text "optionally "
       , renderText choice
       ]
-    MoveFromTo { n, filter, destination } -> case n of
+    MoveFromTo { n, filter, source, destination } -> case n of
       UpTo n ->
         [ HH.text $ verb <> " up to "
           <> show (n .^ Int._toWire)
-          <> suffix
+          <> " " <> description
+          <> " " <> suffix
         ]
       Exactly n ->
         [ HH.text $ verb <> " "
           <> show (n .^ Int._toWire)
-          <> suffix
+          <> " " <> description
+          <> " " <> suffix
         ]
       DownTo n ->
         [ HH.text $ verb <> " down to "
           <> show (n .^ Int._toWire)
-          <> suffix
+          <> " " <> description
+          <> " " <> suffix
         ]
       where
-        suffix = case filter of
-          Nothing -> " cards"
-          Just (HasName name) -> " " <> name
-          Just (HasType cardType) -> " " <> show cardType
-          Just (CostUpTo cost) -> " cards costing up to "
+        description = case filter of
+          Nothing -> "card(s)"
+          Just (HasName name) -> name
+          Just (HasType cardType) -> show cardType
+          Just (CostUpTo cost) -> "cards costing up to"
             <> show (cost .^ Int._toWire)
+        suffix = case source of
+          Pile.Hand -> ""
+          Pile.Discard -> "from your discard pile"
+          Pile.ToDiscard -> "from your to-discard pile"
+          Pile.Deck -> "from your deck"
+          Pile.Trash -> "from the trash"
 
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
@@ -253,17 +262,23 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text $ "Gain " <> cardName <> " x"
         <> show n
       ]
-    GainCard { filter } ->
+    GainCard { filter, destination } ->
       let
+        verb = case destination of
+          Pile.Hand -> "Gain to your hand"
+          Pile.Discard -> "Gain"
+          Pile.ToDiscard -> "Gain"
+          Pile.Deck -> "Gain onto your deck"
+          Pile.Trash -> "Trash"
         card = case filter of
-          Nothing -> "card"
-          Just (HasName name) -> name
-          Just (HasType cardType) -> "card of type "
+          Nothing -> "a card"
+          Just (HasName name) -> "1 " <> name
+          Just (HasType cardType) -> "a card of type "
             <> show cardType
-          Just (CostUpTo cost) -> " card costing up to "
+          Just (CostUpTo cost) -> "a card costing up to "
             <> show (cost .^ Int._toWire)
       in
-        [ HH.text $ "gain a " <> card <> " from the supply" ]
+        [ HH.text $ verb <> " " <> card <> " from the supply" ]
     GainActions { n } ->
       [ HH.text "+"
       , renderText n

@@ -456,7 +456,7 @@ renderPlayer cs@{ state, playerIndex } player =
             [ HH.slot
               (SProxy :: SProxy "MoveFromTo")
               (AreaSlot ChoiceArea)
-              (MoveFromTo.component player choice baseSlotNumber)
+              (MoveFromTo.component state player choice baseSlotNumber)
               unit
               $ Just
               <<< MakePlay

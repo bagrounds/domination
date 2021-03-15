@@ -42,6 +42,7 @@ cardMap =
   , consolation
   , settlers
   , courtyard
+  , lurker
   , greatHall
   , village
   , woodCutter
@@ -80,7 +81,7 @@ emptyChoice :: Choice
 emptyChoice = GainBonus
   { bonus: Cash $ 100 ^. Int._toWire
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 copper :: Card
@@ -233,7 +234,7 @@ gainCurse = let attack = true in GainCards
   { cardName: "Curse"
   , destination: Pile.Discard
   , n: one
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -257,7 +258,7 @@ councilRoom = let attack = false in
 draw1Card :: Choice
 draw1Card = let attack = false in Draw
   { n: one
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -279,7 +280,7 @@ scholar = let attack = false in
 discardYourHand :: Boolean -> Choice
 discardYourHand attack = Discard
   { selection: SelectAll
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -289,11 +290,11 @@ scholarChoice = let attack = false in And
     [ discardYourHand attack
     , Draw
       { n: 7
-      , resolution: Nothing
+      , resolution
       , attack
       }
     ]
-    , resolution: Nothing
+    , resolution
     , attack
   }
 
@@ -318,7 +319,7 @@ chapelChoice = let attack = false in MoveFromTo
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Trash
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -344,7 +345,7 @@ discardDownTo3 = let attack = true in MoveFromTo
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Discard
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -376,10 +377,10 @@ nobles = let attack = false in
 noblesChoice :: Choice
 noblesChoice = let attack = false in Or
   { choices:
-    [ Draw { n: 3, attack, resolution: Nothing }
-    , GainActions { n: actions 2, attack, resolution: Nothing }
+    [ Draw { n: 3, attack, resolution }
+    , GainActions { n: actions 2, attack, resolution }
     ]
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -401,18 +402,18 @@ steward = let attack = false in
 stewardChoice :: Choice
 stewardChoice = let attack = false in Or
   { choices:
-    [ Draw { n: 2, attack, resolution: Nothing }
-    , GainBonus { bonus: Cash $ 2 ^. Int._toWire, attack, resolution: Nothing }
+    [ Draw { n: 2, attack, resolution }
+    , GainBonus { bonus: Cash $ 2 ^. Int._toWire, attack, resolution }
     , MoveFromTo
       { source: Pile.Hand
       , destination: Pile.Trash
       , filter: Nothing
       , n: Exactly $ 2 ^. Int._toWire
       , attack
-      , resolution: Nothing
+      , resolution
       }
     ]
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -435,12 +436,12 @@ pawnChoice :: Choice
 pawnChoice = let attack = false in PickN
   { n: 2
   , choices:
-    [ Draw { n: one, attack, resolution: Nothing }
-    , GainBonus { bonus: Cash one, attack, resolution: Nothing }
-    , GainActions { n: one, attack, resolution: Nothing }
-    , GainBuys { n: one, attack, resolution: Nothing }
+    [ Draw { n: one, attack, resolution }
+    , GainBonus { bonus: Cash one, attack, resolution }
+    , GainActions { n: one, attack, resolution }
+    , GainBuys { n: one, attack, resolution }
     ]
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -470,17 +471,17 @@ torturerChoice = let attack = true in
       , source: Pile.Hand
       , destination: Pile.Discard
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , GainCards
       { n: one
       , cardName: "Curse"
       , destination: Pile.Discard
       , attack
-      , resolution: Nothing
+      , resolution
       }
     ]
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -506,10 +507,10 @@ consolationChoice = let attack = false in
   , choice: GainBonus
     { bonus: Cash $ 2 ^. Int._toWire
     , attack
-    , resolution: Nothing
+    , resolution
     }
   , otherwise: Nothing
-  , resolution: Nothing
+  , resolution
   , attack
   }
 
@@ -540,23 +541,23 @@ moneyLenderChoice = let attack = false in
           , source: Pile.Hand
           , destination: Pile.Trash
           , attack
-          , resolution: Nothing
+          , resolution
           }
         , GainBonus
           { bonus: Cash $ 3 ^. Int._toWire
           , attack
-          , resolution: Nothing
+          , resolution
           }
         ]
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , attack
-    , resolution: Nothing
+    , resolution
     }
   , otherwise: Nothing
   , attack
-  , resolution: Nothing
+  , resolution
   }
 
 moneyLenderSpecial :: Special
@@ -581,7 +582,7 @@ harbingerChoice = MoveFromTo
   , filter: Nothing
   , source: Pile.Discard
   , destination: Pile.Deck
-  , resolution: Nothing
+  , resolution
   , attack: false
   }
 
@@ -605,7 +606,7 @@ gain4Cash :: Choice
 gain4Cash = GainBonus
   { bonus: Cash $ 4 ^. Int._toWire
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 gain1Estate :: Choice
@@ -614,7 +615,7 @@ gain1Estate = GainCards
   , n: one
   , destination: Pile.Discard
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 discard1Estate :: Choice
@@ -624,21 +625,21 @@ discard1Estate = MoveFromTo
   , source: Pile.Hand
   , destination: Pile.ToDiscard
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 discard1EstateAndGain4Cash :: Choice
 discard1EstateAndGain4Cash = And
   { choices: [ gain4Cash, discard1Estate ]
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 discardOrGain1Estate :: Choice
 discardOrGain1Estate = Or
   { choices: [ gain1Estate, discard1EstateAndGain4Cash ]
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 baronChoice :: Choice
@@ -647,7 +648,7 @@ baronChoice = If
   , choice: discardOrGain1Estate
   , otherwise: Just gain1Estate
   , attack: false
-  , resolution: Nothing
+  , resolution
   }
 
 baronSpecial :: Special
@@ -680,12 +681,12 @@ goldfishChoice = let attack = false in If
     { cardName: "Gold"
     , destination: Pile.Hand
     , n: one
-    , resolution: Nothing
+    , resolution
     , attack
     }
   , otherwise: Nothing
   , attack
-  , resolution: Nothing
+  , resolution
   }
 
 mountebank :: Card
@@ -712,15 +713,15 @@ mountebankChoice = let attack = true in If
         , source: Pile.Hand
         , destination: Pile.Discard
         , attack
-        , resolution: Nothing
+        , resolution
         }
       , gainCurseAndCopper
       ]
     , attack
-    , resolution: Nothing
+    , resolution
     }
   , attack
-  , resolution: Nothing
+  , resolution
   , otherwise: Just gainCurseAndCopper
   }
 
@@ -732,18 +733,18 @@ gainCurseAndCopper = let attack = true in And
       , destination: Pile.Discard
       , n: one
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , GainCards
       { cardName: "Curse"
       , destination: Pile.Discard
       , n: one
       , attack
-      , resolution: Nothing
+      , resolution
       }
     ]
   , attack
-  , resolution: Nothing
+  , resolution
   }
 
 margrave :: Card
@@ -760,7 +761,7 @@ margrave = let attack = true in Card.actionAttack
         , discardDownTo3
         ]
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "Each other player draws a card"
       <> ", then discards down to 3 cards in hand."
@@ -781,15 +782,15 @@ huntingLodge = let attack = false in Card.action
           [ discardYourHand attack
           , Draw
             { n: 5
-            , resolution: Nothing
+            , resolution
             , attack
             }
           ]
-          , resolution: Nothing
+          , resolution
           , attack
         }
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "You may discard your hand for +5 Cards"
     }
@@ -814,14 +815,14 @@ oldWitch = let attack = true in
             , source: Pile.Hand
             , destination: Pile.Trash
             , attack
-            , resolution: Nothing
+            , resolution
             }
           , otherwise: Nothing
           , attack
-          , resolution: Nothing
+          , resolution
           }
         ]
-      , resolution: Nothing
+      , resolution
       , attack
       }
     , description: "Each other player gains a Curse"
@@ -842,7 +843,7 @@ settlers = Card.action
       , filter: Just $ HasName "Copper"
       , source: Pile.Discard
       , destination: Pile.Hand
-      , resolution: Nothing
+      , resolution
       , attack: false
       }
     , description: "Look through your discard pile."
@@ -864,7 +865,7 @@ junkDealer = Card.action
       , filter: Nothing
       , source: Pile.Hand
       , destination: Pile.Trash
-      , resolution: Nothing
+      , resolution
       , attack: false
       }
     , description: "Trash a card from your hand."
@@ -889,27 +890,27 @@ stables = let attack = false in Card.action
               , source: Pile.Hand
               , destination: Pile.ToDiscard
               , attack
-              , resolution: Nothing
+              , resolution
               }
             , Draw
               { n: 3
-              , resolution: Nothing
+              , resolution
               , attack
               }
             , GainActions
               { n: one
-              , resolution: Nothing
+              , resolution
               , attack
               }
             ]
-            , resolution: Nothing
+            , resolution
             , attack
           }
         , attack
-        , resolution: Nothing
+        , resolution
         }
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "You may discard a treasure for +3 Cards"
       <> " and +1 Action."
@@ -926,7 +927,7 @@ workshop = let attack = false in Card.action
       { filter: Just $ CostUpTo (4 ^. Int._toWire)
       , destination: Pile.ToDiscard
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "Gain a card costing up to 4."
     }
@@ -944,19 +945,19 @@ artisan = let attack = false in Card.action
           { filter: Just $ CostUpTo (5 ^. Int._toWire)
           , destination: Pile.Hand
           , attack
-          , resolution: Nothing
+          , resolution
           }
         , MoveFromTo
-          { n: Exactly (1 ^. Int._toWire)
+          { n: Exactly one
           , filter: Nothing
           , source: Pile.Hand
           , destination: Pile.Deck
           , attack
-          , resolution: Nothing
+          , resolution
           }
         ]
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "Gain a card to your hand costing up to 5."
       <> "Put a card from your hand onto your deck."
@@ -973,7 +974,7 @@ armory = let attack = false in Card.action
       { filter: Just $ CostUpTo (4 ^. Int._toWire)
       , destination: Pile.Deck
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "Gain a card onto your deck costing up to 4."
     }
@@ -988,22 +989,22 @@ altar = let attack = false in Card.action
     , command: Choose $ And
       { choices:
         [ MoveFromTo
-          { n: Exactly (1 ^. Int._toWire)
+          { n: Exactly one
           , filter: Nothing
           , source: Pile.Hand
           , destination: Pile.Trash
           , attack
-          , resolution: Nothing
+          , resolution
           }
         , GainCard
           { filter: Just $ CostUpTo (5 ^. Int._toWire)
           , destination: Pile.ToDiscard
           , attack
-          , resolution: Nothing
+          , resolution
           }
         ]
       , attack
-      , resolution: Nothing
+      , resolution
       }
     , description: "Trash a card from your hand."
       <> "Gain a card costing up to 5."
@@ -1022,10 +1023,45 @@ courtyard = let attack = false in Card.action
       , filter: Nothing
       , source: Pile.Hand
       , destination: Pile.Deck
-      , resolution: Nothing
+      , resolution
       , attack: false
       }
     , description: "Put a card from your hand onto your deck."
     }
   }
+
+lurker :: Card
+lurker = let attack = false in Card.action
+  { name = "Lurker"
+  , cost = 2
+  , actions = one
+  , special = Just
+    { target: Self
+    , command: Choose $ Or
+      { choices:
+        [ GainCard
+          { filter: Nothing
+          , destination: Pile.Trash
+          , attack
+          , resolution
+          }
+        , MoveFromTo
+          { n: Exactly one
+          , filter: Nothing
+          , source: Pile.Trash
+          , destination: Pile.ToDiscard
+          , attack
+          , resolution
+          }
+        ]
+      , resolution
+      , attack
+      }
+    , description: "Trash an action card from the supply"
+      <> " or gain an action card from the trash."
+    }
+  }
+
+resolution :: forall a. Maybe a
+resolution = Nothing
 

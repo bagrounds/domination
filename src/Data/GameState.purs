@@ -416,34 +416,20 @@ resolveChoice { playerIndex, choice } state =
       let _destination = _pile destination playerIndex
       stack <- stackByName cardName state.supply
       stackIndex <- indexOfStack stack.card state.supply
-      let newCount = stack.count - one
-      let cards = [ stack.card ]
       let
-        playerUpdate = case destination of
-          Pile.Hand -> Player._hand <>~ cards
-          Pile.Discard -> Player._discard <>~ cards
-          Pile.ToDiscard -> Player._toDiscard <>~ cards
-          Pile.Deck -> Player._deck <>~ cards
-          Pile.Trash -> Player._hand <>~ cards
+        newCount = stack.count - one
+        cards = [ stack.card ]
       over _destination (cards <> _)
         <$> modifyStack stackIndex Stack.take state
 
     GainCards { n, cardName, destination, resolution: Just unit } -> do
       let _destination = _pile destination playerIndex
-      stack <- stackByName cardName state.supply
-      stackIndex <- indexOfStack stack.card state.supply
-      let cardsToGain = min n stack.count
-      let newCount = max zero (stack.count - n)
+      { card, count } <- stackByName cardName state.supply
+      stackIndex <- indexOfStack card state.supply
+      let cardsToGain = min n count
+      let newCount = max zero (count - n)
       let stackUpdate = Stack._count .~ newCount
-      let cards = replicate cardsToGain stack.card
-      let
-        playerUpdate = case destination of
-          Pile.Hand -> Player._hand <>~ cards
-          Pile.Discard -> Player._discard <>~ cards
-          Pile.ToDiscard -> Player._toDiscard <>~ cards
-          Pile.Deck -> Player._deck <>~ cards
-          -- TODO: make this a state update so we can trash cards
-          Pile.Trash -> Player._hand <>~ cards
+      let cards = replicate cardsToGain card
       over _destination (cards <> _)
         <$> modifyStack stackIndex stackUpdate state
     GainActions { n, resolution: Just unit } ->

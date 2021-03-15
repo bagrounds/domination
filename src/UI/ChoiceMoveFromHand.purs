@@ -11,6 +11,7 @@ import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.GameState (GameState)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.Data.Wire.Int as Int
@@ -25,16 +26,18 @@ component
   :: forall query input m
   . Dom m
   => Log m
-  => Player
+  => GameState
+  -> Player
   -> Choice
   -> (Int -> DomSlot)
   -> Component HTML query input Choice m
-component player choice baseSlotNumber =
+component state player choice baseSlotNumber =
   CardChooser.component
     { renderChoice
     , canToggle
     , resolve
     , player
+    , state
     , choice
     , pile
     , baseSlotNumber
@@ -64,7 +67,7 @@ component player choice baseSlotNumber =
       _ -> Pile.Trash
     cards = case pile of
       -- TODO pass in full game state so we can look at the trash
-      Pile.Trash -> []
+      Pile.Trash -> state.trash
       Pile.Hand -> player.hand
       Pile.Discard -> player.discard
       Pile.ToDiscard -> player.toDiscard
