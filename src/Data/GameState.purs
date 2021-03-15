@@ -43,7 +43,6 @@ import Domination.Data.Stack as Stack
 import Domination.Data.Supply (Supply, emptyStackCount, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
-import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
 import Relation (Relation(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
@@ -383,7 +382,6 @@ resolveChoice { playerIndex, choice } state =
         _source = _pile source playerIndex
         _destination = _pile destination playerIndex
       sourcePile <- fromJust "failed to get source" $ state ^? _source
-      player <- getPlayer playerIndex state
       selected <- takeIndices cardIndices sourcePile
       remaining <- dropIndices cardIndices sourcePile
       let

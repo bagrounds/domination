@@ -19,7 +19,6 @@ import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Target (Target(..))
-import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
 
 upgrade :: Card -> Card
@@ -42,6 +41,7 @@ cardMap =
   , pawn
   , consolation
   , settlers
+  , courtyard
   , greatHall
   , village
   , woodCutter
@@ -1007,6 +1007,25 @@ altar = let attack = false in Card.action
       }
     , description: "Trash a card from your hand."
       <> "Gain a card costing up to 5."
+    }
+  }
+
+courtyard :: Card
+courtyard = let attack = false in Card.action
+  { name = "Courtyard"
+  , cost = 2
+  , cards = 3
+  , special = Just
+    { target: Self
+    , command: Choose $ MoveFromTo
+      { n: Exactly one
+      , filter: Nothing
+      , source: Pile.Hand
+      , destination: Pile.Deck
+      , resolution: Nothing
+      , attack: false
+      }
+    , description: "Put a card from your hand onto your deck."
     }
   }
 
