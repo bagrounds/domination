@@ -1040,14 +1040,14 @@ lurker = let attack = false in Card.action
     , command: Choose $ Or
       { choices:
         [ GainCard
-          { filter: Nothing
+          { filter: Just (HasType Action)
           , destination: Pile.Trash
           , attack
           , resolution
           }
         , MoveFromTo
           { n: Exactly one
-          , filter: Nothing
+          , filter: Just (HasType Action)
           , source: Pile.Trash
           , destination: Pile.ToDiscard
           , attack
