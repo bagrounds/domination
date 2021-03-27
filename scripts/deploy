@@ -5,14 +5,11 @@ main () (
   npm ci
   npm run bundle
 
-  rename_file_with_content_hash assets/stylesheet.css
-  rename_file_with_content_hash assets/manifest.webmanifest
-  rename_file_with_content_hash dist/app.js
-
   cp assets/* dist
   mv dist/prod-index.html dist/index.html
   rm -rf public
   mv dist public
+  ./scripts/content-hash
 )
 
 rename_file_with_content_hash () (

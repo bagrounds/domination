@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+/**
+ * content-hash creates a hash of the content of a file
+ *
+ * @module content-hash
+ */
+;(function () {
+  'use strict'
+
+  /* imports */
+  const hashFunction = require('hash-function')
+  const fs = require('fs')
+  const replaceFile = require('replacefile')
+
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+  const base64Alphabet = (lowercase
+    + lowercase.toUpperCase()
+    + '0123456789'
+    + '-_').split('')
+
+  const files = [
+    ['public/', 'stylesheet', '.css'],
+    ['public/', 'manifest', '.webmanifest'],
+    ['public/', 'app', '.js']
+  ]
+
+  files.forEach(([path, file, ext], i) => {
+    contentHash({ file: path + file + ext }, (error, hash) => {
+      const oldFile = file + ext
+      const newFile = `${file}-${hash}${ext}`
+      console.log(`${oldFile} -> ${newFile}`)
+      fs.rename(path + oldFile, path + newFile, (error, result) =>
+        [
+          'public/index.html'
+        ].forEach(f => replaceFile.replace(f, new RegExp(oldFile), newFile))
+      )
+    })
+  })
+
+  /**
+   * contentHash creates a hash of the content of a file
+   *
+   * @function contentHash
+   * @alias content-hash
+   *
+   * @param {Object} options all function parameters
+   * @param {Function} callback handle results
+   */
+  function contentHash ({ file }, callback) {
+    console.log(file)
+    fs.readFile(file, function (error, content) {
+      const string = content.toString()
+      hashFunction({ string }, (error, n) =>
+        callback(
+          null,
+          Array
+            .from({ length: 6 }, () => {
+              const base64Digit = Math.max(0, n % 64)
+              n -= base64Digit
+              n /= 64
+              return base64Alphabet[base64Digit]
+            })
+            .reverse()
+            .join('')
+        )
+      )
+    })
+  }
+})()
+
