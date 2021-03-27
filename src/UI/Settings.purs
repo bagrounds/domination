@@ -95,7 +95,7 @@ render cs@{ showMenu, dominationConfig } = let
         , HP.checked longGame
         , HE.onChecked \_ -> Just ToggleLongGame
         ]
-      , HH.text "Don't end the game when 3 piles are empty"
+      , HH.text "Don't end the game until the leader can't be beaten"
       ]
     ]
   , HH.button

@@ -34,6 +34,9 @@ _count = prop (SProxy :: SProxy "count")
 take :: Stack -> Stack
 take = decOver _count
 
+isEmpty :: Stack -> Boolean
+isEmpty = _.count >>> (_ <= 0)
+
 assertNotEmpty :: forall m. MonadError String m => Stack -> m Stack
 assertNotEmpty = assert (_.count >>> (_ > zero)) "stack is empty!"
 

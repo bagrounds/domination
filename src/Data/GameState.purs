@@ -40,7 +40,7 @@ import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
-import Domination.Data.Supply (Supply, emptyStackCount, getStack, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
+import Domination.Data.Supply (Supply, emptyStackCount, getStack, highestVictoryCardStackIsEmpty, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
 import Domination.Data.Wire.Int as Int
@@ -426,10 +426,11 @@ resolveChoice { playerIndex, choice } state =
       let _destination = _pile destination playerIndex
       { card, count } <- stackByName cardName state.supply
       stackIndex <- indexOfStack card state.supply
-      let cardsToGain = min n count
-      let newCount = max zero (count - n)
-      let stackUpdate = Stack._count .~ newCount
-      let cards = replicate cardsToGain card
+      let
+        cardsToGain = min n count
+        newCount = max zero (count - n)
+        stackUpdate = Stack._count .~ newCount
+        cards = replicate cardsToGain card
       over _destination (cards <> _)
         <$> modifyStack stackIndex stackUpdate state
     GainActions { n, resolution: Just unit } ->
@@ -655,6 +656,7 @@ finalResult state@{ players, supply, longGame } =
         positivePoints supply <= zero
       Short p1 p2 ->
         emptyStackCount supply >= 3
+          || highestVictoryCardStackIsEmpty supply
       Long p1 p2 ->
         clearWinner || noRemainingPoints
         where
