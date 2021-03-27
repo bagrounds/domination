@@ -525,8 +525,8 @@ button span,
 }
 
 @keyframes color_change {
-  from { background-color: white; }
-  to { background-color: red; }
+  from { opacity: 1; }
+  to { opacity: 0.5; }
 }
 
 .waiting .next-phase {
