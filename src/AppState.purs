@@ -83,6 +83,11 @@ defaultKingdom = ({ card: _, selected: true }) <$> Cards.cardMap
 
 type Selection = { card :: Card, selected :: Boolean }
 
+_selected
+  :: forall a b r
+  . Lens { selected :: a | r } { selected :: b | r } a b
+_selected = prop (SProxy :: SProxy "selected")
+
 type Config =
   { nextPlayerIndex :: Int
   , nextPlayerCount :: Int
