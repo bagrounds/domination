@@ -10,7 +10,6 @@
   /* imports */
   const hashFunction = require('hash-function')
   const fs = require('fs')
-  const replaceFile = require('replacefile')
 
   const lowercase = 'abcdefghijklmnopqrstuvwxyz'
   const base64Alphabet = (lowercase
@@ -24,16 +23,22 @@
     ['public/', 'app', '.js']
   ]
 
+  const filesToUpdate = ['public/index.html']
+
   files.forEach(([path, file, ext], i) => {
     contentHash({ file: path + file + ext }, (error, hash) => {
       const oldFile = file + ext
       const newFile = `${file}-${hash}${ext}`
       console.log(`${oldFile} -> ${newFile}`)
-      fs.rename(path + oldFile, path + newFile, (error, result) =>
-        [
-          'public/index.html'
-        ].forEach(f => replaceFile.replace(f, new RegExp(oldFile), newFile))
-      )
+      fs.rename(path + oldFile, path + newFile, function () {
+        filesToUpdate
+          .forEach(f => {
+            const data = fs.readFileSync(f, 'utf8')
+            const result = data.replace(new RegExp(oldFile, 'g'), newFile);
+
+            fs.writeFileSync(f, result, 'utf8')
+          })
+      })
     })
   })
 
