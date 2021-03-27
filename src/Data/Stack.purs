@@ -40,6 +40,9 @@ isEmpty = _.count >>> (_ <= 0)
 assertNotEmpty :: forall m. MonadError String m => Stack -> m Stack
 assertNotEmpty = assert (_.count >>> (_ > zero)) "stack is empty!"
 
+new :: Card -> Int -> Stack
+new card count = { card, count }
+
 stackCards :: Array Card -> Array Stack
 stackCards cards = catMaybes (foldr f [] names)
   where

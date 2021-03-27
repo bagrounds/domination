@@ -4,7 +4,7 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, filter, foldr, head, length, mapWithIndex, null, takeWhile, uncons, updateAt)
+import Data.Array (all, dropWhile, elem, filter, foldr, head, length, mapWithIndex, null, takeWhile, uncons, updateAt)
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM, maximum)
 import Data.Lens.Fold ((^?))
@@ -656,6 +656,8 @@ finalResult state@{ players, supply, longGame } =
         positivePoints supply <= zero
       Short p1 p2 ->
         emptyStackCount supply >= 3
+          || Stack.new Cards.province zero `elem` supply
+          || Stack.new Cards.colony zero `elem` supply
           || highestVictoryCardStackIsEmpty supply
       Long p1 p2 ->
         clearWinner || noRemainingPoints
