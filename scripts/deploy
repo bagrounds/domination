@@ -3,6 +3,7 @@ set -uex
 
 main () (
   npm ci
+  mkdir -p dist
   cp assets/* dist
   npm run bundle
   npm run minify-js
