@@ -123,8 +123,6 @@ handleQuery = case _ of
     then beep Sound.Attacked
     else pure unit
 
-    log "Domination: UpdateState"
-    log "I should ask the user if they want to load this state"
     let
       previousI = activeGame.i
       expectedI = previousI + one
@@ -162,7 +160,6 @@ handleQuery = case _ of
       } = config
 
     H.modify_ $ _playerIndex .~ playerIndex
-    log $ "Domination: StartNewGame as player " <> show playerIndex
     let supply = _.card <$> _.selected `filter` kingdom
     playAndReport playerIndex
       $ NewGame { playerCount, supply, longGame }
@@ -631,7 +628,6 @@ handleAction
 handleAction = case _ of
   MakePlay play -> do
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
-    log "Domination: MakePlay"
     playAndReport playerIndex play
   UndoRequest as -> H.raise $ Undo as
   ToggleSupply -> H.modify_ $ _showSupply %~ not
@@ -645,7 +641,6 @@ playAndReport
   -> Play
   -> HalogenM ActiveState p s GameEvent m Unit
 playAndReport playerIndex play = do
-  log $ "~Domination: play: " <> show play
   activeState@{ state, showSupply } <- H.get
   let
     lastPhase = state.phase
@@ -681,8 +676,6 @@ playAndReport playerIndex play = do
         newI = case play of
           NewGame _ -> zero
           _ -> activeState.i + one
-      log $ "playAndReport.newShowSupply: "
-        <> show newShowSupply
       H.modify_ $ (_playerIndex .~ activeState.playerIndex)
         >>> (_i .~ newI)
         >>> (_showSupply .~ newShowSupply)

@@ -218,31 +218,23 @@ handleAction = case _ of
 
   WritePlayerIndex index -> do
     { dominationConfig: { nextPlayerIndex, nextPlayerCount } } <- H.get
-    log $ "Domination: updating playerIndex from "
-      <> show nextPlayerIndex <> " -> " <> show index
     let
       newPlayerIndex = max index zero
       newPlayerCount = max (index + one) nextPlayerCount
     H.modify_ $ (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
-    log $ "saving player_index: " <> show newPlayerIndex
     save "player_index" newPlayerIndex
-    log $ "saving player_count: " <> show newPlayerCount
     save "player_count" newPlayerCount
 
   WritePlayerCount count -> do
     { nextPlayerIndex, nextPlayerCount } <- H.gets _.dominationConfig
-    log $ "Domination: updating playerCount from "
-      <> show nextPlayerCount <> " -> " <> show count
     let
       newPlayerIndex = min (count - one) nextPlayerIndex
       newPlayerCount = max count one
     H.modify_
       $ (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
-    log $ "saving player_index: " <> show newPlayerIndex
     save "player_index" newPlayerIndex
-    log $ "saving player_count: " <> show newPlayerCount
     save "player_count" newPlayerCount
 
   RandomizeKingdom -> do
@@ -294,7 +286,6 @@ handleAction = case _ of
 
   ReceiveRemoteMessage customEvent -> do
     let detail = FFI.detail customEvent
-    log $ "ReceiveRemoteMessage: " <> detail
     (eWireEnvelope :: Either String WireEnvelope) <- readWire detail
     let
       eMessage = (
@@ -306,8 +297,7 @@ handleAction = case _ of
       Right (Tuple _ msg) -> do
         case msg of
           UsernameMessage { username, id } -> do
-            log $ "username incoming: "
-              <> username
+            log $ "username incoming: " <> username
             H.modify_ $ over _usernames
               $ HashMap.insert id username
           ChatMessage { message, username } -> do
@@ -320,14 +310,12 @@ handleAction = case _ of
                 sendChatMessage
               else pure unit
           GameStateMessage { i, state, playMade } -> do
-            log "Main: Receive GameStateMessage"
             queryGame $ ReceiveGameState
               { i
               , state
               }
             case playMade of
               Just x -> do
-                log $ "Receive PlayMadeMessage"
                 H.modify_ $ _messages :~ PlayMadeMessage x
               Nothing -> pure unit
           PlayMadeMessage _ ->
@@ -336,10 +324,8 @@ handleAction = case _ of
     NewState activeState playMade -> do
       case playMade of
         Just x -> do
-          log $ "Main: PlayMade"
           H.modify_ $ _messages :~ (PlayMadeMessage x)
         Nothing -> pure unit
-      log $ "saving state as player" <> show activeState.playerIndex
       queryGame $ LoadActiveState activeState
       sendMessage $ GameStateMessage
         { state: activeState.state
@@ -356,13 +342,10 @@ handleAction = case _ of
   where
     loadGame key = do
       { nextPlayerIndex } <- H.gets _.dominationConfig
-      log $ "Main: LoadGame"
       mbGameState <- load key
       case mbGameState of
         Left e -> error e
         Right activeState -> do
-          log $ "Main: LoadGame successful as player"
-            <> show nextPlayerIndex
           let
             newActiveState = ActiveState.upgrade $
               (_playerIndex .~ nextPlayerIndex) activeState
@@ -373,8 +356,6 @@ handleAction = case _ of
             , playMade: Nothing
             }
     saveGame activeState = do
-      log $ "saving state as player"
-        <> show activeState.playerIndex
       let
         saveNumber = activeState.i `mod` 10
         key = "game_state_" <> show saveNumber
@@ -397,7 +378,6 @@ handleAction = case _ of
 --      -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
     sendMessage message' = do
       let message = view Message._toWire message'
-      log "Main: sending message"
       { maybeBroadcaster, id } <- H.get
       let wireEnvelope = Tuple id message
       case maybeBroadcaster of
