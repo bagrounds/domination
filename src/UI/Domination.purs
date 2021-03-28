@@ -208,7 +208,7 @@ renderSupply' cs@{ showSupply, state, playerIndex } player =
   then HH.div
     [ HP.classes $ [ Css.supply, Css.collapsed, activity ] ]
     []
-  else HH.ul
+  else HH.div
     [ HP.classes $
       [ Css.supply
       , Css.showing
