@@ -3,5 +3,5 @@ module Version where
 data Version = Version Int Int Int
 
 version :: Version
-version = Version 0 10 2
+version = Version 0 10 3
 
