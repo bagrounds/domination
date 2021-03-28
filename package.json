@@ -2,7 +2,7 @@
   "name": "purescript-wip",
   "version": "0.1.0",
   "description": "purescript work in progress",
-  "main": "index.js",
+  "main": "dist/app.js",
   "scripts": {
     "clean": "rm -rf .cache dist public",
     "prebuild": "stylelint **/*.css",
@@ -12,13 +12,14 @@
     "deploy": "./scripts/deploy",
     "hot-reload": "./scripts/hot-reload",
     "run": "spago run",
-    "test": "spago test"
+    "test": "spago test",
+    "minify": "parcel build dist/app.js"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "hash-function": "^0.1.5",
-    "parcel-bundler": "^1.12.4",
+    "parcel": "^2.0.0-beta.2",
     "purescript": "^0.13.8",
     "spago": "^0.15.3",
     "stylelint": "^13.10.0",

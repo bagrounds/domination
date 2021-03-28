@@ -4,6 +4,7 @@ set -uex
 main () (
   npm ci
   npm run bundle
+  npm run minify
 
   cp assets/* dist
   mv dist/prod-index.html dist/index.html
