@@ -23,6 +23,26 @@ const logError = (...args) => log('error')(...args)
 
 // exports
 
+exports.registerServiceWorker = () => {
+  if ('serviceWorker' in navigator) {
+    const onLoad = () =>
+      navigator.serviceWorker
+        .register('sw.js')
+        .then(({ scope }) =>
+          logInfo(
+            'ServiceWorker registration successful with scope: ',
+            scope
+          )
+        )
+        .catch(error =>
+          logInfo('ServiceWorker registration failed: ', error)
+        )
+    window.addEventListener('load', onLoad)
+  } else {
+    logInfo('ServiceWorker unsupported')
+  }
+}
+
 exports.copyToClipboard = id => () => {
   const element = document.getElementById(id)
 

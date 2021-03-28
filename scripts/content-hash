@@ -23,7 +23,10 @@
     ['public/', 'app', '.js']
   ]
 
-  const filesToUpdate = ['public/index.html']
+  const filesToUpdate = [
+    'public/index.html',
+    'public/sw.js'
+  ]
 
   files.forEach(([path, file, ext], i) => {
     contentHash({ file: path + file + ext }, (error, hash) => {

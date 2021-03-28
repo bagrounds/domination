@@ -3,8 +3,8 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, Selection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _selected, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
-import Data.Array (elem, foldM, length, take)
+import AppState (AppState, Selection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import Data.Array (elem, length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -19,7 +19,7 @@ import Domination.Capability.Broadcast (class Broadcast, broadcast, create)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
-import Domination.Capability.Random (class Random, randomBoolean, randomElement, shuffle)
+import Domination.Capability.Random (class Random, randomElement, shuffle)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Card (Card)
@@ -35,6 +35,7 @@ import Domination.UI.Icons as Icons
 import Domination.UI.Settings as Settings
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
+import Effect.Class (liftEffect)
 import FFI as FFI
 import Halogen (Component)
 import Halogen as H
@@ -67,6 +68,8 @@ emojis = ["😄","😃","😀","😊","☺","😉","😍","😘","😚","😗","
 
 main :: Effect Unit
 main = launchAff_ $ do
+  liftEffect $ FFI.registerServiceWorker
+  HA.awaitLoad
   body <- HA.awaitBody
   runUI root unit body
 

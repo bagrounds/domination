@@ -11,6 +11,8 @@ import Effect.Aff (Canceler, Error)
 import Message (LocalMessage(..))
 import Web.Event.Event (Event)
 
+foreign import registerServiceWorker :: Effect Unit
+
 foreign import copyToClipboard :: String -> Effect Unit
 
 foreign import detail :: forall a. Event -> a

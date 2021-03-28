@@ -3,10 +3,10 @@ set -uex
 
 main () (
   npm ci
+  cp assets/* dist
   npm run bundle
   npm run minify-js
 
-  cp assets/* dist
   npm run minify-css
   mv dist/prod-index.html dist/index.html
   rm -rf public
