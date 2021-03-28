@@ -112,7 +112,9 @@ render state = HH.main_ $
       (Just <<< ReceiveLocalMessage)
     ]
     []
-  , Settings.render state
+  , if state.showMenu
+    then Settings.render state
+    else Settings.renderEmpty
   , renderSettingsButton
   , HH.slot
       Domination._component

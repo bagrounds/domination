@@ -27,6 +27,19 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Version (version)
 
+renderEmpty
+  :: forall t1 t2 t3 m
+  . Dom m
+  => Log m
+  => HTML (ComponentSlot HTML (description :: Slot t1 t2 DomSlot | t3) m AppAction) AppAction
+renderEmpty = HH.div
+  [ HP.classes
+    [ Css.settingsMenu
+    , Css.collapsed
+    ]
+  ]
+  []
+
 render
   :: forall t1 t2 t3 m
   . Dom m

@@ -319,10 +319,6 @@ button span,
   padding: 0;
 }
 
-.supply-container {
-  max-height: 0;
-}
-
 .supply.collapsed {
   max-height: 0;
 }
@@ -334,6 +330,8 @@ button span,
 .supply {
   position: absolute;
   overflow-y: scroll;
+  height: 100%;
+  width: 100%;
   transition: max-height 0.5s ease;
   z-index: 100;
 }

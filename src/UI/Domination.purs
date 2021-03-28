@@ -200,16 +200,22 @@ renderSupply'
   -> Player
   -> HTML (ChildComponents query r m) Action
 renderSupply' cs@{ showSupply, state, playerIndex } player =
-  HH.ul
+  let
+    activity =
+      if state.turn == playerIndex
+      && state.phase == BuyPhase
+      then Css.active
+      else Css.inactive
+  in
+  if not showSupply
+  then HH.ul
+    [ HP.classes $ [ Css.supply, Css.collapsed, activity ] ]
+    []
+  else HH.ul
     [ HP.classes $
       [ Css.supply
-      , if showSupply
-        then Css.showing
-        else Css.collapsed
-      , if state.turn == playerIndex
-        && state.phase == BuyPhase
-        then Css.active
-        else Css.inactive
+      , Css.showing
+      , activity
       ] <> if player.buys < one
         then [ Css.waiting ]
         else []
@@ -357,9 +363,7 @@ renderPlayer cs@{ state, playerIndex } player =
           then [ HP.class_ Css.waiting ]
           else []
         )
-        [ HH.div
-          [ HP.class_ Css.supplyContainer ]
-          [ renderSupply' cs player ]
+        [ renderSupply' cs player
         , HH.div
           [ HP.class_ Css.table ]
           [ renderAtPlay currentPlayer
