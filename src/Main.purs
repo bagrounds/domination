@@ -135,6 +135,7 @@ render state = HH.main_ $
 renderSettingsButton :: forall w. HTML w AppAction
 renderSettingsButton = HH.button
   [ HP.class_ Css.settingsButton
+  , HH.attr (H.AttrName "aria-label") "Settings"
   , HE.onClick \_ -> Just ToggleMenu
   ]
   [ Icons.settings ]

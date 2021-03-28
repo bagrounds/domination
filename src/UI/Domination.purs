@@ -205,7 +205,7 @@ renderSupply' cs@{ showSupply, state, playerIndex } player =
       else Css.inactive
   in
   if not showSupply
-  then HH.ul
+  then HH.div
     [ HP.classes $ [ Css.supply, Css.collapsed, activity ] ]
     []
   else HH.ul

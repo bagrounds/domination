@@ -34,6 +34,7 @@ render onClick extraClasses card slot =
   HH.button properties children where
   properties =
     [ HE.onClick onClick
+    , HH.attr (H.AttrName "aria-label") card.name
     , HP.classes
       $ [ Css.card ]
       <> extraClasses <>
