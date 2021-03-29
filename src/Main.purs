@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio)
-import Domination.Capability.Broadcast (class Broadcast, broadcast, create)
+import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
@@ -156,7 +156,8 @@ handleAction
   => Random m
   => Broadcast m
   => WireCodec m
-  => AppAction -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
+  => AppAction
+  -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
 handleAction = case _ of
   Initialize -> do
     eUuid <- load uuidKey
@@ -178,13 +179,13 @@ handleAction = case _ of
 
     roomCode <- H.gets _.roomCode
 
-    broadcaster <- create
+    maybeBroadcaster <- maybeCreateBroadcaster
       roomCode remoteMessageTarget localMessageTarget
 
     eKingdom <- load "kingdom"
     kingdom <- case eKingdom of
       Left e -> do
-        error $ "Failed to load kingdom. Falling back to default."
+        log $ "Failed to load kingdom. Falling back to default."
           <> "Error: " <> e
         pure defaultKingdom
       Right k ->
@@ -195,7 +196,7 @@ handleAction = case _ of
     ePlayerIndex <- load "player_index"
     nextPlayerIndex <- case ePlayerIndex of
       Left e -> do
-        error $ "Failed to load playerIndex. Falling back to default."
+        log $ "Failed to load playerIndex. Falling back to default."
           <> "Error: " <> e
         pure 0
       Right i -> pure i
@@ -203,7 +204,7 @@ handleAction = case _ of
     ePlayerCount <- load "player_count"
     nextPlayerCount <- case ePlayerCount of
       Left e -> do
-        error $ "Failed to load playerCount. Falling back to default."
+        log $ "Failed to load playerCount. Falling back to default."
           <> "Error: " <> e
         pure 1
       Right i -> pure i
@@ -211,7 +212,7 @@ handleAction = case _ of
     H.modify_ $ (_id .~ uuid)
       >>> (_username .~ username)
       >>> (_usernames %~ HashMap.insert uuid username)
-      >>> (_maybeBroadcaster .~ Just broadcaster)
+      >>> (_maybeBroadcaster .~ maybeBroadcaster)
       >>> (_dominationConfig <<< _kingdom .~ kingdom)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
@@ -382,11 +383,17 @@ handleAction = case _ of
 --      -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
     sendMessage message' = do
       let message = view Message._toWire message'
-      { maybeBroadcaster, id } <- H.get
+      { roomCode, maybeBroadcaster, id } <- H.get
       let wireEnvelope = Tuple id message
-      case maybeBroadcaster of
+
+      maybeBroadcaster' <- case maybeBroadcaster of
+        Nothing -> maybeCreateBroadcaster
+          roomCode remoteMessageTarget localMessageTarget
+        Just b -> pure (Just b)
+
+      case maybeBroadcaster' of
         Nothing ->
-          error "no broadcaster to send message"
+          log "no broadcaster to send message"
         Just broadcaster -> do
           eString <- writeWire wireEnvelope
           case eString of

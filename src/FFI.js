@@ -65,6 +65,43 @@ exports.makeBugoutFFI = tuple =>
   localMessageTarget =>
   callback =>
   () => {
+  var fresh = true
+  const installBugoutHandlers = bugout => {
+    bugout.on("connections", count => {
+      if (count == 0 && fresh) {
+        fresh = false
+        callback(right(bugout))()
+      }
+      broadcastEvent(localMessageTarget)(connections(count))
+    })
+
+    bugout.on("message", (address, message) => {
+      logInfo("incoming message length: ", message.length)
+      address === bugout.address()
+        || broadcastEvent(remoteMessageTarget)(message)
+    })
+
+    bugout.on("seen", address => {
+      broadcastEvent(localMessageTarget)(seen(address))
+    })
+
+    bugout.on("ping", address => {
+      if (address !== bugout.address()) {
+        logInfo("ping from: ", address)
+      } else {
+        logInfo("self ping? ", address)
+      }
+    })
+
+    bugout.on("timeout", address => {
+      if (address !== bugout.address()) {
+        logInfo("timeout: ", address)
+      } else {
+        logInfo("self timeout? ", address)
+      }
+    })
+  }
+
   const options = {
     // try these options again when we can do something about timeouts
     // heartbeat: 5000,
@@ -76,42 +113,13 @@ exports.makeBugoutFFI = tuple =>
       "wss://tracker.btorrent.xyz"
     ]
   }
-  const bugout = new Bugout(roomCode, options)
-  var fresh = true
 
-  bugout.on("connections", count => {
-    if (count == 0 && fresh) {
-      fresh = false
-      callback(right(bugout))()
-    }
-    broadcastEvent(localMessageTarget)(connections(count))
-  })
-
-  bugout.on("message", (address, message) => {
-    logInfo("incoming message length: ", message.length)
-    address === bugout.address()
-      || broadcastEvent(remoteMessageTarget)(message)
-  })
-
-  bugout.on("seen", address => {
-    broadcastEvent(localMessageTarget)(seen(address))
-  })
-
-  bugout.on("ping", address => {
-    if (address !== bugout.address()) {
-      logInfo("ping from: ", address)
-    } else {
-      logInfo("self ping? ", address)
-    }
-  })
-
-  bugout.on("timeout", address => {
-    if (address !== bugout.address()) {
-      logInfo("timeout: ", address)
-    } else {
-      logInfo("self timeout? ", address)
-    }
-  })
+  try {
+    const bugout = new Bugout(roomCode, options)
+    installBugoutHandlers(bugout)
+  } catch (error) {
+    callback(left(error))()
+  }
 }
 
 exports.address = bugout => () => bugout.address()

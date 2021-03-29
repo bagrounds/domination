@@ -6,7 +6,8 @@ const urlsToCache = [
   '/',
   '/stylesheet.css',
   '/app.js',
-  '/manifest.webmanifest'
+  '/manifest.webmanifest',
+  'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js',
 ]
 
 self.addEventListener('install', event =>
@@ -39,8 +40,10 @@ self.addEventListener('fetch', event =>
               .then(cache => cache.put(event.request, responseToCache))
 
             return response
-          }
-        )
+          })
+          .catch(error =>
+            console.error('failed to fetch request. Error: ', error)
+          )
       )
     )
 )

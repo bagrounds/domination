@@ -2,9 +2,13 @@ module Domination.Capability.Broadcast where
 
 import Prelude
 
+import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Domination.AppM (AppM)
-import Effect.Aff (Aff, makeAff)
+import Domination.Capability.Log (class Log, log)
+import Effect.Aff (Aff, Error, makeAff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI as FFI
@@ -13,7 +17,7 @@ import Halogen (HalogenM)
 newtype Broadcaster = Broadcaster FFI.Bugout
 
 class Monad m <= Broadcast m where
-  create :: String -> String -> String -> m Broadcaster
+  create :: String -> String -> String -> m (Either Error Broadcaster)
   address :: Broadcaster -> m String
   broadcast :: Broadcaster -> String -> m Unit
 
@@ -48,12 +52,33 @@ runBroadcastM (BroadcastM m) = liftAff m
 broadcastMessage :: Broadcaster -> String -> Aff Unit
 broadcastMessage (Broadcaster bugout) = liftEffect <<< FFI.send bugout
 
-createBroadcaster :: String -> String -> String -> Aff Broadcaster
+createBroadcaster
+  :: String
+  -> String
+  -> String
+  -> Aff (Either Error Broadcaster)
 createBroadcaster remoteMessageTarget localMessageTarget roomCode =
-  Broadcaster
+  try
+  $ Broadcaster
   <$> makeAff
   (FFI.makeBugout remoteMessageTarget localMessageTarget roomCode)
 
 getAddress :: Broadcaster -> Aff String
 getAddress (Broadcaster bugout) = liftEffect $ FFI.address bugout
 
+maybeCreateBroadcaster
+  :: forall m
+  . Log m
+  => Broadcast m
+  => String
+  -> String
+  -> String
+  -> m (Maybe Broadcaster)
+maybeCreateBroadcaster roomCode remoteMessageTarget localMessageTarget = do
+  eBroadcaster <- create
+    roomCode remoteMessageTarget localMessageTarget
+  case eBroadcaster of
+    Left e -> do
+      log $ "Error creating broadcaster: " <> show e
+      pure Nothing
+    Right b -> pure (Just b)
