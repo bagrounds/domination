@@ -94,14 +94,15 @@ component = H.mkComponent { eval, initialState, render } where
     }
   initialState _ = newApp
 
---render
---  :: forall c m
---  . Log m
---  => Storage m
---  => Dom m
---  => Random m
---  => AppState
---  -> HTML (Domination.Component GameQuery c m AppAction) AppAction
+render
+  :: forall c m
+  . Log m
+  => Audio m
+  => Storage m
+  => Dom m
+  => Random m
+  => AppState
+  -> HTML (Domination.Component GameQuery c m AppAction) AppAction
 render state = HH.main_ $
   [ HH.div
     [ HP.id_ $ remoteMessageTarget
@@ -148,6 +149,7 @@ type ChildComponents o r q1 o1 =
   , "description" :: H.Slot q1 o1 DomSlot
   | r
   )
+
 handleAction
   :: forall output m t1 r o1 q1
   . Storage m
@@ -378,9 +380,9 @@ handleAction = case _ of
       H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
       sendMessage chat
 
---    sendMessage
---      :: RemoteMessage
---      -> HalogenM AppState AppAction (ChildComponents t1 r ) output m Unit
+    sendMessage
+      :: RemoteMessage
+      -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
     sendMessage message' = do
       let message = view Message._toWire message'
       { roomCode, maybeBroadcaster, id } <- H.get

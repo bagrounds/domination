@@ -68,7 +68,10 @@ _component = SProxy
 type Component query r m action =
   ComponentSlot
   HTML
-  ("Domination" :: Slot query GameEvent DomSlot | r)
+  ( "Domination" :: Slot query GameEvent DomSlot
+  , "description" :: H.Slot query Unit DomSlot
+  | r
+  )
   m
   action
 
@@ -97,8 +100,9 @@ component config = H.mkComponent { initialState, render, eval }
     , handleQuery = handleQuery
     }
 
-updateShowSupply activeState { turn, phase } =
-  case activeState, activeState.playerIndex, turn, phase of
+updateShowSupply :: ActiveState -> GameState -> Boolean
+updateShowSupply activeState { turn: nextTurn, phase } =
+  case activeState, activeState.playerIndex, nextTurn, phase of
   { state: { turn } }, me, nt, BuyPhase
     | me == turn && me /= nt -> false
     | me == nt -> true
