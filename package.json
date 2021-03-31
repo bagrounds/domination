@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "clean": "rm -rf .cache dist public",
-    "prebuild": "stylelint **/*.css",
+    "prebuild": "stylelint assets/*.css",
     "build": "spago build",
     "prebundle": "npm run test",
     "bundle": "spago bundle-app --main Main --to dist/app.js",
