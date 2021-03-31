@@ -2,10 +2,10 @@ module Domination.Capability.Audio where
 
 import Prelude hiding (compose)
 
-import Audio.WebAudio.AudioParam (setValueAtTime)
-import Audio.WebAudio.BaseAudioContext (createGain, createOscillator, destination, newAudioContext)
+import Audio.WebAudio.BaseAudioContext (createGain, createOscillator, currentTime, destination, resume)
+import Audio.WebAudio.BaseAudioContext as BaselineAudioContext
 import Audio.WebAudio.GainNode (setGain)
-import Audio.WebAudio.Oscillator (frequency, startOscillator, stopOscillator)
+import Audio.WebAudio.Oscillator (setFrequency, startOscillator, stopOscillator)
 import Audio.WebAudio.Types (AudioContext, connect)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (drop, head)
@@ -16,14 +16,17 @@ import Effect.Class (class MonadEffect, liftEffect)
 import Halogen (HalogenM)
 
 class Monad m <= Audio m where
-  note :: Number -> Number -> Number -> m Unit
+  note :: AudioContext -> Number -> Number -> Number -> m Unit
+  newAudioContext :: m AudioContext
 
 instance audioHalogenM
   :: Audio m => Audio (HalogenM st act slots msg m) where
-  note f s = lift <<< note f s
+  note c f s = lift <<< note c f s
+  newAudioContext = lift newAudioContext
 
 instance audioAppM :: Audio AppM where
-  note f s = liftEffect <<< note' f s
+  note c f s = liftEffect <<< note' c f s
+  newAudioContext = liftEffect BaselineAudioContext.newAudioContext
 
 newtype AudioM a = AudioM (Effect a)
 
@@ -35,7 +38,8 @@ derive newtype instance monadAudioM :: Monad AudioM
 derive newtype instance monadEffectAudioM :: MonadEffect AudioM
 
 instance audioAudioM :: Audio AudioM where
-  note f s = liftEffect <<< note' f s
+  note c f s = liftEffect <<< note' c f s
+  newAudioContext = liftEffect BaselineAudioContext.newAudioContext
 
 runAudioM :: AudioM ~> Effect
 runAudioM (AudioM m) = liftEffect m
@@ -46,21 +50,21 @@ data Sound
   | Error
   | Attacked
 
-beep :: forall m. Audio m => Sound -> m Unit
-beep = case _ of
-  Acknowledge -> note c5 0.0 0.05
-  Purchase -> marioCoin
-  Error -> note ab4 0.0 0.05
-  Attacked -> suspense
+beep :: forall m. Audio m => AudioContext -> Sound -> m Unit
+beep context = case _ of
+  Acknowledge -> note context c5 0.0 0.05
+  Purchase -> marioCoin context
+  Error -> note context ab4 0.0 0.05
+  Attacked -> suspense context
 
 note'
-  :: Number
+  :: AudioContext
+  -> Number
   -> Number
   -> Number
   -> Effect Unit
-note' freq start stop = do
-  audioContext <- newAudioContext
-  note'' freq start stop audioContext
+note' context freq start stop = do
+  note'' freq start stop context
 
 note''
   :: Number
@@ -70,63 +74,66 @@ note''
   -> Effect Unit
 note'' freq start stop audioContext = do
   oscillatorNode <- createOscillator audioContext
+  setFrequency freq oscillatorNode
   gainNode <- createGain audioContext
-  setGain 0.5 gainNode
-  f <- frequency oscillatorNode
-  value <- setValueAtTime freq start f
+  setGain 0.1 gainNode
+  connect oscillatorNode gainNode
+  now <- currentTime audioContext
+  startOscillator (now + start) oscillatorNode
+  stopOscillator (now + stop) oscillatorNode
   dest <- destination audioContext
-  startOscillator start oscillatorNode
-  setGain 0.0 gainNode
-  stopOscillator stop oscillatorNode
-  connect oscillatorNode dest
+  connect gainNode dest
+  resume audioContext
 
 compose
   :: forall m
   . Audio m
-  => Array
-  { frequency :: Number
-  , duration :: Number
-  , start :: Number
-  }
+  => AudioContext
+  -> Array
+    { frequency :: Number
+    , duration :: Number
+    , start :: Number
+    }
   -> m Unit
-compose notes =
+compose context notes =
   case head notes of
     Nothing -> pure unit
     Just { frequency, duration, start } -> do
       let tail = drop 1 notes
-      note frequency start (start + duration)
-      compose tail
+      note context frequency start (start + duration)
+      compose context tail
 
 arpeggio
   :: forall m
   . Audio m
-  => Array Number
+  => AudioContext
+  -> Array Number
   -> Number
   -> Number
   -> Number
   -> m Unit
-arpeggio notes on off start =
+arpeggio context notes on off start =
   case head notes of
     Nothing -> pure unit
     Just head -> do
       let tail = drop 1 notes
-      note head start (start + on)
-      arpeggio tail on off (start + on + off)
+      note context head start (start + on)
+      arpeggio context tail on off (start + on + off)
 
-c5_1'4'5 :: forall m. Audio m => m Unit
-c5_1'4'5 = do
-  arpeggio c5Major 0.1 0.0 0.0
-  arpeggio f5Major 0.1 0.0 0.3
-  arpeggio g5Major 0.1 0.0 0.6
+c5_1'4'5 :: forall m. Audio m => AudioContext -> m Unit
+c5_1'4'5 context = do
+  arpeggio context c5Major 0.1 0.0 0.0
+  arpeggio context f5Major 0.1 0.0 0.3
+  arpeggio context g5Major 0.1 0.0 0.6
 
-marioCoin :: forall m. Audio m => m Unit
-marioCoin = compose
+marioCoin :: forall m. Audio m => AudioContext -> m Unit
+marioCoin context = compose context
   [ { frequency: b5, duration: 0.1, start: 0.0 }
   , { frequency: e6, duration: 0.2, start: 0.1 }
   ]
 
-suspense :: forall m. Audio m => m Unit
-suspense = compose
+suspense :: forall m. Audio m => AudioContext -> m Unit
+suspense context = compose context
   [ { frequency: eb4, duration: 0.1, start: 0.0 }
   , { frequency: c4, duration: 0.1, start: 0.2 }
   , { frequency: fH4, duration: 0.3, start: 0.4 }

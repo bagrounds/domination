@@ -2,6 +2,7 @@ module AppState where
 
 import Prelude
 
+import Audio.WebAudio.Types (AudioContext)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Lens.Lens (Lens', Lens)
@@ -28,6 +29,7 @@ type AppState =
   , dominationConfig :: Config
   , showMenu :: Boolean
   , longGame :: Boolean
+  , maybeAudioContext :: Maybe AudioContext
   }
 
 _id :: Lens' AppState String
@@ -50,6 +52,13 @@ _showMenu
   :: forall a b r
   . Lens { showMenu :: a | r } { showMenu :: b | r } a b
 _showMenu = prop (SProxy :: SProxy "showMenu")
+_maybeAudioContext
+  :: forall a b r
+  . Lens
+    { maybeAudioContext :: a | r }
+    { maybeAudioContext :: b | r }
+    a b
+_maybeAudioContext = prop (SProxy :: SProxy "maybeAudioContext")
 
 globalRoomCode :: String
 globalRoomCode = "global-dev"
@@ -68,6 +77,7 @@ newApp =
   , dominationConfig: newConfig
   , showMenu: false
   , longGame: false
+  , maybeAudioContext: Nothing
   }
 
 newConfig :: Config

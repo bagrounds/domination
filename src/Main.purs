@@ -3,7 +3,8 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, Selection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, Selection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import Audio.WebAudio.Types (AudioContext)
 import Data.Array (elem, length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
@@ -14,7 +15,7 @@ import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
-import Domination.Capability.Audio (class Audio)
+import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
@@ -36,6 +37,7 @@ import Domination.UI.Settings as Settings
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
+import Emojis (emojis)
 import FFI as FFI
 import Halogen (Component)
 import Halogen as H
@@ -63,18 +65,16 @@ uuidKey = "player-id"
 usernameKey :: String
 usernameKey = "username"
 
-emojis :: Array String
-emojis = ["😄","😃","😀","😊","☺","😉","😍","😘","😚","😗","😙","😜","😝","😛","😳","😁","😔","😌","😒","😞","😣","😢","😂","😭","😪","😥","😰","😅","😓","😩","😫","😨","😱","😠","😡","😤","😖","😆","😋","😷","😎","😴","😵","😲","😟","😦","😧","😈","👿","😮","😬","😐","😕","😯","😶","😇","😏","😑","👲","👳","👮","👷","💂","👶","👦","👧","👨","👩","👴","👵","👱","👼","👸","😺","😸","😻","😽","😼","🙀","😿","😹","😾"]
-
 main :: Effect Unit
 main = launchAff_ $ do
   liftEffect $ FFI.registerServiceWorker
+  audioContext <- liftEffect $ runAudioM newAudioContext
   HA.awaitLoad
   body <- HA.awaitBody
-  runUI root unit body
+  runUI (root audioContext) unit body
 
-root :: forall s query o. Component HTML query o s Aff
-root = H.hoist (runAppM {}) component
+root :: forall s query o. AudioContext -> Component HTML query o s Aff
+root audioContext = H.hoist (runAppM {}) (component audioContext)
 
 component
   :: forall m s query o
@@ -86,10 +86,13 @@ component
   => Broadcast m
   => WireCodec m
   => Audio m
-  => Component HTML query o s m
-component = H.mkComponent { eval, initialState, render } where
+  => AudioContext
+  -> Component HTML query o s m
+component audioContext =
+  H.mkComponent { eval, initialState, render: render audioContext }
+  where
   eval = H.mkEval H.defaultEval
-    { handleAction = handleAction
+    { handleAction = handleAction audioContext
     , initialize = Just Initialize
     }
   initialState _ = newApp
@@ -101,9 +104,10 @@ render
   => Storage m
   => Dom m
   => Random m
-  => AppState
+  => AudioContext
+  -> AppState
   -> HTML (Domination.Component GameQuery c m AppAction) AppAction
-render state = HH.main_ $
+render audioContext state = HH.main_ $
   [ HH.div
     [ HP.id_ $ remoteMessageTarget
     , HE.handler (EventType "purescript") (Just <<< ReceiveRemoteMessage)
@@ -123,7 +127,7 @@ render state = HH.main_ $
   , HH.slot
       Domination._component
       (AreaSlot GameArea)
-      (Domination.component state.dominationConfig)
+      (Domination.component state.dominationConfig audioContext)
       unit
       (Just <<< HandleGameEvent)
   , Chat.render
@@ -152,15 +156,17 @@ type ChildComponents o r q1 o1 =
 
 handleAction
   :: forall output m t1 r o1 q1
-  . Storage m
+  . Audio m
+  => Storage m
   => Log m
   => GenUuid m
   => Random m
   => Broadcast m
   => WireCodec m
-  => AppAction
+  => AudioContext
+  -> AppAction
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
-handleAction = case _ of
+handleAction audioContext = case _ of
   Initialize -> do
     eUuid <- load uuidKey
     uuid <- case eUuid of
@@ -218,6 +224,7 @@ handleAction = case _ of
       >>> (_dominationConfig <<< _kingdom .~ kingdom)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
+      >>> (_maybeAudioContext .~ Just audioContext)
 
     loadGame "game_state"
 

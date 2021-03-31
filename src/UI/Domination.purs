@@ -4,6 +4,7 @@ import Prelude
 
 import AppState (Config)
 import AppState as AppState
+import Audio.WebAudio.Types (AudioContext)
 import Data.Array (filter, findIndex, length, (!!), (:))
 import Data.Either (Either(..))
 import Data.FunctorWithIndex (mapWithIndex)
@@ -83,8 +84,10 @@ component
   => Random m
   => Audio m
   => Config
+  -> AudioContext
   -> H.Component HTML GameQuery input GameEvent m
-component config = H.mkComponent { initialState, render, eval }
+component config audioContext =
+  H.mkComponent { initialState, render, eval }
   where
   initialState _ =
     { i: zero
@@ -96,8 +99,8 @@ component config = H.mkComponent { initialState, render, eval }
   kingdom = _.card <$> _.selected `filter` config.kingdom
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
-    { handleAction = handleAction
-    , handleQuery = handleQuery
+    { handleAction = handleAction audioContext
+    , handleQuery = handleQuery audioContext
     }
 
 updateShowSupply :: ActiveState -> GameState -> Boolean
@@ -117,14 +120,15 @@ handleQuery
   => Storage m
   => Audio m
   => Random m
-  => GameQuery a
+  => AudioContext
+  -> GameQuery a
   -> H.HalogenM ActiveState action slots GameEvent m (Maybe a)
-handleQuery = case _ of
+handleQuery audioContext = case _ of
   ReceiveGameState { state, i } a -> do
     activeGame <- H.get
 
     if Dom.isAttacked activeGame.playerIndex state
-    then beep Sound.Attacked
+    then beep audioContext Sound.Attacked
     else pure unit
 
     let
@@ -165,8 +169,10 @@ handleQuery = case _ of
 
     H.modify_ $ _playerIndex .~ playerIndex
     let supply = _.card <$> _.selected `filter` kingdom
-    playAndReport playerIndex
-      $ NewGame { playerCount, supply, longGame }
+    playAndReport
+      playerIndex
+      (NewGame { playerCount, supply, longGame })
+      audioContext
     pure $ Just a
 
 type ChildComponents query r m =
@@ -627,12 +633,13 @@ handleAction
   . Log m
   => Random m
   => Audio m
-  => Action
+  => AudioContext
+  -> Action
   -> HalogenM ActiveState p s GameEvent m Unit
-handleAction = case _ of
+handleAction audioContext = case _ of
   MakePlay play -> do
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
-    playAndReport playerIndex play
+    playAndReport playerIndex play audioContext
   UndoRequest as -> H.raise $ Undo as
   ToggleSupply -> H.modify_ $ _showSupply %~ not
 
@@ -643,8 +650,9 @@ playAndReport
   => Audio m
   => Int
   -> Play
+  -> AudioContext
   -> HalogenM ActiveState p s GameEvent m Unit
-playAndReport playerIndex play = do
+playAndReport playerIndex play audioContext = do
   activeState@{ state, showSupply } <- H.get
   let
     lastPhase = state.phase
@@ -652,12 +660,12 @@ playAndReport playerIndex play = do
   result <- Dom.makeAutoPlay play activeState.state
   case result of
     Left e -> do
-      beep Sound.Error
+      beep audioContext Sound.Error
       error e
     Right gameState -> do
       case play of
-        Purchase _ -> beep Sound.Purchase
-        _ -> beep Sound.Acknowledge
+        Purchase _ -> beep audioContext Sound.Purchase
+        _ -> beep audioContext Sound.Acknowledge
       let
         phase = gameState.phase
         turn = gameState.turn
