@@ -129,7 +129,11 @@ handleQuery audioContext = case _ of
 
     if Dom.isAttacked activeGame.playerIndex state
     then beep audioContext Sound.Attacked
-    else pure unit
+    else
+      if activeGame.state.turn /= activeGame.playerIndex
+      && state.turn == activeGame.playerIndex
+      then beep audioContext Sound.YourTurn
+      else pure unit
 
     let
       previousI = activeGame.i

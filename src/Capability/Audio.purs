@@ -49,6 +49,7 @@ data Sound
   | Purchase
   | Error
   | Attacked
+  | YourTurn
 
 beep :: forall m. Audio m => AudioContext -> Sound -> m Unit
 beep context = case _ of
@@ -56,6 +57,7 @@ beep context = case _ of
   Purchase -> marioCoin context
   Error -> note context ab4 0.0 0.05
   Attacked -> suspense context
+  YourTurn -> doorbell context
 
 note'
   :: AudioContext
@@ -130,6 +132,12 @@ marioCoin :: forall m. Audio m => AudioContext -> m Unit
 marioCoin context = compose context
   [ { frequency: b5, duration: 0.1, start: 0.0 }
   , { frequency: e6, duration: 0.2, start: 0.1 }
+  ]
+
+doorbell :: forall m. Audio m => AudioContext -> m Unit
+doorbell context = compose context
+  [ { frequency: e5, duration: 0.2, start: 0.0 }
+  , { frequency: c5, duration: 0.3, start: 0.2 }
   ]
 
 suspense :: forall m. Audio m => AudioContext -> m Unit
