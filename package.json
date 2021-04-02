@@ -28,8 +28,5 @@
     "spago": "^0.15.3",
     "stylelint": "^13.10.0",
     "stylelint-config-standard": "^20.0.0"
-  },
-  "dependencies": {
-    "bugout": "0.0.10"
   }
 }
