@@ -405,7 +405,7 @@ button span,
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 7vh;
+  height: 6.7vh;
   font-size: 5vh;
   width: 100%;
 }
@@ -486,12 +486,11 @@ button span,
 }
 
 .active.waiting {
-  border: 3px solid rgb(120, 120, 120);
   background-color: rgb(120, 120, 120);
 }
 
 .controls {
-  height: 7vh;
+  height: 7.3vh;
   width: 100%;
   max-width: 48em;
   z-index: 400;
