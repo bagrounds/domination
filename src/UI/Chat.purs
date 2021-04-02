@@ -6,6 +6,7 @@ import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
 import Data.Maybe (Maybe(..), fromMaybe)
 import Halogen.HTML (ClassName(..), HTML)
+import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -55,6 +56,7 @@ render { sendEvent, onInput, state } =
     , HH.input
       [ HP.type_ HP.InputText
       , HP.class_ $ ClassName "chat-input"
+      , HH.attr (H.AttrName "aria-label") "Chat"
       , HP.value message
       , HP.required true
       , HE.onValueInput $ Just <<< onInput
