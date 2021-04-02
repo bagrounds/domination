@@ -13,6 +13,7 @@ main () (
   rm -rf public
   mv dist public
   ./scripts/content-hash
+  gzip -k -6 -r public
 )
 
 rename_file_with_content_hash () (
