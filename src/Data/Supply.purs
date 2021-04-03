@@ -41,7 +41,7 @@ makeSupply playerCount cards = makeStack <$> cards
       else kingdomCount
     curseCount = 10 * (playerCount - one)
     victoryCount = 4 * playerCount
-    kingdomCount = 4 * playerCount
+    kingdomCount = 10 + ((max 0 (playerCount - 4)) * 2)
     treasureCount = 10 * playerCount
 
 upgrade :: Supply -> Supply
