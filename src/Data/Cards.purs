@@ -18,6 +18,7 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
+import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Target (Target(..))
 import Domination.Data.Wire.Int as Int
 
@@ -43,6 +44,7 @@ cardMap =
   , settlers
   , courtyard
   , lurker
+  , cellar
   , greatHall
   , village
   , woodCutter
@@ -1059,6 +1061,28 @@ lurker = let attack = false in Card.action
       }
     , description: "Trash an action card from the supply"
       <> " or gain an action card from the trash."
+    }
+  }
+
+cellar :: Card
+cellar = let attack = false in Card.action
+  { name = "Cellar"
+  , cost = 2
+  , actions = one
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCardsFromHand Nothing
+        , StackDuplicate
+        , StackDiscard
+        , StackLength
+        , StackDraw
+        ]
+      , stack: []
+      , attack
+      }
+    , description: "Discard N cards, then draw N cards."
     }
   }
 

@@ -26,6 +26,10 @@ import Domination.Data.Pile (Pile)
 import Domination.Data.SelectCards (SelectCards)
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
+import Domination.Data.Wire.StackExpression (WireStackExpression)
+import Domination.Data.Wire.StackExpression as StackExpression
+import Domination.Data.Wire.StackValue (WireStackValue)
+import Domination.Data.Wire.StackValue as StackValue
 
 data WireChoice
   = WireIf Boolean WireChoice Condition (Maybe WireChoice) (Maybe Unit)
@@ -43,6 +47,7 @@ data WireChoice
   | WireDiscard Boolean (Maybe Unit) SelectCards
   | WireDraw Boolean WireInt (Maybe Unit)
   | WireGainBonus Boolean Bonus (Maybe Unit)
+  | WireStackChoice Boolean (Array WireStackExpression) (Array WireStackValue)
 
 _toWire :: Iso' Choice WireChoice
 _toWire = iso to from where
@@ -75,6 +80,11 @@ _toWire = iso to from where
       WireDraw attack (n ^. Int._toWire) resolution
     GainBonus { attack, bonus, resolution } ->
       WireGainBonus attack bonus resolution
+    StackChoice { attack, expression, stack } ->
+      WireStackChoice
+        attack
+        (view StackExpression._toWire <$> expression)
+        (view StackValue._toWire <$> stack)
   from = case _ of
     WireIf attack choice condition otherwise resolution ->
       If { attack, choice: review _toWire choice, condition, otherwise: review _toWire <$> otherwise, resolution }
@@ -102,6 +112,12 @@ _toWire = iso to from where
       Draw { attack, n: review Int._toWire n, resolution }
     WireGainBonus attack bonus resolution ->
       GainBonus { attack, bonus, resolution }
+    WireStackChoice attack expression stack ->
+      StackChoice
+        { attack
+        , expression: review StackExpression._toWire <$> expression
+        , stack: review StackValue._toWire <$> stack
+        }
 
 derive instance genericWireChoice :: Generic WireChoice _
 derive instance eqWireChoice :: Eq WireChoice

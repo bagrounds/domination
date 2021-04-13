@@ -4,11 +4,11 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, elem, filter, foldr, head, length, mapWithIndex, null, takeWhile, uncons, updateAt)
+import Data.Array (all, dropWhile, elem, filter, foldr, head, length, mapWithIndex, null, tail, takeWhile, uncons, updateAt, (:))
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM, maximum)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (Prism', prism', review)
@@ -40,6 +40,7 @@ import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
+import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Supply (Supply, emptyStackCount, getStack, highestVictoryCardStackIsEmpty, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
@@ -371,46 +372,85 @@ resolveChoice
   -> m GameState
 resolveChoice { playerIndex, choice } state =
   case choice of
-    MoveFromTo
-      { filter
-      , n: constraint
-      , source
-      , destination
-      , resolution: Just cardIndices
-      } -> do
-      let
-        _source = _pile source playerIndex
-        _destination = _pile destination playerIndex
-      sourcePile <- fromJust "failed to get source" $ state ^? _source
-      selected <- takeIndices cardIndices sourcePile
-      remaining <- dropIndices cardIndices sourcePile
-      let
-        forSelected = ("selected cards" <>! _) >>> (selected <@! _)
-        forRemaining = ("remaining cards" <>! _) >>> (remaining <@! _)
-        forSource = ("source cards" <>! _) >>> (sourcePile <@! _)
-      case constraint of
-        UpTo n -> check $
-          forSelected $ lengthIs LTE (review Int._toWire n)
-        DownTo n -> check $
-          forRemaining (lengthIs EQ $ review Int._toWire n)
-          ||
-          ( forSource (lengthIs LT $ review Int._toWire n)
-          && forSelected (lengthIs EQ zero)
-          )
-        Exactly n -> check $
-          forSelected (lengthIs EQ $ review Int._toWire n)
-          ||
-          ( forSource (lengthIs LT $ review Int._toWire n)
-          && forSelected (lengthIs EQ $ length sourcePile)
-          )
-      case filter of
-        Just f -> check $
-          forSelected $ all (passFilter f) !> "illegal choice in"
-        Nothing -> pure unit
-      pure
-        $ _source .~ remaining
-        $ over _destination (selected <> _)
-        $ state
+    StackChoice { attack, expression, stack } ->
+      go expression stack state
+      where
+        go
+          :: Array StackExpression
+          -> Array StackValue
+          -> GameState
+          -> m GameState
+        go expression stack state =
+          case uncons expression of
+            Nothing ->
+              case head stack of
+                Nothing -> pure state
+                Just x -> throwError $
+                  "Empty expression but non-empty stack: "
+                  <> show stack
+            Just { head: e, tail: expressionTail } -> case e of
+              StackChooseCardsFromHand (Just v) ->
+                go expressionTail (StackArrayInt v : stack) state
+              StackChooseCardsFromHand Nothing -> let
+                choice' = StackChoice { attack, expression, stack }
+                in
+                traverseOf
+                  (_player playerIndex)
+                  Player.dropChoice
+                  state
+                  -- TODO: clean up this hack
+                  -- HACK: adding same choice twice because we drop
+                  -- a choice at the end of resolveChoice
+                  -- unconditionally.
+                  >>= modifyPlayer
+                    playerIndex
+                    (Player.gainChoices [choice', choice'])
+              StackDuplicate ->
+                case head stack of
+                  Nothing -> throwError
+                    "StackDuplicate with empty Stack"
+                  Just v ->
+                    go expressionTail (v : stack) state
+              StackDiscard ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackDuplicate with empty Stack"
+                  Just (StackArrayInt cardIndices), (Just stackTail) -> do
+                    s <- moveFromTo playerIndex state
+                      { filter: Nothing
+                      , n: Exactly ((length cardIndices) ^. Int._toWire)
+                      , source: Pile.Hand
+                      , destination: Pile.ToDiscard
+                      , resolution: Just cardIndices
+                      , attack
+                      }
+                    go expressionTail stackTail s
+                  Just x, _ -> throwError $
+                    "can't discard " <> show x
+              StackLength ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackDuplicate with empty Stack"
+                  Just (StackArrayInt ints), Just stackTail -> let
+                    stack' = StackInt (length ints) : stackTail
+                    in go expressionTail stack' state
+                  Just x, _ -> throwError $
+                    "can't take the length of " <> show x
+              StackDraw ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackDuplicate with empty Stack"
+                  Just (StackInt n), Just stackTail ->
+                    -- TODO: deduplicate code
+                    modifyPlayerM
+                      playerIndex
+                      (Player.drawCards n)
+                      state
+                      >>= go expressionTail stackTail
+                  Just x, _ -> throwError $
+                    "can't draw " <> show x
+
+    MoveFromTo body -> moveFromTo playerIndex state body
 
     GainCard { filter, destination, resolution: Just cardName } -> do
       let _destination = _pile destination playerIndex
@@ -496,6 +536,67 @@ resolveChoice { playerIndex, choice } state =
   where
     unresolved =
       throwError $ "this is an unresolved choice: " <> show choice
+
+type MoveFromToRecord =
+  { filter :: Maybe Filter
+  , n :: Constraint
+  , source :: Pile
+  , destination :: Pile
+  , resolution :: Maybe (Array Int)
+  , attack :: Boolean
+  }
+
+moveFromTo
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Int
+  -> GameState
+  -> MoveFromToRecord
+  -> m GameState
+moveFromTo _ _ choice@{ resolution: Nothing } =
+  throwError $ "this is an unresolved choice: " <> show choice
+moveFromTo playerIndex state
+  { filter
+  , n: constraint
+  , source
+  , destination
+  , resolution: Just cardIndices
+  } = do
+  let
+    _source = _pile source playerIndex
+    _destination = _pile destination playerIndex
+  sourcePile <- fromJust "failed to get source" $ state ^? _source
+  selected <- takeIndices cardIndices sourcePile
+  remaining <- dropIndices cardIndices sourcePile
+  let
+    forSelected = ("selected cards" <>! _) >>> (selected <@! _)
+    forRemaining = ("remaining cards" <>! _) >>> (remaining <@! _)
+    forSource = ("source cards" <>! _) >>> (sourcePile <@! _)
+  case constraint of
+    UpTo n -> check $
+      forSelected $ lengthIs LTE (review Int._toWire n)
+    DownTo n -> check $
+      forRemaining (lengthIs EQ $ review Int._toWire n)
+      ||
+      ( forSource (lengthIs LT $ review Int._toWire n)
+      && forSelected (lengthIs EQ zero)
+      )
+    Exactly n -> check $
+      forSelected (lengthIs EQ $ review Int._toWire n)
+      ||
+      ( forSource (lengthIs LT $ review Int._toWire n)
+      && forSelected (lengthIs EQ $ length sourcePile)
+      )
+  case filter of
+    Just f -> check $
+      forSelected $ all (passFilter f) !> "illegal choice in"
+    Nothing -> pure unit
+  pure
+    $ _source .~ remaining
+    $ over _destination (selected <> _)
+    $ state
+
 
 assertTurn
   :: forall m

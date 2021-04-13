@@ -5,7 +5,7 @@ import Prelude
 import AppState (Config)
 import AppState as AppState
 import Audio.WebAudio.Types (AudioContext)
-import Data.Array (filter, findIndex, length, (!!), (:))
+import Data.Array (filter, findIndex, length, uncons, (!!), (:))
 import Data.Either (Either(..))
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
@@ -25,6 +25,7 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState, newGame, passFilter)
 import Domination.Data.GameState as Dom
 import Domination.Data.Phase (Phase(..))
+import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
 import Domination.Data.Play as Play
 import Domination.Data.Player (Player)
@@ -32,9 +33,11 @@ import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
+import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Supply (negativePoints, nonEmptyStacks, positivePoints)
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
+import Domination.UI.ChooseCards as ChooseCards
 import Domination.UI.ChooseFromSupply as ChooseFromSupply
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
@@ -186,6 +189,7 @@ type ChildComponents query r m =
   , "PickN" :: H.Slot query (Array Choice) DomSlot
   , "description" :: H.Slot query Unit DomSlot
   , "ChooseFromSupply" :: H.Slot query (Maybe String) DomSlot
+  , "ChooseCards" :: H.Slot query (Array Int) DomSlot
   | r
   )
   m
@@ -367,7 +371,8 @@ renderPlayer cs@{ state, playerIndex } player =
       else pure <$> renderChoice (CardSlot ChoiceArea) choice
     else HH.div_ []
   , case state.players !! state.turn of
-      Nothing -> h1__ "Something has gone terribly wrong!"
+      Nothing -> h1__ $ "No player (" <> show state.turn <> ") in "
+        <> show state.players
       Just currentPlayer -> HH.div
         ( if state.turn /= playerIndex
           || Dom.choicesOutstanding state
@@ -419,10 +424,41 @@ renderPlayer cs@{ state, playerIndex } player =
         -> Maybe Choice
         -> Maybe (HTML (ChildComponents query r m) Action)
       renderChoice baseSlotNumber = map \choice -> case choice of
+          StackChoice x@{ attack, expression, stack } ->
+            case uncons expression of
+              Nothing ->
+                h1__ "Something has gone terribly wrong!!!"
+              Just ({ head: StackChooseCardsFromHand (Just _) }) ->
+                h1__ "Domination: StackChooseCardsFromHand: cards already chosen!"
+              Just ({ head: StackChooseCardsFromHand Nothing, tail }) -> HH.div_
+                [ HH.slot
+                  (SProxy :: SProxy "ChooseCards")
+                  (AreaSlot ChoiceArea)
+                  (ChooseCards.component { state, player, baseSlotNumber, pile: Pile.Hand })
+                  unit
+                  $ Just
+                  <<< MakePlay
+                  <<< ResolveChoice
+                  <<< ({ playerIndex, choice: _ })
+                  <<< StackChoice
+                  <<< (x { expression = _ })
+                  <<< (_ : tail)
+                  <<< StackChooseCardsFromHand
+                  <<< Just
+                ]
+              Just _ ->
+                acknowledge
+                  (renderText choice)
+                  (MakePlay $ ResolveChoice
+                    { playerIndex
+                    , choice: StackChoice x
+                    })
+
           If x ->
             acknowledge
               (renderText choice)
               (playEvent If x unit)
+
           And x@{ choices } ->
             acknowledge
               (renderText choice)
