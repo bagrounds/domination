@@ -11,7 +11,7 @@ import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view, (^.))
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens', Lens)
-import Data.Lens.Prism (Prism', prism', review)
+import Data.Lens.Prism (Prism', prism')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf)
@@ -27,6 +27,7 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Constraint as Constraint
 import Domination.Data.Filter (Filter(..))
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
@@ -389,9 +390,9 @@ resolveChoice { playerIndex, choice } state =
                   "Empty expression but non-empty stack: "
                   <> show stack
             Just { head: e, tail: expressionTail } -> case e of
-              StackChooseCardsFromHand (Just v) ->
+              StackChooseCardsFromHand constraint (Just v) ->
                 go expressionTail (StackArrayInt v : stack) state'
-              StackChooseCardsFromHand Nothing -> let
+              StackChooseCardsFromHand constraint Nothing -> let
                 choice' = StackChoice
                   { attack
                   , expression
@@ -575,28 +576,13 @@ moveFromTo playerIndex state
   sourcePile <- fromJust "failed to get source" $ state ^? _source
   selected <- takeIndices cardIndices sourcePile
   remaining <- dropIndices cardIndices sourcePile
-  let
-    forSelected = ("selected cards" <>! _) >>> (selected <@! _)
-    forRemaining = ("remaining cards" <>! _) >>> (remaining <@! _)
-    forSource = ("source cards" <>! _) >>> (sourcePile <@! _)
-  case constraint of
-    UpTo n -> check $
-      forSelected $ lengthIs LTE (review Int._toWire n)
-    DownTo n -> check $
-      forRemaining (lengthIs EQ $ review Int._toWire n)
-      ||
-      ( forSource (lengthIs LT $ review Int._toWire n)
-      && forSelected (lengthIs EQ zero)
-      )
-    Exactly n -> check $
-      forSelected (lengthIs EQ $ review Int._toWire n)
-      ||
-      ( forSource (lengthIs LT $ review Int._toWire n)
-      && forSelected (lengthIs EQ $ length sourcePile)
-      )
+  Constraint.check constraint selected remaining sourcePile
   case filter of
-    Just f -> check $
-      forSelected $ all (passFilter f) !> "illegal choice in"
+    Just f ->
+      let  forSelected = ("selected cards" <>! _) >>> (selected <@! _)
+      in check
+        $ forSelected
+        $ all (passFilter f) !> "illegal choice in"
     Nothing -> pure unit
   pure
     $ _source .~ remaining

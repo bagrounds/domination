@@ -1076,7 +1076,7 @@ cellar = let
     { target: Self
     , command: Choose $ StackChoice
       { expression:
-        [ StackChooseCardsFromHand Nothing
+        [ StackChooseCardsFromHand Unlimited Nothing
         , StackDuplicate
         , StackDiscard
         , StackLength

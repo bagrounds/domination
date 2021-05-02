@@ -158,7 +158,7 @@ handleQuery audioContext = case _ of
     H.raise $ SaveGame newActiveState
     pure $ Just a
 
-  LoadActiveState activeState@{ showSupply, state, playerIndex } a -> do
+  LoadActiveState activeState@{ showSupply, state } a -> do
     activeGame <- H.get
     let
       newShowSupply = updateShowSupply activeGame state
@@ -260,7 +260,8 @@ renderSupply
 renderSupply player { playerIndex, state } =
   renderStackI `mapWithIndex` state.supply
   where
-    renderStackI stackIndex = renderStack onClick player (CardSlot SupplyArea stackIndex)
+    renderStackI stackIndex =
+      renderStack onClick player (CardSlot SupplyArea stackIndex)
       where
         onClick _ =
           Just $ MakePlay $ Purchase { playerIndex, stackIndex }
@@ -295,11 +296,12 @@ renderCard
 renderCard onClick player card slotNumber =
   Card.render onClick extraClasses card slotNumber
   where
-    extraClasses = [
-      if player.actions > zero && Card.isAction card
-      then Css.canPlay
-      else Css.cantPlay
-    ]
+    extraClasses =
+      [ if player.actions > zero
+        && Card.isAction card
+        then Css.canPlay
+        else Css.cantPlay
+      ]
 
 renderStack
   :: forall query r m
@@ -311,7 +313,8 @@ renderStack
   -> Stack
   -> HTML (ChildComponents query r m) Action
 renderStack onClick player slotNumber stack =
-  HH.li [ HP.class_ Css.stack ]
+  HH.li
+    [ HP.class_ Css.stack ]
     [ HH.ul_
       [ HH.li
         [ HP.class_ Css.stackCount ]
@@ -326,12 +329,7 @@ renderStack onClick player slotNumber stack =
             else Css.cantBuy
           ]
         ]
-        [ renderCard
-          onClick
-          player
-          stack.card
-          slotNumber
-        ]
+        [ renderCard onClick player stack.card slotNumber ]
       ]
     ]
 
@@ -428,13 +426,26 @@ renderPlayer cs@{ state, playerIndex } player =
             case uncons expression of
               Nothing ->
                 h1__ "Something has gone terribly wrong!!!"
-              Just ({ head: StackChooseCardsFromHand (Just _) }) ->
-                h1__ "Domination: StackChooseCardsFromHand: cards already chosen!"
-              Just ({ head: StackChooseCardsFromHand Nothing, tail }) -> HH.div_
+
+              Just
+                { head: StackChooseCardsFromHand constraint (Just _)
+                } -> h1__ $ "Domination: StackChooseCardsFromHand:"
+                  <> " cards already chosen!"
+
+              Just
+                { head: StackChooseCardsFromHand constraint Nothing
+                , tail
+                } -> HH.div_
                 [ HH.slot
                   (SProxy :: SProxy "ChooseCards")
                   (AreaSlot ChoiceArea)
-                  (ChooseCards.component { state, player, baseSlotNumber, pile: Pile.Hand })
+                  ( ChooseCards.component
+                    { state
+                    , player
+                    , baseSlotNumber
+                    , pile: Pile.Hand
+                    }
+                  )
                   unit
                   $ Just
                   <<< MakePlay
@@ -443,41 +454,37 @@ renderPlayer cs@{ state, playerIndex } player =
                   <<< StackChoice
                   <<< (x { expression = _ })
                   <<< (_ : tail)
-                  <<< StackChooseCardsFromHand
+                  <<< StackChooseCardsFromHand constraint
                   <<< Just
                 ]
+
               Just _ ->
                 acknowledge
                   (renderText choice)
-                  (MakePlay $ ResolveChoice
+                  ( MakePlay $ ResolveChoice
                     { playerIndex
                     , choice: StackChoice x
-                    })
+                    }
+                  )
 
           If x ->
-            acknowledge
-              (renderText choice)
-              (playEvent If x unit)
+            acknowledge (renderText choice) (playEvent If x unit)
 
           And x@{ choices } ->
-            acknowledge
-              (renderText choice)
-              (playEvent And x unit)
-          Or x@{ choices } ->
-            chooseOne (HH.text "Choose one")
-              $ choices <#> \choice' ->
-                { clickEvent: playEvent Or x choice'
-                , text: renderText choice'
-                }
+            acknowledge (renderText choice) (playEvent And x unit)
+
+          Or x@{ choices } -> chooseOne (HH.text "Choose one")
+            $ choices <#> \choice' ->
+              { clickEvent: playEvent Or x choice'
+              , text: renderText choice'
+              }
+
           PickN x@{ n, choices } -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "PickN")
               (AreaSlot ChoiceArea)
               ( PickN.component
-                { title: "Choose " <> show n
-                , n
-                , choices
-                }
+                { title: "Choose " <> show n, n, choices }
               )
               unit
               $ Just
@@ -488,6 +495,7 @@ renderPlayer cs@{ state, playerIndex } player =
               <<< (x { resolution = _ })
               <<< Just
             ]
+
           Option x ->
             chooseOne (renderText x.choice)
               [ { clickEvent: MakePlay $ ResolveChoice
@@ -503,6 +511,7 @@ renderPlayer cs@{ state, playerIndex } player =
                 , text: HH.text "No"
                 }
               ]
+
           MoveFromTo _ -> HH.div_
             [ HH.slot
               (SProxy :: SProxy "MoveFromTo")
@@ -514,10 +523,11 @@ renderPlayer cs@{ state, playerIndex } player =
               <<< ResolveChoice
               <<< { playerIndex, choice: _ }
             ]
-          GainCards x@{ n, cardName } ->
-            acknowledge
+
+          GainCards x@{ n, cardName } -> acknowledge
             (renderText choice)
             (playEvent GainCards x unit)
+
           GainCard x@{ filter: cardFilter } ->
             let
               predicate :: Card -> Boolean
@@ -528,8 +538,7 @@ renderPlayer cs@{ state, playerIndex } player =
               unfiltered = _.card <$> nonEmptyStacks state.supply
               cards :: Array Card
               cards = predicate `filter` unfiltered
-            in
-            HH.div_
+            in HH.div_
               [ HH.slot
                 (SProxy :: SProxy "ChooseFromSupply")
                 (AreaSlot ChoiceArea)
@@ -542,24 +551,28 @@ renderPlayer cs@{ state, playerIndex } player =
                 <<< GainCard
                 <<< (x { resolution = _ })
               ]
-          GainActions x@{ n } ->
-            acknowledge
+
+          GainActions x -> acknowledge
             (renderText choice)
             (playEvent GainActions x unit)
-          GainBuys x@{ n } ->
-            acknowledge
+
+          GainBuys x -> acknowledge
             (renderText choice)
             (playEvent GainBuys x unit)
+
           Discard x@{ selection: SelectAll } ->
             acknowledge (renderText choice) (playEvent Discard x unit)
-          Draw x@{ n } ->
+
+          Draw x ->
             acknowledge
             (renderText choice)
             (playEvent Draw x unit)
+
           GainBonus x ->
             acknowledge
             (renderText choice)
             (playEvent GainBonus x unit)
+
         where
           playEvent
             :: forall a r2
@@ -568,9 +581,7 @@ renderPlayer cs@{ state, playerIndex } player =
             -> a
             -> Action
           playEvent mk x r = MakePlay $ ResolveChoice
-            { playerIndex
-            , choice: mk x { resolution = Just r }
-            }
+            { playerIndex, choice: mk x { resolution = Just r } }
 
 renderNextPhaseButton
   :: forall w
@@ -618,8 +629,10 @@ renderAtPlay currentPlayer =
     title = HH.li
       [ HP.class_ Css.playTitle ]
       [ HH.text "At Play" ]
-    stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot AtPlayArea i))
-      `mapWithIndex` stackCards currentPlayer.atPlay
+    stacks =
+      ( renderStack (const Nothing) currentPlayer
+      <<< (CardSlot AtPlayArea)
+      ) `mapWithIndex` stackCards currentPlayer.atPlay
 
 renderBuying
   :: forall query r m
@@ -633,8 +646,10 @@ renderBuying currentPlayer =
     title = HH.li
       [ HP.class_ Css.buyingTitle ]
       [ HH.text "Buying" ]
-    stacks = (\i -> renderStack (const Nothing) currentPlayer (CardSlot BuyingArea i))
-      `mapWithIndex` stackCards currentPlayer.buying
+    stacks =
+      ( renderStack (const Nothing) currentPlayer
+      <<< (CardSlot BuyingArea)
+      ) `mapWithIndex` stackCards currentPlayer.buying
 
 renderHand
   :: forall query r m
@@ -655,9 +670,14 @@ renderHand player { playerIndex, state } = HH.ul
     || (length $ Card.isAction `filter` player.hand) < one
     then [ Css.waiting ]
     else []
-  ] $
-  title : (\i s -> renderStack (onClick s player.hand) player (CardSlot HandArea i) s)
-    `mapWithIndex` (stackCards player.hand)
+  ] $ title :
+    ( \i s ->
+      renderStack
+        (onClick s player.hand)
+        player
+        (CardSlot HandArea i)
+        s
+    ) `mapWithIndex` (stackCards player.hand)
   where
     title = HH.li
       [ HP.class_ Css.handTitle ]
@@ -666,7 +686,7 @@ renderHand player { playerIndex, state } = HH.ul
       $ PlayCard { playerIndex,  cardIndex }
       where
         cardIndex = fromMaybe (-one)
-          $ findIndex (_.name >>> (_ == stack.card.name)) hand
+          $ findIndex ((_ == stack.card.name) <<< _.name) hand
 
 handleAction
   :: forall s p m
@@ -677,9 +697,9 @@ handleAction
   -> Action
   -> HalogenM ActiveState p s GameEvent m Unit
 handleAction audioContext = case _ of
-  MakePlay play -> do
+  MakePlay play ->
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
-    playAndReport playerIndex play audioContext
+    in playAndReport playerIndex play audioContext
   UndoRequest as -> H.raise $ Undo as
   ToggleSupply -> H.modify_ $ _showSupply %~ not
 

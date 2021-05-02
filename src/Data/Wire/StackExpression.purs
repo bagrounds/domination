@@ -13,12 +13,13 @@ import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe)
+import Domination.Data.Constraint (Constraint)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
 
 data WireStackExpression
-  = WireStackChooseCardsFromHand (Maybe (Array WireInt))
+  = WireStackChooseCardsFromHand Constraint (Maybe (Array WireInt))
   | WireStackDuplicate
   | WireStackDiscard
   | WireStackLength
@@ -27,15 +28,19 @@ data WireStackExpression
 _toWire :: Iso' StackExpression WireStackExpression
 _toWire = iso to from where
   to = case _ of
-    StackChooseCardsFromHand maybeXs ->
-      WireStackChooseCardsFromHand $ map (view Int._toWire) <$> maybeXs
+    StackChooseCardsFromHand constraint maybeXs ->
+      WireStackChooseCardsFromHand
+        constraint
+        $ map (view Int._toWire) <$> maybeXs
     StackDuplicate -> WireStackDuplicate
     StackDiscard -> WireStackDiscard
     StackLength -> WireStackLength
     StackDraw -> WireStackDraw
   from = case _ of
-    WireStackChooseCardsFromHand maybeXs ->
-      StackChooseCardsFromHand $ map (review Int._toWire) <$> maybeXs
+    WireStackChooseCardsFromHand constraint maybeXs ->
+      StackChooseCardsFromHand
+        constraint
+        $ map (review Int._toWire) <$> maybeXs
     WireStackDuplicate -> StackDuplicate
     WireStackDiscard -> StackDiscard
     WireStackLength -> StackLength

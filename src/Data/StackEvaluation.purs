@@ -9,9 +9,10 @@ import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
+import Domination.Data.Constraint (Constraint)
 
 data StackExpression
-  = StackChooseCardsFromHand (Maybe (Array Int))
+  = StackChooseCardsFromHand Constraint (Maybe (Array Int))
   | StackDuplicate
   | StackDiscard
   | StackLength
