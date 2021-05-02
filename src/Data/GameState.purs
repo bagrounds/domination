@@ -13,7 +13,7 @@ import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (Prism', prism', review)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set, (%~), (.~), (<>~))
+import Data.Lens.Setter (over, set, (%~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
@@ -372,32 +372,37 @@ resolveChoice
   -> m GameState
 resolveChoice { playerIndex, choice } state =
   case choice of
-    StackChoice { attack, expression, stack, description } ->
-      go expression stack state
+    StackChoice { attack, expression: expr, stack: s, description } ->
+      go expr s state
       where
         go
           :: Array StackExpression
           -> Array StackValue
           -> GameState
           -> m GameState
-        go expression stack state =
+        go expression stack state' =
           case uncons expression of
             Nothing ->
               case head stack of
-                Nothing -> pure state
+                Nothing -> pure state'
                 Just x -> throwError $
                   "Empty expression but non-empty stack: "
                   <> show stack
             Just { head: e, tail: expressionTail } -> case e of
               StackChooseCardsFromHand (Just v) ->
-                go expressionTail (StackArrayInt v : stack) state
+                go expressionTail (StackArrayInt v : stack) state'
               StackChooseCardsFromHand Nothing -> let
-                choice' = StackChoice { attack, expression, stack, description }
+                choice' = StackChoice
+                  { attack
+                  , expression
+                  , stack
+                  , description
+                  }
                 in
                 traverseOf
                   (_player playerIndex)
                   Player.dropChoice
-                  state
+                  state'
                   -- TODO: clean up this hack
                   -- HACK: adding same choice twice because we drop
                   -- a choice at the end of resolveChoice
@@ -410,21 +415,23 @@ resolveChoice { playerIndex, choice } state =
                   Nothing -> throwError
                     "StackDuplicate with empty Stack"
                   Just v ->
-                    go expressionTail (v : stack) state
+                    go expressionTail (v : stack) state'
               StackDiscard ->
                 case head stack, tail stack of
                   Nothing, _ -> throwError
                     "StackDuplicate with empty Stack"
-                  Just (StackArrayInt cardIndices), (Just stackTail) -> do
-                    s <- moveFromTo playerIndex state
+                  Just (StackArrayInt cardIndices)
+                    , (Just stackTail) -> do
+                    state'' <- moveFromTo playerIndex state'
                       { filter: Nothing
-                      , n: Exactly ((length cardIndices) ^. Int._toWire)
+                      , n: Exactly ((length cardIndices)
+                        ^. Int._toWire)
                       , source: Pile.Hand
                       , destination: Pile.ToDiscard
                       , resolution: Just cardIndices
                       , attack
                       }
-                    go expressionTail stackTail s
+                    go expressionTail stackTail state''
                   Just x, _ -> throwError $
                     "can't discard " <> show x
               StackLength ->
@@ -433,7 +440,7 @@ resolveChoice { playerIndex, choice } state =
                     "StackDuplicate with empty Stack"
                   Just (StackArrayInt ints), Just stackTail -> let
                     stack' = StackInt (length ints) : stackTail
-                    in go expressionTail stack' state
+                    in go expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't take the length of " <> show x
               StackDraw ->
@@ -445,7 +452,7 @@ resolveChoice { playerIndex, choice } state =
                     modifyPlayerM
                       playerIndex
                       (Player.drawCards n)
-                      state
+                      state'
                       >>= go expressionTail stackTail
                   Just x, _ -> throwError $
                     "can't draw " <> show x
@@ -514,7 +521,6 @@ resolveChoice { playerIndex, choice } state =
     Or { resolution: Nothing } -> unresolved
     PickN { resolution: Nothing } -> unresolved
     Option { resolution: Nothing } -> unresolved
-    MoveFromTo { resolution: Nothing } -> unresolved
     GainCards { resolution: Nothing } -> unresolved
     GainCard { filter: cardFilter, resolution: Nothing } -> do
       let
