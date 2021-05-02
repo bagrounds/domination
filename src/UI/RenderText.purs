@@ -110,8 +110,8 @@ instance choiceRenderTextInContext
   :: RenderTextInContext Choice where
   renderTextInContext playerIndex state c =
     HH.span_ case c of
-      StackChoice _ ->
-        [ HH.text $ show c ]
+      StackChoice { description } ->
+        [ HH.text $ description ]
       If { choice, condition } ->
         [ HH.text "if "
         , renderText condition
@@ -194,8 +194,8 @@ instance choiceRenderTextInContext
 
 instance choiceRenderText :: RenderText Choice where
   renderText choice = HH.span_ case choice of
-    StackChoice _ ->
-      [ HH.text $ show choice ]
+    StackChoice { description } ->
+      [ HH.text $ description ]
     If { condition, choice, otherwise } ->
       [ HH.text "If ("
       , renderText condition

@@ -1081,6 +1081,7 @@ cellar = let attack = false in Card.action
         ]
       , stack: []
       , attack
+      , description: "discard n cards and draw n cards"
       }
     , description: "Discard N cards, then draw N cards."
     }

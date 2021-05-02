@@ -372,7 +372,7 @@ resolveChoice
   -> m GameState
 resolveChoice { playerIndex, choice } state =
   case choice of
-    StackChoice { attack, expression, stack } ->
+    StackChoice { attack, expression, stack, description } ->
       go expression stack state
       where
         go
@@ -392,7 +392,7 @@ resolveChoice { playerIndex, choice } state =
               StackChooseCardsFromHand (Just v) ->
                 go expressionTail (StackArrayInt v : stack) state
               StackChooseCardsFromHand Nothing -> let
-                choice' = StackChoice { attack, expression, stack }
+                choice' = StackChoice { attack, expression, stack, description }
                 in
                 traverseOf
                   (_player playerIndex)

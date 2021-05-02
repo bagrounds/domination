@@ -47,7 +47,11 @@ data WireChoice
   | WireDiscard Boolean (Maybe Unit) SelectCards
   | WireDraw Boolean WireInt (Maybe Unit)
   | WireGainBonus Boolean Bonus (Maybe Unit)
-  | WireStackChoice Boolean (Array WireStackExpression) (Array WireStackValue)
+  | WireStackChoice
+    Boolean
+    (Array WireStackExpression)
+    (Array WireStackValue)
+    String
 
 _toWire :: Iso' Choice WireChoice
 _toWire = iso to from where
@@ -80,11 +84,12 @@ _toWire = iso to from where
       WireDraw attack (n ^. Int._toWire) resolution
     GainBonus { attack, bonus, resolution } ->
       WireGainBonus attack bonus resolution
-    StackChoice { attack, expression, stack } ->
+    StackChoice { attack, expression, stack, description } ->
       WireStackChoice
         attack
         (view StackExpression._toWire <$> expression)
         (view StackValue._toWire <$> stack)
+        description
   from = case _ of
     WireIf attack choice condition otherwise resolution ->
       If { attack, choice: review _toWire choice, condition, otherwise: review _toWire <$> otherwise, resolution }
@@ -112,11 +117,12 @@ _toWire = iso to from where
       Draw { attack, n: review Int._toWire n, resolution }
     WireGainBonus attack bonus resolution ->
       GainBonus { attack, bonus, resolution }
-    WireStackChoice attack expression stack ->
+    WireStackChoice attack expression stack description ->
       StackChoice
         { attack
         , expression: review StackExpression._toWire <$> expression
         , stack: review StackValue._toWire <$> stack
+        , description
         }
 
 derive instance genericWireChoice :: Generic WireChoice _

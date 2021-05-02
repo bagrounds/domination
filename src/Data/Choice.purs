@@ -98,6 +98,7 @@ data Choice
     { expression :: Array StackExpression
     , stack :: Array StackValue
     , attack :: Boolean
+    , description :: String
     }
 
 isAttack :: Choice -> Boolean
