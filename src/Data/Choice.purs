@@ -50,7 +50,7 @@ data Choice
     }
   | MoveFromTo
     { n :: Constraint
-    , filter :: Maybe Filter
+    , filter :: Filter
     , source :: Pile
     , destination :: Pile
     , resolution :: Maybe (Array Int)
@@ -58,7 +58,7 @@ data Choice
     }
   | GainCard
     { attack :: Boolean
-    , filter :: Maybe Filter
+    , filter :: Filter
     , destination :: Pile
     , resolution :: Maybe String
     }

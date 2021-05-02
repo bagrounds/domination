@@ -531,9 +531,7 @@ renderPlayer cs@{ state, playerIndex } player =
           GainCard x@{ filter: cardFilter } ->
             let
               predicate :: Card -> Boolean
-              predicate = case cardFilter of
-                Nothing -> \_ -> true
-                Just f -> passFilter f
+              predicate = passFilter cardFilter
               unfiltered :: Array Card
               unfiltered = _.card <$> nonEmptyStacks state.supply
               cards :: Array Card

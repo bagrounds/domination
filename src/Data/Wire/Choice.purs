@@ -47,10 +47,10 @@ data WireChoice
   | WirePickN Boolean (Array WireChoice) WireInt
     (Maybe (Array WireChoice))
   | WireOption Boolean WireChoice (Maybe Boolean)
-  | WireMoveFromTo Boolean Pile (Maybe WireFilter) WireConstraint
+  | WireMoveFromTo Boolean Pile WireFilter WireConstraint
     (Maybe (Array WireInt)) Pile
   | WireGainCards Boolean String Pile WireInt (Maybe Unit)
-  | WireGainCard Boolean Pile (Maybe WireFilter) (Maybe String)
+  | WireGainCard Boolean Pile WireFilter (Maybe String)
   | WireGainActions Boolean Actions (Maybe Unit)
   | WireGainBuys Boolean Buys (Maybe Unit)
   | WireDiscard Boolean (Maybe Unit) SelectCards
@@ -93,7 +93,7 @@ _toWire = iso to from where
       WireMoveFromTo
         attack
         destination
-        (view Filter._toWire <$> filter)
+        (filter ^. Filter._toWire)
         (n ^. Constraint._toWire)
         ((map $ view Int._toWire) <$> resolution)
         source
@@ -110,7 +110,7 @@ _toWire = iso to from where
       WireGainCard
         attack
         destination
-        (view Filter._toWire <$> filter)
+        (filter ^. Filter._toWire)
         resolution
 
     GainActions { attack, n, resolution } ->
@@ -169,7 +169,7 @@ _toWire = iso to from where
       MoveFromTo
         { attack
         , destination
-        , filter: review Filter._toWire <$> filter
+        , filter: filter .^ Filter._toWire
         , n: n .^ Constraint._toWire
         , resolution: (map $ review Int._toWire) <$> resolution
         , source
@@ -187,7 +187,7 @@ _toWire = iso to from where
       GainCard
         { attack
         , destination
-        , filter: review Filter._toWire <$> filter
+        , filter: filter .^ Filter._toWire
         , resolution
         }
 

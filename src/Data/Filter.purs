@@ -14,6 +14,7 @@ data Filter
   = HasName String
   | HasType CardType
   | CostUpTo Int
+  | Any
 
 derive instance genericFilter :: Generic Filter _
 derive instance eqFilter :: Eq Filter

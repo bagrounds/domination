@@ -424,8 +424,8 @@ resolveChoice { playerIndex, choice } state =
                   Just (StackArrayInt cardIndices)
                     , (Just stackTail) -> do
                     state'' <- moveFromTo playerIndex state'
-                      { filter: Nothing
-                      , n: Exactly $ length cardIndices
+                      { filter: Any
+                      , n: Unlimited
                       , source: Pile.Hand
                       , destination: Pile.ToDiscard
                       , resolution: Just cardIndices
@@ -527,9 +527,7 @@ resolveChoice { playerIndex, choice } state =
         unfiltered :: Array Card
         unfiltered = _.card <$> nonEmptyStacks state.supply
         cards :: Array Card
-        cards = case cardFilter of
-          Nothing -> unfiltered
-          Just f -> passFilter f `filter` unfiltered
+        cards = (passFilter cardFilter) `filter` unfiltered
       case cards of
         [] -> pure state
         xs -> unresolved
@@ -544,7 +542,7 @@ resolveChoice { playerIndex, choice } state =
       throwError $ "this is an unresolved choice: " <> show choice
 
 type MoveFromToRecord =
-  { filter :: Maybe Filter
+  { filter :: Filter
   , n :: Constraint
   , source :: Pile
   , destination :: Pile
@@ -576,18 +574,13 @@ moveFromTo playerIndex state
   selected <- takeIndices cardIndices sourcePile
   remaining <- dropIndices cardIndices sourcePile
   Constraint.check constraint selected remaining sourcePile
-  case filter of
-    Just f ->
-      let  forSelected = ("selected cards" <>! _) >>> (selected <@! _)
-      in check
-        $ forSelected
-        $ all (passFilter f) !> "illegal choice in"
-    Nothing -> pure unit
+  check
+    $ ("selected cards" <>! _) >>> (selected <@! _)
+    $ all (passFilter filter) !> "illegal choice in"
   pure
     $ _source .~ remaining
     $ over _destination (selected <> _)
     $ state
-
 
 assertTurn
   :: forall m
@@ -682,14 +675,16 @@ describes = case _ of
   HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
   HasCardType cardType -> pure <<< _.hand >>> any (hasType cardType)
   HasDiscard -> pure <<< _.discard >>> (not <<< null)
-  Randomly percent ->
-    const $ (_ > (percent .^ Int._toWire)) <$> randomIntBetween zero 100
+  Randomly percent -> const
+    $ (_ > (percent .^ Int._toWire))
+    <$> randomIntBetween zero 100
 
 passFilter :: Filter -> Card -> Boolean
 passFilter = case _ of
   HasName name -> _.name >>> (_ == name)
   HasType cardType -> hasType cardType
   CostUpTo cost -> (_ <= cost) <<< (view _cost)
+  Any -> const true
 
 upgrade :: GameState -> GameState
 upgrade = (_supply %~ Supply.upgrade)

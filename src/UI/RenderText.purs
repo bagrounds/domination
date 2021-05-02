@@ -223,10 +223,10 @@ instance choiceRenderText :: RenderText Choice where
         makeText condition = HH.text $ intercalate " "
           [ verb, condition, description, suffix ]
         description = case filter of
-          Nothing -> "card(s)"
-          Just (HasName name) -> name
-          Just (HasType cardType) -> show cardType
-          Just (CostUpTo cost) -> "cards costing up to " <> show cost
+          HasName name -> name
+          HasType cardType -> show cardType
+          CostUpTo cost -> "cards costing up to " <> show cost
+          Any -> "card(s)"
         suffix = case source of
           Pile.Hand -> ""
           Pile.Discard -> "from your discard pile"
@@ -252,10 +252,10 @@ instance choiceRenderText :: RenderText Choice where
           Pile.Deck -> "Gain onto your deck"
           Pile.Trash -> "Trash"
         card = case filter of
-          Nothing -> "a card"
-          Just (HasName name) -> "1 " <> name
-          Just (HasType t) -> "a card of type " <> show t
-          Just (CostUpTo cost) -> "a card costing up to " <> show cost
+          HasName name -> "1 " <> name
+          HasType t -> "a card of type " <> show t
+          CostUpTo cost -> "a card costing up to " <> show cost
+          Any -> "a card"
       in [ HH.text $ verb <> " " <> card <> " from the supply" ]
 
     GainActions { n } -> [ HH.text "+", renderText n ]

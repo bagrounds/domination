@@ -21,6 +21,7 @@ data WireFilter
   = WireHasName String
   | WireHasType CardType
   | WireCostUpTo WireInt
+  | WireAny
 
 _toWire :: Iso' Filter WireFilter
 _toWire = iso to from where
@@ -28,10 +29,12 @@ _toWire = iso to from where
     HasName name -> WireHasName name
     HasType cardType -> WireHasType cardType
     CostUpTo n -> WireCostUpTo $ n ^. Int._toWire
+    Any -> WireAny
   from = case _ of
     WireHasName name -> HasName name
     WireHasType cardType -> HasType cardType
     WireCostUpTo n -> CostUpTo $ n .^ Int._toWire
+    WireAny -> Any
 
 derive instance genericWireFilter :: Generic WireFilter _
 derive instance eqWireFilter :: Eq WireFilter
