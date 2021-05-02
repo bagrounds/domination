@@ -9,17 +9,19 @@ import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe)
-import Domination.Data.Constraint (Constraint)
 import Domination.Data.StackEvaluation (StackExpression(..))
+import Domination.Data.Wire.Constraint (WireConstraint)
+import Domination.Data.Wire.Constraint as Constraint
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
+import Util ((.^))
 
 data WireStackExpression
-  = WireStackChooseCardsFromHand Constraint (Maybe (Array WireInt))
+  = WireStackChooseCardsFromHand WireConstraint (Maybe (Array WireInt))
   | WireStackDuplicate
   | WireStackDiscard
   | WireStackLength
@@ -30,16 +32,16 @@ _toWire = iso to from where
   to = case _ of
     StackChooseCardsFromHand constraint maybeXs ->
       WireStackChooseCardsFromHand
-        constraint
+        (constraint ^. Constraint._toWire)
         $ map (view Int._toWire) <$> maybeXs
     StackDuplicate -> WireStackDuplicate
     StackDiscard -> WireStackDiscard
     StackLength -> WireStackLength
     StackDraw -> WireStackDraw
   from = case _ of
-    WireStackChooseCardsFromHand constraint maybeXs ->
+    WireStackChooseCardsFromHand wireConstraint maybeXs ->
       StackChooseCardsFromHand
-        constraint
+        (wireConstraint .^ Constraint._toWire)
         $ map (review Int._toWire) <$> maybeXs
     WireStackDuplicate -> StackDuplicate
     WireStackDiscard -> StackDiscard
@@ -48,21 +50,28 @@ _toWire = iso to from where
 
 derive instance genericWireStackExpression
   :: Generic WireStackExpression _
+
 derive instance eqWireStackExpression :: Eq WireStackExpression
+
 instance showWireStackExpression :: Show WireStackExpression where
   show wireChoice = genericShow wireChoice
+
 instance encodeJsonWireStackExpression
   :: EncodeJson WireStackExpression where
   encodeJson a = genericEncodeJson a
+
 instance decodeJsonWireStackExpression
   :: DecodeJson WireStackExpression where
   decodeJson a = genericDecodeJson a
+
 instance dynamicByteLengthWireStackExpression
   :: DynamicByteLength WireStackExpression where
   byteLength x = genericByteLength x
+
 instance encodeArrayBuffeWireStackExpression
   :: EncodeArrayBuffer WireStackExpression where
   putArrayBuffer x = genericPutArrayBuffer x
+
 instance decodeArrayBuffeWireStackExpression
   :: DecodeArrayBuffer WireStackExpression where
   readArrayBuffer x = genericReadArrayBuffer x

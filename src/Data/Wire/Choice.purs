@@ -16,37 +16,46 @@ import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Maybe (Maybe)
 import Domination.Data.Actions (Actions)
-import Domination.Data.Bonus (Bonus)
 import Domination.Data.Buys (Buys)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition)
-import Domination.Data.Constraint (Constraint)
-import Domination.Data.Filter (Filter)
 import Domination.Data.Pile (Pile)
 import Domination.Data.SelectCards (SelectCards)
+import Domination.Data.Wire.Bonus (WireBonus)
+import Domination.Data.Wire.Bonus as Bonus
+import Domination.Data.Wire.Constraint (WireConstraint)
+import Domination.Data.Wire.Constraint as Constraint
+import Domination.Data.Wire.Filter (WireFilter)
+import Domination.Data.Wire.Filter as Filter
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
 import Domination.Data.Wire.StackExpression (WireStackExpression)
 import Domination.Data.Wire.StackExpression as StackExpression
 import Domination.Data.Wire.StackValue (WireStackValue)
 import Domination.Data.Wire.StackValue as StackValue
+import Util ((.^))
 
 data WireChoice
-  = WireIf Boolean WireChoice Condition (Maybe WireChoice) (Maybe Unit)
+  = WireIf
+    Boolean
+    WireChoice
+    Condition
+    (Maybe WireChoice)
+    (Maybe Unit)
   | WireAnd Boolean (Array WireChoice) (Maybe Unit)
   | WireOr Boolean (Array WireChoice) (Maybe WireChoice)
   | WirePickN Boolean (Array WireChoice) WireInt
     (Maybe (Array WireChoice))
   | WireOption Boolean WireChoice (Maybe Boolean)
-  | WireMoveFromTo Boolean Pile (Maybe Filter) Constraint
+  | WireMoveFromTo Boolean Pile (Maybe WireFilter) WireConstraint
     (Maybe (Array WireInt)) Pile
   | WireGainCards Boolean String Pile WireInt (Maybe Unit)
-  | WireGainCard Boolean Pile (Maybe Filter) (Maybe String)
+  | WireGainCard Boolean Pile (Maybe WireFilter) (Maybe String)
   | WireGainActions Boolean Actions (Maybe Unit)
   | WireGainBuys Boolean Buys (Maybe Unit)
   | WireDiscard Boolean (Maybe Unit) SelectCards
   | WireDraw Boolean WireInt (Maybe Unit)
-  | WireGainBonus Boolean Bonus (Maybe Unit)
+  | WireGainBonus Boolean WireBonus (Maybe Unit)
   | WireStackChoice
     Boolean
     (Array WireStackExpression)
@@ -59,64 +68,144 @@ _toWire = iso to from where
     If { attack, choice, condition, otherwise, resolution } ->
       WireIf attack (choice ^. _toWire) condition
         (otherwise ^? (_Just <<< _toWire)) resolution
+
     And { attack, choices, resolution } ->
       WireAnd attack ((_ ^. _toWire) <$> choices) resolution
+
     Or { attack, choices, resolution } ->
-      WireOr attack ((_ ^. _toWire) <$> choices) (resolution ^? (_Just <<< _toWire))
+      WireOr
+        attack
+        ((_ ^. _toWire) <$> choices)
+        (resolution ^? (_Just <<< _toWire))
+
     PickN { attack, choices, n, resolution } ->
-      WirePickN attack ((_ ^. _toWire) <$> choices) (n ^. Int._toWire)
+      WirePickN
+        attack
+        ((_ ^. _toWire) <$> choices)
+        (n ^. Int._toWire)
         (map (_ ^. _toWire) <$> resolution)
+
     Option { attack, choice, resolution } ->
       WireOption attack (choice ^. _toWire) resolution
-    MoveFromTo { attack, destination, filter, n, resolution, source } ->
-      WireMoveFromTo attack destination filter n ((map $ view Int._toWire) <$> resolution) source
+
+    MoveFromTo
+      { attack, destination, filter, n, resolution, source } ->
+      WireMoveFromTo
+        attack
+        destination
+        (view Filter._toWire <$> filter)
+        (n ^. Constraint._toWire)
+        ((map $ view Int._toWire) <$> resolution)
+        source
+
     GainCards { attack, cardName, destination, n, resolution } ->
-      WireGainCards attack cardName destination (n ^. Int._toWire) resolution
+      WireGainCards
+        attack
+        cardName
+        destination
+        (n ^. Int._toWire)
+        resolution
+
     GainCard { attack, destination, filter, resolution } ->
-      WireGainCard attack destination filter resolution
+      WireGainCard
+        attack
+        destination
+        (view Filter._toWire <$> filter)
+        resolution
+
     GainActions { attack, n, resolution } ->
       WireGainActions attack n resolution
+
     GainBuys { attack, n, resolution } ->
       WireGainBuys attack n resolution
+
     Discard { attack, resolution, selection } ->
       WireDiscard attack resolution selection
+
     Draw { attack, n, resolution } ->
       WireDraw attack (n ^. Int._toWire) resolution
+
     GainBonus { attack, bonus, resolution } ->
-      WireGainBonus attack bonus resolution
+      WireGainBonus attack (bonus ^. Bonus._toWire) resolution
+
     StackChoice { attack, expression, stack, description } ->
       WireStackChoice
         attack
         (view StackExpression._toWire <$> expression)
         (view StackValue._toWire <$> stack)
         description
+
   from = case _ of
     WireIf attack choice condition otherwise resolution ->
-      If { attack, choice: review _toWire choice, condition, otherwise: review _toWire <$> otherwise, resolution }
+      If
+        { attack
+        , choice: review _toWire choice
+        , condition, otherwise: review _toWire <$> otherwise
+        , resolution
+        }
+
     WireAnd attack choices resolution ->
       And { attack, choices: review _toWire <$> choices, resolution }
+
     WireOr attack choices resolution ->
-      Or { attack, choices: review _toWire <$> choices, resolution: review _toWire <$> resolution }
+      Or
+        { attack
+        , choices: review _toWire <$> choices
+        , resolution: review _toWire <$> resolution
+        }
+
     WirePickN attack choices n resolution ->
-      PickN { attack, choices: review _toWire <$> choices, n: review Int._toWire n, resolution: (map $ review _toWire) <$> resolution }
+      PickN
+        { attack
+        , choices: review _toWire <$> choices
+        , n: review Int._toWire n
+        , resolution: (map $ review _toWire) <$> resolution
+        }
+
     WireOption attack choice resolution ->
       Option { attack, choice: review _toWire choice, resolution }
+
     WireMoveFromTo attack destination filter n resolution source ->
-      MoveFromTo { attack, destination, filter, n, resolution: (map $ review Int._toWire) <$> resolution, source }
+      MoveFromTo
+        { attack
+        , destination
+        , filter: review Filter._toWire <$> filter
+        , n: n .^ Constraint._toWire
+        , resolution: (map $ review Int._toWire) <$> resolution
+        , source
+        }
+
     WireGainCards attack cardName destination n resolution ->
-      GainCards { attack, cardName, destination, n: review Int._toWire n, resolution }
+      GainCards
+        { attack
+        , cardName
+        , destination
+        , n: review Int._toWire n, resolution
+        }
+
     WireGainCard attack destination filter resolution ->
-      GainCard { attack, destination, filter, resolution }
+      GainCard
+        { attack
+        , destination
+        , filter: review Filter._toWire <$> filter
+        , resolution
+        }
+
     WireGainActions attack n resolution ->
       GainActions { attack, n, resolution }
+
     WireGainBuys attack n resolution ->
       GainBuys { attack, n, resolution }
+
     WireDiscard attack resolution selection ->
       Discard { attack, resolution, selection }
+
     WireDraw attack n resolution ->
       Draw { attack, n: review Int._toWire n, resolution }
+
     WireGainBonus attack bonus resolution ->
-      GainBonus { attack, bonus, resolution }
+      GainBonus { attack, bonus: bonus .^ Bonus._toWire, resolution }
+
     WireStackChoice attack expression stack description ->
       StackChoice
         { attack

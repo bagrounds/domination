@@ -8,7 +8,7 @@ import Data.Array (all, dropWhile, elem, filter, foldr, head, length, mapWithInd
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM, maximum)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Getter (view, (^.))
+import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (Prism', prism')
@@ -425,8 +425,7 @@ resolveChoice { playerIndex, choice } state =
                     , (Just stackTail) -> do
                     state'' <- moveFromTo playerIndex state'
                       { filter: Nothing
-                      , n: Exactly ((length cardIndices)
-                        ^. Int._toWire)
+                      , n: Exactly $ length cardIndices
                       , source: Pile.Hand
                       , destination: Pile.ToDiscard
                       , resolution: Just cardIndices
@@ -690,7 +689,7 @@ passFilter :: Filter -> Card -> Boolean
 passFilter = case _ of
   HasName name -> _.name >>> (_ == name)
   HasType cardType -> hasType cardType
-  CostUpTo cost -> (_ <= cost) <<< (view (_cost <<< Int._toWire))
+  CostUpTo cost -> (_ <= cost) <<< (view _cost)
 
 upgrade :: GameState -> GameState
 upgrade = (_supply %~ Supply.upgrade)

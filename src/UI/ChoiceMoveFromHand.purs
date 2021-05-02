@@ -11,14 +11,12 @@ import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.GameState (GameState)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
-import Domination.Data.Wire.Int as Int
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
 import Halogen (Component)
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
-import Util ((.^))
 
 component
   :: forall query input m
@@ -40,29 +38,33 @@ component state player choice baseSlotNumber =
     , pile
     , baseSlotNumber
     }
+
   where
     renderChoice = case _ of
-      x@(MoveFromTo { n, resolution: Nothing }) -> Just
+      x@(MoveFromTo { resolution: Nothing }) -> Just
         { title: renderText x
         , buttonText: HH.text "Done"
         }
       _ -> Nothing
-    canToggle { selected, total } =
-      selected || total < maxSelected
+
+    canToggle { selected, total } = selected || total < maxSelected
+
     maxSelected = case choice of
-      MoveFromTo { n: n' } ->
-        case n' of
-          UpTo n -> n .^ Int._toWire
-          Exactly n -> n .^ Int._toWire
-          DownTo n -> length cards - (n .^ Int._toWire)
-          Unlimited -> length cards
+      MoveFromTo { n: n' } -> case n' of
+        UpTo n -> n
+        Exactly n -> n
+        DownTo n -> length cards - n
+        Unlimited -> length cards
       _ -> 0
+
     resolve resolution = case choice of
       MoveFromTo x -> MoveFromTo x { resolution = resolution }
       y -> y
+
     pile = case choice of
       MoveFromTo { source } -> source
       _ -> Pile.Trash
+
     cards = case pile of
       Pile.Trash -> state.trash
       Pile.Hand -> player.hand

@@ -81,7 +81,7 @@ cardMap =
 
 emptyChoice :: Choice
 emptyChoice = GainBonus
-  { bonus: Cash $ 100 ^. Int._toWire
+  { bonus: Cash 100
   , attack: false
   , resolution
   }
@@ -317,7 +317,7 @@ chapel = let attack = false in
 
 chapelChoice :: Choice
 chapelChoice = let attack = false in MoveFromTo
-  { n: UpTo $ 4 ^. Int._toWire
+  { n: UpTo 4
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Trash
@@ -343,7 +343,7 @@ militia = let attack = true in
 
 discardDownTo3 :: Choice
 discardDownTo3 = let attack = true in MoveFromTo
-  { n: DownTo $ 3 ^. Int._toWire
+  { n: DownTo 3
   , filter: Nothing
   , source: Pile.Hand
   , destination: Pile.Discard
@@ -405,12 +405,12 @@ stewardChoice :: Choice
 stewardChoice = let attack = false in Or
   { choices:
     [ Draw { n: 2, attack, resolution }
-    , GainBonus { bonus: Cash $ 2 ^. Int._toWire, attack, resolution }
+    , GainBonus { bonus: Cash 2, attack, resolution }
     , MoveFromTo
       { source: Pile.Hand
       , destination: Pile.Trash
       , filter: Nothing
-      , n: Exactly $ 2 ^. Int._toWire
+      , n: Exactly 2
       , attack
       , resolution
       }
@@ -468,7 +468,7 @@ torturerChoice = let attack = true in
   { n: one
   , choices:
     [ MoveFromTo
-      { n: Exactly $ 2 ^. Int._toWire
+      { n: Exactly 2
       , filter: Nothing
       , source: Pile.Hand
       , destination: Pile.Discard
@@ -507,7 +507,7 @@ consolationChoice = let attack = false in
   If
   { condition: HasCard "Estate"
   , choice: GainBonus
-    { bonus: Cash $ 2 ^. Int._toWire
+    { bonus: Cash 2
     , attack
     , resolution
     }
@@ -546,7 +546,7 @@ moneyLenderChoice = let attack = false in
           , resolution
           }
         , GainBonus
-          { bonus: Cash $ 3 ^. Int._toWire
+          { bonus: Cash 3
           , attack
           , resolution
           }
@@ -606,7 +606,7 @@ baron = Card.action
 
 gain4Cash :: Choice
 gain4Cash = GainBonus
-  { bonus: Cash $ 4 ^. Int._toWire
+  { bonus: Cash 4
   , attack: false
   , resolution
   }
@@ -926,7 +926,7 @@ workshop = let attack = false in Card.action
   , special = Just
     { target: Self
     , command: Choose $ GainCard
-      { filter: Just $ CostUpTo (4 ^. Int._toWire)
+      { filter: Just $ CostUpTo 4
       , destination: Pile.ToDiscard
       , attack
       , resolution
@@ -944,7 +944,7 @@ artisan = let attack = false in Card.action
     , command: Choose $ And
       { choices:
         [ GainCard
-          { filter: Just $ CostUpTo (5 ^. Int._toWire)
+          { filter: Just $ CostUpTo 5
           , destination: Pile.Hand
           , attack
           , resolution
@@ -973,7 +973,7 @@ armory = let attack = false in Card.action
   , special = Just
     { target: Self
     , command: Choose $ GainCard
-      { filter: Just $ CostUpTo (4 ^. Int._toWire)
+      { filter: Just $ CostUpTo 4
       , destination: Pile.Deck
       , attack
       , resolution
@@ -999,7 +999,7 @@ altar = let attack = false in Card.action
           , resolution
           }
         , GainCard
-          { filter: Just $ CostUpTo (5 ^. Int._toWire)
+          { filter: Just $ CostUpTo 5
           , destination: Pile.ToDiscard
           , attack
           , resolution

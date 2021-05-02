@@ -70,7 +70,7 @@ instance reactionRenderText :: RenderText Reaction where
 instance bonusRenderText :: RenderText Bonus where
   renderText bonus = HH.span_ case bonus of
     Cash n ->
-      [ HH.text $ "+" <> show (n .^ Int._toWire)
+      [ HH.text $ "+" <> show n
       , Icons.money
       ]
 
@@ -215,14 +215,10 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text "optionally ", renderText choice' ]
 
     MoveFromTo { n, filter, source, destination } -> case n of
-      UpTo limit ->
-        [ makeText $ "up to " <> show (limit .^ Int._toWire) ]
-      Exactly limit ->
-        [ makeText $ "exactly " <> show (limit .^ Int._toWire) ]
-      DownTo limit ->
-        [ makeText $ "down to " <> show (limit .^ Int._toWire) ]
-      Unlimited ->
-        [ makeText "any number of" ]
+      UpTo limit -> [ makeText $ "up to " <> show limit ]
+      Exactly limit -> [ makeText $ "exactly " <> show limit ]
+      DownTo limit -> [ makeText $ "down to " <> show limit ]
+      Unlimited -> [ makeText "any number of" ]
       where
         makeText condition = HH.text $ intercalate " "
           [ verb, condition, description, suffix ]
@@ -230,8 +226,7 @@ instance choiceRenderText :: RenderText Choice where
           Nothing -> "card(s)"
           Just (HasName name) -> name
           Just (HasType cardType) -> show cardType
-          Just (CostUpTo cost) -> "cards costing up to"
-            <> show (cost .^ Int._toWire)
+          Just (CostUpTo cost) -> "cards costing up to " <> show cost
         suffix = case source of
           Pile.Hand -> ""
           Pile.Discard -> "from your discard pile"
@@ -259,10 +254,8 @@ instance choiceRenderText :: RenderText Choice where
         card = case filter of
           Nothing -> "a card"
           Just (HasName name) -> "1 " <> name
-          Just (HasType cardType) -> "a card of type "
-            <> show cardType
-          Just (CostUpTo cost) -> "a card costing up to "
-            <> show (cost .^ Int._toWire)
+          Just (HasType t) -> "a card of type " <> show t
+          Just (CostUpTo cost) -> "a card costing up to " <> show cost
       in [ HH.text $ verb <> " " <> card <> " from the supply" ]
 
     GainActions { n } -> [ HH.text "+", renderText n ]
