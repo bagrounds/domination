@@ -1065,7 +1065,10 @@ lurker = let attack = false in Card.action
   }
 
 cellar :: Card
-cellar = let attack = false in Card.action
+cellar = let
+  attack = false
+  description = "Discard N cards, then draw N cards."
+  in Card.action
   { name = "Cellar"
   , cost = 2
   , actions = one
@@ -1081,9 +1084,9 @@ cellar = let attack = false in Card.action
         ]
       , stack: []
       , attack
-      , description: "discard n cards and draw n cards"
+      , description
       }
-    , description: "Discard N cards, then draw N cards."
+    , description
     }
   }
 
