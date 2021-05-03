@@ -10,6 +10,7 @@
     "clean": "rm -rf .cache dist public",
     "prebuild": "stylelint assets/*.css",
     "build": "spago build",
+    "build-watch": "spago build --watch",
     "prebundle": "npm run test",
     "bundle": "spago bundle-app --main Main --to dist/app.js",
     "deploy": "./scripts/deploy",
