@@ -8,15 +8,33 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
 import Domination.Data.Constraint (Constraint)
+import Domination.Data.Filter (Filter)
+import Domination.Data.Pile (Pile)
+import Domination.Data.Var (Var)
 
 data StackExpression
-  = StackChooseCardsFromHand Constraint (Maybe (Array Int))
+  = StackChooseCards
+    { cards :: Var (Array Int)
+    , filter :: Var Filter
+    , from :: Var Pile
+    , n :: Var Constraint
+    }
   | StackDuplicate
   | StackDiscard
   | StackLength
+  | StackAddN Int
   | StackDraw
+  | StackTrash
+  | StackNth Int
+  | StackCostOf
+  | StackMakeFilterCostUpTo
+  | StackBind String
+  | StackGainTo Pile
+  | StackGainCard
+    { cardName :: Var String
+    , filter :: Var Filter
+    }
 
 derive instance genericStackExpression :: Generic StackExpression _
 derive instance eqStackExpression :: Eq StackExpression
@@ -30,6 +48,8 @@ instance decodeJsonStackExpression :: DecodeJson StackExpression where
 data StackValue
   = StackArrayInt (Array Int)
   | StackInt Int
+  | StackString String
+  | StackFilter Filter
 
 derive instance genericStackValue :: Generic StackValue _
 derive instance eqStackValue :: Eq StackValue

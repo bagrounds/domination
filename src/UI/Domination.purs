@@ -25,7 +25,6 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.GameState (GameState, newGame, passFilter)
 import Domination.Data.GameState as Dom
 import Domination.Data.Phase (Phase(..))
-import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
 import Domination.Data.Play as Play
 import Domination.Data.Player (Player)
@@ -35,6 +34,7 @@ import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Supply (negativePoints, nonEmptyStacks, positivePoints)
+import Domination.Data.Var (Var(..))
 import Domination.UI.Card (render) as Card
 import Domination.UI.ChoiceMoveFromTo as MoveFromTo
 import Domination.UI.ChooseCards as ChooseCards
@@ -428,12 +428,12 @@ renderPlayer cs@{ state, playerIndex } player =
                 h1__ "Something has gone terribly wrong!!!"
 
               Just
-                { head: StackChooseCardsFromHand constraint (Just _)
-                } -> h1__ $ "Domination: StackChooseCardsFromHand:"
-                  <> " cards already chosen!"
-
-              Just
-                { head: StackChooseCardsFromHand constraint Nothing
+                { head: StackChooseCards
+                  y@{ cards: Unbound
+                  , filter: Bound filter
+                  , from: Bound pile
+                  , n: Bound constraint
+                  }
                 , tail
                 } -> HH.div_
                 [ HH.slot
@@ -443,7 +443,9 @@ renderPlayer cs@{ state, playerIndex } player =
                     { state
                     , player
                     , baseSlotNumber
-                    , pile: Pile.Hand
+                    , pile
+                    , constraint
+                    , filter
                     }
                   )
                   unit
@@ -454,9 +456,56 @@ renderPlayer cs@{ state, playerIndex } player =
                   <<< StackChoice
                   <<< (x { expression = _ })
                   <<< (_ : tail)
-                  <<< StackChooseCardsFromHand constraint
-                  <<< Just
+                  <<< StackChooseCards
+                  <<< (y { cards = _ })
+                  <<< Bound
                 ]
+
+              Just
+                { head: StackChooseCards { cards: Bound cards } } ->
+                  h1__ $ "Domination: StackChooseCards:"
+                    <> " cards already chosen: " <> show cards
+
+              Just
+                { head: StackGainCard { cardName: Bound cardName }
+                , tail
+                } -> h1__ $ "Domination: StackGainCard:"
+                  <> " card already chosen: " <> show cardName
+
+              Just
+                { head: StackGainCard
+                  y@{ cardName: Unbound
+                  , filter: Bound cardFilter
+                  }
+                , tail
+                } ->
+                  let
+                    predicate :: Card -> Boolean
+                    predicate = passFilter cardFilter
+                    unfiltered :: Array Card
+                    unfiltered = _.card <$> nonEmptyStacks state.supply
+                    cards :: Array Card
+                    cards = predicate `filter` unfiltered
+                  in HH.div_
+                    [ HH.slot
+                      (SProxy :: SProxy "ChooseFromSupply")
+                      (AreaSlot ChoiceArea)
+                      ( ChooseFromSupply.component
+                        { cards, baseSlotNumber }
+                      )
+                      unit
+                      $ Just
+                      <<< MakePlay
+                      <<< ResolveChoice
+                      <<< ({ playerIndex, choice: _ })
+                      <<< StackChoice
+                      <<< (x { expression = _ })
+                      <<< (_ : tail)
+                      <<< StackGainCard
+                      <<< (y { cardName = _ })
+                      <<< Bound
+                      <<< fromMaybe "couldn't find card in supply"
+                    ]
 
               Just _ ->
                 acknowledge

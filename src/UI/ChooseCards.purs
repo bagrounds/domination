@@ -2,13 +2,15 @@ module Domination.UI.ChooseCards where
 
 import Prelude
 
-import Data.Array (filter)
+import Data.Array (filter, length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
+import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Filter (Filter)
 import Domination.Data.GameState (GameState)
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
@@ -34,6 +36,8 @@ type ComponentSpec =
   , pile :: Pile
   , baseSlotNumber :: Int -> DomSlot
   , state :: GameState
+  , constraint :: Constraint
+  , filter :: Filter
   }
 
 component
@@ -42,19 +46,17 @@ component
   => Log m
   => ComponentSpec
   -> Component HTML query Unit (Array Int) m
-component { baseSlotNumber, state, player, pile } =
-  H.mkComponent { initialState, render, eval }
-    where
+component
+  { baseSlotNumber
+  , state
+  , player
+  , pile
+  , constraint
+  , filter: cardFilter
+  } = H.mkComponent { initialState, render, eval }
+  where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
     initialState _ = (\x -> Tuple x false) <$> cards
-      where
-        cards = case pile of
-          Pile.Hand -> player.hand
-          Pile.Discard -> player.discard
-          Pile.ToDiscard -> player.toDiscard
-          Pile.Deck -> player.deck
-          Pile.Trash -> state.trash
-
     render xs = HH.div_ $
       [ HH.text "Choose cards"
       , HH.p_
@@ -71,15 +73,26 @@ component { baseSlotNumber, state, player, pile } =
       { handleAction = case _ of
         Toggle i -> do
           xs <- H.get
+          let total = length $ snd `filter` xs
           H.modify_
             $ mapWithIndex
               \j (Tuple c selected) -> Tuple c
                 $ if i == j
+                  && canToggle { selected, total }
                   then not selected
                   else selected
         Done -> (resolution <$> H.get) >>= H.raise
       }
       where
+        canToggle { selected, total } =
+          selected || total < maxSelected
+
+        maxSelected = case constraint of
+          UpTo n -> n
+          Exactly n -> n
+          DownTo n -> length cards - n
+          Unlimited -> length cards
+
         resolution :: State -> Array Int
         resolution xs = map snd
           $ filter fst
@@ -94,4 +107,12 @@ component { baseSlotNumber, state, player, pile } =
             then Css.toTrash
             else Css.toKeep
           ]
+
+    cards = case pile of
+      Pile.Hand -> player.hand
+      Pile.Discard -> player.discard
+      Pile.ToDiscard -> player.toDiscard
+      Pile.Deck -> player.deck
+      Pile.Trash -> state.trash
+
 

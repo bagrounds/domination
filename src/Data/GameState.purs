@@ -4,7 +4,7 @@ import Prelude hiding (Ordering(..))
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except.Trans (runExceptT)
-import Data.Array (all, dropWhile, elem, filter, foldr, head, length, mapWithIndex, null, tail, takeWhile, uncons, updateAt, (:))
+import Data.Array (all, dropWhile, elem, filter, foldr, head, length, mapWithIndex, null, tail, takeWhile, uncons, updateAt, (!!), (:))
 import Data.Either (Either(..))
 import Data.Foldable (any, foldM, maximum)
 import Data.Lens.Fold ((^?))
@@ -45,7 +45,9 @@ import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Supply (Supply, emptyStackCount, getStack, highestVictoryCardStackIsEmpty, indexOfStack, makeSupply, negativePoints, nonEmptyStacks, positivePoints, stackByName)
 import Domination.Data.Supply as Supply
 import Domination.Data.Target (Target(..))
+import Domination.Data.Var (Var(..))
 import Domination.Data.Wire.Int as Int
+import Record (merge)
 import Relation (Relation(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (assert, dropIndices, fromJust, indices, justIf, moveAll, takeIndices, withIndices, (.^))
@@ -389,17 +391,87 @@ resolveChoice { playerIndex, choice } state =
                 Just x -> throwError $
                   "Empty expression but non-empty stack: "
                   <> show stack
+
             Just { head: e, tail: expressionTail } -> case e of
-              StackChooseCardsFromHand constraint (Just v) ->
-                go expressionTail (StackArrayInt v : stack) state'
-              StackChooseCardsFromHand constraint Nothing -> let
-                choice' = StackChoice
-                  { attack
-                  , expression
-                  , stack
-                  , description
-                  }
-                in
+              StackGainCard
+                { cardName: Bound cardName
+                , filter: Bound filter
+                } -> do
+                  { count, card } <-
+                    stackByName cardName state'.supply
+                  check
+                    $ ("selected card" <>! _) >>> (card <@! _)
+                    $ passFilter filter !> "illegal card"
+                  check
+                    $ ("selected stack" <>! _) >>> (count <@! _)
+                    $ (_ > 0) !> "empty"
+                  let
+                    stack' = StackString cardName : stack
+                  go expressionTail stack' state'
+
+              StackGainCard
+                { cardName: Unbound
+                , filter: Bound filter
+                } -> do
+                  let
+                    choice' = StackChoice
+                      { attack
+                      , expression
+                      , stack
+                      , description
+                      }
+                  traverseOf
+                    (_player playerIndex)
+                    Player.dropChoice
+                    state'
+                    -- TODO: clean up this hack
+                    -- HACK: adding same choice twice because we drop
+                    -- a choice at the end of resolveChoice
+                    -- unconditionally.
+                    >>= modifyPlayer
+                      playerIndex
+                      (Player.gainChoices [choice', choice'])
+
+              StackGainCard
+                { filter: Unbound
+                } -> throwError $ "Unbound filter"
+
+              StackChooseCards
+                { cards: Bound cardIndices
+                , filter: Bound filter
+                , from: Bound source
+                , n: Bound constraint
+                } -> do
+                  let
+                    _source = _pile source playerIndex
+                    stack' = StackArrayInt cardIndices : stack
+                  sourcePile <- fromJust "failed to get source"
+                    $ state ^? _source
+                  selected <- takeIndices cardIndices sourcePile
+                  remaining <- dropIndices cardIndices sourcePile
+                  Constraint.check
+                    constraint
+                    selected
+                    remaining
+                    sourcePile
+                  check
+                    $ ("selected cards" <>! _) >>> (selected <@! _)
+                    $ all (passFilter filter) !> "illegal choice in"
+                  go expressionTail stack' state'
+
+              StackChooseCards
+                { cards: Unbound
+                , filter: Bound filter
+                , from: Bound source
+                , n: Bound constraint
+                } -> do
+                let
+                  choice' = StackChoice
+                    { attack
+                    , expression
+                    , stack
+                    , description
+                    }
                 traverseOf
                   (_player playerIndex)
                   Player.dropChoice
@@ -411,16 +483,84 @@ resolveChoice { playerIndex, choice } state =
                   >>= modifyPlayer
                     playerIndex
                     (Player.gainChoices [choice', choice'])
+
+              StackChooseCards
+                { cards: Unbound
+                } -> throwError $ "Unbound cards"
+
+              StackChooseCards
+                { filter: Unbound
+                } -> throwError $ "Unbound filter"
+
+              StackChooseCards
+                { from: Unbound
+                } -> throwError $ "Unbound from"
+
+              StackChooseCards
+                { n: Unbound
+                } -> throwError $ "Unbound n"
+
+              StackBind label -> do
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackBind with empty Stack"
+                  Just stackValue, (Just stackTail) -> do
+                    case uncons expressionTail of
+                      Nothing -> throwError "nothing to bind to!"
+                      Just { head: nextExpr, tail: exprTail' } ->
+                        case stackValue, label, nextExpr of
+                          StackFilter f, "filter", StackGainCard x -> do
+                            let
+                              z = merge { filter: Bound f } x
+                              top = StackGainCard z
+                              expr' = top : exprTail'
+                            go expr' stackTail state'
+                          _, _, _ -> throwError
+                            $ "unimplemented - "
+                            <> "stackValue: " <> show stackValue
+                            <> ", label: " <> show label
+                            <> ", nextExpr: " <> show nextExpr
+                  Just x, _ -> throwError $
+                    "can't bind " <> show x
+
               StackDuplicate ->
                 case head stack of
                   Nothing -> throwError
                     "StackDuplicate with empty Stack"
                   Just v ->
                     go expressionTail (v : stack) state'
+
+              StackCostOf ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackCostOf with empty Stack"
+                  Just (StackInt cardIndex), (Just stackTail) -> do
+                    player <- getPlayer playerIndex state
+                    { cost } <- Player.getCard cardIndex player
+                    let
+                      top = StackInt cost
+                      stack' = top : stackTail
+                    go expressionTail stack' state'
+                  Just x, _ -> throwError $
+                    "can't get the cost of " <> show x
+
+              StackGainTo destination ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackGainTo with empty Stack"
+                  Just (StackString cardName), (Just stackTail) ->
+                    gainCards
+                      playerIndex
+                      state'
+                      { n: one, cardName, destination }
+                    >>= go expressionTail stackTail
+                  Just x, _ -> throwError $
+                    "can't gain " <> show x
+
               StackDiscard ->
                 case head stack, tail stack of
                   Nothing, _ -> throwError
-                    "StackDuplicate with empty Stack"
+                    "StackDiscard with empty Stack"
                   Just (StackArrayInt cardIndices)
                     , (Just stackTail) -> do
                     state'' <- moveFromTo playerIndex state'
@@ -434,15 +574,74 @@ resolveChoice { playerIndex, choice } state =
                     go expressionTail stackTail state''
                   Just x, _ -> throwError $
                     "can't discard " <> show x
+
+              StackTrash ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackTrash with empty Stack"
+                  Just (StackArrayInt cardIndices)
+                    , (Just stackTail) -> do
+                    state'' <- moveFromTo playerIndex state'
+                      { filter: Any
+                      , n: Unlimited
+                      , source: Pile.Hand
+                      , destination: Pile.Trash
+                      , resolution: Just cardIndices
+                      , attack
+                      }
+                    go expressionTail stackTail state''
+                  Just x, _ -> throwError $
+                    "can't discard " <> show x
+
               StackLength ->
                 case head stack, tail stack of
                   Nothing, _ -> throwError
-                    "StackDuplicate with empty Stack"
+                    "StackLength with empty Stack"
                   Just (StackArrayInt ints), Just stackTail -> let
                     stack' = StackInt (length ints) : stackTail
                     in go expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't take the length of " <> show x
+
+              StackAddN n ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackAddN with empty Stack"
+                  Just (StackInt i), Just stackTail -> let
+                    stack' = StackInt (i + n) : stackTail
+                    in go expressionTail stack' state'
+                  Just x, _ -> throwError $
+                    "can't add to " <> show x
+
+              StackMakeFilterCostUpTo ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackMakeFilterCostUpTo with empty Stack"
+                  Just (StackInt n), Just stackTail -> do
+                    let
+                      top = StackFilter $ CostUpTo n
+                      stack' = top : stackTail
+                    go expressionTail stack' state'
+                  Just x, _ -> throwError $
+                    "can't make a filter from " <> show x
+                    <> " stack: " <> show stack
+                    <> ", expression: " <> show expression
+
+              StackNth n ->
+                case head stack, tail stack of
+                  Nothing, _ -> throwError
+                    "StackNth with empty Stack"
+                  Just (StackArrayInt ints), Just stackTail -> do
+                    top :: Int <- fromJust
+                      ( "cannot get element " <> show n
+                      <> " from array " <> show ints
+                      )
+                      $ ints !! n
+                    let stack' = (StackInt top) : stackTail
+                    go expressionTail stack' state'
+                  Just x, _ -> throwError $
+                    "can't take the nth of " <> show x
+
               StackDraw ->
                 case head stack, tail stack of
                   Nothing, _ -> throwError
@@ -459,27 +658,11 @@ resolveChoice { playerIndex, choice } state =
 
     MoveFromTo body -> moveFromTo playerIndex state body
 
-    GainCard { filter, destination, resolution: Just cardName } -> do
-      let _destination = _pile destination playerIndex
-      stack <- stackByName cardName state.supply
-      stackIndex <- indexOfStack stack.card state.supply
-      let
-        newCount = stack.count - one
-        cards = [ stack.card ]
-      over _destination (cards <> _)
-        <$> modifyStack stackIndex Stack.take state
+    GainCard { filter, destination, resolution: Just cardName } ->
+      gainCard playerIndex state { filter, destination, cardName }
 
-    GainCards { n, cardName, destination, resolution: Just unit } -> do
-      let _destination = _pile destination playerIndex
-      { card, count } <- stackByName cardName state.supply
-      stackIndex <- indexOfStack card state.supply
-      let
-        cardsToGain = min n count
-        newCount = max zero (count - n)
-        stackUpdate = Stack._count .~ newCount
-        cards = replicate cardsToGain card
-      over _destination (cards <> _)
-        <$> modifyStack stackIndex stackUpdate state
+    GainCards { n, cardName, destination, resolution: Just unit } ->
+      gainCards playerIndex state { n, cardName, destination }
     GainActions { n, resolution: Just unit } ->
       modifyPlayer playerIndex (Player.gainActions n) state
     GainBuys { n, resolution: Just unit } ->
@@ -581,6 +764,44 @@ moveFromTo playerIndex state
     $ _source .~ remaining
     $ over _destination (selected <> _)
     $ state
+
+gainCards
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Int
+  -> GameState
+  -> { n :: Int, cardName :: String, destination :: Pile }
+  -> m GameState
+gainCards playerIndex state { n, cardName, destination } = do
+  let _destination = _pile destination playerIndex
+  { card, count } <- stackByName cardName state.supply
+  stackIndex <- indexOfStack card state.supply
+  let
+    cardsToGain = min n count
+    newCount = max zero (count - n)
+    stackUpdate = Stack._count .~ newCount
+    cards = replicate cardsToGain card
+  over _destination (cards <> _)
+    <$> modifyStack stackIndex stackUpdate state
+
+gainCard
+  :: forall m
+  . MonadError String m
+  => Random m
+  => Int
+  -> GameState
+  -> { filter :: Filter, cardName :: String, destination :: Pile }
+  -> m GameState
+gainCard playerIndex state { filter, destination, cardName } = do
+  let _destination = _pile destination playerIndex
+  stack <- stackByName cardName state.supply
+  stackIndex <- indexOfStack stack.card state.supply
+  let
+    newCount = stack.count - one
+    cards = [ stack.card ]
+  over _destination (cards <> _)
+    <$> modifyStack stackIndex Stack.take state
 
 assertTurn
   :: forall m

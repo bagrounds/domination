@@ -20,6 +20,7 @@ import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Target (Target(..))
+import Domination.Data.Var (Var(..))
 import Domination.Data.Wire.Int as Int
 
 upgrade :: Card -> Card
@@ -59,6 +60,7 @@ cardMap =
   , militia
   , moneyLender
   , armory
+  , remodel
   , bazaar
   , festival
   , laboratory
@@ -1076,11 +1078,55 @@ cellar = let
     { target: Self
     , command: Choose $ StackChoice
       { expression:
-        [ StackChooseCardsFromHand Unlimited Nothing
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Any
+          , from: Bound Pile.Hand
+          , n: Bound Unlimited
+          }
         , StackDuplicate
         , StackDiscard
         , StackLength
         , StackDraw
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  }
+
+remodel :: Card
+remodel = let
+  attack = false
+  description = "Trash a card from your hand."
+    <> " Gain a card costing up to 2 more than it."
+  in Card.action
+  { name = "Remodel"
+  , cost = 4
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly one
+          }
+        , StackDuplicate
+        , StackTrash
+        , StackNth zero
+        , StackCostOf
+        , StackAddN 2
+        , StackMakeFilterCostUpTo
+        , StackBind "filter"
+        , StackGainCard
+          { cardName: Unbound
+          , filter: Unbound
+          }
+        , StackGainTo Pile.ToDiscard
         ]
       , stack: []
       , attack
