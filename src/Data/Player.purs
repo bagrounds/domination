@@ -9,7 +9,7 @@ import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso (Iso', iso)
-import Data.Lens.Lens (Lens', Lens)
+import Data.Lens.Lens (Lens)
 import Data.Lens.Prism (review)
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
-import Domination.Data.Bonus as Bonus
+import Domination.Data.Bonus (cashValue) as Bonus
 import Domination.Data.Buys (Buys)
 import Domination.Data.Card (Card)
 import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positivePoints, value) as Card
@@ -30,6 +30,8 @@ import Domination.Data.Choice (Choice)
 import Domination.Data.Choice (isAttack) as Choice
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.Wire.Bonus (WireBonus)
+import Domination.Data.Wire.Bonus (_toWire) as Bonus
 import Domination.Data.Wire.Card (_toWire) as Card
 import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
@@ -55,7 +57,7 @@ type Player =
 type WirePlayer =
   (Tuple Actions
   (Tuple (Array WireInt) -- atPlay
-  (Tuple (Array Bonus) -- bonuses
+  (Tuple (Array WireBonus) -- bonuses
   (Tuple (Array WireInt) -- buying
   (Tuple Buys
   (Tuple (Array WireChoice) -- choices
@@ -67,6 +69,7 @@ type WirePlayer =
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
   to = (_choices <$>~ view Choice._toWire)
+    >>> (_bonuses <$>~ view Bonus._toWire)
     >>> (_deck <$>~ view Card._toWire)
     >>> (_hand <$>~ view Card._toWire)
     >>> (_discard <$>~ view Card._toWire)
@@ -76,6 +79,7 @@ _toWire = iso to from where
     >>> toTuple
   from = fromTuple
     >>> (_choices <$>~ review Choice._toWire)
+    >>> (_bonuses <$>~ review Bonus._toWire)
     >>> (_deck <$>~ review Card._toWire)
     >>> (_hand <$>~ review Card._toWire)
     >>> (_discard <$>~ review Card._toWire)
@@ -166,7 +170,9 @@ _choices
 _choices = prop (SProxy :: SProxy "choices")
 _reaction :: Traversal' Player Reaction
 _reaction = prop (SProxy :: SProxy "reaction") <<< _Just
-_bonuses :: Lens' Player (Array Bonus)
+_bonuses
+  :: forall a b r
+  . Lens { bonuses :: a | r } { bonuses :: b | r } a b
 _bonuses = prop (SProxy :: SProxy "bonuses")
 
 _cardInHand :: Int -> Traversal' Player Card

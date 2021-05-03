@@ -17,6 +17,7 @@ import Domination.Data.Constraint (Constraint)
 import Domination.Data.Filter (Filter)
 import Domination.Data.Pile (Pile)
 import Domination.Data.SelectCards (SelectCards)
+import Domination.Data.StackEvaluation (StackExpression, StackValue)
 
 data Choice
   = If
@@ -49,7 +50,7 @@ data Choice
     }
   | MoveFromTo
     { n :: Constraint
-    , filter :: Maybe Filter
+    , filter :: Filter
     , source :: Pile
     , destination :: Pile
     , resolution :: Maybe (Array Int)
@@ -57,7 +58,7 @@ data Choice
     }
   | GainCard
     { attack :: Boolean
-    , filter :: Maybe Filter
+    , filter :: Filter
     , destination :: Pile
     , resolution :: Maybe String
     }
@@ -93,6 +94,12 @@ data Choice
     , resolution :: Maybe Unit
     , attack :: Boolean
     }
+  | StackChoice
+    { expression :: Array StackExpression
+    , stack :: Array StackValue
+    , attack :: Boolean
+    , description :: String
+    }
 
 isAttack :: Choice -> Boolean
 isAttack = case _ of
@@ -109,6 +116,7 @@ isAttack = case _ of
   Discard { attack } -> attack
   Draw { attack } -> attack
   GainBonus { attack } -> attack
+  StackChoice { attack } -> attack
 
 derive instance genericChoice :: Generic Choice _
 derive instance eqChoice :: Eq Choice

@@ -12,10 +12,10 @@ import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
+import Domination.Data.Card (Card)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
-import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
@@ -28,10 +28,13 @@ import Halogen.HTML.Properties as HP
 import Version (version)
 
 renderEmpty
-  :: forall t1 t2 t3 m
+  :: forall a b r m
   . Dom m
   => Log m
-  => HTML (ComponentSlot HTML (description :: Slot t1 t2 DomSlot | t3) m AppAction) AppAction
+  => HTML
+    ( ComponentSlot
+      HTML (description :: Slot a b DomSlot | r) m AppAction
+    ) AppAction
 renderEmpty = HH.div
   [ HP.classes
     [ Css.settingsMenu
@@ -41,11 +44,14 @@ renderEmpty = HH.div
   []
 
 render
-  :: forall t1 t2 t3 m
+  :: forall a b r m
   . Dom m
   => Log m
   => AppState
-  -> HTML (ComponentSlot HTML (description :: Slot t1 t2 DomSlot | t3) m AppAction) AppAction
+  -> HTML
+    ( ComponentSlot
+      HTML (description :: Slot a b DomSlot | r) m AppAction
+    ) AppAction
 render cs@{ showMenu, dominationConfig } = let
   { nextPlayerIndex
   , nextPlayerCount
@@ -63,7 +69,8 @@ render cs@{ showMenu, dominationConfig } = let
   [ HH.div
     [ HP.class_ Css.backButtonContainer ]
     [ HH.button
-      [ HE.onClick \_ -> Just $ ToggleMenu , HP.class_ Css.backButton
+      [ HE.onClick \_ -> Just $ ToggleMenu
+      , HP.class_ Css.backButton
       ]
       [ HH.text "Back" ]
     ]
@@ -119,19 +126,31 @@ render cs@{ showMenu, dominationConfig } = let
   , renderKingdom kingdom
   ]
 
+renderKingdom
+  :: forall a b r m
+  . Dom m
+  => Log m
+  => Array { card :: Card, selected :: Boolean }
+  -> HTML
+    ( ComponentSlot
+      HTML (description :: Slot a b DomSlot | r) m AppAction
+    ) AppAction
 renderKingdom kingdom = HH.div
   [ HP.class_ Css.kingdom ]
   $ renderCard `mapWithIndex` kingdom
   where
     renderCard i { card, selected } =
       Card.render (onClick i) (extraClasses selected) card (slot i)
+
     onClick i _ = Just
       $ ChooseKingdom
       $ ((ix i) <<< prop (SProxy :: SProxy "selected") %~ not) kingdom
+
     slot = CardSlot KingdomConfigArea
-    extraClasses selected = [
-      if selected
-      then Css.active
-      else Css.inactive
-    ]
+
+    extraClasses selected =
+      [ if selected
+        then Css.active
+        else Css.inactive
+      ]
 

@@ -7,21 +7,18 @@ import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Array (foldr)
-import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
-import Data.ArrayBuffer.Class.Types (Int16LE(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Domination.Data.Wire.Int (WireInt(..))
 
 data Bonus
-  = Cash WireInt
+  = Cash Int
 
 cashValue :: Array Bonus -> Int
-cashValue = foldr (\a b -> cashValue1 a + b) 0
+cashValue = foldr (\a b -> cashValue1 a + b) zero
 
 cashValue1 :: Bonus -> Int
 cashValue1 = case _ of
-  Cash (WireInt (Int16LE c)) -> c
+  Cash c -> c
 
 derive instance genericBonus :: Generic Bonus _
 derive instance eqBonus :: Eq Bonus
@@ -30,11 +27,4 @@ instance encodeJsonBonus :: EncodeJson Bonus where
   encodeJson a = genericEncodeJson a
 instance decodeJsonBonus :: DecodeJson Bonus where
   decodeJson a = genericDecodeJson a
-
-instance dynamicByteLengthBonus :: DynamicByteLength Bonus where
-  byteLength = genericByteLength
-instance encodeArrayBuffeBonus :: EncodeArrayBuffer Bonus where
-  putArrayBuffer = genericPutArrayBuffer
-instance decodeArrayBuffeBonus :: DecodeArrayBuffer Bonus where
-  readArrayBuffer = genericReadArrayBuffer
 

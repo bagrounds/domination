@@ -1,8 +1,14 @@
 {
   "image": "node:14",
   "stages": [
+    "test",
     "deploy"
   ],
+  "test": {
+    "stage": "test",
+    "script": ["npm ci", "npm run test"],
+    "except": ["master"]
+  },
   "pages": {
     "stage": "deploy",
     "script": ["npm run deploy"],
