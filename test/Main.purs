@@ -17,12 +17,14 @@ import Domination.Data.Game.Engine (makeAutoPlay) as Dom
 import Domination.Data.Game as Game
 import Domination.Data.Play (Play(..))
 import Domination.Data.Wire.Game (_toWire) as Dom
+import Data.Stack.Machine (ex)
 import Effect (Effect)
 import Test.QuickCheck (quickCheck')
 
 main :: Effect Unit
 main = do
   quickCheck' 1 `traverse_` examples
+  ex
 
 -- can't run this test outside of the browser due to FFI.js
 -- using browser specific APIs (window) and libraries (LZString)
