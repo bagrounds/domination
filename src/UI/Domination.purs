@@ -467,13 +467,14 @@ renderPlayer cs@{ state, playerIndex } player =
                     <> " cards already chosen: " <> show cards
 
               Just
-                { head: StackGainCard { cardName: Bound cardName }
+                { head: StackChooseCardFromSupply
+                  { cardName: Bound cardName }
                 , tail
-                } -> h1__ $ "Domination: StackGainCard:"
+                } -> h1__ $ "Domination: StackChooseCardFromSupply:"
                   <> " card already chosen: " <> show cardName
 
               Just
-                { head: StackGainCard
+                { head: StackChooseCardFromSupply
                   y@{ cardName: Unbound
                   , filter: Bound cardFilter
                   }
@@ -483,7 +484,8 @@ renderPlayer cs@{ state, playerIndex } player =
                     predicate :: Card -> Boolean
                     predicate = passFilter cardFilter
                     unfiltered :: Array Card
-                    unfiltered = _.card <$> nonEmptyStacks state.supply
+                    unfiltered = _.card
+                      <$> nonEmptyStacks state.supply
                     cards :: Array Card
                     cards = predicate `filter` unfiltered
                   in HH.div_
@@ -501,7 +503,7 @@ renderPlayer cs@{ state, playerIndex } player =
                       <<< StackChoice
                       <<< (x { expression = _ })
                       <<< (_ : tail)
-                      <<< StackGainCard
+                      <<< StackChooseCardFromSupply
                       <<< (y { cardName = _ })
                       <<< Bound
                       <<< fromMaybe "couldn't find card in supply"
@@ -565,7 +567,12 @@ renderPlayer cs@{ state, playerIndex } player =
             [ HH.slot
               (SProxy :: SProxy "MoveFromTo")
               (AreaSlot ChoiceArea)
-              (MoveFromTo.component state player choice baseSlotNumber)
+              ( MoveFromTo.component
+                state
+                player
+                choice
+                baseSlotNumber
+              )
               unit
               $ Just
               <<< MakePlay
