@@ -24,6 +24,7 @@ data WireStackValue
   | WireStackInt WireInt
   | WireStackString String
   | WireStackFilter WireFilter
+  | WireStackBool Boolean
 
 _toWire :: Iso' StackValue WireStackValue
 _toWire = iso to from where
@@ -32,11 +33,13 @@ _toWire = iso to from where
     StackInt x -> WireStackInt (view Int._toWire x)
     StackString s -> WireStackString s
     StackFilter filter -> WireStackFilter $ filter ^. Filter._toWire
+    StackBool b -> WireStackBool b
   from = case _ of
     WireStackArrayInt xs -> StackArrayInt (review Int._toWire <$> xs)
     WireStackInt x -> StackInt (review Int._toWire x)
     WireStackString s -> StackString s
     WireStackFilter filter -> StackFilter $ filter .^ Filter._toWire
+    WireStackBool b -> StackBool b
 
 derive instance genericWireStackValue :: Generic WireStackValue _
 derive instance eqWireStackValue :: Eq WireStackValue

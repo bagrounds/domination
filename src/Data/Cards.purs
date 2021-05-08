@@ -18,7 +18,7 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
-import Domination.Data.StackEvaluation (StackExpression(..))
+import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Target (Target(..))
 import Domination.Data.Var (Var(..))
 import Domination.Data.Wire.Int as Int
@@ -75,6 +75,7 @@ cardMap =
   , oldWitch
   , junkDealer
   , stables
+  , tradingPost
   , harem
   , nobles
   , artisan
@@ -1122,11 +1123,49 @@ remodel = let
         , StackAddN 2
         , StackMakeFilterCostUpTo
         , StackBind "filter"
-        , StackGainCard
+        , StackChooseCardFromSupply
           { cardName: Unbound
           , filter: Unbound
           }
         , StackGainTo Pile.ToDiscard
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  }
+
+tradingPost :: Card
+tradingPost = let
+  attack = false
+  description = "Trash 2 cards from your hand."
+    <> " If you did, gain a Silver to your hand."
+  in Card.action
+  { name = "Trading Post"
+  , cost = 5
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly 2
+          }
+        , StackDuplicate
+        , StackTrash
+        , StackLength
+        , StackIf
+          { condition: [ StackEquals $ StackInt 2 ]
+          , following:
+            [ StackPush $ StackString silver.name
+            , StackGainTo Pile.Hand
+            ]
+          , otherwise: [ ]
+          }
         ]
       , stack: []
       , attack

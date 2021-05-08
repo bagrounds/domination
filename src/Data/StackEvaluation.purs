@@ -31,9 +31,16 @@ data StackExpression
   | StackMakeFilterCostUpTo
   | StackBind String
   | StackGainTo Pile
-  | StackGainCard
+  | StackChooseCardFromSupply
     { cardName :: Var String
     , filter :: Var Filter
+    }
+  | StackEquals StackValue
+  | StackPush StackValue
+  | StackIf
+    { condition :: Array StackExpression
+    , following :: Array StackExpression
+    , otherwise :: Array StackExpression
     }
 
 derive instance genericStackExpression :: Generic StackExpression _
@@ -50,6 +57,7 @@ data StackValue
   | StackInt Int
   | StackString String
   | StackFilter Filter
+  | StackBool Boolean
 
 derive instance genericStackValue :: Generic StackValue _
 derive instance eqStackValue :: Eq StackValue

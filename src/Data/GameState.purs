@@ -375,25 +375,58 @@ resolveChoice
   -> m GameState
 resolveChoice { playerIndex, choice } state =
   case choice of
-    StackChoice { attack, expression: expr, stack: s, description } ->
-      go expr s state
+    StackChoice { attack, expression: expr, stack: s, description } -> do
+      { expr: expr', stack, state: state' } <- evalStackChoice expr s state
+      case expr', stack of
+        [], [] -> pure state'
+        [], x -> throwError $ "leftover stack: " <> show x
+        _, _ -> pure state'
       where
-        go
+        evalStackChoice
           :: Array StackExpression
           -> Array StackValue
           -> GameState
-          -> m GameState
-        go expression stack state' =
+          -> m
+            { state :: GameState
+            , expr :: Array StackExpression
+            , stack :: Array StackValue
+            }
+        evalStackChoice expression stack state' =
           case uncons expression of
-            Nothing ->
-              case head stack of
-                Nothing -> pure state'
-                Just x -> throwError $
-                  "Empty expression but non-empty stack: "
-                  <> show stack
+            Nothing -> pure { state: state', expr: [], stack }
 
             Just { head: e, tail: expressionTail } -> case e of
-              StackGainCard
+              StackIf { condition, following, otherwise } -> do
+                { stack: result, state: state'', expr: expr'' } <-
+                  evalStackChoice condition stack state'
+                case uncons result of
+                  Nothing -> throwError $ "StackIf: condition"
+                    <> " evaluated to empty stack!"
+                  Just { head, tail } ->
+                    case head of
+                      StackBool b ->
+                        let
+                          expr' =
+                            if b
+                            then following <> expressionTail
+                            else otherwise <> expressionTail
+                        in evalStackChoice expr' tail state''
+                      x -> throwError $ "StackIf: condition must"
+                        <> " evaluate to a boolean, not: "
+                        <> show x
+
+              StackPush value ->
+                evalStackChoice expressionTail (value : stack) state'
+
+              StackEquals value ->
+                case uncons stack of
+                  Nothing -> throwError
+                    "StackEquals with empty Stack"
+                  Just { head: value', tail: stackTail } -> let
+                    stack' = StackBool (value' == value) : stackTail
+                    in evalStackChoice expressionTail stack' state'
+
+              StackChooseCardFromSupply
                 { cardName: Bound cardName
                 , filter: Bound filter
                 } -> do
@@ -407,9 +440,9 @@ resolveChoice { playerIndex, choice } state =
                     $ (_ > 0) !> "empty"
                   let
                     stack' = StackString cardName : stack
-                  go expressionTail stack' state'
+                  evalStackChoice expressionTail stack' state'
 
-              StackGainCard
+              StackChooseCardFromSupply
                 { cardName: Unbound
                 , filter: Bound filter
                 } -> do
@@ -431,8 +464,9 @@ resolveChoice { playerIndex, choice } state =
                     >>= modifyPlayer
                       playerIndex
                       (Player.gainChoices [choice', choice'])
+                    <#> { state: _, expr: expression, stack }
 
-              StackGainCard
+              StackChooseCardFromSupply
                 { filter: Unbound
                 } -> throwError $ "Unbound filter"
 
@@ -457,7 +491,7 @@ resolveChoice { playerIndex, choice } state =
                   check
                     $ ("selected cards" <>! _) >>> (selected <@! _)
                     $ all (passFilter filter) !> "illegal choice in"
-                  go expressionTail stack' state'
+                  evalStackChoice expressionTail stack' state'
 
               StackChooseCards
                 { cards: Unbound
@@ -483,6 +517,7 @@ resolveChoice { playerIndex, choice } state =
                   >>= modifyPlayer
                     playerIndex
                     (Player.gainChoices [choice', choice'])
+                  <#> { state: _, expr: expressionTail, stack }
 
               StackChooseCards
                 { cards: Unbound
@@ -509,12 +544,14 @@ resolveChoice { playerIndex, choice } state =
                       Nothing -> throwError "nothing to bind to!"
                       Just { head: nextExpr, tail: exprTail' } ->
                         case stackValue, label, nextExpr of
-                          StackFilter f, "filter", StackGainCard x -> do
+                          StackFilter f
+                          , "filter"
+                          , StackChooseCardFromSupply x -> do
                             let
                               z = merge { filter: Bound f } x
-                              top = StackGainCard z
+                              top = StackChooseCardFromSupply z
                               expr' = top : exprTail'
-                            go expr' stackTail state'
+                            evalStackChoice expr' stackTail state'
                           _, _, _ -> throwError
                             $ "unimplemented - "
                             <> "stackValue: " <> show stackValue
@@ -528,7 +565,7 @@ resolveChoice { playerIndex, choice } state =
                   Nothing -> throwError
                     "StackDuplicate with empty Stack"
                   Just v ->
-                    go expressionTail (v : stack) state'
+                    evalStackChoice expressionTail (v : stack) state'
 
               StackCostOf ->
                 case head stack, tail stack of
@@ -540,21 +577,20 @@ resolveChoice { playerIndex, choice } state =
                     let
                       top = StackInt cost
                       stack' = top : stackTail
-                    go expressionTail stack' state'
+                    evalStackChoice expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't get the cost of " <> show x
 
               StackGainTo destination ->
-                case head stack, tail stack of
-                  Nothing, _ -> throwError
-                    "StackGainTo with empty Stack"
-                  Just (StackString cardName), (Just stackTail) ->
+                case uncons stack of
+                  Nothing -> throwError "StackGainTo with empty Stack"
+                  Just { head: StackString cardName, tail: stackTail } ->
                     gainCards
                       playerIndex
                       state'
                       { n: one, cardName, destination }
-                    >>= go expressionTail stackTail
-                  Just x, _ -> throwError $
+                    >>= evalStackChoice expressionTail stackTail
+                  Just { head: x } -> throwError $
                     "can't gain " <> show x
 
               StackDiscard ->
@@ -571,7 +607,7 @@ resolveChoice { playerIndex, choice } state =
                       , resolution: Just cardIndices
                       , attack
                       }
-                    go expressionTail stackTail state''
+                    evalStackChoice expressionTail stackTail state''
                   Just x, _ -> throwError $
                     "can't discard " <> show x
 
@@ -589,7 +625,7 @@ resolveChoice { playerIndex, choice } state =
                       , resolution: Just cardIndices
                       , attack
                       }
-                    go expressionTail stackTail state''
+                    evalStackChoice expressionTail stackTail state''
                   Just x, _ -> throwError $
                     "can't discard " <> show x
 
@@ -599,7 +635,7 @@ resolveChoice { playerIndex, choice } state =
                     "StackLength with empty Stack"
                   Just (StackArrayInt ints), Just stackTail -> let
                     stack' = StackInt (length ints) : stackTail
-                    in go expressionTail stack' state'
+                    in evalStackChoice expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't take the length of " <> show x
 
@@ -609,7 +645,7 @@ resolveChoice { playerIndex, choice } state =
                     "StackAddN with empty Stack"
                   Just (StackInt i), Just stackTail -> let
                     stack' = StackInt (i + n) : stackTail
-                    in go expressionTail stack' state'
+                    in evalStackChoice expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't add to " <> show x
 
@@ -621,7 +657,7 @@ resolveChoice { playerIndex, choice } state =
                     let
                       top = StackFilter $ CostUpTo n
                       stack' = top : stackTail
-                    go expressionTail stack' state'
+                    evalStackChoice expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't make a filter from " <> show x
                     <> " stack: " <> show stack
@@ -638,7 +674,7 @@ resolveChoice { playerIndex, choice } state =
                       )
                       $ ints !! n
                     let stack' = (StackInt top) : stackTail
-                    go expressionTail stack' state'
+                    evalStackChoice expressionTail stack' state'
                   Just x, _ -> throwError $
                     "can't take the nth of " <> show x
 
@@ -652,7 +688,7 @@ resolveChoice { playerIndex, choice } state =
                       playerIndex
                       (Player.drawCards n)
                       state'
-                      >>= go expressionTail stackTail
+                      >>= evalStackChoice expressionTail stackTail
                   Just x, _ -> throwError $
                     "can't draw " <> show x
 

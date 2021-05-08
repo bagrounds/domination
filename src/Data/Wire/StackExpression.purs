@@ -21,6 +21,8 @@ import Domination.Data.Wire.Filter (WireFilter)
 import Domination.Data.Wire.Filter as Filter
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
+import Domination.Data.Wire.StackValue (WireStackValue)
+import Domination.Data.Wire.StackValue as StackValue
 import Util ((.^))
 
 data WireStackExpression
@@ -40,7 +42,13 @@ data WireStackExpression
   | WireStackMakeFilterCostUpTo
   | WireStackBind String
   | WireStackGainTo Pile
-  | WireStackGainCard (Var String) (Var WireFilter)
+  | WireStackChooseCardFromSupply (Var String) (Var WireFilter)
+  | WireStackEquals WireStackValue
+  | WireStackIf
+    (Array WireStackExpression)
+    (Array WireStackExpression)
+    (Array WireStackExpression)
+  | WireStackPush WireStackValue
 
 _toWire :: Iso' StackExpression WireStackExpression
 _toWire = iso to fro where
@@ -62,8 +70,17 @@ _toWire = iso to fro where
     StackMakeFilterCostUpTo -> WireStackMakeFilterCostUpTo
     StackBind s -> WireStackBind s
     StackGainTo pile -> WireStackGainTo pile
-    StackGainCard { cardName, filter } ->
-      WireStackGainCard cardName (view Filter._toWire <$> filter)
+    StackChooseCardFromSupply { cardName, filter } ->
+      WireStackChooseCardFromSupply
+        cardName
+        (view Filter._toWire <$> filter)
+    StackEquals value -> WireStackEquals $ value ^. StackValue._toWire
+    StackIf { condition, following, otherwise } -> WireStackIf
+      (view _toWire <$> condition)
+      (view _toWire <$> following)
+      (view _toWire <$> otherwise)
+    StackPush value -> WireStackPush $ value ^. StackValue._toWire
+
   fro = case _ of
     WireStackChooseCards cards filter from n ->
       StackChooseCards
@@ -83,11 +100,18 @@ _toWire = iso to fro where
     WireStackMakeFilterCostUpTo -> StackMakeFilterCostUpTo
     WireStackBind s -> StackBind s
     WireStackGainTo pile -> StackGainTo pile
-    WireStackGainCard cardName filter ->
-      StackGainCard
+    WireStackChooseCardFromSupply cardName filter ->
+      StackChooseCardFromSupply
         { cardName
         , filter: review Filter._toWire <$> filter
         }
+    WireStackEquals value -> StackEquals $ value .^ StackValue._toWire
+    WireStackIf condition following otherwise -> StackIf
+      { condition: review _toWire <$> condition
+      , following: review _toWire <$> following
+      , otherwise: review _toWire <$> otherwise
+      }
+    WireStackPush value -> StackPush $ value .^ StackValue._toWire
 
 derive instance genericWireStackExpression
   :: Generic WireStackExpression _

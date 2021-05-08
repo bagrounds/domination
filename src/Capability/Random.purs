@@ -35,7 +35,8 @@ derive newtype instance bindRandomM :: Bind RandomM
 derive newtype instance monadRandomM :: Monad RandomM
 derive newtype instance monadEffectRandomM :: MonadEffect RandomM
 
-instance exceptTStringRandomM :: Random m => Random (ExceptT String m) where
+instance exceptTStringRandomM
+  :: Random m => Random (ExceptT String m) where
   shuffle xs = pure xs >>= lift <<< shuffle
   randomElement xs = pure xs >>= lift <<< randomElement
   randomIntBetween a = lift <<< randomIntBetween a
