@@ -2,8 +2,10 @@ module Domination.Capability.Log where
 
 import Prelude
 
+import Control.Monad.Except.Trans (ExceptT)
 import Control.Monad.Trans.Class (lift)
 import Domination.AppM (AppM)
+import Domination.Capability.Random (RandomM)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
@@ -13,9 +15,14 @@ class Monad m <= Log m where
   log :: String -> m Unit
   error :: String -> m Unit
 
-instance logHalogenM :: Log m => Log (HalogenM st act slots msg m) where
+instance logHalogenM
+  :: Log m => Log (HalogenM st act slots msg m) where
   log  = lift <<< log
   error  = lift <<< error
+
+instance logRandomM :: Log RandomM where
+  log = liftEffect <<< Console.log
+  error = liftEffect <<< Console.error
 
 instance logAppM :: Log AppM where
   log = liftEffect <<< Console.log
@@ -29,6 +36,10 @@ derive newtype instance applicativeLogM :: Applicative LogM
 derive newtype instance bindLogM :: Bind LogM
 derive newtype instance monadLogM :: Monad LogM
 derive newtype instance monadEffectLogM :: MonadEffect LogM
+
+instance logExceptTString :: Log m => Log (ExceptT String m) where
+  log = lift <<< log
+  error = lift <<< error
 
 instance logLogM :: Log LogM where
   log = liftEffect <<< Console.log
