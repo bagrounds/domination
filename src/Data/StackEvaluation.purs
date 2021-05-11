@@ -30,6 +30,7 @@ data StackExpression
   | StackNth Int
   | StackCostOf
   | StackMakeFilterCostUpTo
+  | StackMakeFilterAnd
   | StackBind String
   | StackGainTo Pile
   | StackChooseCardFromSupply

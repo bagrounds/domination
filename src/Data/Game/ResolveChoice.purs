@@ -14,7 +14,8 @@ import Domination.Data.Card (Card, passFilter)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Constraint as Constraint
-import Domination.Data.Filter (Filter(..))
+import Domination.Data.Filter (Filter)
+import Domination.Data.Filter as Filter
 import Domination.Data.Game (Game, getPlayer, modifyPlayer, modifyPlayerM, modifyStack)
 import Domination.Data.Game as Game
 import Domination.Data.Pile (Pile)
@@ -267,7 +268,7 @@ resolveChoice { playerIndex, choice } state =
                     "StackDiscard with empty Stack"
                   Just { head: StackArrayInt cardIndices, tail: stackTail } -> do
                     state'' <- moveFromTo playerIndex state'
-                      { filter: Any
+                      { filter: Filter.Any
                       , n: Unlimited
                       , source: Pile.Hand
                       , destination: Pile.ToDiscard
@@ -283,7 +284,7 @@ resolveChoice { playerIndex, choice } state =
                   Nothing -> throwError "StackTrash with empty Stack"
                   Just { head: StackArrayInt cardIndices, tail: stackTail } -> do
                     state'' <- moveFromTo playerIndex state'
-                      { filter: Any
+                      { filter: Filter.Any
                       , n: Unlimited
                       , source: Pile.Hand
                       , destination: Pile.Trash
@@ -312,13 +313,35 @@ resolveChoice { playerIndex, choice } state =
                   Just { head } -> throwError $
                     "can't add to " <> show head
 
+              StackMakeFilterAnd ->
+                case uncons stack of
+                  Nothing -> throwError
+                    "StackMakeFilterAnd with empty Stack"
+                  Just { head: StackFilter f1, tail: stackTail } ->
+                    case uncons stackTail of
+                      Nothing -> throwError
+                        "StackMakeFilterAnd requires 2 items on stack"
+                      Just { head: StackFilter f2, tail: stackTail' } -> do
+                        let
+                          top = StackFilter $ Filter.And f1 f2
+                          stack' = top : stackTail'
+                        evalStackChoice expressionTail stack' state'
+                      Just { head } -> throwError $
+                        "can't make a filter from " <> show head
+                        <> " stack: " <> show stack
+                        <> ", expression: " <> show expression
+                  Just { head } -> throwError $
+                    "can't make a filter from " <> show head
+                    <> " stack: " <> show stack
+                    <> ", expression: " <> show expression
+
               StackMakeFilterCostUpTo ->
                 case uncons stack of
                   Nothing -> throwError
                     "StackMakeFilterCostUpTo with empty Stack"
                   Just { head: StackInt n, tail: stackTail } -> do
                     let
-                      top = StackFilter $ CostUpTo n
+                      top = StackFilter $ Filter.CostUpTo n
                       stack' = top : stackTail
                     evalStackChoice expressionTail stack' state'
                   Just { head } -> throwError $

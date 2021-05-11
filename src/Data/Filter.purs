@@ -15,6 +15,7 @@ data Filter
   | HasType CardType
   | CostUpTo Int
   | Any
+  | And Filter Filter
 
 derive instance genericFilter :: Generic Filter _
 derive instance eqFilter :: Eq Filter

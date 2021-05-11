@@ -13,7 +13,7 @@ import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
-import Domination.Data.Filter (Filter(..))
+import Domination.Data.Filter as Filter
 import Domination.Data.Pile as Pile
 import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
@@ -76,6 +76,7 @@ cardMap =
   , junkDealer
   , stables
   , tradingPost
+  , mine
   , harem
   , nobles
   , artisan
@@ -319,7 +320,7 @@ chapel =
 chapelChoice :: Choice
 chapelChoice = let attack = false in MoveFromTo
   { n: UpTo 4
-  , filter: Any
+  , filter: Filter.Any
   , source: Pile.Hand
   , destination: Pile.Trash
   , resolution
@@ -345,7 +346,7 @@ militia =
 discardDownTo3 :: Choice
 discardDownTo3 = let attack = true in MoveFromTo
   { n: DownTo 3
-  , filter: Any
+  , filter: Filter.Any
   , source: Pile.Hand
   , destination: Pile.Discard
   , resolution
@@ -410,7 +411,7 @@ stewardChoice = let attack = false in Or
     , MoveFromTo
       { source: Pile.Hand
       , destination: Pile.Trash
-      , filter: Any
+      , filter: Filter.Any
       , n: Exactly 2
       , attack
       , resolution
@@ -470,7 +471,7 @@ torturerChoice = let attack = true in
   , choices:
     [ MoveFromTo
       { n: Exactly 2
-      , filter: Any
+      , filter: Filter.Any
       , source: Pile.Hand
       , destination: Pile.Discard
       , attack
@@ -540,7 +541,7 @@ moneyLenderChoice = let attack = false in
       { choices:
         [ MoveFromTo
           { n: Exactly one
-          , filter: HasName "Copper"
+          , filter: Filter.HasName "Copper"
           , source: Pile.Hand
           , destination: Pile.Trash
           , attack
@@ -582,7 +583,7 @@ harbinger = Card.action
 harbingerChoice :: Choice
 harbingerChoice = MoveFromTo
   { n: UpTo one
-  , filter: Any
+  , filter: Filter.Any
   , source: Pile.Discard
   , destination: Pile.Deck
   , resolution
@@ -623,7 +624,7 @@ gain1Estate = GainCards
 
 discard1Estate :: Choice
 discard1Estate = MoveFromTo
-  { filter: HasName "Estate"
+  { filter: Filter.HasName "Estate"
   , n: Exactly one
   , source: Pile.Hand
   , destination: Pile.ToDiscard
@@ -712,7 +713,7 @@ mountebankChoice = let attack = true in If
     { choices:
       [ MoveFromTo
         { n: Exactly one
-        , filter: HasName "Curse"
+        , filter: Filter.HasName "Curse"
         , source: Pile.Hand
         , destination: Pile.Discard
         , attack
@@ -814,7 +815,7 @@ oldWitch = let attack = true in
           { condition: HasCard "Curse"
           , choice: MoveFromTo
             { n: UpTo one
-            , filter: HasName "Curse"
+            , filter: Filter.HasName "Curse"
             , source: Pile.Hand
             , destination: Pile.Trash
             , attack
@@ -843,7 +844,7 @@ settlers = Card.action
     { target: Self
     , command: Choose $ MoveFromTo
       { n: UpTo one
-      , filter: HasName "Copper"
+      , filter: Filter.HasName "Copper"
       , source: Pile.Discard
       , destination: Pile.Hand
       , resolution
@@ -865,7 +866,7 @@ junkDealer = Card.action
     { target: Self
     , command: Choose $ MoveFromTo
       { n: Exactly one
-      , filter: Any
+      , filter: Filter.Any
       , source: Pile.Hand
       , destination: Pile.Trash
       , resolution
@@ -888,7 +889,7 @@ stables = let attack = false in Card.action
         , choice: And
           { choices:
             [ MoveFromTo
-              { filter: HasType Treasure
+              { filter: Filter.HasType Treasure
               , n: Exactly one
               , source: Pile.Hand
               , destination: Pile.ToDiscard
@@ -927,7 +928,7 @@ workshop = let attack = false in Card.action
   , special = Just
     { target: Self
     , command: Choose $ GainCard
-      { filter: CostUpTo 4
+      { filter: Filter.CostUpTo 4
       , destination: Pile.ToDiscard
       , attack
       , resolution
@@ -945,14 +946,14 @@ artisan = let attack = false in Card.action
     , command: Choose $ And
       { choices:
         [ GainCard
-          { filter: CostUpTo 5
+          { filter: Filter.CostUpTo 5
           , destination: Pile.Hand
           , attack
           , resolution
           }
         , MoveFromTo
           { n: Exactly one
-          , filter: Any
+          , filter: Filter.Any
           , source: Pile.Hand
           , destination: Pile.Deck
           , attack
@@ -974,7 +975,7 @@ armory = let attack = false in Card.action
   , special = Just
     { target: Self
     , command: Choose $ GainCard
-      { filter: CostUpTo 4
+      { filter: Filter.CostUpTo 4
       , destination: Pile.Deck
       , attack
       , resolution
@@ -993,14 +994,14 @@ altar = let attack = false in Card.action
       { choices:
         [ MoveFromTo
           { n: Exactly one
-          , filter: Any
+          , filter: Filter.Any
           , source: Pile.Hand
           , destination: Pile.Trash
           , attack
           , resolution
           }
         , GainCard
-          { filter: CostUpTo 5
+          { filter: Filter.CostUpTo 5
           , destination: Pile.ToDiscard
           , attack
           , resolution
@@ -1023,7 +1024,7 @@ courtyard = Card.action
     { target: Self
     , command: Choose $ MoveFromTo
       { n: Exactly one
-      , filter: Any
+      , filter: Filter.Any
       , source: Pile.Hand
       , destination: Pile.Deck
       , resolution
@@ -1043,14 +1044,14 @@ lurker = let attack = false in Card.action
     , command: Choose $ Or
       { choices:
         [ GainCard
-          { filter: HasType Action
+          { filter: Filter.HasType Action
           , destination: Pile.Trash
           , attack
           , resolution
           }
         , MoveFromTo
           { n: Exactly one
-          , filter: HasType Action
+          , filter: Filter.HasType Action
           , source: Pile.Trash
           , destination: Pile.ToDiscard
           , attack
@@ -1079,7 +1080,7 @@ cellar = let
       { expression:
         [ StackChooseCards
           { cards: Unbound
-          , filter: Bound Any
+          , filter: Bound Filter.Any
           , from: Bound Pile.Hand
           , n: Bound Unlimited
           }
@@ -1110,7 +1111,7 @@ remodel = let
       { expression:
         [ StackChooseCards
           { cards: Unbound
-          , filter: Bound Any
+          , filter: Bound Filter.Any
           , from: Bound Pile.Hand
           , n: Bound $ Exactly one
           }
@@ -1149,7 +1150,7 @@ tradingPost = let
       { expression:
         [ StackChooseCards
           { cards: Unbound
-          , filter: Bound Any
+          , filter: Bound Filter.Any
           , from: Bound Pile.Hand
           , n: Bound $ Exactly 2
           }
@@ -1164,6 +1165,48 @@ tradingPost = let
             ]
           , otherwise: [ ]
           }
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  }
+
+mine :: Card
+mine = let
+  attack = false
+  description = "You may trash a Treasure card from your hand."
+    <> " Gain a Treasure card to your hand"
+    <> " costing up to $3 more than it."
+  in Card.action
+  { name = "Mine"
+  , cost = 5
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound $ Filter.HasType Treasure
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly one
+          }
+        , StackDuplicate
+        , StackTrash
+        , StackNth zero
+        , StackCostOf
+        , StackAddN 3
+        , StackMakeFilterCostUpTo
+        , StackPush (StackFilter (Filter.HasType Treasure))
+        , StackMakeFilterAnd
+        , StackBind "filter"
+        , StackChooseCardFromSupply
+          { cardName: Unbound
+          , filter: Unbound
+          }
+        , StackGainTo Pile.Hand
         ]
       , stack: []
       , attack

@@ -22,6 +22,7 @@ data WireFilter
   | WireHasType CardType
   | WireCostUpTo WireInt
   | WireAny
+  | WireAnd WireFilter WireFilter
 
 _toWire :: Iso' Filter WireFilter
 _toWire = iso to from where
@@ -30,11 +31,13 @@ _toWire = iso to from where
     HasType cardType -> WireHasType cardType
     CostUpTo n -> WireCostUpTo $ n ^. Int._toWire
     Any -> WireAny
+    And f1 f2 -> WireAnd (f1 ^. _toWire) (f2 ^. _toWire)
   from = case _ of
     WireHasName name -> HasName name
     WireHasType cardType -> HasType cardType
     WireCostUpTo n -> CostUpTo $ n .^ Int._toWire
     WireAny -> Any
+    WireAnd f1 f2 -> And (f1 .^ _toWire) (f2 .^ _toWire)
 
 derive instance genericWireFilter :: Generic WireFilter _
 derive instance eqWireFilter :: Eq WireFilter
@@ -47,11 +50,11 @@ instance decodeJsonWireFilter :: DecodeJson WireFilter where
 
 instance dynamicByteLengthWireFilter
   :: DynamicByteLength WireFilter where
-  byteLength = genericByteLength
+  byteLength a = genericByteLength a
 instance encodeArrayBuffeWireFilter
   :: EncodeArrayBuffer WireFilter where
-  putArrayBuffer = genericPutArrayBuffer
+  putArrayBuffer a = genericPutArrayBuffer a
 instance decodeArrayBuffeWireFilter
   :: DecodeArrayBuffer WireFilter where
-  readArrayBuffer = genericReadArrayBuffer
+  readArrayBuffer a = genericReadArrayBuffer a
 

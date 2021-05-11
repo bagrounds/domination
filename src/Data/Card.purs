@@ -22,6 +22,7 @@ import Domination.Data.Buys (Buys)
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
 import Domination.Data.Filter (Filter(..))
+import Domination.Data.Filter as Filter
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.Target (Target)
@@ -158,4 +159,5 @@ passFilter = case _ of
   HasType cardType -> hasType cardType
   CostUpTo cost' -> (_ <= cost') <<< (view _cost)
   Any -> const true
+  Filter.And f1 f2 -> passFilter f1 && passFilter f2
 

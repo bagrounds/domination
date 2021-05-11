@@ -14,7 +14,7 @@ import Domination.Data.Buys as Buys
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
-import Domination.Data.Filter (Filter(..))
+import Domination.Data.Filter as Filter
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
 import Domination.Data.Phase (Phase(..))
@@ -221,12 +221,13 @@ instance choiceRenderText :: RenderText Choice where
       Unlimited -> [ makeText "any number of" ]
       where
         makeText condition = HH.text $ intercalate " "
-          [ verb, condition, description, suffix ]
-        description = case filter of
-          HasName name -> name
-          HasType cardType -> show cardType
-          CostUpTo cost -> "cards costing up to " <> show cost
-          Any -> "card(s)"
+          [ verb, condition, description filter, suffix ]
+        description = case _ of
+          Filter.HasName name -> name
+          Filter.HasType cardType -> show cardType
+          Filter.CostUpTo cost -> "cards costing up to " <> show cost
+          Filter.Any -> "card(s)"
+          Filter.And f1 f2 -> description f1 <> " and " <> description f2
         suffix = case source of
           Pile.Hand -> ""
           Pile.Discard -> "from your discard pile"
@@ -251,12 +252,13 @@ instance choiceRenderText :: RenderText Choice where
           Pile.ToDiscard -> "Gain"
           Pile.Deck -> "Gain onto your deck"
           Pile.Trash -> "Trash"
-        card = case filter of
-          HasName name -> "1 " <> name
-          HasType t -> "a card of type " <> show t
-          CostUpTo cost -> "a card costing up to " <> show cost
-          Any -> "a card"
-      in [ HH.text $ verb <> " " <> card <> " from the supply" ]
+        card = case _ of
+          Filter.HasName name -> "1 " <> name
+          Filter.HasType cardType -> "a card of type " <> show cardType
+          Filter.CostUpTo cost -> "cards costing up to " <> show cost
+          Filter.Any -> "a card"
+          Filter.And f1 f2 -> card f1 <> " and " <> card f2
+      in [ HH.text $ verb <> " " <> card filter <> " from the supply" ]
 
     GainActions { n } -> [ HH.text "+", renderText n ]
 

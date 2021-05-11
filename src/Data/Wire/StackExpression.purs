@@ -40,6 +40,7 @@ data WireStackExpression
   | WireStackNth WireInt
   | WireStackCostOf
   | WireStackMakeFilterCostUpTo
+  | WireStackMakeFilterAnd
   | WireStackBind String
   | WireStackGainTo Pile
   | WireStackChooseCardFromSupply (Var String) (Var WireFilter)
@@ -68,6 +69,7 @@ _toWire = iso to fro where
     StackNth n -> WireStackNth $ n ^. Int._toWire
     StackCostOf -> WireStackCostOf
     StackMakeFilterCostUpTo -> WireStackMakeFilterCostUpTo
+    StackMakeFilterAnd -> WireStackMakeFilterAnd
     StackBind s -> WireStackBind s
     StackGainTo pile -> WireStackGainTo pile
     StackChooseCardFromSupply { cardName, filter } ->
@@ -98,6 +100,7 @@ _toWire = iso to fro where
     WireStackNth n -> StackNth $ n .^ Int._toWire
     WireStackCostOf -> StackCostOf
     WireStackMakeFilterCostUpTo -> StackMakeFilterCostUpTo
+    WireStackMakeFilterAnd -> StackMakeFilterAnd
     WireStackBind s -> StackBind s
     WireStackGainTo pile -> StackGainTo pile
     WireStackChooseCardFromSupply cardName filter ->
