@@ -69,6 +69,13 @@ resolveChoice { playerIndex, choice } state =
             Nothing -> pure { state: state', expr: [], stack }
 
             Just { head: e, tail: expressionTail } -> case e of
+              StackGainBonus bonus -> do
+                state'' <- modifyPlayer
+                  playerIndex
+                  (Player.gainBonus bonus)
+                  state
+                evalStackChoice expressionTail stack state''
+
               StackIf { condition, following, otherwise } -> do
                 { stack: result, state: state'' } <-
                   evalStackChoice condition stack state'
@@ -114,6 +121,30 @@ resolveChoice { playerIndex, choice } state =
                   let
                     stack' = StackString cardName : stack
                   evalStackChoice expressionTail stack' state'
+
+              StackOption (Bound b) -> let value = StackBool b in
+                evalStackChoice expressionTail (value : stack) state'
+
+              StackOption Unbound -> do
+                  let
+                    choice' = StackChoice
+                      { attack
+                      , expression
+                      , stack
+                      , description
+                      }
+                  traverseOf
+                    (Game._player playerIndex)
+                    Player.dropChoice
+                    state'
+                    -- TODO: clean up this hack
+                    -- HACK: adding same choice twice because we drop
+                    -- a choice at the end of resolveChoice
+                    -- unconditionally.
+                    >>= modifyPlayer
+                      playerIndex
+                      (Player.gainChoices [choice', choice'])
+                    <#> { state: _, expr: expression, stack }
 
               StackChooseCardFromSupply
                 { cardName: Unbound

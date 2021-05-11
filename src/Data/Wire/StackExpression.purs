@@ -8,13 +8,15 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
+import Data.Show.Generic (genericShow)
 import Domination.Data.Pile (Pile)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Var (Var)
+import Domination.Data.Wire.Bonus (WireBonus)
+import Domination.Data.Wire.Bonus as Bonus
 import Domination.Data.Wire.Constraint (WireConstraint)
 import Domination.Data.Wire.Constraint as Constraint
 import Domination.Data.Wire.Filter (WireFilter)
@@ -50,6 +52,8 @@ data WireStackExpression
     (Array WireStackExpression)
     (Array WireStackExpression)
   | WireStackPush WireStackValue
+  | WireStackGainBonus WireBonus
+  | WireStackOption (Var Boolean)
 
 _toWire :: Iso' StackExpression WireStackExpression
 _toWire = iso to fro where
@@ -82,6 +86,9 @@ _toWire = iso to fro where
       (view _toWire <$> following)
       (view _toWire <$> otherwise)
     StackPush value -> WireStackPush $ value ^. StackValue._toWire
+    StackGainBonus bonus -> WireStackGainBonus
+      $ bonus ^. Bonus._toWire
+    StackOption var -> WireStackOption var
 
   fro = case _ of
     WireStackChooseCards cards filter from n ->
@@ -115,6 +122,9 @@ _toWire = iso to fro where
       , otherwise: review _toWire <$> otherwise
       }
     WireStackPush value -> StackPush $ value .^ StackValue._toWire
+    WireStackGainBonus bonus -> StackGainBonus
+      $ bonus .^ Bonus._toWire
+    WireStackOption var -> StackOption var
 
 derive instance genericWireStackExpression
   :: Generic WireStackExpression _

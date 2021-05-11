@@ -507,6 +507,33 @@ renderPlayer cs@{ state, playerIndex } player =
                       <<< fromMaybe "couldn't find card in supply"
                     ]
 
+              Just
+                { head: StackOption (Bound b)
+                } -> h1__ $ "Domination: StackOption:"
+                  <> " decision already made: " <> show b
+
+              Just { head: StackOption Unbound, tail } ->
+                chooseOne (HH.text x.description)
+                  [ { clickEvent: MakePlay $ ResolveChoice
+                      { playerIndex
+                      , choice: StackChoice x
+                        { expression = (StackOption $ Bound $ true)
+                          : tail
+                        }
+                      }
+                    , text: HH.text "Yes"
+                    }
+                  , { clickEvent: MakePlay $ ResolveChoice
+                      { playerIndex
+                      , choice: StackChoice x
+                        { expression = (StackOption $ Bound $ false)
+                          : tail
+                        }
+                      }
+                    , text: HH.text "No"
+                    }
+                  ]
+
               Just _ ->
                 acknowledge
                   (renderText choice)

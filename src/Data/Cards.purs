@@ -52,6 +52,7 @@ cardMap =
   , steward
   , harbinger
   , workshop
+  , mill
   , goldfish
   , baron
   , monument
@@ -1207,6 +1208,50 @@ mine = let
           , filter: Unbound
           }
         , StackGainTo Pile.Hand
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  }
+
+mill :: Card
+mill = let
+  attack = false
+  description = "You may discard 2 cards, for +$2"
+  in Card.actionVictory
+  { name = "Mill"
+  , cost = 4
+  , cards = one
+  , actions = one
+  , victoryPoints = one
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackOption Unbound
+        , StackIf
+          { condition: [ StackEquals $ StackBool true ]
+          , following:
+            [ StackChooseCards
+              { cards: Unbound
+              , filter: Bound Filter.Any
+              , from: Bound Pile.Hand
+              , n: Bound $ Exactly 2
+              }
+            , StackDuplicate
+            , StackDiscard
+            , StackLength
+            , StackIf
+              { condition: [ StackEquals $ StackInt 2 ]
+              , following: [ StackGainBonus $ Cash 2 ]
+              , otherwise: []
+              }
+            ]
+          , otherwise: []
+          }
         ]
       , stack: []
       , attack
