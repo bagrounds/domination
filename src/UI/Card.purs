@@ -4,32 +4,36 @@ module Domination.UI.Card
 
 import Prelude
 
-import Data.Array (intercalate)
-import Data.Maybe (Maybe(..), isJust)
-import Data.Symbol (SProxy(..))
+import Data.Maybe (Maybe(..), isJust, fromMaybe)
 import Domination.Capability.Dom (class Dom, stopPropagation)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
+import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Halogen as H
+import Halogen.Component (ComponentSlot)
+import Halogen.Data.Slot (Slot)
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HP
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (class_, classes) as HP
-import Web.UIEvent.MouseEvent (toEvent)
+import Type.Proxy (Proxy(..))
+import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
---render
---  :: forall w i
---  . (MouseEvent -> Maybe i)
---  -> Array H.ClassName
---  -> Card
---  -> DomSlot
---  -> HTML w i
+render
+  :: forall a b r m i
+  . Dom m
+  => Log m
+  => (MouseEvent -> i)
+  -> Array H.ClassName
+  -> Card
+  -> DomSlot
+  -> HTML (ComponentSlot (description :: Slot a b DomSlot | r) m i) i
 render onClick extraClasses card slot =
   HH.button properties children where
   properties =
@@ -65,12 +69,11 @@ render onClick extraClasses card slot =
     ]
   children =
     [ HH.ul_
-      [ HH.slot
-        (SProxy :: SProxy "description")
+      [ HH.slot_
+        (Proxy :: Proxy "description")
         slot
         (descriptionComponent card)
         card
-        (const Nothing)
       , HH.li
         [ HP.classes [ Css.cardText, Css.cardCards ] ]
           if card.cards > zero
@@ -125,7 +128,7 @@ descriptionComponent
   . Dom m
   => Log m
   => Card
-  -> H.Component HTML query Card output m
+  -> H.Component query Card output m
 descriptionComponent card' =
   H.mkComponent { initialState, render: render', eval }
   where
@@ -140,7 +143,7 @@ descriptionComponent card' =
         [ HH.button
           [ HP.classes [ Css.cardText, Css.cardName, Css.toggle ]
           , HP.onClick \event ->
-            Just { card, event: Just event, reset: false }
+            { card, event: Just event, reset: false }
           ]
           [ HH.text card.name ]
         ] <>
@@ -149,7 +152,7 @@ descriptionComponent card' =
           [ HH.button
             [ HP.class_ Css.toolTip
             , HP.onClick \event ->
-              Just { card, event: Just event, reset: false }
+              { card, event: Just event, reset: false }
             ] $
             [ HH.text $ description card.special ]
             <> case card.reaction of
@@ -160,7 +163,7 @@ descriptionComponent card' =
                 ]
           ]
         else []
-    description special = intercalate ". " (_.description <$> special)
+    description special = fromMaybe "" (_.description <$> special)
     eval = H.mkEval H.defaultEval
       { handleAction = \{ event, reset, card } -> do
         case event of

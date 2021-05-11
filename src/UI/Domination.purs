@@ -5,25 +5,27 @@ import Prelude
 import AppState (Config)
 import AppState as AppState
 import Audio.WebAudio.Types (AudioContext)
-import Data.Array (filter, findIndex, length, uncons, (!!), (:))
+import Data.Array (filter, findIndex, uncons, (:))
+import Data.Array.NonEmpty ((!!))
 import Data.Either (Either(..))
+import Data.Foldable (length)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Setter ((%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Symbol (SProxy(..))
 import Domination.Capability.Audio (class Audio, beep)
 import Domination.Capability.Audio as Sound
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
 import Domination.Capability.Storage (class Storage)
-import Domination.Data.Card (Card)
+import Domination.Data.Card (Card, passFilter)
 import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
-import Domination.Data.GameState (GameState, newGame, passFilter)
-import Domination.Data.GameState as Dom
+import Domination.Data.Game (Game)
+import Domination.Data.Game (hasReaction, new, choicesOutstanding, isAttacked) as Game
+import Domination.Data.Game.Engine (choiceTurn, makeAutoPlay) as Game
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
 import Domination.Data.Play as Play
@@ -57,21 +59,21 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
+import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 data GameQuery a
   = LoadActiveState ActiveState a
-  | ReceiveGameState { state :: GameState, i :: Int } a
+  | ReceiveGame { state :: Game, i :: Int } a
   | StartNewGameRequest AppState.Config a
 
 derive instance genericGameQuery :: Generic (GameQuery a) _
 
-_component :: SProxy "Domination"
-_component = SProxy
+_component :: Proxy "Domination"
+_component = Proxy
 
 type Component query r m action =
   ComponentSlot
-  HTML
   ( "Domination" :: Slot query GameEvent DomSlot
   , "description" :: H.Slot query Unit DomSlot
   | r
@@ -88,7 +90,7 @@ component
   => Audio m
   => Config
   -> AudioContext
-  -> H.Component HTML GameQuery input GameEvent m
+  -> H.Component GameQuery input GameEvent m
 component config audioContext =
   H.mkComponent { initialState, render, eval }
   where
@@ -96,7 +98,7 @@ component config audioContext =
     { i: zero
     , playerIndex: config.nextPlayerIndex
     , playerCount: config.nextPlayerCount
-    , state: newGame one kingdom config.longGame
+    , state: Game.new one kingdom config.longGame
     , showSupply: true
     }
   kingdom = _.card <$> _.selected `filter` config.kingdom
@@ -106,13 +108,13 @@ component config audioContext =
     , handleQuery = handleQuery audioContext
     }
 
-updateShowSupply :: ActiveState -> GameState -> Boolean
+updateShowSupply :: ActiveState -> Game -> Boolean
 updateShowSupply activeState { turn: nextTurn, phase } =
   case activeState, activeState.playerIndex, nextTurn, phase of
   { state: { turn } }, me, nt, BuyPhase
     | me == turn && me /= nt -> false
     | me == nt -> true
-  { state: { turn } }, me, nt, ActionPhase
+  _, me, nt, ActionPhase
     | me == nt -> false
   { showSupply }, _, _, _ -> showSupply
 
@@ -127,10 +129,10 @@ handleQuery
   -> GameQuery a
   -> H.HalogenM ActiveState action slots GameEvent m (Maybe a)
 handleQuery audioContext = case _ of
-  ReceiveGameState { state, i } a -> do
+  ReceiveGame { state, i } a -> do
     activeGame <- H.get
 
-    if Dom.isAttacked activeGame.playerIndex state
+    if Game.isAttacked activeGame.playerIndex state
     then beep audioContext Sound.Attacked
     else
       if activeGame.state.turn /= activeGame.playerIndex
@@ -141,7 +143,6 @@ handleQuery audioContext = case _ of
     let
       previousI = activeGame.i
       expectedI = previousI + one
-      isExpected = i == expectedI
     log $ "Expected i = " <> (show expectedI)
       <> ". Received i = " <> (show i)
 
@@ -158,7 +159,7 @@ handleQuery audioContext = case _ of
     H.raise $ SaveGame newActiveState
     pure $ Just a
 
-  LoadActiveState activeState@{ showSupply, state } a -> do
+  LoadActiveState activeState@{ state } a -> do
     activeGame <- H.get
     let
       newShowSupply = updateShowSupply activeGame state
@@ -184,7 +185,6 @@ handleQuery audioContext = case _ of
 
 type ChildComponents query r m =
   ComponentSlot
-  HTML
   ( "MoveFromTo" :: H.Slot query Choice DomSlot
   , "PickN" :: H.Slot query (Array Choice) DomSlot
   , "description" :: H.Slot query Unit DomSlot
@@ -264,23 +264,23 @@ renderSupply player { playerIndex, state } =
       renderStack onClick player (CardSlot SupplyArea stackIndex)
       where
         onClick _ =
-          Just $ MakePlay $ Purchase { playerIndex, stackIndex }
+          MakePlay $ Purchase { playerIndex, stackIndex }
 
-renderDeck :: forall widget input. Player -> HTML widget input
+renderDeck :: forall widget. Player -> HTML widget Action
 renderDeck player = HH.button
-  [ HE.onClick (const Nothing), HP.class_ Css.deck ]
+  [ HE.onClick (const DoNothing), HP.class_ Css.deck ]
   [ HH.ul_
     [ HH.li [] [ HH.text "Discard" ]
-    , HH.li [] [ HH.text $ show $ length player.discard ]
+    , HH.li [] [ HH.text $ show $ (length player.discard :: Int)]
     ]
   ]
 
-renderDiscard :: forall widget input. Player -> HTML widget input
+renderDiscard :: forall widget. Player -> HTML widget Action
 renderDiscard player = HH.button
-  [ HE.onClick (const Nothing), HP.class_ Css.discard ]
+  [ HE.onClick (const DoNothing), HP.class_ Css.discard ]
   [ HH.ul_
     [ HH.li [] [ HH.text "Deck" ]
-    , HH.li [] [ HH.text $ show $ length player.deck ]
+    , HH.li [] [ HH.text $ show $ (length player.deck :: Int) ]
     ]
   ]
 
@@ -288,7 +288,7 @@ renderCard
   :: forall query r m
   . Dom m
   => Log m
-  => (MouseEvent -> Maybe Action)
+  => (MouseEvent -> Action)
   -> Player
   -> Card
   -> DomSlot
@@ -307,7 +307,7 @@ renderStack
   :: forall query r m
   . Dom m
   => Log m
-  => (MouseEvent -> Maybe Action)
+  => (MouseEvent -> Action)
   -> Player
   -> DomSlot
   -> Stack
@@ -343,7 +343,8 @@ renderPlayers cs@{ playerIndex, state } =
   case state.players !! playerIndex of
     Nothing ->
       [ HH.text $ "You cannot be player " <> show (playerIndex + 1)
-        <> " in a " <> show (length state.players) <> " player game."
+        <> " in a " <> show (length state.players :: Int)
+        <> " player game."
       ]
     Just player -> renderPlayer cs player
 
@@ -357,12 +358,12 @@ renderPlayer
 renderPlayer cs@{ state, playerIndex } player =
   [ Hud.render cs
   , if Player.hasChoices player
-    && playerIndex == Dom.choiceTurn state
+    && playerIndex == Game.choiceTurn state
     then HH.div [ HP.class_ Css.dialogue ] $ fromMaybe [] $
       let
         choice = Player.firstChoice player
-        hasReaction = Dom.hasReaction playerIndex state
-        isAttacked = Dom.isAttacked playerIndex state
+        hasReaction = Game.hasReaction playerIndex state
+        isAttacked = Game.isAttacked playerIndex state
       in
       if isAttacked && hasReaction
       then pure <$> renderReaction
@@ -373,7 +374,7 @@ renderPlayer cs@{ state, playerIndex } player =
         <> show state.players
       Just currentPlayer -> HH.div
         ( if state.turn /= playerIndex
-          || Dom.choicesOutstanding state
+          || Game.choicesOutstanding state
           then [ HP.class_ Css.waiting ]
           else []
         )
@@ -389,12 +390,12 @@ renderPlayer cs@{ state, playerIndex } player =
           [ HP.class_ Css.controls ]
           [ HH.button
             [ HP.class_ Css.undo
-            , HE.onClick \_ -> Just $ UndoRequest cs
+            , HE.onClick \_ -> UndoRequest cs
             ]
             [ HH.text "Undo" ]
           , HH.button
             [ HP.class_ Css.supplyToggle
-            , HE.onClick \_ -> Just ToggleSupply
+            , HE.onClick \_ -> ToggleSupply
             ]
             [ HH.text "Supply" ]
           , renderNextPhaseButton cs
@@ -422,7 +423,7 @@ renderPlayer cs@{ state, playerIndex } player =
         -> Maybe Choice
         -> Maybe (HTML (ChildComponents query r m) Action)
       renderChoice baseSlotNumber = map \choice -> case choice of
-          StackChoice x@{ attack, expression, stack } ->
+          StackChoice x@{ expression } ->
             case uncons expression of
               Nothing ->
                 h1__ "Something has gone terribly wrong!!!"
@@ -437,7 +438,7 @@ renderPlayer cs@{ state, playerIndex } player =
                 , tail
                 } -> HH.div_
                 [ HH.slot
-                  (SProxy :: SProxy "ChooseCards")
+                  (Proxy :: Proxy "ChooseCards")
                   (AreaSlot ChoiceArea)
                   ( ChooseCards.component
                     { state
@@ -449,8 +450,7 @@ renderPlayer cs@{ state, playerIndex } player =
                     }
                   )
                   unit
-                  $ Just
-                  <<< MakePlay
+                  $ MakePlay
                   <<< ResolveChoice
                   <<< ({ playerIndex, choice: _ })
                   <<< StackChoice
@@ -469,7 +469,6 @@ renderPlayer cs@{ state, playerIndex } player =
               Just
                 { head: StackChooseCardFromSupply
                   { cardName: Bound cardName }
-                , tail
                 } -> h1__ $ "Domination: StackChooseCardFromSupply:"
                   <> " card already chosen: " <> show cardName
 
@@ -490,14 +489,13 @@ renderPlayer cs@{ state, playerIndex } player =
                     cards = predicate `filter` unfiltered
                   in HH.div_
                     [ HH.slot
-                      (SProxy :: SProxy "ChooseFromSupply")
+                      (Proxy :: Proxy "ChooseFromSupply")
                       (AreaSlot ChoiceArea)
                       ( ChooseFromSupply.component
                         { cards, baseSlotNumber }
                       )
                       unit
-                      $ Just
-                      <<< MakePlay
+                      $ MakePlay
                       <<< ResolveChoice
                       <<< ({ playerIndex, choice: _ })
                       <<< StackChoice
@@ -521,7 +519,7 @@ renderPlayer cs@{ state, playerIndex } player =
           If x ->
             acknowledge (renderText choice) (playEvent If x unit)
 
-          And x@{ choices } ->
+          And x ->
             acknowledge (renderText choice) (playEvent And x unit)
 
           Or x@{ choices } -> chooseOne (HH.text "Choose one")
@@ -532,14 +530,13 @@ renderPlayer cs@{ state, playerIndex } player =
 
           PickN x@{ n, choices } -> HH.div_
             [ HH.slot
-              (SProxy :: SProxy "PickN")
+              (Proxy :: Proxy "PickN")
               (AreaSlot ChoiceArea)
               ( PickN.component
                 { title: "Choose " <> show n, n, choices }
               )
               unit
-              $ Just
-              <<< MakePlay
+              $ MakePlay
               <<< ResolveChoice
               <<< ({ playerIndex, choice: _ })
               <<< PickN
@@ -565,7 +562,7 @@ renderPlayer cs@{ state, playerIndex } player =
 
           MoveFromTo _ -> HH.div_
             [ HH.slot
-              (SProxy :: SProxy "MoveFromTo")
+              (Proxy :: Proxy "MoveFromTo")
               (AreaSlot ChoiceArea)
               ( MoveFromTo.component
                 state
@@ -574,13 +571,12 @@ renderPlayer cs@{ state, playerIndex } player =
                 baseSlotNumber
               )
               unit
-              $ Just
-              <<< MakePlay
+              $ MakePlay
               <<< ResolveChoice
               <<< { playerIndex, choice: _ }
             ]
 
-          GainCards x@{ n, cardName } -> acknowledge
+          GainCards x -> acknowledge
             (renderText choice)
             (playEvent GainCards x unit)
 
@@ -594,12 +590,11 @@ renderPlayer cs@{ state, playerIndex } player =
               cards = predicate `filter` unfiltered
             in HH.div_
               [ HH.slot
-                (SProxy :: SProxy "ChooseFromSupply")
+                (Proxy :: Proxy "ChooseFromSupply")
                 (AreaSlot ChoiceArea)
                 (ChooseFromSupply.component { cards, baseSlotNumber })
                 unit
-                $ Just
-                <<< MakePlay
+                $ MakePlay
                 <<< ResolveChoice
                 <<< { playerIndex, choice: _ }
                 <<< GainCard
@@ -644,12 +639,12 @@ renderNextPhaseButton
 renderNextPhaseButton { playerIndex, state } =
   HH.button
     [ HP.class_ Css.nextPhase
-    , HE.onClick $ const $ Just $ MakePlay $ EndPhase { playerIndex }
+    , HE.onClick $ const $ MakePlay $ EndPhase { playerIndex }
     ]
     [ HH.span_ if state.turn == playerIndex
-      then if Dom.choicesOutstanding state
+      then if Game.choicesOutstanding state
         then [ HH.text $ "Waiting for Player "
-          <> show (Dom.choiceTurn state + one)
+          <> show (Game.choiceTurn state + one)
           <> " to Choose" ]
         else case state.phase of
           ActionPhase ->
@@ -684,7 +679,7 @@ renderAtPlay currentPlayer =
       [ HP.class_ Css.playTitle ]
       [ HH.text "At Play" ]
     stacks =
-      ( renderStack (const Nothing) currentPlayer
+      ( renderStack (const DoNothing) currentPlayer
       <<< (CardSlot AtPlayArea)
       ) `mapWithIndex` stackCards currentPlayer.atPlay
 
@@ -701,7 +696,7 @@ renderBuying currentPlayer =
       [ HP.class_ Css.buyingTitle ]
       [ HH.text "Buying" ]
     stacks =
-      ( renderStack (const Nothing) currentPlayer
+      ( renderStack (const DoNothing) currentPlayer
       <<< (CardSlot BuyingArea)
       ) `mapWithIndex` stackCards currentPlayer.buying
 
@@ -721,7 +716,7 @@ renderHand player { playerIndex, state } = HH.ul
       else Css.inactive
     ] <>
     if player.actions < one
-    || (length $ Card.isAction `filter` player.hand) < one
+    || (length $ Card.isAction `filter` player.hand) < 1
     then [ Css.waiting ]
     else []
   ] $ title :
@@ -736,7 +731,7 @@ renderHand player { playerIndex, state } = HH.ul
     title = HH.li
       [ HP.class_ Css.handTitle ]
       [ HH.text "Hand" ]
-    onClick stack hand = const $ Just $ MakePlay
+    onClick stack hand = const $ MakePlay
       $ PlayCard { playerIndex,  cardIndex }
       where
         cardIndex = fromMaybe (-one)
@@ -756,6 +751,7 @@ handleAction audioContext = case _ of
     in playAndReport playerIndex play audioContext
   UndoRequest as -> H.raise $ Undo as
   ToggleSupply -> H.modify_ $ _showSupply %~ not
+  DoNothing -> pure unit
 
 playAndReport
   :: forall s p m
@@ -771,7 +767,7 @@ playAndReport playerIndex play audioContext = do
   let
     lastPhase = state.phase
     lastTurn = state.turn
-  result <- Dom.makeAutoPlay play activeState.state
+  result <- Game.makeAutoPlay play activeState.state
   case result of
     Left e -> do
       beep audioContext Sound.Error

@@ -119,17 +119,12 @@ let additions =
 
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20210118/packages.dhall sha256:a59c5c93a68d5d066f3815a89f398bcf00e130a51cb185b2da29b20e2d8ae115
+      https://github.com/purescript/package-sets/releases/download/psc-0.14.1-20210506/packages.dhall sha256:d199e142515f9cc15838d8e6d724a98cd0ca776ceb426b7b36e841311643e3ef
 
 let overrides = {=}
 
 let additions =
-      { web-storage =
-        { dependencies = [ "web-events", "nullable" ]
-        , repo = "https://github.com/purescript-web/purescript-web-storage.git"
-        , version = "v3.0.0"
-        }
-      , webaudio =
+      { webaudio =
         { dependencies =
           [ "effect"
           , "arraybuffer-types"
@@ -145,6 +140,56 @@ let additions =
           ]
         , repo = "https://github.com/adkelley/purescript-webaudio.git"
         , version = "v0.2.1"
+        }
+      , arraybuffer =
+        { dependencies =
+          [ "effect"
+          , "arraybuffer-types"
+          , "maybe"
+          , "typelevel"
+          , "uint"
+          , "float32"
+          , "partial"
+          , "nullable"
+          , "functions"
+          ]
+        , repo = "https://github.com/jacereda/purescript-arraybuffer.git"
+        , version = "v10.0.2"
+        }
+      , arraybuffer-class =
+        { dependencies =
+          [ "unordered-collections"
+          , "exceptions"
+          , "effect"
+          , "ordered-collections"
+          , "foreign-object"
+          , "prelude"
+          , "strings"
+          , "sized-vectors"
+          , "arraybuffer"
+          ]
+        , repo = "https://github.com/bagrounds/purescript-arraybuffer-class.git"
+        , version = "master"
+        }
+      , float32 =
+        { dependencies =
+          [ "prelude"
+          ]
+        , repo = "https://github.com/athanclark/purescript-float32.git"
+        , version = "v0.2.0"
+        }
+      , uint =
+        { dependencies =
+          [ "effect"
+          , "quickcheck-laws"
+          , "console"
+          , "maybe"
+          , "math"
+          , "psci-support"
+          , "quickcheck"
+          ]
+        , repo = "https://github.com/zaquest/purescript-uint.git"
+        , version = "v5.1.4"
         }
       }
 

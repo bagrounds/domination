@@ -7,14 +7,12 @@ import Prelude
 import Data.Array (filter, (:))
 import Data.Foldable (length)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Maybe (Maybe(..))
 import Domination.Data.Choice (Choice)
 import Domination.UI.Css as Css
 import Domination.UI.RenderText (renderText)
 import Domination.UI.Util (h2__)
 import Halogen (Component)
 import Halogen as H
-import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -30,7 +28,7 @@ data Action
 component
   :: forall query input m
   . { title :: String, n :: Int, choices :: Array Choice }
-  -> Component HTML query input (Array Choice) m
+  -> Component query input (Array Choice) m
 component { n, title, choices } =
   H.mkComponent { initialState, render, eval }
     where
@@ -41,14 +39,14 @@ component { n, title, choices } =
     render xs = HH.div_ $ (h2__ title)
       : HH.p_
         [ HH.button
-          [ HE.onClick \_ -> Just Done ]
+          [ HE.onClick \_ -> Done ]
           [ HH.text "Done choosing" ]
         ]
       : (xs <#> f)
       where
         f { i, selected, choice } =
           HH.button
-            [ HE.onClick \_ -> Just (Toggle i)
+            [ HE.onClick \_ -> Toggle i
             , HP.class_ if selected
               then Css.toTrash
               else Css.toKeep

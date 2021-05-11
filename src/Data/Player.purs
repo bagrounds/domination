@@ -3,7 +3,7 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, deleteAt, filter, head, length, reverse)
+import Data.Array (any, catMaybes, deleteAt, filter, head, length, replicate, reverse)
 import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
@@ -18,16 +18,17 @@ import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Domination.Capability.Random (class Random, shuffle)
+import Domination.Capability.Random (class Random, randomIntBetween, shuffle)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus (cashValue) as Bonus
 import Domination.Data.Buys (Buys)
-import Domination.Data.Card (Card)
+import Domination.Data.Card (Card, hasType)
 import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positivePoints, value) as Card
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice (isAttack) as Choice
+import Domination.Data.Condition (Condition(..))
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.Wire.Bonus (WireBonus)
@@ -36,9 +37,10 @@ import Domination.Data.Wire.Card (_toWire) as Card
 import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
 import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Int as Int
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
-import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
+import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (.^), (:~), (<$>~))
 
 type Player =
   { actions :: Actions
@@ -369,4 +371,28 @@ positivePoints = sum <<< (map Card.positivePoints) <<< allCards
 
 negativePoints :: Player -> Points
 negativePoints = sum <<< (map Card.negativePoints) <<< allCards
+
+describes :: forall m. Random m => Condition -> Player -> m Boolean
+describes = case _ of
+  HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
+  HasCardType cardType -> pure <<< _.hand >>> any (hasType cardType)
+  HasDiscard -> pure <<< _.discard >>> (not <<< null)
+  Randomly percent -> const
+    $ (_ > (percent .^ Int._toWire))
+    <$> randomIntBetween zero 100
+
+newPlayer :: Player
+newPlayer =
+  { deck: []
+  , hand: []
+  , discard: (replicate 7 Cards.copper) <> (replicate 3 Cards.estate)
+  , toDiscard: []
+  , atPlay: []
+  , buying: []
+  , actions: one
+  , buys: one
+  , choices: []
+  , reaction : Nothing
+  , bonuses : []
+  }
 

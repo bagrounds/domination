@@ -4,15 +4,15 @@ import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Symbol (SProxy(..))
-import Domination.Data.GameState (GameState)
-import Domination.Data.GameState as GameState
+import Domination.Data.Game (Game)
+import Domination.Data.Game as Game
 
 type ActiveState =
   { i :: Int
   , playerCount :: Int
   , playerIndex :: Int
   , showSupply :: Boolean
-  , state :: GameState
+  , state :: Game
   }
 
 _i
@@ -33,4 +33,5 @@ _state
 _state = prop (SProxy :: SProxy "state")
 
 upgrade :: ActiveState -> ActiveState
-upgrade = _state %~ GameState.upgrade
+upgrade = _state %~ Game.upgrade
+

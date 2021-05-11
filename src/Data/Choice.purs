@@ -1,13 +1,14 @@
 module Domination.Data.Choice where
 
+import Prim hiding (Constraint)
 import Prelude
 
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
@@ -119,11 +120,15 @@ isAttack = case _ of
   StackChoice { attack } -> attack
 
 derive instance genericChoice :: Generic Choice _
+
 derive instance eqChoice :: Eq Choice
+
 instance showChoice :: Show Choice where
   show choice = genericShow choice
+
 instance encodeJsonChoice :: EncodeJson Choice where
   encodeJson a = genericEncodeJson a
+
 instance decodeJsonChoice :: DecodeJson Choice where
   decodeJson a = genericDecodeJson a
 

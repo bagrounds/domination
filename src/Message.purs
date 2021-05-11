@@ -3,12 +3,12 @@ module Message where
 import Prelude
 
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Lens.Fold (preview, (^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso', iso)
@@ -16,13 +16,13 @@ import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card as Card
-import Domination.Data.GameState (GameState)
-import Domination.Data.GameState (_player, _stack) as GameState
+import Domination.Data.Game (Game)
+import Domination.Data.Game (_player, _stack) as Game
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
-import Domination.Data.Wire.GameState (WireGameState)
-import Domination.Data.Wire.GameState (_toWire) as GameState
+import Domination.Data.Wire.Game (WireGame)
+import Domination.Data.Wire.Game (_toWire) as Game
 import Domination.Data.Wire.Play (WirePlay)
 import Domination.Data.Wire.Play (_toWire) as Play
 import Domination.Data.Wire.Int (WireInt)
@@ -42,19 +42,19 @@ wrapMessage id message = { id, message }
 data RemoteMessage
   = ChatMessage { username :: String, message :: String }
   | UsernameMessage { username :: String, id :: String }
-  | GameStateMessage
+  | GameMessage
     { i :: Int
-    , state :: GameState
+    , state :: Game
     , playMade :: Maybe
       { play :: Play
       , playerIndex :: Int
-      , state :: GameState
+      , state :: Game
       }
     }
   | PlayMadeMessage
     { play :: Play
     , playerIndex :: Int
-    , state :: GameState
+    , state :: Game
     }
 
 data LocalMessage
@@ -73,15 +73,15 @@ instance decodeJsonRemoteMessage :: DecodeJson RemoteMessage where
 data WireMessage
   = ChatWireMessage (Tuple String String)
   | UsernameWireMessage (Tuple String String)
-  | GameStateWireMessage
+  | GameWireMessage
     (Tuple WireInt
-    (Tuple WireGameState
+    (Tuple WireGame
     (Maybe
     (Tuple WirePlay
-    (Tuple WireInt WireGameState)))))
+    (Tuple WireInt WireGame)))))
   | PlayMadeWireMessage
     (Tuple WirePlay
-    (Tuple WireInt WireGameState))
+    (Tuple WireInt WireGame))
 
 _toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
@@ -90,10 +90,10 @@ _toWire = iso to from where
       ChatWireMessage (Tuple username message)
     UsernameMessage { username, id} ->
       UsernameWireMessage (Tuple username id)
-    GameStateMessage { i, state, playMade } ->
-      GameStateWireMessage
+    GameMessage { i, state, playMade } ->
+      GameWireMessage
       $ Tuple (view Int._toWire i)
-      $ Tuple (view GameState._toWire state) (pmm <$> playMade)
+      $ Tuple (view Game._toWire state) (pmm <$> playMade)
     PlayMadeMessage x ->
       PlayMadeWireMessage $ pmm x
     where
@@ -101,16 +101,16 @@ _toWire = iso to from where
         Tuple (view Play._toWire play)
         $ Tuple
           (view Int._toWire playerIndex)
-          (view GameState._toWire state)
+          (view Game._toWire state)
   from = case _ of
     ChatWireMessage (Tuple username message) ->
       ChatMessage { username, message }
     UsernameWireMessage (Tuple username id) ->
       UsernameMessage { username, id}
-    GameStateWireMessage (Tuple i (Tuple state maybePlayMade)) ->
-      GameStateMessage
+    GameWireMessage (Tuple i (Tuple state maybePlayMade)) ->
+      GameMessage
         { i: review Int._toWire i
-        , state: review GameState._toWire state
+        , state: review Game._toWire state
         , playMade: pmm <$> maybePlayMade
         }
     PlayMadeWireMessage x ->
@@ -119,7 +119,7 @@ _toWire = iso to from where
       pmm (Tuple play (Tuple playerIndex state)) =
         { play: review Play._toWire play
         , playerIndex: review Int._toWire playerIndex
-        , state: review GameState._toWire state
+        , state: review Game._toWire state
         }
 
 derive instance genericWireMessage :: Generic WireMessage _
@@ -148,7 +148,7 @@ renderHtml (ChatMessage { username, message }) =
     , HH.text ": "
     , HH.span [ HH.class_ $ ClassName "message" ] [ HH.text message ]
     ]
-renderHtml (GameStateMessage _) =
+renderHtml (GameMessage _) =
   HH.div
     [ HH.class_ $ ClassName "game-state-message" ]
     [ HH.div [ HH.class_ $ ClassName "game-state" ] [ HH.text "(Game Data Received)" ]
@@ -180,26 +180,26 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
             [ HH.text $ "created a new "
               <> show playerCount <> " player game"
             ]
-        EndPhase { playerIndex } -> Nothing
+        EndPhase _ -> Nothing
         PlayCard { playerIndex, cardIndex } -> Just $
           HH.text $ "played: "
             <> getPlayerCardName playerIndex state cardIndex
-        Purchase { playerIndex, stackIndex } -> Just $
+        Purchase { stackIndex } -> Just $
           HH.text $ "purchased: " <> text
           where
-            text = case preview (GameState._stack stackIndex) state of
+            text = case preview (Game._stack stackIndex) state of
               Nothing -> "???"
               Just { card } -> card.name
         ResolveChoice { playerIndex, choice } ->
           Just $ renderTextInContext playerIndex state choice
-        React { playerIndex, reaction } -> Just $
+        React { reaction } -> Just $
           HH.text $ case reaction of
             Nothing -> "did not react"
             Just BlockAttack -> "blocked an attack"
 
-getPlayerCardName :: Int -> GameState -> Int -> String
+getPlayerCardName :: Int -> Game -> Int -> String
 getPlayerCardName playerIndex state cardIndex = fromMaybe "???"
-  $ state ^? GameState._player playerIndex
+  $ state ^? Game._player playerIndex
     <<< Player._cardInHand cardIndex
     <<< Card._name
 

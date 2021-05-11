@@ -3,23 +3,25 @@ module Domination.Data.Card where
 import Prelude
 
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Foldable (elem, foldr)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Prism (Prism', is, prism')
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
 import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..))
+import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(..))
 import Domination.Data.Actions (Actions)
 import Domination.Data.Buys (Buys)
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice)
+import Domination.Data.Filter (Filter(..))
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.Target (Target)
@@ -144,13 +146,16 @@ instance encodeJsonCommand :: EncodeJson Command where
 instance decodeJsonCommand :: DecodeJson Command where
   decodeJson x = genericDecodeJson x
 
-_toChoose :: Prism' Command Choice
-_toChoose = prism' Choose case _ of
-  Choose s -> Just s
-
 positivePoints :: Card -> Points
 positivePoints = max zero <<< _.victoryPoints
 
 negativePoints :: Card -> Points
 negativePoints = min zero <<< _.victoryPoints
+
+passFilter :: Filter -> Card -> Boolean
+passFilter = case _ of
+  HasName name -> _.name >>> (_ == name)
+  HasType cardType -> hasType cardType
+  CostUpTo cost' -> (_ <= cost') <<< (view _cost)
+  Any -> const true
 

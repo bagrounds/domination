@@ -1,13 +1,14 @@
 module Domination.Data.StackEvaluation where
 
+import Prim hiding (Constraint)
 import Prelude
 
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Domination.Data.Constraint (Constraint)
 import Domination.Data.Filter (Filter)
 import Domination.Data.Pile (Pile)

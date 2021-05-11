@@ -2,10 +2,11 @@ module Domination.UI.Hud where
 
 import Prelude
 
-import Data.Array (length, mapWithIndex, (!!))
+import Data.Array.NonEmpty (mapWithIndex, toArray, (!!))
+import Data.Foldable (length)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Card as Card
-import Domination.Data.GameState (GameState)
+import Domination.Data.Game (Game)
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
@@ -22,7 +23,7 @@ type ActiveState =
   { i :: Int
   , playerIndex :: Int
   , playerCount :: Int
-  , state :: GameState
+  , state :: Game
   , showSupply :: Boolean
   }
 
@@ -31,7 +32,7 @@ render cs@{ i, playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> HH.text $ "cannot find player " <> show playerIndex
       <> " in players: " <> show state.players
-    Just player -> HH.div
+    Just _ -> HH.div
       [ HP.class_ $ ClassName "hud" ]
       [ HH.div
         [ HP.class_ $ ClassName "title-bar" ]
@@ -47,7 +48,7 @@ render cs@{ i, playerIndex, state } =
         ]
 
 renderHandInfos :: forall w. ActiveState -> HTML w Action
-renderHandInfos cs@{ i, playerIndex, state } =
+renderHandInfos { playerIndex, state } =
   case state.players !! playerIndex of
     Nothing -> HH.text $ "cannot find player " <> show playerIndex
       <> " in players: " <> show state.players
@@ -56,7 +57,7 @@ renderHandInfos cs@{ i, playerIndex, state } =
       [ HH.li
         [ HP.class_ Css.handInfo ]
         [ HH.span_
-          [ HH.text $ show $ length player.deck
+          [ HH.text $ show $ (length player.deck :: Int)
           , Icons.cards
           ]
         ]
@@ -101,7 +102,7 @@ renderHandInfos cs@{ i, playerIndex, state } =
       , HH.li
         [ HP.class_ Css.handInfo ]
         [ HH.span_
-          [ HH.text $ show $ length player.discard
+          [ HH.text $ show $ (length player.discard :: Int)
           , Icons.cards
           ]
         ]
@@ -110,6 +111,7 @@ renderHandInfos cs@{ i, playerIndex, state } =
 renderStats :: forall w i. ActiveState -> HTML w i
 renderStats cs = HH.div
   [ HP.class_ Css.statsContainer ]
+  $ toArray
   $ playerStats cs `mapWithIndex` cs.state.players
 
 playerStats
@@ -118,7 +120,7 @@ playerStats
   -> Int
   -> Player
   -> HTML w i
-playerStats { state, playerIndex: me } playerIndex player =
+playerStats { state } playerIndex player =
   HH.ul
     [ HP.class_ Css.stats ]
     [ HH.li

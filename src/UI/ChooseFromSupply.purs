@@ -5,13 +5,16 @@ import Prelude
 import Data.Array (filter, find)
 import Data.Foldable (length)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..), fst, snd)
+import Domination.Capability.Dom (class Dom)
+import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
 import Halogen as H
+import Halogen.Component (Component)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -26,10 +29,12 @@ type ComponentSpec =
   { cards :: Array Card
   , baseSlotNumber :: Int -> DomSlot
   }
---component
---  :: forall query input m
---  . ComponentSpec
---  -> Component HTML query Action Choice m
+component
+  :: forall query m
+  . Dom m
+  => Log m
+  => ComponentSpec
+  -> Component query Unit (Maybe String) m
 component { cards, baseSlotNumber } =
   H.mkComponent { initialState, render, eval }
     where
@@ -40,7 +45,7 @@ component { cards, baseSlotNumber } =
           , HH.p_
             [ HH.button
               [ HP.class_ Css.resolveChoice
-              , HE.onClick \_ -> Just $ Done
+              , HE.onClick \_ -> Done
               ]
               [ HH.text "Done" ]
             ]
@@ -71,7 +76,7 @@ component { cards, baseSlotNumber } =
     renderCard cardIndex (Tuple card selected) =
       Card.render onClick extraClasses card (baseSlotNumber cardIndex)
       where
-        onClick _ = Just (Toggle cardIndex)
+        onClick _ = Toggle cardIndex
         extraClasses =
           [ if selected
             then Css.toTrash

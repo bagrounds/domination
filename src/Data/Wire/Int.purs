@@ -7,7 +7,7 @@ import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer)
 import Data.ArrayBuffer.Class.Types (Int16LE(..))
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Lens.Iso (Iso', iso)
 import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
 

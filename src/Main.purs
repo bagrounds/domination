@@ -73,7 +73,7 @@ main = launchAff_ $ do
   body <- HA.awaitBody
   runUI (root audioContext) unit body
 
-root :: forall s query o. AudioContext -> Component HTML query o s Aff
+root :: forall s query o. AudioContext -> Component query o s Aff
 root audioContext = H.hoist (runAppM {}) (component audioContext)
 
 component
@@ -87,7 +87,7 @@ component
   => WireCodec m
   => Audio m
   => AudioContext
-  -> Component HTML query o s m
+  -> Component query o s m
 component audioContext =
   H.mkComponent { eval, initialState, render: render audioContext }
   where
@@ -109,15 +109,15 @@ render
   -> HTML (Domination.Component GameQuery c m AppAction) AppAction
 render audioContext state = HH.main_ $
   [ HH.div
-    [ HP.id_ $ remoteMessageTarget
-    , HE.handler (EventType "purescript") (Just <<< ReceiveRemoteMessage)
+    [ HP.id $ remoteMessageTarget
+    , HE.handler (EventType "purescript") ReceiveRemoteMessage
     ]
     []
   , HH.div
-    [ HP.id_ $ localMessageTarget
+    [ HP.id $ localMessageTarget
     , HE.handler
       (EventType "purescript")
-      (Just <<< ReceiveLocalMessage)
+      (ReceiveLocalMessage)
     ]
     []
   , if state.showMenu
@@ -129,10 +129,11 @@ render audioContext state = HH.main_ $
       (AreaSlot GameArea)
       (Domination.component state.dominationConfig audioContext)
       unit
-      (Just <<< HandleGameEvent)
+      HandleGameEvent
   , Chat.render
     { sendEvent: SendMessage
     , onInput: Write _message
+    , nothing: DoNothing
     , state
     }
   , HH.i
@@ -144,7 +145,7 @@ renderSettingsButton :: forall w. HTML w AppAction
 renderSettingsButton = HH.button
   [ HP.class_ Css.settingsButton
   , HH.attr (H.AttrName "aria-label") "Settings"
-  , HE.onClick \_ -> Just ToggleMenu
+  , HE.onClick \_ -> ToggleMenu
   ]
   [ Icons.settings ]
 
@@ -171,7 +172,8 @@ handleAction audioContext = case _ of
     eUuid <- load uuidKey
     uuid <- case eUuid of
       Left e -> do
-        log "no existing uuid found, generating a new one"
+        log $ "no existing uuid found, generating a new one."
+          <> " error: " <> e
         uuid <- genUuid
         save uuidKey uuid
         pure $ show uuid
@@ -180,7 +182,8 @@ handleAction audioContext = case _ of
     eUsername <- load usernameKey
     username <- case eUsername of
       Left e -> do
-        log "no existing username found, using default"
+        log $ "no existing username found, using default."
+          <> " error: " <> e
         emoji <- fromMaybe ":)" <$> randomElement emojis
         pure $ emoji <> "lurker" <> emoji
       Right u -> pure u
@@ -231,7 +234,7 @@ handleAction audioContext = case _ of
   ToggleMenu -> H.modify_ $ _showMenu %~ not
 
   WritePlayerIndex index -> do
-    { dominationConfig: { nextPlayerIndex, nextPlayerCount } } <- H.get
+    { dominationConfig: { nextPlayerCount } } <- H.get
     let
       newPlayerIndex = max index zero
       newPlayerCount = max (index + one) nextPlayerCount
@@ -241,7 +244,7 @@ handleAction audioContext = case _ of
     save "player_count" newPlayerCount
 
   WritePlayerCount count -> do
-    { nextPlayerIndex, nextPlayerCount } <- H.gets _.dominationConfig
+    { nextPlayerIndex } <- H.gets _.dominationConfig
     let
       newPlayerIndex = min (count - one) nextPlayerIndex
       newPlayerCount = max count one
@@ -271,6 +274,8 @@ handleAction audioContext = case _ of
   ToggleLongGame ->
     H.modify_ $ _dominationConfig <<< _longGame %~ not
 
+  DoNothing -> pure unit
+
   StartNewGame -> do
     config <- H.gets _.dominationConfig
     queryGame $ StartNewGameRequest config
@@ -281,7 +286,7 @@ handleAction audioContext = case _ of
     H.modify_ $ _showMenu .~ false
 
   WriteUsername username -> do
-    { id, usernames } <- H.get
+    { id } <- H.get
     save "username" username
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
@@ -314,7 +319,7 @@ handleAction audioContext = case _ of
             log $ "username incoming: " <> username
             H.modify_ $ over _usernames
               $ HashMap.insert id username
-          ChatMessage { message, username } -> do
+          ChatMessage { message } -> do
             H.modify_
               $ (_messages :~ msg)
               >>> (_messages %~ take 250)
@@ -323,8 +328,8 @@ handleAction audioContext = case _ of
                 H.modify_ $ _message .~ "PONG"
                 sendChatMessage
               else pure unit
-          GameStateMessage { i, state, playMade } -> do
-            queryGame $ ReceiveGameState
+          GameMessage { i, state, playMade } -> do
+            queryGame $ ReceiveGame
               { i
               , state
               }
@@ -341,7 +346,7 @@ handleAction audioContext = case _ of
           H.modify_ $ _messages :~ (PlayMadeMessage x)
         Nothing -> pure unit
       queryGame $ LoadActiveState activeState
-      sendMessage $ GameStateMessage
+      sendMessage $ GameMessage
         { state: activeState.state
         , i: activeState.i
         , playMade
@@ -356,15 +361,15 @@ handleAction audioContext = case _ of
   where
     loadGame key = do
       { nextPlayerIndex } <- H.gets _.dominationConfig
-      mbGameState <- load key
-      case mbGameState of
+      mbGame <- load key
+      case mbGame of
         Left e -> error e
         Right activeState -> do
           let
             newActiveState = ActiveState.upgrade $
               (_playerIndex .~ nextPlayerIndex) activeState
           queryGame $ LoadActiveState newActiveState
-          sendMessage $ GameStateMessage
+          sendMessage $ GameMessage
             { state: activeState.state
             , i: activeState.i
             , playMade: Nothing
