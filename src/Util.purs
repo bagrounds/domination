@@ -9,11 +9,11 @@ import Data.Argonaut.Decode (decodeJson)
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Parser (jsonParser)
-import Data.Array (deleteAt, drop, filter, length, nub, take, zip, (!!), (:))
+import Data.Array (deleteAt, drop, filter, length, nub, take, (!!), (:))
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Foldable (any, elem, notElem)
-import Data.FunctorWithIndex (mapWithIndex)
+import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
 import Data.Lens.Getter (view)
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Prism (Review, review)
@@ -28,8 +28,8 @@ class RenderText a where
 dropIndex :: forall a. Int -> Array a -> Array a
 dropIndex i xs = take i xs <> drop (i + 1) xs
 
-withIndices :: forall a. Array a -> Array (Tuple Int a)
-withIndices xs = zip (indices xs) xs
+withIndices :: forall a f. FunctorWithIndex Int f => f a -> f (Tuple Int a)
+withIndices = mapWithIndex Tuple
 
 dropIndices
   :: forall m a
@@ -61,7 +61,7 @@ takeIndices is xs = fromJust "failed to drop indices" $
   else Just $ snd <$>
   (fst >>> flip elem is) `filter` withIndices xs
 
-indices :: forall a. Array a -> Array Int
+indices :: forall f a. FunctorWithIndex Int f => f a -> f Int
 indices xs = fst <$> mapWithIndex Tuple xs
 
 justIf :: forall a. (a -> Boolean) -> a -> Maybe a

@@ -9,7 +9,7 @@ import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
@@ -33,7 +33,7 @@ renderEmpty
   => Log m
   => HTML
     ( ComponentSlot
-      HTML (description :: Slot a b DomSlot | r) m AppAction
+      (description :: Slot a b DomSlot | r) m AppAction
     ) AppAction
 renderEmpty = HH.div
   [ HP.classes
@@ -50,7 +50,7 @@ render
   => AppState
   -> HTML
     ( ComponentSlot
-      HTML (description :: Slot a b DomSlot | r) m AppAction
+      (description :: Slot a b DomSlot | r) m AppAction
     ) AppAction
 render cs@{ showMenu, dominationConfig } = let
   { nextPlayerIndex
@@ -69,7 +69,7 @@ render cs@{ showMenu, dominationConfig } = let
   [ HH.div
     [ HP.class_ Css.backButtonContainer ]
     [ HH.button
-      [ HE.onClick \_ -> Just $ ToggleMenu
+      [ HE.onClick \_ -> ToggleMenu
       , HP.class_ Css.backButton
       ]
       [ HH.text "Back" ]
@@ -92,7 +92,7 @@ render cs@{ showMenu, dominationConfig } = let
     }
   , HH.div_
     [ HH.button
-      [ HE.onClick \_ -> Just $ StartNewGame
+      [ HE.onClick \_ -> StartNewGame
       , HP.class_ Css.newGameButton
       ]
       [ HH.text $ "Start "
@@ -102,7 +102,7 @@ render cs@{ showMenu, dominationConfig } = let
         <> show (nextPlayerIndex + one)
       ]
     , HH.button
-      [ HE.onClick \_ -> Just $ LoadGameRequest
+      [ HE.onClick \_ -> LoadGameRequest
       , HP.class_ Css.loadGameButton
       ]
       [ HH.text "Load Game" ]
@@ -113,13 +113,13 @@ render cs@{ showMenu, dominationConfig } = let
       [ HH.input
         [ HP.type_ HP.InputCheckbox
         , HP.checked longGame
-        , HE.onChecked \_ -> Just ToggleLongGame
+        , HE.onChecked \_ -> ToggleLongGame
         ]
       , HH.text "Don't end the game until the leader can't be beaten"
       ]
     ]
   , HH.button
-    [ HE.onClick \_ -> Just $ RandomizeKingdom
+    [ HE.onClick \_ -> RandomizeKingdom
     , HP.class_ Css.randomizeKingdomButton
     ]
     [ HH.text "Randomize Kingdom" ]
@@ -133,7 +133,7 @@ renderKingdom
   => Array { card :: Card, selected :: Boolean }
   -> HTML
     ( ComponentSlot
-      HTML (description :: Slot a b DomSlot | r) m AppAction
+      (description :: Slot a b DomSlot | r) m AppAction
     ) AppAction
 renderKingdom kingdom = HH.div
   [ HP.class_ Css.kingdom ]
@@ -142,9 +142,8 @@ renderKingdom kingdom = HH.div
     renderCard i { card, selected } =
       Card.render (onClick i) (extraClasses selected) card (slot i)
 
-    onClick i _ = Just
-      $ ChooseKingdom
-      $ ((ix i) <<< prop (SProxy :: SProxy "selected") %~ not) kingdom
+    onClick i _ = ChooseKingdom
+      $ ((ix i) <<< prop (Proxy :: Proxy "selected") %~ not) kingdom
 
     slot = CardSlot KingdomConfigArea
 

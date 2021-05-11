@@ -7,4 +7,5 @@ data Action
   = MakePlay Play
   | UndoRequest ActiveState
   | ToggleSupply
+  | DoNothing
 

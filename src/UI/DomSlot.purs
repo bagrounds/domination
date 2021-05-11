@@ -2,7 +2,7 @@ module Domination.UI.DomSlot where
 
 import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Ord (class Ord)
 import Prelude (class Show)
 

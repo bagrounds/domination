@@ -15,8 +15,8 @@ import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Filter (Filter(..))
-import Domination.Data.GameState (GameState)
-import Domination.Data.GameState as GameState
+import Domination.Data.Game (Game)
+import Domination.Data.Game as Game
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
@@ -37,7 +37,7 @@ class RenderTextInContext a where
   renderTextInContext
     :: forall w i
     . Int
-    -> GameState
+    -> Game
     -> a
     -> HTML w i
 
@@ -124,7 +124,7 @@ instance choiceRenderTextInContext
           <> (intercalate [ HH.text ", " ]
           $ (pure <<< renderText) <$> choices)
 
-      PickN { n, choices, resolution } ->
+      PickN { n, choices } ->
         [ HH.text $ "chose " <> show n <> " of: " ]
           <> (intercalate [ HH.text ", " ]
           $ (pure <<< renderText) <$> choices)
@@ -162,18 +162,18 @@ instance choiceRenderTextInContext
             Pile.Trash -> " into the trash for some reason"
         in [ HH.text $ "gained a " <> cardName <> " " <> suffix ]
 
-      GainActions { n, resolution } -> [ HH.text "+", renderText n ]
+      GainActions { n } -> [ HH.text "+", renderText n ]
 
-      GainBuys { n, resolution } ->
+      GainBuys { n } ->
         [ HH.text "gained +", renderText n ]
 
-      GainBonus { bonus, resolution } ->
+      GainBonus { bonus } ->
         [ HH.text "gained", renderText bonus ]
 
       Discard { selection: SelectAll } ->
         [ HH.text "discarded their hand" ]
 
-      Draw { n, resolution } ->
+      Draw { n } ->
         [ HH.text $ "+" <> show n, Icons.cards ]
 
       MoveFromTo { resolution: Nothing } -> [ unresolved ]
@@ -273,14 +273,14 @@ getCardName
   :: forall w i
   . Pile
   -> Int
-  -> GameState
+  -> Game
   -> Int
   -> HTML w i
 getCardName source playerIndex state cardIndex = HH.text
   $ fromMaybe "???"
   $ _.name
   <$> state
-  ^? GameState._pile source playerIndex
+  ^? Game._pile source playerIndex
   <<< ix cardIndex
 
 parenthesize :: forall w i. HTML w i -> Array (HTML w i)

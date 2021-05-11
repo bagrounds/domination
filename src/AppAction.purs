@@ -22,4 +22,5 @@ data AppAction
   | ReceiveRemoteMessage Event
   | ReceiveLocalMessage Event
   | HandleGameEvent GameEvent
+  | DoNothing
 

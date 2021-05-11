@@ -1,12 +1,12 @@
 {
-  "image": "node:14",
+  "image": "node:16",
   "stages": [
     "test",
     "deploy"
   ],
   "test": {
     "stage": "test",
-    "script": ["npm ci", "npm run test"],
+    "script": ["apt-get update", "apt-get install -y libncurses5", "npm ci", "npm run test"],
     "except": ["master"]
   },
   "pages": {

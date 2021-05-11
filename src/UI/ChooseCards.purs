@@ -1,17 +1,17 @@
 module Domination.UI.ChooseCards where
 
+import Prim hiding (Constraint)
 import Prelude
 
 import Data.Array (filter, length)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Filter (Filter)
-import Domination.Data.GameState (GameState)
+import Domination.Data.Game (Game)
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
@@ -20,7 +20,6 @@ import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
 import Halogen as H
 import Halogen.Component (Component)
-import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -35,7 +34,7 @@ type ComponentSpec =
   { player :: Player
   , pile :: Pile
   , baseSlotNumber :: Int -> DomSlot
-  , state :: GameState
+  , state :: Game
   , constraint :: Constraint
   , filter :: Filter
   }
@@ -45,14 +44,13 @@ component
   . Dom m
   => Log m
   => ComponentSpec
-  -> Component HTML query Unit (Array Int) m
+  -> Component query Unit (Array Int) m
 component
   { baseSlotNumber
   , state
   , player
   , pile
   , constraint
-  , filter: cardFilter
   } = H.mkComponent { initialState, render, eval }
   where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
@@ -62,7 +60,7 @@ component
       , HH.p_
         [ HH.button
           [ HP.class_ Css.resolveChoice
-          , HE.onClick \_ -> Just $ Done
+          , HE.onClick \_ -> Done
           ]
           [ HH.text "Done" ]
         ]
@@ -101,7 +99,7 @@ component
     renderCard cardIndex (Tuple card selected) =
       Card.render onClick extraClasses card (baseSlotNumber cardIndex)
       where
-        onClick _ = Just (Toggle cardIndex)
+        onClick _ = Toggle cardIndex
         extraClasses =
           [ if selected
             then Css.toTrash

@@ -8,25 +8,24 @@ import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
-import Domination.Data.GameState (GameState)
+import Domination.Data.Game (Game)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
 import Halogen (Component)
-import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 
 component
   :: forall query input m
   . Dom m
   => Log m
-  => GameState
+  => Game
   -> Player
   -> Choice
   -> (Int -> DomSlot)
-  -> Component HTML query input Choice m
+  -> Component query input Choice m
 component state player choice baseSlotNumber =
   CardChooser.component
     { renderChoice

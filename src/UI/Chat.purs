@@ -4,7 +4,7 @@ import Prelude
 
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (fromMaybe)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as H
 import Halogen.HTML as HH
@@ -24,11 +24,12 @@ type State r =
 type RenderInput a r =
   { state :: State r
   , onInput :: String -> a
+  , nothing :: a
   , sendEvent :: a
   }
 
 render :: forall s a r. RenderInput a r -> HTML s a
-render { sendEvent, onInput, state } =
+render { sendEvent, onInput, state, nothing } =
   let { usernames, messages, message } = state
   in HH.div
   [ HP.class_ $ ClassName "chat" ]
@@ -49,7 +50,7 @@ render { sendEvent, onInput, state } =
   , HH.div
     [ HP.class_ $ ClassName "chat-form"]
     [ HH.button
-      [ HE.onClick $ const $ Just sendEvent
+      [ HE.onClick $ const $ sendEvent
       , HP.class_ $ ClassName "send-chat"
       ]
       [ HH.text "Send" ]
@@ -59,11 +60,11 @@ render { sendEvent, onInput, state } =
       , HH.attr (H.AttrName "aria-label") "Chat"
       , HP.value message
       , HP.required true
-      , HE.onValueInput $ Just <<< onInput
+      , HE.onValueInput $ onInput
       , HE.onKeyDown \e ->
         if (KE.key e) == "Enter"
-        then Just sendEvent
-        else Nothing
+        then sendEvent
+        else nothing
       ]
     ]
   ]

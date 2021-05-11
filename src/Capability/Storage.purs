@@ -58,6 +58,7 @@ saveStorage key x = liftEffect do
   let json = encodeJson x
   let string = stringify json
   setItem key string ls
+
 loadStorage
   :: forall a m
   . MonadEffect m

@@ -11,7 +11,7 @@ import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.Data.Choice (Choice)
-import Domination.Data.GameState (GameState)
+import Domination.Data.Game (Game)
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
@@ -36,7 +36,6 @@ data Action
 
 type ChildrenWidget t26 t25 r m =
   ComponentSlot
-  HTML
   ( description :: Slot t26 t25 DomSlot | r )
   m
   Action
@@ -58,7 +57,7 @@ type ComponentSpec t26 t25 t29 m =
   , player :: Player
   , renderChoice :: RenderChoice t26 t25 t29 m
   , resolve :: Maybe (Array Int) -> Choice
-  , state :: GameState
+  , state :: Game
   }
 
 component
@@ -67,7 +66,7 @@ component
   => Dom m
   => Log m
   => ComponentSpec t26 t25 t29 m
-  -> Component HTML query input Choice m
+  -> Component query input Choice m
 component
   { baseSlotNumber
   , renderChoice
@@ -75,7 +74,6 @@ component
   , resolve
   , state
   , player
-  , choice
   , pile
   } = H.mkComponent { initialState, render, eval }
   where
@@ -96,7 +94,7 @@ component
         , HH.p_
           [ HH.button
             [ HP.class_ Css.resolveChoice
-            , HE.onClick \_ -> Just $ Done
+            , HE.onClick \_ -> Done
             ]
             [ buttonText ]
           ]
@@ -131,7 +129,7 @@ component
   renderCardToTrash cardIndex (Tuple card selected) =
     Card.render onClick extraClasses card (baseSlotNumber cardIndex)
     where
-      onClick _ = Just (Toggle cardIndex)
+      onClick _ = Toggle cardIndex
       extraClasses =
         [ if selected
           then Css.toTrash

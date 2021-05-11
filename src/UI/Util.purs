@@ -28,7 +28,7 @@ chooseOne title bs = HH.div_ $
   title : map mkButton bs
   where
     mkButton { clickEvent, text } = HH.button
-      [ HE.onClick \_ -> Just clickEvent ]
+      [ HE.onClick \_ -> clickEvent ]
       [ text ]
 
 acknowledge
@@ -40,7 +40,7 @@ acknowledge message clickEvent = HH.div
   [ HP.class_ Css.dialogue ]
   [ HH.div_ [ message ]
   , HH.button
-    [ HE.onClick \_ -> Just clickEvent ]
+    [ HE.onClick \_ -> clickEvent ]
     [ HH.text "OK" ]
   ]
 
@@ -54,9 +54,9 @@ incrementer { label, mbMin, mbMax, value, setValue } = HH.div
       [ HE.onClick \_ -> case mbMin of
         Just min ->
           if value <= min
-          then Just $ setValue min
-          else Just $ setValue (value - 1)
-        Nothing -> Just $ setValue (value - 1)
+          then setValue min
+          else setValue (value - 1)
+        Nothing -> setValue (value - 1)
       ] [ HH.text "-" ]
     , HH.input $
       [ HP.value $ show value
@@ -73,9 +73,9 @@ incrementer { label, mbMin, mbMax, value, setValue } = HH.div
       [ HE.onClick $ \_ -> case mbMax of
         Just max ->
           if value >= max
-          then Just $ setValue max
-          else Just $ setValue (value + 1)
-        Nothing -> Just $ setValue (value + 1)
+          then setValue max
+          else setValue (value + 1)
+        Nothing -> setValue (value + 1)
       ]
       [ HH.text "+" ]
     ]

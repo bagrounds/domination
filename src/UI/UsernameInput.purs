@@ -2,7 +2,6 @@ module Domination.UI.UsernameInput where
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
 import Domination.UI.Css as Css
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
@@ -29,7 +28,7 @@ render { onInput, state: { username } } = HH.div
     , HP.value username
     , HP.placeholder "Username"
     , HP.required true
-    , HE.onValueInput $ Just <<< onInput
+    , HE.onValueInput $ onInput
     ]
   ]
 

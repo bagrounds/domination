@@ -1,17 +1,19 @@
 module Domination.Data.Constraint where
 
+import Prim hiding (Constraint)
+
 import Control.Applicative (pure)
 import Control.Monad.Error.Class (class MonadError)
 import Control.Semigroupoid ((>>>))
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Array (length)
 import Data.Eq (class Eq)
 import Data.Function (($))
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.HeytingAlgebra ((&&), (||))
 import Data.Semiring (zero)
 import Data.Show (class Show)

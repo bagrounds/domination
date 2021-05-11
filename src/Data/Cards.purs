@@ -226,8 +226,7 @@ workersVillage = Card.action
   }
 
 witch :: Card
-witch = let attack = true in
-  Card.actionAttack
+witch = Card.actionAttack
   { name = "Witch"
   , cost = 5
   , cards = 2
@@ -244,15 +243,14 @@ gainCurse = let attack = true in GainCards
   }
 
 witchSpecial :: Special
-witchSpecial = let attack = true in
+witchSpecial =
   { target: EveryoneElse
   , command: Choose gainCurse
   , description: "Each other player gains a Curse."
   }
 
 councilRoom :: Card
-councilRoom = let attack = false in
-  Card.action
+councilRoom = Card.action
   { name = "Council Room"
   , cost = 5
   , cards = 4
@@ -268,14 +266,14 @@ draw1Card = let attack = false in Draw
   }
 
 councilRoomSpecial :: Special
-councilRoomSpecial = let attack = false in
+councilRoomSpecial =
   { target: EveryoneElse
   , command: Choose draw1Card
   , description: "Each other player draws a card."
   }
 
 scholar :: Card
-scholar = let attack = false in
+scholar =
   Card.action
   { name = "Scholar"
   , cost = 5
@@ -304,14 +302,14 @@ scholarChoice = let attack = false in And
   }
 
 scholarSpecial :: Special
-scholarSpecial = let attack = false in
+scholarSpecial =
   { target: Self
   , command: Choose scholarChoice
   , description: "Discard your hand and draw 7 cards"
   }
 
 chapel :: Card
-chapel = let attack = false in
+chapel =
   Card.action
   { name = "Chapel"
   , cost = 2
@@ -329,14 +327,14 @@ chapelChoice = let attack = false in MoveFromTo
   }
 
 chapelSpecial :: Special
-chapelSpecial = let attack = false in
+chapelSpecial =
   { target: Self
   , command: Choose chapelChoice
   , description: "Trash up to 4 cards from your hand"
   }
 
 militia :: Card
-militia = let attack = true in
+militia =
   Card.actionAttack
   { name = "Militia"
   , cost = 4
@@ -355,7 +353,7 @@ discardDownTo3 = let attack = true in MoveFromTo
   }
 
 militiaSpecial :: Special
-militiaSpecial = let attack = true in
+militiaSpecial =
   { target: EveryoneElse
   , command: Choose discardDownTo3
   , description: "Each other player discards down to 3 cards"
@@ -371,7 +369,7 @@ moat =
   }
 
 nobles :: Card
-nobles = let attack = false in
+nobles =
   Card.actionVictory
   { name = "Nobles"
   , cost = 6
@@ -390,14 +388,14 @@ noblesChoice = let attack = false in Or
   }
 
 noblesSpecial :: Special
-noblesSpecial = let attack = false in
+noblesSpecial =
   { target: Self
   , command: Choose noblesChoice
   , description: "Choose one: +3 cards or +2 actions"
   }
 
 steward :: Card
-steward = let attack = false in
+steward =
   Card.action
   { name = "Steward"
   , cost = 3
@@ -423,7 +421,7 @@ stewardChoice = let attack = false in Or
   }
 
 stewardSpecial :: Special
-stewardSpecial = let attack = false in
+stewardSpecial =
   { target: Self
   , command: Choose stewardChoice
   , description:
@@ -451,7 +449,7 @@ pawnChoice = let attack = false in PickN
   }
 
 pawnSpecial :: Special
-pawnSpecial = let attack = false in
+pawnSpecial =
   { target: Self
   , command: Choose pawnChoice
   , description: "Choose 2 of: + $1, + 1 card, + 1 action, or +1 buy"
@@ -491,7 +489,7 @@ torturerChoice = let attack = true in
   }
 
 torturerSpecial :: Special
-torturerSpecial = let attack = true in
+torturerSpecial =
   { target: EveryoneElse
   , command: Choose torturerChoice
   , description:
@@ -566,7 +564,7 @@ moneyLenderChoice = let attack = false in
   }
 
 moneyLenderSpecial :: Special
-moneyLenderSpecial = let attack = false in
+moneyLenderSpecial =
   { target: Self
   , command: Choose moneyLenderChoice
   , description: "You may trash a copper from your hand for + $3"
@@ -1017,7 +1015,7 @@ altar = let attack = false in Card.action
   }
 
 courtyard :: Card
-courtyard = let attack = false in Card.action
+courtyard = Card.action
   { name = "Courtyard"
   , cost = 2
   , cards = 3
