@@ -24,10 +24,9 @@ chooseOne
   . HTML w i
   -> Array { clickEvent :: i, text :: HTML w i }
   -> HTML w i
-chooseOne title bs = HH.div_ $
-  title : map mkButton bs
+chooseOne title buttons = HH.div_ $ title : map makeButton buttons
   where
-    mkButton { clickEvent, text } = HH.button
+    makeButton { clickEvent, text } = HH.button
       [ HE.onClick \_ -> clickEvent ]
       [ text ]
 

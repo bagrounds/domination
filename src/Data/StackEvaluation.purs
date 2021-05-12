@@ -9,44 +9,54 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Domination.Data.Bonus (Bonus)
 import Domination.Data.Constraint (Constraint)
 import Domination.Data.Filter (Filter)
 import Domination.Data.Pile (Pile)
 import Domination.Data.Var (Var)
 
 data StackExpression
+  -- user prompts
   = StackChooseCards
     { cards :: Var (Array Int)
     , filter :: Var Filter
     , from :: Var Pile
     , n :: Var Constraint
     }
-  | StackDuplicate
-  | StackDiscard
-  | StackLength
-  | StackAddN Int
-  | StackDraw
-  | StackTrash
-  | StackNth Int
-  | StackCostOf
-  | StackMakeFilterCostUpTo
-  | StackMakeFilterAnd
-  | StackBind String
-  | StackGainTo Pile
   | StackChooseCardFromSupply
     { cardName :: Var String
     , filter :: Var Filter
     }
-  | StackEquals StackValue
+  | StackOption (Var Boolean)
+
+  -- effects
+  | StackMoveCards { from :: Pile, to :: Pile }
+  | StackDiscard
+  | StackTrash
+  | StackDraw
+  | StackGainTo Pile
+  | StackGainBonusCash
+
+  -- stack manipulation
+  | StackDuplicate
   | StackPush StackValue
+
+  -- pure stack operations
+  | StackLength
+  | StackAddN Int
+  | StackNth Int
+  | StackCostOf
+  | StackMakeFilterCostUpTo
+  | StackMakeFilterAnd
+  -- predicates
+  | StackEquals StackValue
+
+  -- higher order
+  | StackBind String
   | StackIf
     { condition :: Array StackExpression
     , following :: Array StackExpression
     , otherwise :: Array StackExpression
     }
-  | StackGainBonus Bonus
-  | StackOption (Var Boolean)
 
 derive instance genericStackExpression :: Generic StackExpression _
 derive instance eqStackExpression :: Eq StackExpression

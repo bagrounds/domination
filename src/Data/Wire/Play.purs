@@ -8,19 +8,30 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
-import Domination.Data.Wire.Card as Cards
 import Domination.Data.Play (Play(..))
-import Domination.Data.Reaction (Reaction)
+import Domination.Data.Wire.Card as Cards
 import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice as Choice
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
+import Domination.Data.Wire.Reaction (WireReaction)
+import Domination.Data.Wire.Reaction as Reaction
+import Util ((.^))
+
+data WirePlay
+  = WireNewGame WireInt (Array WireInt) Boolean
+  | WireEndPhase WireInt
+  | WirePlayCard (Tuple WireInt WireInt)
+  | WirePurchase (Tuple WireInt WireInt)
+  | WireResolveChoice (Tuple WireInt WireChoice)
+  | WireReact (Tuple WireInt (Maybe WireReaction))
+  | WireDoneReacting WireInt
 
 _toWire :: Iso' Play WirePlay
 _toWire = iso to from where
@@ -45,7 +56,13 @@ _toWire = iso to from where
         (view Int._toWire playerIndex)
         (view Choice._toWire choice)
     React { playerIndex, reaction } ->
-      WireReact $ Tuple (view Int._toWire playerIndex) reaction
+      WireReact
+        $ Tuple
+          (view Int._toWire playerIndex)
+          (view Reaction._toWire <$> reaction)
+    DoneReacting { playerIndex } ->
+      WireDoneReacting $ playerIndex ^. Int._toWire
+
   from = case _ of
     WireNewGame playerCount supply longGame ->
       NewGame
@@ -73,16 +90,10 @@ _toWire = iso to from where
     WireReact (Tuple playerIndex reaction) ->
       React
         { playerIndex: review Int._toWire playerIndex
-        , reaction
+        , reaction: review Reaction._toWire <$> reaction
         }
-
-data WirePlay
-  = WireNewGame WireInt (Array WireInt) Boolean
-  | WireEndPhase WireInt
-  | WirePlayCard (Tuple WireInt WireInt)
-  | WirePurchase (Tuple WireInt WireInt)
-  | WireResolveChoice (Tuple WireInt WireChoice)
-  | WireReact (Tuple WireInt (Maybe Reaction))
+    WireDoneReacting playerIndex ->
+      DoneReacting { playerIndex: playerIndex .^ Int._toWire }
 
 derive instance genericWirePlay :: Generic WirePlay _
 derive instance eqWirePlay :: Eq WirePlay

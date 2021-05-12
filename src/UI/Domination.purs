@@ -25,7 +25,7 @@ import Domination.Data.Card (Card, _card, passFilter)
 import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
-import Domination.Data.Game (hasReaction, new, choicesOutstanding, isAttacked) as Game
+import Domination.Data.Game (choicesOutstanding, isAttacked, new) as Game
 import Domination.Data.Game.Engine (choiceTurn, makeAutoPlay) as Game
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
@@ -368,12 +368,11 @@ renderPlayer cs@{ state, playerIndex } player =
     then HH.div [ HP.class_ Css.dialogue ] $ fromMaybe [] $
       let
         choice = Player.firstChoice player
-        hasReaction = Game.hasReaction playerIndex state
         isAttacked = Game.isAttacked playerIndex state
       in
-      if isAttacked && hasReaction
-      then pure <$> renderReaction
-      else pure <$> renderChoice (CardSlot ChoiceArea) choice
+      pure <$> if isAttacked && length player.reactions > 0
+      then renderReactions player.reactions
+      else renderChoice (CardSlot ChoiceArea) choice
     else HH.div_ []
   , case state.players !! state.turn of
       Nothing -> h1__ $ "No player (" <> show state.turn <> ") in "
@@ -409,96 +408,83 @@ renderPlayer cs@{ state, playerIndex } player =
         ]
   ]
     where
+      renderReactions
+        :: Array Reaction
+        -> Maybe (HTML (ChildComponents query r m) Action)
+      renderReactions reactions =
+        Just $ chooseOne (HH.text "Choose a reaction")
+          $ { clickEvent: MakePlay $ DoneReacting { playerIndex }
+            , text: HH.text "Done reacting"
+            }
+          : ( ( \reaction ->
+                { clickEvent: MakePlay $
+                  React { playerIndex, reaction: Just reaction }
+                , text: renderText reaction
+                }
+              ) <$> reactions
+            )
+
       renderReaction
-        :: forall widget
-        . Maybe (HTML widget Action)
-      renderReaction =
-        Just $ chooseOne (HH.text "Block attack?")
-          [ { clickEvent: MakePlay $
-              React { playerIndex, reaction: Just BlockAttack }
-            , text: HH.text "Yes"
-            }
-          , { clickEvent: MakePlay $
-              React { playerIndex, reaction: Nothing }
-            , text: HH.text "No"
-            }
-          ]
+        :: Reaction
+        -> Maybe (HTML (ChildComponents query r m) Action)
+      renderReaction = case _ of
+        BlockAttack ->
+          Just $ chooseOne (HH.text "Block attack?")
+            [ { clickEvent: MakePlay $
+                React { playerIndex, reaction: Just BlockAttack }
+              , text: HH.text "Yes"
+              }
+            , { clickEvent: MakePlay $
+                React { playerIndex, reaction: Nothing }
+              , text: HH.text "No"
+              }
+            ]
+        reaction@(ReactWithChoice choice) ->
+          Just $ chooseOne
+            ( HH.span_
+              [ HH.text "Would you like to react with: "
+              , renderText choice
+              , HH.text "?"
+              ]
+            )
+            [ { clickEvent: MakePlay $
+                React { playerIndex, reaction: Just reaction }
+              , text: HH.text "Yes"
+              }
+            , { clickEvent: MakePlay $
+                React { playerIndex, reaction: Nothing }
+              , text: HH.text "No"
+              }
+            ]
 
       renderChoice
         :: (Int -> DomSlot)
         -> Maybe Choice
         -> Maybe (HTML (ChildComponents query r m) Action)
       renderChoice baseSlotNumber = map \choice -> case choice of
-          StackChoice x@{ expression } ->
-            case uncons expression of
-              Nothing ->
-                h1__ "Something has gone terribly wrong!!!"
-
-              Just
-                { head: StackChooseCards
+        StackChoice x@{ expression } ->
+          case uncons expression of
+            Nothing -> h1__
+              $ "UI.Domination: Empty Expression: " <> show x
+            Just { head: term, tail } ->
+              case term of
+                StackChooseCards
                   y@{ cards: Unbound
                   , filter: Bound filter
                   , from: Bound pile
                   , n: Bound constraint
-                  }
-                , tail
-                } -> HH.div_
-                [ HH.slot
-                  (Proxy :: Proxy "ChooseCards")
-                  (AreaSlot ChoiceArea)
-                  ( ChooseCards.component
-                    { state
-                    , player
-                    , baseSlotNumber
-                    , pile
-                    , constraint
-                    , filter
-                    }
-                  )
-                  unit
-                  $ MakePlay
-                  <<< ResolveChoice
-                  <<< ({ playerIndex, choice: _ })
-                  <<< StackChoice
-                  <<< (x { expression = _ })
-                  <<< (_ : tail)
-                  <<< StackChooseCards
-                  <<< (y { cards = _ })
-                  <<< Bound
-                ]
-
-              Just
-                { head: StackChooseCards { cards: Bound cards } } ->
-                  h1__ $ "Domination: StackChooseCards:"
-                    <> " cards already chosen: " <> show cards
-
-              Just
-                { head: StackChooseCardFromSupply
-                  { cardName: Bound cardName }
-                } -> h1__ $ "Domination: StackChooseCardFromSupply:"
-                  <> " card already chosen: " <> show cardName
-
-              Just
-                { head: StackChooseCardFromSupply
-                  y@{ cardName: Unbound
-                  , filter: Bound cardFilter
-                  }
-                , tail
-                } ->
-                  let
-                    predicate :: Card -> Boolean
-                    predicate = passFilter cardFilter
-                    unfiltered :: Array Card
-                    unfiltered = _.card
-                      <$> nonEmptyStacks state.supply
-                    cards :: Array Card
-                    cards = predicate `filter` unfiltered
-                  in HH.div_
+                  } -> HH.div_
                     [ HH.slot
-                      (Proxy :: Proxy "ChooseFromSupply")
+                      (Proxy :: Proxy "ChooseCards")
                       (AreaSlot ChoiceArea)
-                      ( ChooseFromSupply.component
-                        { cards, baseSlotNumber }
+                      ( ChooseCards.component
+                        { state
+                        , player
+                        , baseSlotNumber
+                        , pile
+                        , constraint
+                        , filter
+                        }
                       )
                       unit
                       $ MakePlay
@@ -507,41 +493,72 @@ renderPlayer cs@{ state, playerIndex } player =
                       <<< StackChoice
                       <<< (x { expression = _ })
                       <<< (_ : tail)
-                      <<< StackChooseCardFromSupply
-                      <<< (y { cardName = _ })
+                      <<< StackChooseCards
+                      <<< (y { cards = _ })
                       <<< Bound
-                      <<< fromMaybe "couldn't find card in supply"
                     ]
 
-              Just
-                { head: StackOption (Bound b)
-                } -> h1__ $ "Domination: StackOption:"
-                  <> " decision already made: " <> show b
+                StackChooseCards { cards: Bound cards } ->
+                  h1__ $ "Domination: StackChooseCards:"
+                    <> " cards already chosen: " <> show cards
 
-              Just { head: StackOption Unbound, tail } ->
-                chooseOne (HH.text x.description)
-                  [ { clickEvent: MakePlay $ ResolveChoice
-                      { playerIndex
-                      , choice: StackChoice x
-                        { expression = (StackOption $ Bound $ true)
-                          : tail
-                        }
-                      }
-                    , text: HH.text "Yes"
-                    }
-                  , { clickEvent: MakePlay $ ResolveChoice
-                      { playerIndex
-                      , choice: StackChoice x
-                        { expression = (StackOption $ Bound $ false)
-                          : tail
-                        }
-                      }
-                    , text: HH.text "No"
-                    }
-                  ]
+                StackChooseCardFromSupply
+                  { cardName: Bound cardName } ->
+                    h1__ $ "Domination: StackChooseCardFromSupply:"
+                      <> " card already chosen: " <> show cardName
 
-              Just _ ->
-                acknowledge
+                StackChooseCardFromSupply
+                  y@{ cardName: Unbound
+                  , filter: Bound cardFilter
+                  } ->
+                    let
+                      predicate :: Card -> Boolean
+                      predicate = passFilter cardFilter
+                      unfiltered :: Array Card
+                      unfiltered = _.card
+                        <$> nonEmptyStacks state.supply
+                      cards :: Array Card
+                      cards = predicate `filter` unfiltered
+                    in HH.div_
+                      [ HH.slot
+                        (Proxy :: Proxy "ChooseFromSupply")
+                        (AreaSlot ChoiceArea)
+                        ( ChooseFromSupply.component
+                          { cards, baseSlotNumber }
+                        )
+                        unit
+                        $ MakePlay
+                        <<< ResolveChoice
+                        <<< ({ playerIndex, choice: _ })
+                        <<< StackChoice
+                        <<< (x { expression = _ })
+                        <<< (_ : tail)
+                        <<< StackChooseCardFromSupply
+                        <<< (y { cardName = _ })
+                        <<< Bound
+                        <<< fromMaybe "couldn't find card in supply"
+                      ]
+
+                StackOption (Bound b) ->
+                  h1__ $ "Domination: StackOption:"
+                    <> " decision already made: " <> show b
+
+                StackOption Unbound -> chooseOne
+                  (HH.text x.description)
+                  [ button true "Yes", button false "No" ]
+                  where
+                    button value text =
+                      { clickEvent: MakePlay $ ResolveChoice
+                        { playerIndex
+                        , choice: StackChoice x
+                          { expression =
+                            (StackOption $ Bound $ value) : tail
+                          }
+                        }
+                      , text: HH.text text
+                      }
+
+                _ -> acknowledge
                   (renderText choice)
                   ( MakePlay $ ResolveChoice
                     { playerIndex
@@ -549,111 +566,111 @@ renderPlayer cs@{ state, playerIndex } player =
                     }
                   )
 
-          If x ->
-            acknowledge (renderText choice) (playEvent If x unit)
+        If x ->
+          acknowledge (renderText choice) (playEvent If x unit)
 
-          And x ->
-            acknowledge (renderText choice) (playEvent And x unit)
+        And x ->
+          acknowledge (renderText choice) (playEvent And x unit)
 
-          Or x@{ choices } -> chooseOne (HH.text "Choose one")
-            $ choices <#> \choice' ->
-              { clickEvent: playEvent Or x choice'
-              , text: renderText choice'
+        Or x@{ choices } -> chooseOne (HH.text "Choose one")
+          $ choices <#> \choice' ->
+            { clickEvent: playEvent Or x choice'
+            , text: renderText choice'
+            }
+
+        PickN x@{ n, choices } -> HH.div_
+          [ HH.slot
+            (Proxy :: Proxy "PickN")
+            (AreaSlot ChoiceArea)
+            ( PickN.component
+              { title: "Choose " <> show n, n, choices }
+            )
+            unit
+            $ MakePlay
+            <<< ResolveChoice
+            <<< ({ playerIndex, choice: _ })
+            <<< PickN
+            <<< (x { resolution = _ })
+            <<< Just
+          ]
+
+        Option x ->
+          chooseOne (renderText x.choice)
+            [ { clickEvent: MakePlay $ ResolveChoice
+                { playerIndex
+                , choice: Option x { resolution = Just true }
+                }
+              , text: HH.text "Yes"
               }
-
-          PickN x@{ n, choices } -> HH.div_
-            [ HH.slot
-              (Proxy :: Proxy "PickN")
-              (AreaSlot ChoiceArea)
-              ( PickN.component
-                { title: "Choose " <> show n, n, choices }
-              )
-              unit
-              $ MakePlay
-              <<< ResolveChoice
-              <<< ({ playerIndex, choice: _ })
-              <<< PickN
-              <<< (x { resolution = _ })
-              <<< Just
+            , { clickEvent: MakePlay $ ResolveChoice
+                { playerIndex
+                , choice: Option x { resolution = Just false }
+                }
+              , text: HH.text "No"
+              }
             ]
 
-          Option x ->
-            chooseOne (renderText x.choice)
-              [ { clickEvent: MakePlay $ ResolveChoice
-                  { playerIndex
-                  , choice: Option x { resolution = Just true }
-                  }
-                , text: HH.text "Yes"
-                }
-              , { clickEvent: MakePlay $ ResolveChoice
-                  { playerIndex
-                  , choice: Option x { resolution = Just false }
-                  }
-                , text: HH.text "No"
-                }
-              ]
+        MoveFromTo _ -> HH.div_
+          [ HH.slot
+            (Proxy :: Proxy "MoveFromTo")
+            (AreaSlot ChoiceArea)
+            ( MoveFromTo.component
+              state
+              player
+              choice
+              baseSlotNumber
+            )
+            unit
+            $ MakePlay
+            <<< ResolveChoice
+            <<< { playerIndex, choice: _ }
+          ]
 
-          MoveFromTo _ -> HH.div_
+        GainCards x -> acknowledge
+          (renderText choice)
+          (playEvent GainCards x unit)
+
+        GainCard x@{ filter: cardFilter } ->
+          let
+            predicate :: Card -> Boolean
+            predicate = passFilter cardFilter
+            unfiltered :: Array Card
+            unfiltered = _.card <$> nonEmptyStacks state.supply
+            cards :: Array Card
+            cards = predicate `filter` unfiltered
+          in HH.div_
             [ HH.slot
-              (Proxy :: Proxy "MoveFromTo")
+              (Proxy :: Proxy "ChooseFromSupply")
               (AreaSlot ChoiceArea)
-              ( MoveFromTo.component
-                state
-                player
-                choice
-                baseSlotNumber
-              )
+              (ChooseFromSupply.component { cards, baseSlotNumber })
               unit
               $ MakePlay
               <<< ResolveChoice
               <<< { playerIndex, choice: _ }
+              <<< GainCard
+              <<< (x { resolution = _ })
             ]
 
-          GainCards x -> acknowledge
-            (renderText choice)
-            (playEvent GainCards x unit)
+        GainActions x -> acknowledge
+          (renderText choice)
+          (playEvent GainActions x unit)
 
-          GainCard x@{ filter: cardFilter } ->
-            let
-              predicate :: Card -> Boolean
-              predicate = passFilter cardFilter
-              unfiltered :: Array Card
-              unfiltered = _.card <$> nonEmptyStacks state.supply
-              cards :: Array Card
-              cards = predicate `filter` unfiltered
-            in HH.div_
-              [ HH.slot
-                (Proxy :: Proxy "ChooseFromSupply")
-                (AreaSlot ChoiceArea)
-                (ChooseFromSupply.component { cards, baseSlotNumber })
-                unit
-                $ MakePlay
-                <<< ResolveChoice
-                <<< { playerIndex, choice: _ }
-                <<< GainCard
-                <<< (x { resolution = _ })
-              ]
+        GainBuys x -> acknowledge
+          (renderText choice)
+          (playEvent GainBuys x unit)
 
-          GainActions x -> acknowledge
-            (renderText choice)
-            (playEvent GainActions x unit)
+        Discard x@{ selection: SelectAll } ->
+          acknowledge (renderText choice) (playEvent Discard x unit)
 
-          GainBuys x -> acknowledge
-            (renderText choice)
-            (playEvent GainBuys x unit)
+        Draw x ->
+          acknowledge
+          (renderText choice)
+          (playEvent Draw x unit)
 
-          Discard x@{ selection: SelectAll } ->
-            acknowledge (renderText choice) (playEvent Discard x unit)
-
-          Draw x ->
-            acknowledge
-            (renderText choice)
-            (playEvent Draw x unit)
-
-          GainBonus x ->
-            acknowledge
-            (renderText choice)
-            (playEvent GainBonus x unit)
+        GainBonus x ->
+          acknowledge
+          (renderText choice)
+          (playEvent GainBonus x unit)
 
         where
           playEvent
@@ -818,13 +835,13 @@ playAndReport playerIndex play audioContext = do
     Left e -> do
       beep audioContext Sound.Error
       error e
-    Right gameState -> do
+    Right game -> do
       case play of
         Purchase _ -> beep audioContext Sound.Purchase
         _ -> beep audioContext Sound.Acknowledge
       let
-        phase = gameState.phase
-        turn = gameState.turn
+        phase = game.phase
+        turn = game.turn
         newShowSupply =
           case play, playerIndex, lastPhase, phase, lastTurn, turn of
           NewGame _, me, _, _, _, t
@@ -848,6 +865,6 @@ playAndReport playerIndex play audioContext = do
         >>> (_i .~ newI)
         >>> (_showSupply .~ newShowSupply)
       H.raise $ NewState
-        (((_i .~ newI) >>> (_state .~ gameState)) activeState)
+        (((_i .~ newI) >>> (_state .~ game)) activeState)
         playMade
 

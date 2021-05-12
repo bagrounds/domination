@@ -65,7 +65,9 @@ instance reactionRenderText :: RenderText Reaction where
   renderText = case _ of
     BlockAttack -> HH.text
       $ "When another player plays an Attack card"
-      <> ", you may first reveal this from your hand, to be unaffected by it."
+      <> ", you may first reveal this from your hand"
+      <> ", to be unaffected by it."
+    ReactWithChoice choice -> renderText choice
 
 instance bonusRenderText :: RenderText Bonus where
   renderText bonus = HH.span_ case bonus of

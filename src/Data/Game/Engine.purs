@@ -10,7 +10,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty (mapWithIndex, span, toArray)
 import Data.Either (Either(..))
 import Data.Foldable (foldM, length, maximum)
-import Data.Lens.Setter (over, set)
+import Data.Lens.Setter (over, set, (%~))
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse)
@@ -33,7 +33,7 @@ import Domination.Data.Result (Result(..))
 import Domination.Data.Stack as Stack
 import Domination.Data.Supply (emptyStackCount, getStack, highestVictoryCardStackIsEmpty, negativePoints, nonEmptyStacks, positivePoints)
 import Domination.Data.Target (Target(..))
-import Util (indices, withIndices)
+import Util (indices, withIndices, (:~))
 
 makeAutoPlay
   :: forall m
@@ -64,7 +64,12 @@ makePlay play' = maybeGameOver <=< case play' of
   PlayCard x -> play x
   Purchase x -> purchase x
   ResolveChoice x -> resolveChoice x
-  React x -> react x
+  React x@{ playerIndex } ->
+    (pure <<< (Game._player playerIndex %~ Player.updateReactions))
+      >=> react x
+      >=> pure <<< (Game._player playerIndex %~ Player.updateReactions)
+  DoneReacting { playerIndex } ->
+    pure <<< (Game._player playerIndex %~ Player.clearReactions)
   where
     maybeGameOver :: Game -> m Game
     maybeGameOver state =
@@ -156,16 +161,18 @@ purchase { playerIndex, stackIndex } =
 react
   :: forall m
   . MonadError String m
+  => Log m
   => { playerIndex :: Int, reaction :: Maybe Reaction }
   -> Game
   -> m Game
-react { playerIndex, reaction } =
-  modifyPlayer playerIndex Player.dropReaction >=>
-  case reaction of
-    Nothing ->
-      pure
-    Just BlockAttack ->
-      traverseOf (Game._player playerIndex) Player.dropChoice
+react { playerIndex, reaction: maybeReaction } =
+  case maybeReaction of
+    Nothing -> pure
+    Just reaction -> case reaction of
+      BlockAttack ->
+        traverseOf (Game._player playerIndex) Player.dropChoice
+      ReactWithChoice choice ->
+        modifyPlayer playerIndex (Player._choices :~ choice)
 
 play
   :: forall m

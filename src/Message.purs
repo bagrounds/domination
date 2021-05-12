@@ -192,10 +192,18 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
               Just { card } -> card.name
         ResolveChoice { playerIndex, choice } ->
           Just $ renderTextInContext playerIndex state choice
-        React { reaction } -> Just $
-          HH.text $ case reaction of
-            Nothing -> "did not react"
-            Just BlockAttack -> "blocked an attack"
+        React { playerIndex, reaction: maybeReaction } -> Just $
+          case maybeReaction of
+            Nothing -> HH.text $ "did not react"
+            Just reaction -> case reaction of
+              BlockAttack -> HH.text $ "blocked an attack"
+              ReactWithChoice choice ->
+                HH.span_ [ HH.text $ "reacted with: "
+                , renderTextInContext playerIndex state choice
+                ]
+        DoneReacting { playerIndex } -> Just $
+          HH.text $ "player " <> show (playerIndex + 1)
+            <> " is done reacting"
 
 getPlayerCardName :: Int -> Game -> Int -> String
 getPlayerCardName playerIndex state cardIndex = fromMaybe "???"

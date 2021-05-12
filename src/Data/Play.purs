@@ -29,6 +29,7 @@ data Play
   | Purchase { playerIndex :: Int,  stackIndex :: Int }
   | ResolveChoice { playerIndex :: Int, choice :: Choice }
   | React { playerIndex :: Int, reaction :: Maybe Reaction }
+  | DoneReacting { playerIndex :: Int }
 
 _playerIndex' :: forall r. Lens' { playerIndex :: Int | r } Int
 _playerIndex' = prop (SProxy :: SProxy "playerIndex")
@@ -41,6 +42,7 @@ _playerIndex = wander \f s -> case s of
   Purchase x -> Purchase <$> traverseOf _playerIndex' f x
   ResolveChoice x -> ResolveChoice <$> traverseOf _playerIndex' f x
   React x -> React <$> traverseOf _playerIndex' f x
+  DoneReacting x -> DoneReacting <$> traverseOf _playerIndex' f x
 
 derive instance genericPlay :: Generic Play _
 derive instance eqPlay :: Eq Play

@@ -11,12 +11,10 @@ import Data.Lens.Index (ix)
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens)
 import Data.Lens.Prism (review)
-import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, (%~), (+~), (.~))
+import Data.Lens.Setter (over, set, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Symbol (SProxy(..))
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, randomIntBetween, shuffle)
 import Domination.Data.Actions (Actions)
@@ -25,6 +23,7 @@ import Domination.Data.Bonus (cashValue) as Bonus
 import Domination.Data.Buys (Buys)
 import Domination.Data.Card (Card, _card, hasType)
 import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positivePoints, value) as Card
+import Domination.Data.CardType as CardType
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice (isAttack) as Choice
@@ -38,8 +37,11 @@ import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
+import Domination.Data.Wire.Reaction (WireReaction)
+import Domination.Data.Wire.Reaction as Reaction
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
+import Type.Proxy (Proxy(..))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (.^), (:~), (<$>~))
 
 type Player =
@@ -52,7 +54,7 @@ type Player =
   , deck :: Array Card
   , discard :: Array Card
   , hand :: Array Card
-  , reaction :: Maybe Reaction
+  , reactions :: Array Reaction
   , toDiscard :: Array Card
   }
 
@@ -66,7 +68,7 @@ type WirePlayer =
   (Tuple (Array WireInt) -- deck
   (Tuple (Array WireInt) -- discard
   (Tuple (Array WireInt) -- hand
-  (Tuple (Maybe Reaction) (Array WireInt)))))))))))
+  (Tuple (Array WireReaction) (Array WireInt)))))))))))
 
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
@@ -78,6 +80,7 @@ _toWire = iso to from where
     >>> (_toDiscard <$>~ view Card._toWire)
     >>> (_atPlay <$>~ view Card._toWire)
     >>> (_buying <$>~ view Card._toWire)
+    >>> (_reactions <$>~ view Reaction._toWire)
     >>> toTuple
   from = fromTuple
     >>> (_choices <$>~ review Choice._toWire)
@@ -88,6 +91,7 @@ _toWire = iso to from where
     >>> (_toDiscard <$>~ review Card._toWire)
     >>> (_atPlay <$>~ review Card._toWire)
     >>> (_buying <$>~ review Card._toWire)
+    >>> (_reactions <$>~ review Reaction._toWire)
   toTuple
     { actions
     , atPlay
@@ -98,7 +102,7 @@ _toWire = iso to from where
     , deck
     , discard
     , hand
-    , reaction
+    , reactions
     , toDiscard
     } = Tuple actions
       $ Tuple atPlay
@@ -109,7 +113,7 @@ _toWire = iso to from where
       $ Tuple deck
       $ Tuple discard
       $ Tuple hand
-      $ Tuple reaction toDiscard
+      $ Tuple reactions toDiscard
   fromTuple
     (Tuple actions
     (Tuple atPlay
@@ -120,7 +124,7 @@ _toWire = iso to from where
     (Tuple deck
     (Tuple discard
     (Tuple hand
-    (Tuple reaction toDiscard)))))))))) =
+    (Tuple reactions toDiscard)))))))))) =
     { actions
     , atPlay
     , bonuses
@@ -130,52 +134,56 @@ _toWire = iso to from where
     , deck
     , discard
     , hand
-    , reaction
+    , reactions
     , toDiscard
     }
 
 _deck
   :: forall a b r
   . Lens { deck :: a | r } { deck :: b | r } a b
-_deck = prop (SProxy :: SProxy "deck")
+_deck = prop (Proxy :: Proxy "deck")
 _hand
   :: forall a b r
   . Lens { hand :: a | r } { hand :: b | r } a b
-_hand = prop (SProxy :: SProxy "hand")
+_hand = prop (Proxy :: Proxy "hand")
 _discard
   :: forall a b r
   . Lens { discard :: a | r } { discard :: b | r } a b
-_discard = prop (SProxy :: SProxy "discard")
+_discard = prop (Proxy :: Proxy "discard")
 _toDiscard
   :: forall a b r
   . Lens { toDiscard :: a | r } { toDiscard :: b | r } a b
-_toDiscard = prop (SProxy :: SProxy "toDiscard")
+_toDiscard = prop (Proxy :: Proxy "toDiscard")
 _atPlay
   :: forall a b r
   . Lens { atPlay :: a | r } { atPlay :: b | r } a b
-_atPlay = prop (SProxy :: SProxy "atPlay")
+_atPlay = prop (Proxy :: Proxy "atPlay")
 _buying
   :: forall a b r
   . Lens { buying :: a | r } { buying :: b | r } a b
-_buying = prop (SProxy :: SProxy "buying")
+_buying = prop (Proxy :: Proxy "buying")
 _actions
   :: forall a b r
   . Lens { actions :: a | r } { actions :: b | r } a b
-_actions = prop (SProxy :: SProxy "actions")
+_actions = prop (Proxy :: Proxy "actions")
 _buys
   :: forall a b r
   . Lens { buys :: a | r } { buys :: b | r } a b
-_buys = prop (SProxy :: SProxy "buys")
+_buys = prop (Proxy :: Proxy "buys")
 _choices
   :: forall a b r
   . Lens { choices :: a | r } { choices :: b | r } a b
-_choices = prop (SProxy :: SProxy "choices")
-_reaction :: Traversal' Player Reaction
-_reaction = prop (SProxy :: SProxy "reaction") <<< _Just
+_choices = prop (Proxy :: Proxy "choices")
+
+_reactions
+  :: forall a b r
+  . Lens { reactions :: a | r } { reactions :: b | r } a b
+_reactions = prop (Proxy :: Proxy "reactions")
+
 _bonuses
   :: forall a b r
   . Lens { bonuses :: a | r } { bonuses :: b | r } a b
-_bonuses = prop (SProxy :: SProxy "bonuses")
+_bonuses = prop (Proxy :: Proxy "bonuses")
 
 _cardInHand :: Int -> Traversal' Player Card
 _cardInHand i = _hand <<< ix i
@@ -183,7 +191,12 @@ _cardInHand i = _hand <<< ix i
 getCard :: forall m. MonadError String m => Int -> Player -> m Card
 getCard i = fromJust "cannot get card!" <<< preview (_cardInHand i)
 
-dropCard :: forall m. MonadError String m => Int -> Player -> m (Array Card)
+dropCard
+  :: forall m
+  . MonadError String m
+  => Int
+  -> Player
+  -> m (Array Card)
 dropCard i = fromJust "cannot drop card!" <<< deleteAt i <<< _.hand
 
 dropCards
@@ -234,32 +247,31 @@ gainBuys n = over _buys (_ + n)
 gainChoices :: Array Choice -> Player -> Player
 gainChoices = flip (foldr gainChoice) <<< reverse
 
+clearReactions :: Player -> Player
+clearReactions = _reactions .~ []
+
+updateReactions :: Player -> Player
+updateReactions player =
+  set _reactions reactionsInHand player
+  where
+    reactionsInHand = catMaybes
+      $ hasType CardType.Reaction `filter` player.hand
+      <#> _.reaction
+
 gainChoice :: Choice -> Player -> Player
 gainChoice choice player =
-  let
-    player' = (over _choices $ (_ <> [ choice ])) player
+  let player' = (_choices %~ (_ <> [ choice ])) player
   in
     if Choice.isAttack choice
-    then case reactionInHand player of
-      Just r -> gainReaction r player'
-      Nothing -> player'
+    then updateReactions player'
     else player'
 
-gainReaction :: Reaction -> Player -> Player
-gainReaction reaction = _ { reaction = Just reaction }
-
-dropReaction :: Player -> Player
-dropReaction = _ { reaction = Nothing }
-
-reactionInHand :: Player -> Maybe Reaction
-reactionInHand =
-  _.hand >>> map _.reaction >>> catMaybes >>> head
+updateChoice :: (Choice -> Choice) -> Player -> Player
+updateChoice choiceUpdate player =
+  (over _choices <<< ix 0) choiceUpdate player
 
 hasReaction :: Player -> Boolean
-hasReaction { reaction } =
-  case reaction of
-    Just _ -> true
-    Nothing -> false
+hasReaction { reactions } = length reactions > zero
 
 purchase :: Card -> Player -> Player
 purchase card = decOver _buys >>> prependOver _buying card
@@ -340,7 +352,11 @@ score player = foldr (+) zero $ _.victoryPoints <$> allCards player
 assertHasBuys :: forall m. MonadError String m => Player -> m Player
 assertHasBuys = assert (_.buys >>> (_ > zero)) "no buys!"
 
-assertHasActions :: forall m. MonadError String m => Player -> m Player
+assertHasActions
+  :: forall m
+  . MonadError String m
+  => Player
+  -> m Player
 assertHasActions = assert (_.actions >>> (_ > zero)) "no actions!"
 
 assertHasCash
@@ -392,7 +408,7 @@ newPlayer =
   , actions: one
   , buys: one
   , choices: []
-  , reaction : Nothing
+  , reactions : []
   , bonuses : []
   }
 

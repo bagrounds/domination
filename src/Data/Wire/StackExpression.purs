@@ -15,8 +15,6 @@ import Data.Show.Generic (genericShow)
 import Domination.Data.Pile (Pile)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Var (Var)
-import Domination.Data.Wire.Bonus (WireBonus)
-import Domination.Data.Wire.Bonus as Bonus
 import Domination.Data.Wire.Constraint (WireConstraint)
 import Domination.Data.Wire.Constraint as Constraint
 import Domination.Data.Wire.Filter (WireFilter)
@@ -52,8 +50,9 @@ data WireStackExpression
     (Array WireStackExpression)
     (Array WireStackExpression)
   | WireStackPush WireStackValue
-  | WireStackGainBonus WireBonus
+  | WireStackGainBonusCash
   | WireStackOption (Var Boolean)
+  | WireStackMoveCards Pile Pile
 
 _toWire :: Iso' StackExpression WireStackExpression
 _toWire = iso to fro where
@@ -86,9 +85,9 @@ _toWire = iso to fro where
       (view _toWire <$> following)
       (view _toWire <$> otherwise)
     StackPush value -> WireStackPush $ value ^. StackValue._toWire
-    StackGainBonus bonus -> WireStackGainBonus
-      $ bonus ^. Bonus._toWire
+    StackGainBonusCash -> WireStackGainBonusCash
     StackOption var -> WireStackOption var
+    StackMoveCards { from, to: to' } -> WireStackMoveCards from to'
 
   fro = case _ of
     WireStackChooseCards cards filter from n ->
@@ -122,9 +121,9 @@ _toWire = iso to fro where
       , otherwise: review _toWire <$> otherwise
       }
     WireStackPush value -> StackPush $ value .^ StackValue._toWire
-    WireStackGainBonus bonus -> StackGainBonus
-      $ bonus .^ Bonus._toWire
+    WireStackGainBonusCash -> StackGainBonusCash
     WireStackOption var -> StackOption var
+    WireStackMoveCards from to' -> StackMoveCards { from, to: to' }
 
 derive instance genericWireStackExpression
   :: Generic WireStackExpression _

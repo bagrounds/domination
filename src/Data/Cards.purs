@@ -49,6 +49,7 @@ cardSpecMap =
   , courtyard
   , lurker
   , cellar
+  , secretChamber
   , greatHall
   , village
   , woodCutter
@@ -1303,6 +1304,52 @@ mill = let
       , attack
       , description
       }
+    , description
+    }
+  }
+
+secretChamber :: Card
+secretChamber = let
+  attack = false
+  description = "Discard N cards, +$N."
+  in Card.actionReaction
+  { name = "Secret Chamber"
+  , cost = 2
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Filter.Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Unlimited
+          }
+        , StackDuplicate
+        , StackMoveCards { from: Pile.Hand, to: Pile.ToDiscard }
+        , StackLength
+        , StackGainBonusCash
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  , reaction = Just $ ReactWithChoice $ StackChoice
+    { expression:
+      [ StackPush $ StackInt 2
+      , StackDraw
+      , StackChooseCards
+        { cards: Unbound
+        , filter: Bound Filter.Any
+        , from: Bound Pile.Hand
+        , n: Bound $ Exactly 2
+        }
+      , StackMoveCards { from: Pile.Hand, to: Pile.Deck }
+      ]
+    , stack: []
+    , attack
     , description
     }
   }
