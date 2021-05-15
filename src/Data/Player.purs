@@ -8,14 +8,11 @@ import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
-import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens)
-import Data.Lens.Prism (review)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe, fromMaybe)
-import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, randomIntBetween, shuffle)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
@@ -29,17 +26,11 @@ import Domination.Data.Choice (Choice)
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
-import Domination.Data.Wire.Bonus (WireBonus)
-import Domination.Data.Wire.Bonus (_toWire) as Bonus
-import Domination.Data.Wire.Card (_toWire) as Card
-import Domination.Data.Wire.Choice (WireChoice)
-import Domination.Data.Wire.Choice (_toWire) as Choice
-import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
 import Type.Proxy (Proxy(..))
-import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (.^), (:~), (<$>~))
+import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (.^), (:~))
 
 type Player =
   { actions :: Actions
@@ -54,112 +45,46 @@ type Player =
   , toDiscard :: Array Card
   }
 
-type WirePlayer =
-  (Tuple Actions
-  (Tuple (Array WireInt) -- atPlay
-  (Tuple (Array WireBonus) -- bonuses
-  (Tuple (Array WireInt) -- buying
-  (Tuple Buys
-  (Tuple (Array WireChoice) -- choices
-  (Tuple (Array WireInt) -- deck
-  (Tuple (Array WireInt) -- discard
-  (Tuple (Array WireInt) -- hand
-  (Array WireInt))))))))))
-
-_toWire :: Iso' Player WirePlayer
-_toWire = iso to from where
-  to = (_choices <$>~ view Choice._toWire)
-    >>> (_bonuses <$>~ view Bonus._toWire)
-    >>> (_deck <$>~ view Card._toWire)
-    >>> (_hand <$>~ view Card._toWire)
-    >>> (_discard <$>~ view Card._toWire)
-    >>> (_toDiscard <$>~ view Card._toWire)
-    >>> (_atPlay <$>~ view Card._toWire)
-    >>> (_buying <$>~ view Card._toWire)
-    >>> toTuple
-  from = fromTuple
-    >>> (_choices <$>~ review Choice._toWire)
-    >>> (_bonuses <$>~ review Bonus._toWire)
-    >>> (_deck <$>~ review Card._toWire)
-    >>> (_hand <$>~ review Card._toWire)
-    >>> (_discard <$>~ review Card._toWire)
-    >>> (_toDiscard <$>~ review Card._toWire)
-    >>> (_atPlay <$>~ review Card._toWire)
-    >>> (_buying <$>~ review Card._toWire)
-  toTuple
-    { actions
-    , atPlay
-    , bonuses
-    , buying
-    , buys
-    , choices
-    , deck
-    , discard
-    , hand
-    , toDiscard
-    } = Tuple actions
-      $ Tuple atPlay
-      $ Tuple bonuses
-      $ Tuple buying
-      $ Tuple buys
-      $ Tuple choices
-      $ Tuple deck
-      $ Tuple discard
-      $ Tuple hand toDiscard
-  fromTuple
-    (Tuple actions
-    (Tuple atPlay
-    (Tuple bonuses
-    (Tuple buying
-    (Tuple buys
-    (Tuple choices
-    (Tuple deck
-    (Tuple discard
-    (Tuple hand toDiscard))))))))) =
-    { actions
-    , atPlay
-    , bonuses
-    , buying
-    , buys
-    , choices
-    , deck
-    , discard
-    , hand
-    , toDiscard
-    }
-
 _deck
   :: forall a b r
   . Lens { deck :: a | r } { deck :: b | r } a b
 _deck = prop (Proxy :: Proxy "deck")
+
 _hand
   :: forall a b r
   . Lens { hand :: a | r } { hand :: b | r } a b
 _hand = prop (Proxy :: Proxy "hand")
+
 _discard
   :: forall a b r
   . Lens { discard :: a | r } { discard :: b | r } a b
 _discard = prop (Proxy :: Proxy "discard")
+
 _toDiscard
   :: forall a b r
   . Lens { toDiscard :: a | r } { toDiscard :: b | r } a b
 _toDiscard = prop (Proxy :: Proxy "toDiscard")
+
 _atPlay
   :: forall a b r
   . Lens { atPlay :: a | r } { atPlay :: b | r } a b
 _atPlay = prop (Proxy :: Proxy "atPlay")
+
 _buying
   :: forall a b r
   . Lens { buying :: a | r } { buying :: b | r } a b
 _buying = prop (Proxy :: Proxy "buying")
+
 _actions
   :: forall a b r
   . Lens { actions :: a | r } { actions :: b | r } a b
 _actions = prop (Proxy :: Proxy "actions")
+
 _buys
   :: forall a b r
   . Lens { buys :: a | r } { buys :: b | r } a b
 _buys = prop (Proxy :: Proxy "buys")
+
 _choices
   :: forall a b r
   . Lens { choices :: a | r } { choices :: b | r } a b

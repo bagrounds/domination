@@ -18,8 +18,8 @@ import Data.NonEmpty (NonEmpty)
 import Data.Show.Generic (genericShow)
 import Domination.Data.Game (Game, _players, _result, _supply, _trash, _turn)
 import Domination.Data.Phase (Phase)
-import Domination.Data.Player (WirePlayer)
-import Domination.Data.Player as Player
+import Domination.Data.Wire.Player (WirePlayer)
+import Domination.Data.Wire.Player as Player
 import Domination.Data.Wire.Card as Card
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
