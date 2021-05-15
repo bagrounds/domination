@@ -1,4 +1,7 @@
-module Domination.Data.Game.Engine where
+module Domination.Data.Game.Engine
+  ( makeAutoPlay
+  , choiceTurn
+  ) where
 
 import Prelude hiding (Ordering(..))
 import Prim hiding (Constraint)
@@ -27,6 +30,7 @@ import Domination.Data.Game.ResolveChoice (resolveChoice)
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
 import Domination.Data.Play (Play(..))
+import Domination.Data.Play as Play
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Result (Result(..))
@@ -57,20 +61,25 @@ makePlay
   => Play
   -> Game
   -> m Game
-makePlay play' = maybeGameOver <=< case play' of
-  NewGame { playerCount, supply, longGame } ->
-    const (setup $ Game.new playerCount supply longGame)
-  EndPhase { playerIndex } -> nextPhase playerIndex
-  PlayCard x -> play x
-  Purchase x -> purchase x
-  ResolveChoice x -> resolveChoice x
-  React x@{ playerIndex } ->
-    (pure <<< (Game._player playerIndex %~ Player.updateReactions))
-      >=> react x
-      >=> pure <<< (Game._player playerIndex %~ Player.updateReactions)
-  DoneReacting { playerIndex } ->
-    pure <<< (Game._player playerIndex %~ Player.clearReactions)
+makePlay play' = maybeGameOver <=< handlePlay play'
   where
+    handlePlay :: Play -> Game -> m Game
+    handlePlay = case _ of
+      NewGame { playerCount, supply, longGame } ->
+        const (setup $ Game.new playerCount supply longGame)
+      EndPhase { playerIndex } -> nextPhase playerIndex
+      PlayCard x -> updateReactions <=< play x
+      Purchase x -> updateReactions <=< purchase x
+      ResolveChoice x -> updateReactions <=< resolveChoice x
+      React x -> updateReactions <=< react x
+      DoneReacting { playerIndex } -> updateReactions
+        <$> (Game._player playerIndex %~ Player.clearReactions)
+
+    updateReactions :: Game -> m Game
+    updateReactions game = do
+      playerIndex <- Play.getPlayerIndex play'
+      pure $ (Game._player playerIndex %~ Player.updateReactions) game
+
     maybeGameOver :: Game -> m Game
     maybeGameOver state =
       set Game._result <$> finalResult state <*> pure state

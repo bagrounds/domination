@@ -2,17 +2,19 @@ module Domination.Data.Play where
 
 import Prelude
 
+import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
+import Data.Lens.Fold ((^?))
 import Data.Lens.Internal.Wander (wander)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Traversal (Traversal', traverseOf)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
+import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Choice (Choice)
@@ -43,6 +45,11 @@ _playerIndex = wander \f s -> case s of
   ResolveChoice x -> ResolveChoice <$> traverseOf _playerIndex' f x
   React x -> React <$> traverseOf _playerIndex' f x
   DoneReacting x -> DoneReacting <$> traverseOf _playerIndex' f x
+
+getPlayerIndex :: forall m. MonadError String m => Play -> m Int
+getPlayerIndex play = case play ^? _playerIndex of
+  Nothing -> throwError "Play should always have a playerIndex"
+  Just playerIndex -> pure playerIndex
 
 derive instance genericPlay :: Generic Play _
 derive instance eqPlay :: Eq Play
