@@ -6,7 +6,7 @@ import Control.Monad.Error.Class (class MonadError)
 import Data.Array.NonEmpty (NonEmptyArray, replicate, updateAt)
 import Data.Foldable (any)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Getter (view, (^.))
+import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
 import Data.Lens.Lens (Lens)
 import Data.Lens.Prism (Prism', prism')
@@ -176,12 +176,6 @@ currentPlayer
   => Game
   -> m Player
 currentPlayer state = getPlayer state.turn state
-
-hasReaction :: Int -> Game -> Boolean
-hasReaction playerIndex state =
-  case state ^. _player playerIndex <<< Player._reactions of
-    [] -> true
-    _ -> false
 
 isAttacked :: Int -> Game -> Boolean
 isAttacked playerIndex state =

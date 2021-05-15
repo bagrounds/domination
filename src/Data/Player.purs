@@ -12,7 +12,7 @@ import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens)
 import Data.Lens.Prism (review)
 import Data.Lens.Record (prop)
-import Data.Lens.Setter (over, set, (%~), (+~), (.~))
+import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Tuple (Tuple(..))
@@ -26,7 +26,6 @@ import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positiv
 import Domination.Data.CardType as CardType
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
-import Domination.Data.Choice (isAttack) as Choice
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
@@ -37,8 +36,6 @@ import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
-import Domination.Data.Wire.Reaction (WireReaction)
-import Domination.Data.Wire.Reaction as Reaction
 import Relation (Relation, is)
 import Rule (Rule, check, (!>), (<@!))
 import Type.Proxy (Proxy(..))
@@ -54,7 +51,6 @@ type Player =
   , deck :: Array Card
   , discard :: Array Card
   , hand :: Array Card
-  , reactions :: Array Reaction
   , toDiscard :: Array Card
   }
 
@@ -68,7 +64,7 @@ type WirePlayer =
   (Tuple (Array WireInt) -- deck
   (Tuple (Array WireInt) -- discard
   (Tuple (Array WireInt) -- hand
-  (Tuple (Array WireReaction) (Array WireInt)))))))))))
+  (Array WireInt))))))))))
 
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
@@ -80,7 +76,6 @@ _toWire = iso to from where
     >>> (_toDiscard <$>~ view Card._toWire)
     >>> (_atPlay <$>~ view Card._toWire)
     >>> (_buying <$>~ view Card._toWire)
-    >>> (_reactions <$>~ view Reaction._toWire)
     >>> toTuple
   from = fromTuple
     >>> (_choices <$>~ review Choice._toWire)
@@ -91,7 +86,6 @@ _toWire = iso to from where
     >>> (_toDiscard <$>~ review Card._toWire)
     >>> (_atPlay <$>~ review Card._toWire)
     >>> (_buying <$>~ review Card._toWire)
-    >>> (_reactions <$>~ review Reaction._toWire)
   toTuple
     { actions
     , atPlay
@@ -102,7 +96,6 @@ _toWire = iso to from where
     , deck
     , discard
     , hand
-    , reactions
     , toDiscard
     } = Tuple actions
       $ Tuple atPlay
@@ -112,8 +105,7 @@ _toWire = iso to from where
       $ Tuple choices
       $ Tuple deck
       $ Tuple discard
-      $ Tuple hand
-      $ Tuple reactions toDiscard
+      $ Tuple hand toDiscard
   fromTuple
     (Tuple actions
     (Tuple atPlay
@@ -123,8 +115,7 @@ _toWire = iso to from where
     (Tuple choices
     (Tuple deck
     (Tuple discard
-    (Tuple hand
-    (Tuple reactions toDiscard)))))))))) =
+    (Tuple hand toDiscard))))))))) =
     { actions
     , atPlay
     , bonuses
@@ -134,7 +125,6 @@ _toWire = iso to from where
     , deck
     , discard
     , hand
-    , reactions
     , toDiscard
     }
 
@@ -174,11 +164,6 @@ _choices
   :: forall a b r
   . Lens { choices :: a | r } { choices :: b | r } a b
 _choices = prop (Proxy :: Proxy "choices")
-
-_reactions
-  :: forall a b r
-  . Lens { reactions :: a | r } { reactions :: b | r } a b
-_reactions = prop (Proxy :: Proxy "reactions")
 
 _bonuses
   :: forall a b r
@@ -247,31 +232,20 @@ gainBuys n = over _buys (_ + n)
 gainChoices :: Array Choice -> Player -> Player
 gainChoices = flip (foldr gainChoice) <<< reverse
 
-clearReactions :: Player -> Player
-clearReactions = _reactions .~ []
-
-updateReactions :: Player -> Player
-updateReactions player =
-  set _reactions reactionsInHand player
-  where
-    reactionsInHand = catMaybes
-      $ hasType CardType.Reaction `filter` player.hand
-      <#> _.reaction
+reactionsInHand :: Player -> Array Reaction
+reactionsInHand player = catMaybes
+  $ hasType CardType.Reaction `filter` player.hand
+  <#> _.reaction
 
 gainChoice :: Choice -> Player -> Player
-gainChoice choice player =
-  let player' = (_choices %~ (_ <> [ choice ])) player
-  in
-    if Choice.isAttack choice
-    then updateReactions player'
-    else player'
+gainChoice choice = _choices %~ (_ <> [ choice ])
 
 updateChoice :: (Choice -> Choice) -> Player -> Player
 updateChoice choiceUpdate player =
   (over _choices <<< ix 0) choiceUpdate player
 
 hasReaction :: Player -> Boolean
-hasReaction { reactions } = length reactions > zero
+hasReaction = (_ > zero) <<< length <<< reactionsInHand
 
 purchase :: Card -> Player -> Player
 purchase card = decOver _buys >>> prependOver _buying card
@@ -408,7 +382,6 @@ newPlayer =
   , actions: one
   , buys: one
   , choices: []
-  , reactions : []
   , bonuses : []
   }
 

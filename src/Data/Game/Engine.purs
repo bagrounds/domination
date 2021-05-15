@@ -14,8 +14,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty (mapWithIndex, span, toArray)
 import Data.Either (Either(..))
 import Data.Foldable (foldM, length, maximum)
-import Data.Lens.Getter ((^.))
-import Data.Lens.Setter (over, set, (%~))
+import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse)
@@ -32,7 +31,6 @@ import Domination.Data.Game.ResolveChoice (resolveChoice)
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
 import Domination.Data.Play (Play(..))
-import Domination.Data.Play as Play
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Result (Result(..))
@@ -63,8 +61,7 @@ makePlay
   => Play
   -> Game
   -> m Game
-makePlay play' =
-  maybeGameOver <=< map updateReactions <<< handlePlay play'
+makePlay play' = maybeGameOver <=< handlePlay play'
   where
     handlePlay :: Play -> Game -> m Game
     handlePlay = case _ of
@@ -73,13 +70,7 @@ makePlay play' =
       Purchase x -> purchase x
       ResolveChoice x -> resolveChoice x
       React x -> react x
-      DoneReacting { playerIndex } ->
-        pure <<< (Game._player playerIndex %~ Player.clearReactions)
-
-    updateReactions :: Game -> Game
-    updateReactions game =
-      let playerIndex = play' ^. Play._playerIndex
-      in (Game._player playerIndex %~ Player.updateReactions) game
+      DoneReacting _ -> pure
 
     maybeGameOver :: Game -> m Game
     maybeGameOver state =
