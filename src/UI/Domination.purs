@@ -26,13 +26,13 @@ import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
 import Domination.Data.Game (choicesOutstanding, isAttacked, new) as Game
-import Domination.Data.Game.Engine (choiceTurn, makeAutoPlay) as Game
+import Domination.Data.Game.Engine (choiceTurn, makeAutoPlay, setup) as Game
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
 import Domination.Data.Play as Play
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
-import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Reaction (Reaction)
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
 import Domination.Data.StackEvaluation (StackExpression(..))
@@ -424,39 +424,6 @@ renderPlayer cs@{ state, playerIndex } player =
               ) <$> reactions
             )
 
-      renderReaction
-        :: Reaction
-        -> Maybe (HTML (ChildComponents query r m) Action)
-      renderReaction = case _ of
-        BlockAttack ->
-          Just $ chooseOne (HH.text "Block attack?")
-            [ { clickEvent: MakePlay $
-                React { playerIndex, reaction: Just BlockAttack }
-              , text: HH.text "Yes"
-              }
-            , { clickEvent: MakePlay $
-                React { playerIndex, reaction: Nothing }
-              , text: HH.text "No"
-              }
-            ]
-        reaction@(ReactWithChoice choice) ->
-          Just $ chooseOne
-            ( HH.span_
-              [ HH.text "Would you like to react with: "
-              , renderText choice
-              , HH.text "?"
-              ]
-            )
-            [ { clickEvent: MakePlay $
-                React { playerIndex, reaction: Just reaction }
-              , text: HH.text "Yes"
-              }
-            , { clickEvent: MakePlay $
-                React { playerIndex, reaction: Nothing }
-              , text: HH.text "No"
-              }
-            ]
-
       renderChoice
         :: (Int -> DomSlot)
         -> Maybe Choice
@@ -830,7 +797,7 @@ playAndReport playerIndex play audioContext = do
   let
     lastPhase = state.phase
     lastTurn = state.turn
-  result <- Game.makeAutoPlay play activeState.state
+  result <- Game.makeAutoPlay play state
   case result of
     Left e -> do
       beep audioContext Sound.Error
@@ -844,8 +811,6 @@ playAndReport playerIndex play audioContext = do
         turn = game.turn
         newShowSupply =
           case play, playerIndex, lastPhase, phase, lastTurn, turn of
-          NewGame _, me, _, _, _, t
-            | me == t -> true
           _, me, BuyPhase, _, lt, t
             | me == lt && me /= t -> false
           _, me, _, ActionPhase, _, t
@@ -856,11 +821,9 @@ playAndReport playerIndex play audioContext = do
           _ -> Just
             { play
             , playerIndex
-            , state: activeState.state
+            , state
             }
-        newI = case play of
-          NewGame _ -> zero
-          _ -> activeState.i + one
+        newI = activeState.i + one
       H.modify_ $ (_playerIndex .~ activeState.playerIndex)
         >>> (_i .~ newI)
         >>> (_showSupply .~ newShowSupply)

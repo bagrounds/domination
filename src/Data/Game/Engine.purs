@@ -1,6 +1,7 @@
 module Domination.Data.Game.Engine
   ( makeAutoPlay
   , choiceTurn
+  , setup
   ) where
 
 import Prelude hiding (Ordering(..))
@@ -13,6 +14,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty (mapWithIndex, span, toArray)
 import Data.Either (Either(..))
 import Data.Foldable (foldM, length, maximum)
+import Data.Lens.Getter ((^.))
 import Data.Lens.Setter (over, set, (%~))
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -46,11 +48,11 @@ makeAutoPlay
   => Play
   -> Game
   -> m (Either String Game)
-makeAutoPlay p s = runExceptT $ do
-  state <- makePlay p s
-  eNextState <- runExceptT $ autoAdvance state
+makeAutoPlay play' state = runExceptT $ do
+  state' <- makePlay play' state
+  eNextState <- runExceptT $ autoAdvance state'
   pure case eNextState of
-    Left _ -> state
+    Left _ -> state'
     Right nextState -> nextState
 
 makePlay
@@ -61,24 +63,23 @@ makePlay
   => Play
   -> Game
   -> m Game
-makePlay play' = maybeGameOver <=< handlePlay play'
+makePlay play' =
+  maybeGameOver <=< map updateReactions <<< handlePlay play'
   where
     handlePlay :: Play -> Game -> m Game
     handlePlay = case _ of
-      NewGame { playerCount, supply, longGame } ->
-        const (setup $ Game.new playerCount supply longGame)
       EndPhase { playerIndex } -> nextPhase playerIndex
-      PlayCard x -> updateReactions <=< play x
-      Purchase x -> updateReactions <=< purchase x
-      ResolveChoice x -> updateReactions <=< resolveChoice x
-      React x -> updateReactions <=< react x
-      DoneReacting { playerIndex } -> updateReactions
-        <$> (Game._player playerIndex %~ Player.clearReactions)
+      PlayCard x -> play x
+      Purchase x -> purchase x
+      ResolveChoice x -> resolveChoice x
+      React x -> react x
+      DoneReacting { playerIndex } ->
+        pure <<< (Game._player playerIndex %~ Player.clearReactions)
 
-    updateReactions :: Game -> m Game
-    updateReactions game = do
-      playerIndex <- Play.getPlayerIndex play'
-      pure $ (Game._player playerIndex %~ Player.updateReactions) game
+    updateReactions :: Game -> Game
+    updateReactions game =
+      let playerIndex = play' ^. Play._playerIndex
+      in (Game._player playerIndex %~ Player.updateReactions) game
 
     maybeGameOver :: Game -> m Game
     maybeGameOver state =
@@ -141,8 +142,7 @@ nextPhase playerIndex state =
 
 setup
   :: forall m
-  . MonadError String m
-  => Random m
+  . Random m
   => Game -> m Game
 setup game = flip (set Game._players) game
   <$> traverse (Player.drawCards 5) game.players

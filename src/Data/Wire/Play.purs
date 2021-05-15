@@ -15,7 +15,6 @@ import Data.Maybe (Maybe)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Domination.Data.Play (Play(..))
-import Domination.Data.Wire.Card as Cards
 import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice as Choice
 import Domination.Data.Wire.Int (WireInt)
@@ -25,8 +24,7 @@ import Domination.Data.Wire.Reaction as Reaction
 import Util ((.^))
 
 data WirePlay
-  = WireNewGame WireInt (Array WireInt) Boolean
-  | WireEndPhase WireInt
+  = WireEndPhase WireInt
   | WirePlayCard (Tuple WireInt WireInt)
   | WirePurchase (Tuple WireInt WireInt)
   | WireResolveChoice (Tuple WireInt WireChoice)
@@ -36,11 +34,6 @@ data WirePlay
 _toWire :: Iso' Play WirePlay
 _toWire = iso to from where
   to = case _ of
-    NewGame { playerCount, supply, longGame } ->
-      WireNewGame
-        (view Int._toWire playerCount)
-        (view Cards._toWire <$> supply)
-        longGame
     EndPhase { playerIndex } ->
       WireEndPhase $ view Int._toWire playerIndex
     PlayCard { playerIndex, cardIndex } ->
@@ -64,12 +57,6 @@ _toWire = iso to from where
       WireDoneReacting $ playerIndex ^. Int._toWire
 
   from = case _ of
-    WireNewGame playerCount supply longGame ->
-      NewGame
-        { playerCount: review Int._toWire playerCount
-        , supply: review Cards._toWire <$> supply
-        , longGame
-        }
     WireEndPhase playerIndex ->
       EndPhase { playerIndex: review Int._toWire playerIndex }
     WirePlayCard (Tuple playerIndex cardIndex) ->

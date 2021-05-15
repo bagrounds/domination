@@ -6,7 +6,8 @@ import Domination.Data.Play (Play)
 import Domination.UI.Domination.ActiveState (ActiveState)
 
 data GameEvent
-  = NewState
+  = CreateNewGame ActiveState
+  | NewState
     ActiveState
     (Maybe { play :: Play, playerIndex :: Int, state :: Game })
   | SaveGame ActiveState

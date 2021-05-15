@@ -3,7 +3,7 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (any, catMaybes, deleteAt, filter, head, length, replicate, reverse)
+import Data.Array (any, catMaybes, deleteAt, filter, length, replicate, reverse)
 import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
@@ -290,17 +290,17 @@ cash player = (Card.value player.atPlay)
 
 drawCards
   :: forall m
-  . MonadError String m
-  => Random m
-  => Int -> Player -> m Player
+  . Random m
+  => Int
+  -> Player
+  -> m Player
 drawCards n p = if n > zero
   then drawCard p >>= drawCards (n - one)
   else pure p
 
 drawCard
   :: forall m
-  . MonadError String m
-  => Random m
+  . Random m
   => Player -> m Player
 drawCard player = do
   deck <- if null player.deck

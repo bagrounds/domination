@@ -13,9 +13,8 @@ import Data.Traversable (traverse_)
 import Domination.Capability.Random (runRandomM)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Cards as Cards
-import Domination.Data.Game.Engine (makeAutoPlay) as Dom
-import Domination.Data.Game as Game
-import Domination.Data.Play (Play(..))
+import Domination.Data.Game (new) as Game
+import Domination.Data.Game.Engine (setup) as Game
 import Domination.Data.Wire.Game (_toWire) as Dom
 import Effect (Effect)
 import Test.QuickCheck (quickCheck')
@@ -77,13 +76,8 @@ examples = game_wire_iso <$> (1 .. 10)
 exampleGame :: Effect Boolean
 exampleGame = do
   let g0 = Game.new 1 Cards.cardMap true
-  g1 <- runRandomM
-    $ Dom.makeAutoPlay
-      (NewGame { playerCount: 1, supply: Cards.cardMap, longGame: true })
-      g0
-  pure case g1 of
-    Left _ -> false
-    Right _ -> true
+  _ <- runRandomM $Game.setup $ g0
+  pure true
 
 -- helpers
 

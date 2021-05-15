@@ -8,13 +8,13 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens.Fold (preview, (^?))
-import Data.Lens.Getter (view)
+import Data.Lens.Getter (view, (^.))
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Tuple (Tuple(..))
+import Data.Show.Generic (genericShow)
+import Data.Tuple (Tuple)
 import Domination.Data.Card as Card
 import Domination.Data.Game (Game)
 import Domination.Data.Game (_player, _stack) as Game
@@ -23,15 +23,16 @@ import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Wire.Game (WireGame)
 import Domination.Data.Wire.Game (_toWire) as Game
-import Domination.Data.Wire.Play (WirePlay)
-import Domination.Data.Wire.Play (_toWire) as Play
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
+import Domination.Data.Wire.Play (WirePlay)
+import Domination.Data.Wire.Play (_toWire) as Play
 import Domination.UI.RenderText (renderTextInContext)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML (text) as HH
 import Halogen.HTML.Elements (div, span, span_) as HH
 import Halogen.HTML.Properties (class_) as HH
+import Util ((.^))
 
 type Envelope = { id :: String, message :: RemoteMessage }
 type WireEnvelope = Tuple String WireMessage
@@ -40,21 +41,28 @@ wrapMessage :: String -> RemoteMessage -> Envelope
 wrapMessage id message = { id, message }
 
 data RemoteMessage
-  = ChatMessage { username :: String, message :: String }
-  | UsernameMessage { username :: String, id :: String }
+  = ChatMessage
+    { message :: String
+    , username :: String
+    }
+  | UsernameMessage
+    { id :: String
+    , username :: String
+    }
   | GameMessage
     { i :: Int
+    , playerIndex :: Int
+    , playMade :: Maybe Play
     , state :: Game
-    , playMade :: Maybe
-      { play :: Play
-      , playerIndex :: Int
-      , state :: Game
-      }
     }
   | PlayMadeMessage
     { play :: Play
     , playerIndex :: Int
     , state :: Game
+    }
+  | NewGameMessage
+    { playerCount :: Int
+    , playerIndex :: Int
     }
 
 data LocalMessage
@@ -71,55 +79,65 @@ instance decodeJsonRemoteMessage :: DecodeJson RemoteMessage where
   decodeJson = genericDecodeJson
 
 data WireMessage
-  = ChatWireMessage (Tuple String String)
-  | UsernameWireMessage (Tuple String String)
-  | GameWireMessage
-    (Tuple WireInt
-    (Tuple WireGame
-    (Maybe
-    (Tuple WirePlay
-    (Tuple WireInt WireGame)))))
-  | PlayMadeWireMessage
-    (Tuple WirePlay
-    (Tuple WireInt WireGame))
+  = ChatWireMessage String String
+  | UsernameWireMessage String String
+  | GameWireMessage WireInt WireInt (Maybe WirePlay) WireGame
+  | PlayMadeWireMessage WirePlay WireInt WireGame
+  | NewGameWireMessage WireInt WireInt
 
 _toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
   to = case _ of
-    ChatMessage { username, message } ->
-      ChatWireMessage (Tuple username message)
-    UsernameMessage { username, id} ->
-      UsernameWireMessage (Tuple username id)
-    GameMessage { i, state, playMade } ->
+    ChatMessage { message, username } ->
+      ChatWireMessage message username
+
+    UsernameMessage { id, username } ->
+      UsernameWireMessage id username
+
+    GameMessage { i, playerIndex, playMade, state } ->
       GameWireMessage
-      $ Tuple (view Int._toWire i)
-      $ Tuple (view Game._toWire state) (pmm <$> playMade)
-    PlayMadeMessage x ->
-      PlayMadeWireMessage $ pmm x
-    where
-      pmm { play, playerIndex, state } =
-        Tuple (view Play._toWire play)
-        $ Tuple
-          (view Int._toWire playerIndex)
-          (view Game._toWire state)
+      (view Int._toWire i)
+      (view Int._toWire playerIndex)
+      (view Play._toWire <$> playMade)
+      (view Game._toWire state)
+
+    PlayMadeMessage { play, playerIndex, state } ->
+      PlayMadeWireMessage
+        (play ^. Play._toWire)
+        (playerIndex ^. Int._toWire)
+        (state ^. Game._toWire)
+
+    NewGameMessage { playerCount, playerIndex } ->
+      NewGameWireMessage
+        (playerCount ^. Int._toWire)
+        (playerIndex ^. Int._toWire)
+
   from = case _ of
-    ChatWireMessage (Tuple username message) ->
-      ChatMessage { username, message }
-    UsernameWireMessage (Tuple username id) ->
-      UsernameMessage { username, id}
-    GameWireMessage (Tuple i (Tuple state maybePlayMade)) ->
+    ChatWireMessage message username ->
+      ChatMessage { message, username }
+
+    UsernameWireMessage id username ->
+      UsernameMessage { id, username }
+
+    GameWireMessage i playerIndex playMade state ->
       GameMessage
         { i: review Int._toWire i
+        , playerIndex: playerIndex .^ Int._toWire
+        , playMade: review Play._toWire <$> playMade
         , state: review Game._toWire state
-        , playMade: pmm <$> maybePlayMade
         }
-    PlayMadeWireMessage x ->
-      PlayMadeMessage $ pmm x
-    where
-      pmm (Tuple play (Tuple playerIndex state)) =
-        { play: review Play._toWire play
-        , playerIndex: review Int._toWire playerIndex
-        , state: review Game._toWire state
+
+    PlayMadeWireMessage play playerIndex state ->
+      PlayMadeMessage
+        { play: play .^ Play._toWire
+        , playerIndex: playerIndex .^ Int._toWire
+        , state: state .^ Game._toWire
+        }
+
+    NewGameWireMessage playerCount playerIndex ->
+      NewGameMessage
+        { playerCount: playerCount .^ Int._toWire
+        , playerIndex: playerIndex .^ Int._toWire
         }
 
 derive instance genericWireMessage :: Generic WireMessage _
@@ -144,24 +162,46 @@ renderHtml :: forall w i. RemoteMessage -> HTML w i
 renderHtml (ChatMessage { username, message }) =
   HH.div
     [ HH.class_ $ ClassName "chat-message" ]
-    [ HH.span [ HH.class_ $ ClassName "username" ] [ HH.text username ]
+    [ HH.span
+      [ HH.class_ $ ClassName "username" ]
+      [ HH.text username ]
     , HH.text ": "
     , HH.span [ HH.class_ $ ClassName "message" ] [ HH.text message ]
     ]
 renderHtml (GameMessage _) =
   HH.div
     [ HH.class_ $ ClassName "game-state-message" ]
-    [ HH.div [ HH.class_ $ ClassName "game-state" ] [ HH.text "(Game Data Received)" ]
+    [ HH.div
+      [ HH.class_ $ ClassName "game-state" ]
+      [ HH.text "(Game Data Received)" ]
     ]
 renderHtml (UsernameMessage { username, id }) =
   HH.div
     [ HH.class_ $ ClassName "username-message" ]
     [ HH.text "("
-    , HH.span [ HH.class_ $ ClassName "username" ] [ HH.text $ show username ]
+    , HH.span
+      [ HH.class_ $ ClassName "username" ]
+      [ HH.text $ show username ]
     , HH.text " has ID: "
-    , HH.span [ HH.class_ $ ClassName "username" ] [ HH.text $ show id ]
+    , HH.span
+      [ HH.class_ $ ClassName "username" ]
+      [ HH.text $ show id ]
     , HH.text ")"
     ]
+
+renderHtml (NewGameMessage { playerIndex, playerCount }) =
+  HH.div
+    [ HH.class_ $ ClassName "play-made-message" ]
+    [ HH.text $ "Player " <> show (playerIndex + 1) <> ": "
+    , HH.span
+      [ HH.class_ $ ClassName "play-made" ]
+      [ HH.span_
+        [ HH.text $ "created a new "
+          <> show playerCount <> " player game"
+        ]
+      ]
+    ]
+
 renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
   case play' of
     Nothing -> HH.span [] []
@@ -175,11 +215,6 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
   where
       play' :: Maybe (HTML w i)
       play' = case play of
-        NewGame { playerCount } -> Just $
-          HH.span_
-            [ HH.text $ "created a new "
-              <> show playerCount <> " player game"
-            ]
         EndPhase _ -> Nothing
         PlayCard { playerIndex, cardIndex } -> Just $
           HH.text $ "played: "

@@ -8,6 +8,7 @@ import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (elem, length, take)
+import Data.Array.NonEmpty as NonEmpty
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -321,7 +322,9 @@ handleAction audioContext = case _ of
       <<< over _usernames (HashMap.insert id username)
     sendMessage $ UsernameMessage { username, id }
   Write lens value -> H.modify_ $ set lens value
+
   SendMessage -> sendChatMessage
+
   ReceiveLocalMessage customEvent -> do
     let localMessage = FFI.detail customEvent
     case localMessage of
@@ -342,12 +345,14 @@ handleAction audioContext = case _ of
         <$> eWireEnvelope
     case eMessage of
       Left e -> error $ "problem receiving message: " <> e
+
       Right (Tuple _ msg) -> do
         case msg of
           UsernameMessage { username, id } -> do
             log $ "username incoming: " <> username
             H.modify_ $ over _usernames
               $ HashMap.insert id username
+
           ChatMessage { message } -> do
             H.modify_
               $ (_messages :~ msg)
@@ -358,29 +363,55 @@ handleAction audioContext = case _ of
                 H.modify_ $ _message .~ "PONG"
                 sendChatMessage
               else pure unit
-          GameMessage { i, state, playMade } -> do
+
+          GameMessage { i, state, playerIndex, playMade } -> do
             queryGame $ ReceiveGame
               { i
               , state
               }
             case playMade of
-              Just x -> do
-                H.modify_ $ _messages :~ PlayMadeMessage x
-              Nothing -> pure unit
+              Just play ->
+                H.modify_
+                  $ _messages :~ PlayMadeMessage
+                    { play, playerIndex, state }
+              Nothing ->
+                H.modify_ $ _messages :~ NewGameMessage
+                  { playerCount: NonEmpty.length state.players
+                  , playerIndex
+                  }
+
           PlayMadeMessage _ ->
             error "PlayMadeMessage should not be called"
+
+          NewGameMessage _ ->
+            error "PlayMadeMessage should not be called"
+
   HandleGameEvent gameEvent -> case gameEvent of
-    NewState activeState playMade -> do
-      case playMade of
-        Just x -> do
-          H.modify_ $ _messages :~ (PlayMadeMessage x)
-        Nothing -> pure unit
+    CreateNewGame activeState@{ playerCount, playerIndex } -> do
+      H.modify_
+        $ _messages :~ NewGameMessage { playerCount, playerIndex }
       queryGame $ LoadActiveState activeState
       sendMessage $ GameMessage
-        { state: activeState.state
-        , i: activeState.i
-        , playMade
+        { i: activeState.i
+        , playerIndex
+        , playMade: Nothing
+        , state: activeState.state
         }
+      saveGame activeState
+
+    NewState activeState playMade -> do
+      case playMade of
+        Just { play, playerIndex, state } -> do
+          H.modify_ $ _messages :~ PlayMadeMessage
+            { play, playerIndex, state }
+          sendMessage $ GameMessage
+            { state: activeState.state
+            , i: activeState.i
+            , playerIndex
+            , playMade: Just play
+            }
+        Nothing -> pure unit
+      queryGame $ LoadActiveState activeState
       saveGame activeState
     SaveGame activeState -> saveGame activeState
     Undo { i } -> do
@@ -400,9 +431,10 @@ handleAction audioContext = case _ of
               (_playerIndex .~ nextPlayerIndex) activeState
           queryGame $ LoadActiveState newActiveState
           sendMessage $ GameMessage
-            { state: activeState.state
-            , i: activeState.i
+            { i: activeState.i
+            , playerIndex: nextPlayerIndex
             , playMade: Nothing
+            , state: activeState.state
             }
     saveGame activeState = do
       let
