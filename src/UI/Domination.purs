@@ -15,6 +15,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Setter ((%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (fst)
 import Domination.Capability.Audio (class Audio, beep)
 import Domination.Capability.Audio as Sound
 import Domination.Capability.Dom (class Dom)
@@ -416,7 +417,7 @@ renderPlayer cs@{ state, playerIndex } player =
             }
           : ( ( \reaction ->
                 { clickEvent: MakePlay $
-                  React { playerIndex, reaction: Just reaction }
+                  React { playerIndex, reaction: Just $ fst reaction }
                 , text: renderText reaction
                 }
               ) <$> reactions

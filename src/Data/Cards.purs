@@ -5,6 +5,7 @@ import Prelude
 import Data.Foldable (find)
 import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (Tuple(..))
 import Domination.Data.Actions (actions)
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Card (Card, CardSpec, Command(..), Special, cardWithRequirements, independentCard)
@@ -376,7 +377,9 @@ moat =
   { name = "Moat"
   , cost = 2
   , cards = 2
-  , reaction = Just BlockAttack
+  , reaction = Just $ Tuple
+    BlockAttack
+    "You may reveal this card from your hand to block attacks."
   }
 
 nobles :: CardSpec
@@ -1256,7 +1259,7 @@ mine = let
         , StackCostOf
         , StackAddN 3
         , StackMakeFilterCostUpTo
-        , StackPush (StackFilter (Filter.HasType Treasure))
+        , StackPush $ StackFilter $ Filter.HasType Treasure
         , StackMakeFilterAnd
         , StackBind "filter"
         , StackChooseCardFromSupply
@@ -1336,22 +1339,26 @@ secretChamber = let
       }
     , description
     }
-  , reaction = Just $ ReactWithChoice $ StackChoice
-    { expression:
-      [ StackPush $ StackInt 2
-      , StackDraw
-      , StackChooseCards
-        { cards: Unbound
-        , filter: Bound Filter.Any
-        , from: Bound Pile.Hand
-        , n: Bound $ Exactly 2
-        }
-      , StackMoveCards { from: Pile.Hand, to: Pile.Deck }
-      ]
-    , stack: []
-    , attack
-    , description
-    }
+  , reaction = Just $ Tuple
+    ( ReactWithChoice $ StackChoice
+      { expression:
+        [ StackPush $ StackInt 2
+        , StackDraw
+        , StackChooseCards
+          { cards: Unbound
+          , filter: Bound Filter.Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly 2
+          }
+        , StackMoveCards { from: Pile.Hand, to: Pile.Deck }
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+   ) $ "When another player plays an Attack card, you may reveal"
+    <> " this from your hand. If you do, +2 Cards, then put 2"
+    <> " cards from your hand on top of your deck."
   }
 
 resolution :: forall a. Maybe a

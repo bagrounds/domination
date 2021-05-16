@@ -13,6 +13,7 @@ import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe, fromMaybe)
+import Data.Tuple (Tuple)
 import Domination.Capability.Random (class Random, randomIntBetween, shuffle)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
@@ -157,7 +158,7 @@ gainBuys n = over _buys (_ + n)
 gainChoices :: Array Choice -> Player -> Player
 gainChoices = flip (foldr gainChoice) <<< reverse
 
-reactionsInHand :: Player -> Array Reaction
+reactionsInHand :: Player -> Array (Tuple Reaction String)
 reactionsInHand player = catMaybes
   $ hasType CardType.Reaction `filter` player.hand
   <#> _.reaction

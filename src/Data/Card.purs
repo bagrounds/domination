@@ -20,6 +20,7 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Buys (Buys)
 import Domination.Data.CardType (CardType(..))
@@ -41,7 +42,7 @@ type Card =
   , cards :: Int
   , actions :: Actions
   , special :: Maybe Special
-  , reaction :: Maybe Reaction
+  , reaction :: Maybe (Tuple Reaction String)
   }
 
 data CardSpec
@@ -107,7 +108,7 @@ _actions :: Lens' Card Actions
 _actions = prop (SProxy :: SProxy "actions")
 _maybeSpecial :: Lens' Card (Maybe Special)
 _maybeSpecial = prop (SProxy :: SProxy "special")
-_reaction :: Traversal' Card Reaction
+_reaction :: Traversal' Card (Tuple Reaction String)
 _reaction = prop (SProxy :: SProxy "reaction") <<< _Just
 
 _ofType :: CardType -> Prism' Card Card
