@@ -28,7 +28,7 @@ import Domination.Data.Condition (Condition(..))
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.Wire.Int as Int
-import Relation (Relation, is)
+import Relationship (Relationship, is)
 import Rule (Rule, check, (!>), (<@!))
 import Type.Proxy (Proxy(..))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (.^), (:~))
@@ -174,7 +174,7 @@ hasReaction :: Player -> Boolean
 hasReaction = (_ > zero) <<< length <<< reactionsInHand
 
 purchase :: Card -> Player -> Player
-purchase card = decOver _buys >>> prependOver _buying card
+purchase = prependOver _buying <<< decOver _buys
 
 hasActions :: Player -> Boolean
 hasActions = (_ > zero) <<< _.actions
@@ -201,7 +201,8 @@ drawCards n p = if n > zero
 drawCard
   :: forall m
   . Random m
-  => Player -> m Player
+  => Player
+  -> m Player
 drawCard player = do
   deck <- if null player.deck
     then do
@@ -270,7 +271,7 @@ assertHasCash i = assert (cash >>> (_ >= i)) "not enough treasure!"
 hasCash :: Int -> Rule Player
 hasCash i = cash >>> (_ >= i) !> ("need $" <> show i)
 
-handSizeIs :: Relation -> Int -> Rule Player
+handSizeIs :: Relationship -> Int -> Rule Player
 handSizeIs r i = _.hand >>> length >>> is r i
   !> "must have " <> show r <> " " <> show i <> " cards in hand"
 

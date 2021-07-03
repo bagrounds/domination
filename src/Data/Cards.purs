@@ -660,7 +660,7 @@ discard1Estate = MoveFromTo
   { filter: Filter.HasName "Estate"
   , n: Exactly one
   , source: Pile.Hand
-  , destination: Pile.ToDiscard
+  , destination: Pile.Discarding
   , attack: false
   , resolution
   }
@@ -946,7 +946,7 @@ stables = let attack = false in independentCard $ Card.action
               { filter: Filter.HasType Treasure
               , n: Exactly one
               , source: Pile.Hand
-              , destination: Pile.ToDiscard
+              , destination: Pile.Discarding
               , attack
               , resolution
               }
@@ -983,7 +983,7 @@ workshop = let attack = false in independentCard $ Card.action
     { target: Self
     , command: Choose $ GainCard
       { filter: Filter.CostUpTo 4
-      , destination: Pile.ToDiscard
+      , destination: Pile.Discarding
       , attack
       , resolution
       }
@@ -1056,7 +1056,7 @@ altar = let attack = false in independentCard $ Card.action
           }
         , GainCard
           { filter: Filter.CostUpTo 5
-          , destination: Pile.ToDiscard
+          , destination: Pile.Discarding
           , attack
           , resolution
           }
@@ -1107,7 +1107,7 @@ lurker = let attack = false in independentCard $ Card.action
           { n: Exactly one
           , filter: Filter.HasType Action
           , source: Pile.Trash
-          , destination: Pile.ToDiscard
+          , destination: Pile.Discarding
           , attack
           , resolution
           }
@@ -1180,7 +1180,7 @@ remodel = let
           { cardName: Unbound
           , filter: Unbound
           }
-        , StackGainTo Pile.ToDiscard
+        , StackGainTo Pile.Discarding
         ]
       , stack: []
       , attack
@@ -1329,7 +1329,7 @@ secretChamber = let
           , n: Bound $ Unlimited
           }
         , StackDuplicate
-        , StackMoveCards { from: Pile.Hand, to: Pile.ToDiscard }
+        , StackMoveCards { from: Pile.Hand, to: Pile.Discarding }
         , StackLength
         , StackGainBonusCash
         ]

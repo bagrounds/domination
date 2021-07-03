@@ -16,6 +16,7 @@ import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
 import Halogen (Component)
 import Halogen.HTML as HH
+import Undefined (undefined)
 
 component
   :: forall query input m
@@ -68,6 +69,8 @@ component state player choice baseSlotNumber =
       Pile.Trash -> state.trash
       Pile.Hand -> player.hand
       Pile.Discard -> player.discard
-      Pile.ToDiscard -> player.toDiscard
+      Pile.Discarding -> player.toDiscard
       Pile.Deck -> player.deck
+      x -> undefined
+        $ "renderText MoveFromTo destination = " <> (show x)
 

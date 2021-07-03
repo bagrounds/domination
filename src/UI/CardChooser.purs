@@ -27,6 +27,7 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Undefined (undefined)
 
 type State = Array (Tuple Card Boolean)
 
@@ -83,9 +84,11 @@ component
       cards = case pile of
         Pile.Hand -> player.hand
         Pile.Discard -> player.discard
-        Pile.ToDiscard -> player.toDiscard
+        Pile.Discarding -> player.toDiscard
         Pile.Deck -> player.deck
         Pile.Trash -> state.trash
+        x -> undefined
+          $ "renderText MoveFromTo destination = " <> (show x)
 
   render xs =
     case Player.firstChoice player >>= renderChoice of

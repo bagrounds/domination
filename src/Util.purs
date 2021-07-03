@@ -14,10 +14,11 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
-import Data.Lens.Getter (view)
-import Data.Lens.Lens (Lens', Lens)
+import Data.Lens.Getter (view, (^.))
+import Data.Lens.Lens (Lens, Lens', lens')
+import Data.Lens.Lens.Tuple (_1, _2)
 import Data.Lens.Prism (Review, review)
-import Data.Lens.Setter (Setter', over, set, subOver)
+import Data.Lens.Setter (Setter', over, set, subOver, (.~))
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
@@ -173,4 +174,38 @@ readJson = lmap show <<< decodeJson <=< jsonParser
 
 writeJson :: forall a. EncodeJson a => a -> String
 writeJson = stringify <<< encodeJson
+
+_tuple
+  :: forall s a b
+  . (Lens' s a)
+  -> (Lens' s b)
+  -> Lens' s (Tuple a b)
+_tuple _l1 _l2 = lens' f
+  where
+    f s = Tuple (Tuple (s ^. _l1) (s ^. _l2)) g
+      where
+        g (Tuple a b) = ((_l1 .~ a) <<< (_l2 .~ b)) s
+
+infixr 4 _tuple as ~&~
+
+_22 :: forall a b c. Lens' (Tuple a (Tuple b c)) c
+_22 = _2 <<< _2
+
+_11 :: forall a b c. Lens' (Tuple (Tuple a b) c) a
+_11 = _1 <<< _1
+
+_21 :: forall a b c. Lens' (Tuple a (Tuple b c)) b
+_21 = _2 <<< _1
+
+_12 :: forall a b c. Lens' (Tuple (Tuple a b) c) b
+_12 = _1 <<< _2
+
+_composePredicate
+  :: forall a b
+  . Lens' a b
+  -> (b -> Boolean)
+  -> a -> Boolean
+_composePredicate _l p = p <<< view _l
+
+infixr 8 _composePredicate as <<~
 

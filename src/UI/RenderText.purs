@@ -23,7 +23,7 @@ import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Points (Points)
 import Domination.Data.Points as Points
-import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Reaction (Reaction)
 import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Wire.Int as Int
@@ -31,6 +31,7 @@ import Domination.UI.Icons as Icons
 import Domination.UI.Util (h2__)
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
+import Undefined (undefined)
 import Util ((.^))
 import Version (Version(..))
 
@@ -135,9 +136,11 @@ instance choiceRenderTextInContext
         case destination of
           Pile.Trash -> [ HH.text $ "trashed: " ] <> cards
           Pile.Discard -> [ HH.text $ "discarded: " ] <> cards
-          Pile.ToDiscard -> [ HH.text $ "will discard: " ] <> cards
+          Pile.Discarding -> [ HH.text $ "will discard: " ] <> cards
           Pile.Hand -> gainedCardsToTheir "hand"
           Pile.Deck -> gainedCardsToTheir "deck"
+          x -> undefined
+            $ "renderText MoveFromTo destination = " <> (show x)
         where
           gainedCardsToTheir pile = [ HH.text $ "gained: " ]
             <> cards
@@ -155,9 +158,11 @@ instance choiceRenderTextInContext
           suffix = case destination of
             Pile.Hand -> " to their hand"
             Pile.Discard -> ""
-            Pile.ToDiscard -> ""
+            Pile.Discarding -> ""
             Pile.Deck -> " onto their deck"
             Pile.Trash -> " into the trash for some reason"
+            x -> undefined
+              $ "renderText MoveFromTo destination = " <> (show x)
         in [ HH.text $ "gained a " <> cardName <> " " <> suffix ]
 
       GainActions { n } -> [ HH.text "+", renderText n ]
@@ -229,15 +234,19 @@ instance choiceRenderText :: RenderText Choice where
         suffix = case source of
           Pile.Hand -> ""
           Pile.Discard -> "from your discard pile"
-          Pile.ToDiscard -> "from your to-discard pile"
+          Pile.Discarding -> "from your to-discard pile"
           Pile.Deck -> "from your deck"
           Pile.Trash -> "from the trash"
+          x -> undefined
+            $ "renderText MoveFromTo destination = " <> (show x)
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
           Pile.Discard -> "Discard"
-          Pile.ToDiscard -> "Discard"
+          Pile.Discarding -> "Discard"
           Pile.Deck -> "Put onto your deck"
           Pile.Trash -> "Trash"
+          x -> undefined
+            $ "renderText MoveFromTo destination = " <> (show x)
 
     GainCards { n, cardName } ->
       [ HH.text $ "Gain " <> cardName <> " x" <> show n ]
@@ -247,9 +256,11 @@ instance choiceRenderText :: RenderText Choice where
         verb = case destination of
           Pile.Hand -> "Gain to your hand"
           Pile.Discard -> "Gain"
-          Pile.ToDiscard -> "Gain"
+          Pile.Discarding -> "Gain"
           Pile.Deck -> "Gain onto your deck"
           Pile.Trash -> "Trash"
+          x -> undefined
+            $ "renderText MoveFromTo destination = " <> (show x)
         card = case _ of
           Filter.HasName name -> "1 " <> name
           Filter.HasType cardType -> "a card of type " <> show cardType

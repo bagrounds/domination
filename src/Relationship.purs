@@ -1,10 +1,10 @@
-module Relation where
+module Relationship where
 
 import Data.Eq ((/=), (==))
 import Data.Ord (class Ord, (<), (<=), (>))
 import Prelude (class Show)
 
-data Relation
+data Relationship
   = EQ
   | NEQ
   | LT
@@ -12,7 +12,7 @@ data Relation
   | GT
   | GTE
 
-instance showRelation :: Show Relation where
+instance showRelationship :: Show Relationship where
   show = case _ of
     EQ -> "exactly"
     NEQ -> "not"
@@ -21,7 +21,7 @@ instance showRelation :: Show Relation where
     GT -> "more than"
     GTE -> "at least"
 
-is :: forall a. Ord a => Relation -> a -> a -> Boolean
+is :: forall a. Ord a => Relationship -> a -> a -> Boolean
 is r n = case r of
   EQ -> (_ == n)
   NEQ -> (_ /= n)

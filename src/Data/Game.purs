@@ -27,17 +27,18 @@ import Domination.Data.Result (Result)
 import Domination.Data.Stack (Stack)
 import Domination.Data.Supply (Supply, getStack, makeSupply)
 import Domination.Data.Supply as Supply
+import Undefined (undefined)
 import Type.Proxy (Proxy(..))
 import Util (assert, fromJust, justIf)
 
 type Game =
-  { phase :: Phase
+  { longGame :: Boolean
+  , phase :: Phase
   , players :: NonEmptyArray Player
+  , result :: Maybe Result
   , supply :: Supply
   , trash :: Array Card
   , turn :: Int
-  , result :: Maybe Result
-  , longGame :: Boolean
   }
 
 _turn
@@ -81,11 +82,14 @@ _ofPhase phase = prism' identity $ justIf ((==) phase <<< _.phase)
 
 _pile :: Pile -> Int -> Traversal' Game (Array Card)
 _pile pile playerIndex = case pile of
-  Pile.Hand -> _player playerIndex <<< Player._hand
-  Pile.Trash -> _trash
+  Pile.AtPlay -> undefined "_pile AtPlay"
+  Pile.Buying -> undefined "_pile Buying"
   Pile.Deck -> _player playerIndex <<< Player._deck
   Pile.Discard -> _player playerIndex <<< Player._discard
-  Pile.ToDiscard -> _player playerIndex <<< Player._toDiscard
+  Pile.Discarding -> _player playerIndex <<< Player._toDiscard
+  Pile.Hand -> _player playerIndex <<< Player._hand
+  Pile.Supply -> undefined "_pile Supply"
+  Pile.Trash -> _trash
 
 new :: Int -> Array Card -> Boolean -> Game
 new playerCount cards longGame =

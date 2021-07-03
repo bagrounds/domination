@@ -32,7 +32,7 @@ import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Supply (indexOfStack, nonEmptyStacks, stackByName)
 import Domination.Data.Var (Var(..))
 import Record (merge)
-import Relation (Relation(..))
+import Relationship (Relationship(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (dropIndices, fromJust, moveAll, takeIndices)
 
@@ -411,7 +411,7 @@ evalStackChoice' playerIndex attack description expression stack state' = do
               { filter: Filter.Any
               , n: Unlimited
               , source: Pile.Hand
-              , destination: Pile.ToDiscard
+              , destination: Pile.Discarding
               , resolution: Just cardIndices
               , attack
               }

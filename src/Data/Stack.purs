@@ -3,7 +3,10 @@ module Domination.Data.Stack where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, filter, foldr, head, length, nub, replicate, reverse, (:))
+import Data.Array (catMaybes, filter, foldr, head, nub, replicate, reverse, (:))
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NonEmpty
+import Data.Foldable (length)
 import Data.Lens.Lens (Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
@@ -21,6 +24,9 @@ type Stack =
 
 toCards :: Stack -> Array Card
 toCards { count, card } = replicate count card
+
+fromCards :: NonEmptyArray Card -> Stack
+fromCards cards = { card: NonEmpty.head cards, count: length cards }
 
 _card
   :: forall a b r

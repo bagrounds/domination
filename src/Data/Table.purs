@@ -1,0 +1,420 @@
+module Domination.Data.Table where
+
+import Prelude hiding (compose)
+
+import Control.Alt ((<|>))
+import Control.MonadPlus (class MonadPlus)
+import Control.Plus as Plus
+import Data.Enum (class BoundedEnum, class Enum)
+import Data.Enum as Enum
+import Data.Foldable (class Foldable)
+import Data.Lens.Getter (view, (^.))
+import Data.Lens.Iso (Iso', iso)
+import Data.Lens.Lens (Lens')
+import Data.Lens.Setter ((%~))
+import Data.List.Lazy (List)
+import Data.List.Lazy as LL
+import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, over, over2, unwrap)
+import Data.Tuple (Tuple(..), fst, snd, swap)
+import Data.Unfoldable (class Unfoldable)
+import Data.Unfoldable1 (class Unfoldable1)
+import Domination.Data.Lattice (class BoundedJoinSemilattice, class BoundedMeetSemilattice, class JoinSemilattice, class MeetSemilattice)
+import Safe.Coerce (coerce)
+import Util ((.^))
+
+class (Eq a, Monoid (s a), BoundedJoinSemilattice (s a), MeetSemilattice (s a))
+  <= Set s a where
+  member :: a -> s a -> Boolean
+  product :: forall b. Eq b => s a -> s b -> s (Tuple a b)
+  smap :: forall b. Eq b => (a -> b) -> s a -> s b
+  filter :: (a -> Boolean) -> s a -> s a
+  cardinality :: s a -> Int
+
+class (Set s a, BoundedMeetSemilattice (s a)) <= BoundedSet s a
+
+infixr 5 product as &
+infixr 4 member as ?
+infixl 4 smap as ?$?
+
+newtype Table a = Table (List a)
+
+derive instance newtypeTable :: Newtype (Table a) _
+
+derive newtype instance unfoldable1Table :: Unfoldable1 Table
+
+instance joinSemilatticeTable
+  :: Eq a => JoinSemilattice (Table a) where
+  join = tableUnion
+
+instance boundedJoinSemilatticeTable
+  :: Eq a => BoundedJoinSemilattice (Table a) where
+  bottom = empty
+
+instance meetSemilatticeTable
+  :: Eq a => MeetSemilattice (Table a) where
+  meet = tableIntersection
+
+instance boundedMeetSemilatticeTable
+  :: (Eq a, Bounded a, Enum a)
+  => BoundedMeetSemilattice (Table a) where
+  top = tableUniverse
+
+instance semigroupTable :: Eq a => Semigroup (Table a) where
+  append = tableUnion
+
+instance monoidTable :: Eq a => Monoid (Table a) where
+  mempty = empty
+
+instance setTable :: Eq a => Set Table a where
+  member x = LL.elem x <<< unwrap
+  product (Table xs) (Table ys) = Table $ Tuple <$> xs <*> ys
+  smap = tableMap
+  filter = tableFilter
+  cardinality (Table l) = LL.length l
+
+instance heytingAlgebraTable
+  :: (Enum a, Bounded a) => HeytingAlgebra (Table a) where
+    ff = empty
+    tt = tableUniverse
+    implies = tableImplies
+    conj = tableIntersection
+    disj = tableUnion
+    not = tableNot
+
+instance booleanAlgebraTable
+  :: (Enum a, Bounded a) => BooleanAlgebra (Table a)
+
+enumFromTo :: forall a. Enum a => a -> a -> Table a
+enumFromTo a b = Table $ a `Enum.enumFromTo` b
+
+infix 8 enumFromTo as ...
+
+tableMap :: forall a b. Eq a => Eq b => (a -> b) -> Table a -> Table b
+tableMap f = Table <<< LL.nubEq <<< map f <<< unwrap
+
+empty :: forall a. Table a
+empty = Table mempty
+
+singleton :: forall a. a -> Table a
+singleton = coerce <<< LL.singleton
+
+cardinalityGT :: forall s a. Set s a => s a -> Int -> Boolean
+cardinalityGT s n = cardinality s > n
+
+infixl 4 cardinalityGT as |>|
+
+cardinalityLT :: forall s a. Set s a => Int -> s a -> Boolean
+cardinalityLT n s = cardinality s < n
+
+infixl 4 cardinalityLT as |<|
+
+cardinalityEQ :: forall s a. Set s a => s a -> Int -> Boolean
+cardinalityEQ s n = cardinality s == n
+
+infixl 4 cardinalityEQ as |=|
+
+tableDifference :: forall a. Eq a => Table a -> Table a -> Table a
+tableDifference = over2 Table LL.difference
+
+tableUniverse :: forall a. Bounded a => Enum a => Table a
+tableUniverse = bottom ... top
+
+tableImplies
+  :: forall a
+  . Enum a
+  => Bounded a
+  =>  Table a
+  -> Table a
+  -> Table a
+tableImplies = tableUnion <<< tableNot
+
+tableNot :: forall a. Enum a => Bounded a => Table a -> Table a
+tableNot = tableDifference tableUniverse
+
+fromPredicate
+  :: forall a
+  . Bounded a
+  => Enum a
+  => (a -> Boolean)
+  -> Table a
+fromPredicate p = over Table (LL.filter p) (bottom ... top)
+
+tableFilter :: forall a. Eq a => (a -> Boolean) -> Table a -> Table a
+tableFilter p = over Table (LL.filter p)
+
+tableUnion :: forall a. Eq a => Table a -> Table a -> Table a
+tableUnion = over2 Table LL.union
+
+tableIntersection :: forall a. Eq a => Table a -> Table a -> Table a
+tableIntersection = over2 Table LL.intersect
+
+class (Set s a, Set s b, Set s (Tuple a b), Eq a, Eq b)
+  <= Relation f s a b | f -> s where
+  compose :: forall c. Eq c => f b c -> f a b -> f a c
+  applyLeft :: s a -> f a b -> s b
+  applyLeft1 :: a -> f a b -> s b
+  applyRight :: f a b -> s b -> s a
+  applyRight1 :: f a b -> b -> s a
+  project :: forall c. Eq c => Lens' (Tuple a b) c -> f a b -> s c
+  reverse :: f a b -> f b a
+  _set :: Iso' (f a b) (s (Tuple a b))
+
+
+compose'
+  :: forall f s a b c
+  . Relation f s a b
+  => Eq c
+  => f a b
+  -> f b c
+  -> f a c
+compose' = flip compose
+
+infixr 6 compose as <?<
+infixl 1 applyLeft as $?
+infixl 1 applyLeft1 as @?
+infixr 0 applyRight as ?$
+infixr 0 applyRight1 as ?@
+infixr 6 compose' as >?>
+
+instance heytingAlgebraTable2
+  :: (Enum a, Bounded a, BoundedEnum b)
+  => HeytingAlgebra (Table2 a b) where
+    ff = emptyTable2
+    tt = table2Universe
+    implies = table2Implies
+    conj = table2Intersection
+    disj = table2Union
+    not = table2Not
+
+instance booleanAlgebraTable2
+  :: (Enum a, Bounded a, BoundedEnum b) => BooleanAlgebra (Table2 a b)
+
+emptyTable2 :: forall a b. Table2 a b
+emptyTable2 = Table2 empty
+
+table2Universe
+  :: forall a b
+  . Enum a
+  => Bounded a
+  => BoundedEnum b
+  => Table2 a b
+table2Universe = Table2 $ tableUniverse
+
+table2Intersection
+  :: forall a b
+  . Eq a
+  => Eq b
+  => Table2 a b
+  -> Table2 a b
+  -> Table2 a b
+table2Intersection (Table2 t1) (Table2 t2) =
+  Table2 $ t1 `tableIntersection` t2
+
+table2Union
+  :: forall a b
+  . Eq a
+  => Eq b
+  => Table2 a b
+  -> Table2 a b
+  -> Table2 a b
+table2Union (Table2 t1) (Table2 t2) = Table2 $ t1 `tableUnion` t2
+table2Implies
+  :: forall a b
+  . Enum a
+  => Bounded a
+  => BoundedEnum b
+  => Table2 a b
+  -> Table2 a b
+  -> Table2 a b
+table2Implies (Table2 t1) (Table2 t2) = Table2 $ t1 `tableImplies` t2
+table2Not
+  :: forall a b
+  . Enum a
+  => Bounded a
+  => BoundedEnum b
+  => Table2 a b
+  -> Table2 a b
+table2Not (Table2 t) = Table2 $ tableNot t
+
+newtype Table2 a b = Table2 (Table (Tuple a b))
+
+relationProduct
+  :: forall r s a b c d
+  . Relation r s a b
+  => Relation r s c d
+  => Relation r s (Tuple a b) (Tuple c d)
+  => r a b
+  -> r c d
+  -> r (Tuple a b) (Tuple c d)
+relationProduct rab rcd = rab ^. _set ?&? rcd ^. _set
+
+setToRelationProduct
+  :: forall r s a b
+  . Relation r s a b
+  => s a
+  -> s b
+  -> r a b
+setToRelationProduct as bs = (as & bs) .^ _set
+
+infixr 5 setToRelationProduct as ?&?
+
+naturalJoin
+  :: forall r s a b c
+  . Relation r s a b
+  => Relation r s b c
+  => Relation r s (Tuple a b) (Tuple b c)
+  => r a b
+  -> r b c
+  -> r (Tuple a b) (Tuple b c)
+naturalJoin tab tbc =
+  p `relationFilter` (tab `relationProduct` tbc)
+  where
+    p (Tuple l r) = snd l == fst r
+
+infixr 6 naturalJoin as ><
+
+instance relationTable2
+  :: (Eq a, Eq b) => Relation Table2 Table a b where
+  compose (Table2 bcs) (Table2 abs) =
+    Table2 $ g `smap` (f `filter` product abs bcs)
+    where
+      f (Tuple (Tuple _ b1) (Tuple b2 _)) = b1 == b2
+      g (Tuple (Tuple a _) (Tuple _ c)) = Tuple a c
+  applyLeft s (Table2 tab) = smap snd (filter f tab)
+    where
+      f  = flip member s <<< fst
+  applyLeft1 = applyLeft <<< singleton
+  applyRight (Table2 tab) s = smap fst (filter f tab)
+    where
+      f  = flip member s <<< snd
+  applyRight1 r = applyRight r <<< singleton
+  project _lens (Table2 table) = smap (view _lens) table
+  reverse (Table2 tab) = Table2 (smap swap tab)
+  _set = iso coerce coerce
+
+relationFilter
+  :: forall r s a b
+  . Relation r s a b
+  => (Tuple a b -> Boolean)
+  -> r a b
+  -> r a b
+relationFilter p = _set %~ filter p
+
+relationFilter'
+  :: forall r s a b
+  . Relation r s a b
+  => r a b
+  -> (Tuple a b -> Boolean)
+  -> r a b
+relationFilter' = flip relationFilter
+
+infixr 5 relationFilter' as #>
+
+relationFilterL
+  :: forall r s a b
+  . Relation r s a b
+  => (a -> Boolean)
+  -> r a b
+  -> r a b
+relationFilterL p = relationFilter $ p <<< fst
+
+relationFilterL'
+  :: forall r s a b
+  . Relation r s a b
+  => r a b
+  -> (a -> Boolean)
+  -> r a b
+relationFilterL' = flip relationFilterL
+
+infixr 5 relationFilterL' as #->
+
+relationFilterLEq
+  :: forall r s a b
+  . Relation r s a b
+  => a
+  -> r a b
+  -> r a b
+relationFilterLEq x = relationFilterL (_ == x)
+
+relationFilterLEq'
+  :: forall r s a b
+  . Relation r s a b
+  => r a b
+  -> a
+  -> r a b
+relationFilterLEq' = flip relationFilterLEq
+
+infixr 5 relationFilterL' as =->
+
+relationFilterR
+  :: forall r s a b
+  . Relation r s a b
+  => (b -> Boolean)
+  -> r a b
+  -> r a b
+relationFilterR p = relationFilter $ p <<< snd
+
+relationFilterR'
+  :: forall r s a b
+  . Relation r s a b
+  => r a b
+  -> (b -> Boolean)
+  -> r a b
+relationFilterR' = flip relationFilterR
+
+infixr 5 relationFilterR' as -#>
+
+relationFilterREq
+  :: forall r s a b
+  . Relation r s a b
+  => b
+  -> r a b
+  -> r a b
+relationFilterREq b = relationFilterR (_ == b)
+
+relationFilterREq'
+  :: forall r s a b
+  . Relation r s a b
+  => r a b
+  -> b
+  -> r a b
+relationFilterREq' = flip relationFilterREq
+
+infixr 5 relationFilterREq' as -=>
+
+project'
+  :: forall r s a b c
+  . Relation r s a b
+  => Eq c
+  => r a b
+  -> Lens' (Tuple a b) c
+  -> s c
+project' r _l = project _l r
+
+infixr 4 project' as |>
+
+fromFoldable
+  :: forall a f
+  . Eq a
+  => Foldable f
+  => f a
+  -> Table a
+fromFoldable = Table <<< LL.nubEq <<< LL.fromFoldable
+
+toUnfoldable
+  :: forall f a
+  . Unfoldable f
+  => Table a
+  -> f a
+toUnfoldable = LL.toUnfoldable <<< coerce
+
+class MonadPlus m <= MonadLogic m where
+  msplit :: forall a. m a -> m (Maybe (Tuple a (m a)))
+
+reflect :: forall m a. MonadLogic m => Maybe (Tuple a (m a)) -> m a
+reflect = case _ of
+  Nothing -> Plus.empty
+  Just (Tuple a as) -> pure a <|> as
+
+
