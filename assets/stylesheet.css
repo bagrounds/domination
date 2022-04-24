@@ -81,25 +81,13 @@ li {
   height: 83vh;
 }
 
-.title {
-  min-width: 6em;
-  float: left;
-}
-
-.player-name {
-  min-width: 6em;
-  float: left;
-}
-
-.iteration {
-  min-width: 2em;
-  float: right;
-}
-
 .title,
-.player-name,
+.player-name {
+  font-size: min(7vmin, 3em);
+}
+
 .iteration {
-  display: inline-block;
+  font-size: min(7vmin, 2em);
 }
 
 button span,
@@ -259,6 +247,8 @@ button span,
 }
 
 .title-bar {
+  display: flex;
+  justify-content: space-between;
   height: 7vh;
   line-height: 7vh;
 }
