@@ -5,6 +5,8 @@ import Prelude
 import AppAction (AppAction(..))
 import AppState (AppState, Selection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
+import Control.Monad.State (class MonadState)
+import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (elem, length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
@@ -64,6 +66,9 @@ uuidKey = "player-id"
 
 usernameKey :: String
 usernameKey = "username"
+
+chatKey :: String
+chatKey = "chat"
 
 main :: Effect Unit
 main = launchAff_ $ do
@@ -155,6 +160,20 @@ type ChildComponents o r q1 o1 =
   | r
   )
 
+saveChat
+  :: forall m r messages
+  . Monad m
+  => MonadState { messages :: messages | r } m
+  => Storage m
+  => EncodeJson messages
+  => DecodeJson messages
+  => Log m
+  => m Unit
+saveChat = do
+  messages <- H.gets _.messages
+  save chatKey messages
+  log "saved chat messages"
+
 handleAction
   :: forall output m t1 r o1 q1
   . Audio m
@@ -220,6 +239,13 @@ handleAction audioContext = case _ of
         pure 1
       Right i -> pure i
 
+    eMessages <- load chatKey
+    messages <- case eMessages of
+      Left e -> do
+        log $ "Failed to load messages. Error: " <> e
+        pure []
+      Right m -> pure m
+
     H.modify_ $ (_id .~ uuid)
       >>> (_username .~ username)
       >>> (_usernames %~ HashMap.insert uuid username)
@@ -228,6 +254,7 @@ handleAction audioContext = case _ of
       >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
       >>> (_maybeAudioContext .~ Just audioContext)
+      >>> (_messages .~ messages)
 
     loadGame "game_state"
 
@@ -323,6 +350,7 @@ handleAction audioContext = case _ of
             H.modify_
               $ (_messages :~ msg)
               >>> (_messages %~ take 250)
+            saveChat
             if message == "PING"
               then do
                 H.modify_ $ _message .~ "PONG"
@@ -390,6 +418,7 @@ handleAction audioContext = case _ of
       { id, message } <- H.get
       let chat = ChatMessage { username: id, message }
       H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
+      saveChat
       sendMessage chat
 
     sendMessage
