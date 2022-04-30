@@ -72,7 +72,6 @@ exports.makeBugoutFFI = tuple =>
         fresh = false
         callback(right(bugout))()
       }
-      broadcastEvent(localMessageTarget)(connections(count))
     })
 
     bugout.on("message", (address, message) => {
@@ -83,6 +82,8 @@ exports.makeBugoutFFI = tuple =>
 
     bugout.on("seen", address => {
       broadcastEvent(localMessageTarget)(seen(address))
+      const peers = Object.keys(bugout.peers || {}).length
+      broadcastEvent(localMessageTarget)(connections(peers))
     })
 
     bugout.on("ping", address => {
