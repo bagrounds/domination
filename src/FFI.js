@@ -131,6 +131,7 @@ exports.makeBugoutFFI = tuple =>
 
   try {
     const bugout = new Bugout(roomCode, options)
+    reloadOnNetworkChange()
     try {
       localStorage.seed = bugout.seed
     } catch (error) {
@@ -140,6 +141,18 @@ exports.makeBugoutFFI = tuple =>
   } catch (error) {
     callback(left(error))()
   }
+}
+
+const reloadOnNetworkChange = () => {
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+  let type = connection.effectiveType
+  
+  function updateConnectionStatus() {
+    logInfo("Connection type changed from " + type + " to " + connection.effectiveType)
+    location.reload()
+  }
+  
+  connection.addEventListener('change', updateConnectionStatus);
 }
 
 exports.address = bugout => () => bugout.address()
