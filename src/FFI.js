@@ -68,6 +68,7 @@ exports.makeBugoutFFI = tuple =>
   const options = {
     heartbeat: 5000,
     timeout: 11000,
+    seed: (localStorage || {}).seed,
     announce: [
       "wss://domination-p2p-tracker.herokuapp.com",
       "wss://hub.bugout.link",
@@ -130,6 +131,11 @@ exports.makeBugoutFFI = tuple =>
 
   try {
     const bugout = new Bugout(roomCode, options)
+    try {
+      localStorage.seed = bugout.seed
+    } catch (error) {
+      logError(`failed to save seed. oh well`)
+    }
     installBugoutHandlers(bugout)
   } catch (error) {
     callback(left(error))()
