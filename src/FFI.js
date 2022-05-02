@@ -65,8 +65,31 @@ exports.makeBugoutFFI = tuple =>
   localMessageTarget =>
   callback =>
   () => {
+  const options = {
+    heartbeat: 5000,
+    timeout: 11000,
+    announce: [
+      "wss://domination-p2p-tracker.herokuapp.com",
+      "wss://hub.bugout.link",
+      "wss://tracker.openwebtorrent.com",
+      "wss://tracker.btorrent.xyz"
+    ]
+  }
+
   var fresh = true
   const installBugoutHandlers = bugout => {
+    const shutdown = (event) => {
+      try {
+        bugout.destroy()
+        logInfo(`destroyed bugout on '${event.type}'`)
+      } catch (e) {
+        logInfo(`failed to destroy bugout on '${event.type}'`)
+      }
+    }
+
+    window.addEventListener("unload", shutdown)
+    window.addEventListener("beforeunload", shutdown)
+
     bugout.on("connections", count => {
       if (count == 0 && fresh) {
         fresh = false
@@ -95,24 +118,14 @@ exports.makeBugoutFFI = tuple =>
     })
 
     bugout.on("timeout", address => {
+      const peers = Object.keys(bugout.peers || {}).length
+      broadcastEvent(localMessageTarget)(connections(peers))
       if (address !== bugout.address()) {
         logInfo("timeout: ", address)
       } else {
         logInfo("self timeout? ", address)
       }
     })
-  }
-
-  const options = {
-    // try these options again when we can do something about timeouts
-    // heartbeat: 5000,
-    // timeout: 10000,
-    announce: [
-      "wss://domination-p2p-tracker.herokuapp.com",
-      "wss://hub.bugout.link",
-      "wss://tracker.openwebtorrent.com",
-      "wss://tracker.btorrent.xyz"
-    ]
   }
 
   try {
