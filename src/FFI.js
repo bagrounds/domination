@@ -66,8 +66,8 @@ exports.makeBugoutFFI = tuple =>
   callback =>
   () => {
   const options = {
-    heartbeat: 5000,
-    timeout: 11000,
+    heartbeat: 10000,
+    timeout: 25000,
     seed: (localStorage || {}).seed,
     announce: [
       "wss://domination-p2p-tracker.herokuapp.com",
