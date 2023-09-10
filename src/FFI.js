@@ -70,9 +70,7 @@ exports.makeBugoutFFI = tuple =>
     timeout: 25000,
     seed: (localStorage || {}).seed,
     announce: [
-      "wss://domination-p2p-tracker.herokuapp.com",
-      "wss://hub.bugout.link",
-      "wss://tracker.openwebtorrent.com",
+      "wss://p2p-tracker-24is.onrender.com",
       "wss://tracker.btorrent.xyz"
     ]
   }
