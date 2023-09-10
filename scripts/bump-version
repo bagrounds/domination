@@ -1,0 +1,97 @@
+#!/bin/bash
+# - if version file is already changed, exit with error
+# - if changes are staged, exit with error
+# - otherwise, update and commit version file
+set -ue
+
+VERSION_FILE=src/Version.purs
+
+fail () (
+  message=$1
+  >&2 echo "$message"
+  exit 1
+)
+
+digits () (
+  grep -oP '\d+'
+)
+
+version_line () (
+  component=$1
+  grep "${component} =" $VERSION_FILE
+)
+
+version_number () (
+  component=$1
+  version_line "$component" | digits
+)
+
+increment () (
+  component=$1
+  old=$(version_number "$component")
+  new=$((old + 1))
+  sed -ri 's/('"$component"' = ).*/\1'"${new}"'/' $VERSION_FILE
+)
+
+zero () (
+  component=$1
+  sed -ri 's/('"$component"' = ).*/\10/' $VERSION_FILE
+)
+
+update_file () (
+  component=$1
+  case $component in
+    patch)
+      increment patch
+      ;;
+    minor)
+      zero patch
+      increment minor
+      ;;
+    major)
+      zero patch
+      zero minor
+      increment major
+      ;;
+    *)
+      fail "specify major minor or patch, not '${component}'"
+      ;;
+  esac
+)
+
+file_changed () (
+  ! git diff --no-patch --exit-code $VERSION_FILE
+)
+
+changes_are_staged () (
+  ! git diff --cached --exit-code
+)
+
+commit_version () (
+  git add $VERSION_FILE
+  major=$(version_number major)
+  minor=$(version_number minor)
+  patch=$(version_number patch)
+  version="v${major}.${minor}.${patch}"
+  git commit -m "$version"
+)
+
+main () (
+  component=$1
+  if file_changed
+  then
+    fail "${VERSION_FILE} is already changed!"
+  fi
+
+  if changes_are_staged
+  then
+    fail "changes are staged! Commit or reset first!"
+  fi
+
+  update_file "$component"
+
+  commit_version
+)
+
+main "$1"
+
