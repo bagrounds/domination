@@ -20,6 +20,7 @@
   const files = [
     ['public/', 'stylesheet', '.css'],
     ['public/', 'manifest', '.webmanifest'],
+    ['public/', 'bugout', '.min.js'],
     ['public/', 'app', '.js']
   ]
 
