@@ -205,7 +205,10 @@ renderPlayerN activeState = HH.div
   [ HP.class_ Css.domination ] $
   case activeState.state.result of
     Nothing -> renderPlayers activeState
-    Just result -> [ renderText result ]
+    Just result ->
+      [ Hud.render activeState
+      , renderText result
+      ]
 
 renderSupply'
   :: forall query r m
