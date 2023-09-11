@@ -2,17 +2,16 @@ module Domination.UI.Settings where
 
 import Prelude
 
-import AppAction (AppAction(..))
+import AppAction (AppAction(..), CardSpecSelection)
 import AppState (AppState)
-import Data.Array (mapWithIndex)
+import Data.Array (elem, mapWithIndex)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
-import Type.Proxy (Proxy(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
-import Domination.Data.Card (Card)
+import Domination.Data.Card (Card, CardSpec, _card, _requirements)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
@@ -21,11 +20,13 @@ import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
 import Halogen.Component (ComponentSlot)
 import Halogen.Data.Slot (Slot)
-import Halogen.HTML (HTML)
+import Halogen.HTML (ClassName, HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Type.Proxy (Proxy(..))
 import Version (version)
+import Web.UIEvent.MouseEvent (MouseEvent)
 
 renderEmpty
   :: forall a b r m
@@ -126,27 +127,43 @@ render cs@{ showMenu, dominationConfig } = let
   , renderKingdom kingdom
   ]
 
+type RenderedKingdom a b r m = HTML
+    ( ComponentSlot
+      (description :: Slot a b DomSlot | r) m AppAction
+    ) AppAction
+
 renderKingdom
   :: forall a b r m
   . Dom m
   => Log m
-  => Array { card :: Card, selected :: Boolean }
-  -> HTML
-    ( ComponentSlot
-      (description :: Slot a b DomSlot | r) m AppAction
-    ) AppAction
+  => Array CardSpecSelection
+  -> RenderedKingdom a b r m
 renderKingdom kingdom = HH.div
   [ HP.class_ Css.kingdom ]
   $ renderCard `mapWithIndex` kingdom
   where
-    renderCard i { card, selected } =
-      Card.render (onClick i) (extraClasses selected) card (slot i)
+    renderCard :: Int -> CardSpecSelection -> RenderedKingdom a b r m
+    renderCard i { cardSpec, selected } =
+      Card.render (onClick i cardSpec selected) (extraClasses selected) (_card cardSpec) (slot i)
 
-    onClick i _ = ChooseKingdom
-      $ ((ix i) <<< prop (Proxy :: Proxy "selected") %~ not) kingdom
+    onClick :: Int -> CardSpec -> Boolean -> MouseEvent -> AppAction
+    onClick i cardSpec selected _ = ChooseKingdom (newKingdom)
+      where
+        newKingdom :: Array CardSpecSelection
+        newKingdom = selectRequirements $ toggleSelected kingdom
+        toggleSelected :: Array CardSpecSelection -> Array CardSpecSelection
+        toggleSelected = (ix i) <<< prop (Proxy :: Proxy "selected") %~ not
+        requirements :: Array Card
+        requirements = _requirements cardSpec
+        selectRequirements :: Array CardSpecSelection -> Array CardSpecSelection
+        selectRequirements selections = selectRequirement <$> selections
+        selectRequirement :: CardSpecSelection -> CardSpecSelection
+        selectRequirement { cardSpec: cs, selected: s } =  { cardSpec: cs, selected: s || (not selected && elem (_card cs) requirements) }
 
+    slot :: Int -> DomSlot
     slot = CardSlot KingdomConfigArea
 
+    extraClasses :: Boolean -> Array ClassName
     extraClasses selected =
       [ if selected
         then Css.active

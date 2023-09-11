@@ -6,6 +6,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
+import Data.Array as Array
 import Data.Foldable (elem, foldr)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Getter (view)
@@ -14,6 +15,8 @@ import Data.Lens.Prism (Prism', is, prism')
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
 import Data.Lens.Traversal (Traversal')
+import Data.List (List(..))
+import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(..))
@@ -40,6 +43,51 @@ type Card =
   , special :: Maybe Special
   , reaction :: Maybe Reaction
   }
+
+data CardSpec
+  = IndependentCard Card
+  | CardWithRequirements { card :: Card, requirements :: (Array Card) }
+
+derive instance genericCardSpec :: Generic CardSpec _
+derive instance eqCardSpec :: Eq CardSpec
+
+instance showCardSpec :: Show CardSpec where
+  show x = genericShow x
+instance encodeJsonCardSpec :: EncodeJson CardSpec where
+  encodeJson x = genericEncodeJson x
+instance decodeJsonCardSpec :: DecodeJson CardSpec where
+  decodeJson x = genericDecodeJson x
+
+_card :: CardSpec -> Card
+_card (IndependentCard c) = c
+_card (CardWithRequirements { card: c }) = c
+
+_requirements :: CardSpec -> Array Card
+_requirements (IndependentCard _) = []
+_requirements (CardWithRequirements { requirements: rs }) = rs
+
+independentCard :: Card -> CardSpec
+independentCard = IndependentCard
+
+cardWithRequirements :: Card -> Array CardSpec -> CardSpec
+cardWithRequirements c specs = CardWithRequirements
+  { card: c, requirements: newRequirements }
+  where
+    specList :: List CardSpec
+    specList = Array.toUnfoldable specs
+
+    newRequirements :: Array Card
+    newRequirements = List.toUnfoldable $ transitiveRequirements specList
+
+    transitiveRequirements :: List CardSpec -> List Card
+    transitiveRequirements Nil = Nil
+    transitiveRequirements (Cons (IndependentCard c1) css) = Cons c1 $ transitiveRequirements css
+    transitiveRequirements (Cons (CardWithRequirements { card: c2, requirements }) css) = List.concat $ Cons l1 $ Cons l2 Nil
+      where
+        l1 :: List Card
+        l1 = Cons c2 (Array.toUnfoldable requirements)
+        l2 :: List Card
+        l2 = transitiveRequirements css
 
 _types :: Lens' Card (Array CardType)
 _types = prop (SProxy :: SProxy "types")

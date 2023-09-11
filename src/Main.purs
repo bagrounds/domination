@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, Selection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -25,7 +25,7 @@ import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random, randomElement, shuffle)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
-import Domination.Data.Card (Card)
+import Domination.Data.Card (CardSpec)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
@@ -285,14 +285,14 @@ handleAction audioContext = case _ of
     { kingdom } <- H.gets _.dominationConfig
     shuffledKingdom <- shuffle kingdom
     let
-      cardsToKeep = take 16 $ _.card <$> shuffledKingdom
+      cardsToKeep = take 16 $ _.cardSpec <$> shuffledKingdom
       newKingdom = selectIfElement cardsToKeep <$> kingdom
     H.modify_ $ _dominationConfig <<< _kingdom .~ newKingdom
     save "kingdom" newKingdom
     where
-      selectIfElement :: Array Card -> Selection -> Selection
-      selectIfElement keepers { card } =
-        { card, selected: card `elem` keepers }
+      selectIfElement :: Array CardSpec -> CardSpecSelection -> CardSpecSelection
+      selectIfElement keepers { cardSpec } =
+        { cardSpec, selected: cardSpec `elem` keepers }
 
   ChooseKingdom kingdom -> do
     save "kingdom" kingdom

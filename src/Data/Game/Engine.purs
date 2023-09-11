@@ -17,6 +17,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card, Command(..), Special)
+import Domination.Data.Card as Card
 import Domination.Data.Cards as Cards
 import Domination.Data.Game (Game, assertChoicesResolved, assertPhase, assertPlayerCanAfford, assertTurn, currentPlayer, getPlayer, modifyPlayer, modifyPlayerM, modifyStack, modifyStackM)
 import Domination.Data.Game as Game
@@ -245,8 +246,8 @@ finalResult state@{ players, supply } =
         positivePoints supply <= zero
       Short _ _ ->
         emptyStackCount supply >= 3
-          || Stack.new Cards.province zero `elem` supply
-          || Stack.new Cards.colony zero `elem` supply
+          || Stack.new (Card._card Cards.province) zero `elem` supply
+          || Stack.new (Card._card Cards.colony) zero `elem` supply
           || highestVictoryCardStackIsEmpty supply
       Long p1 p2 ->
         clearWinner || noRemainingPoints

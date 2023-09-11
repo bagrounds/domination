@@ -23,7 +23,7 @@ import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus (cashValue) as Bonus
 import Domination.Data.Buys (Buys)
-import Domination.Data.Card (Card, hasType)
+import Domination.Data.Card (Card, _card, hasType)
 import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positivePoints, value) as Card
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
@@ -385,7 +385,7 @@ newPlayer :: Player
 newPlayer =
   { deck: []
   , hand: []
-  , discard: (replicate 7 Cards.copper) <> (replicate 3 Cards.estate)
+  , discard: (replicate 7 (_card Cards.copper)) <> (replicate 3 (_card Cards.estate))
   , toDiscard: []
   , atPlay: []
   , buying: []

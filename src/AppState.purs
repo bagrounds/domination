@@ -5,15 +5,16 @@ import Prelude
 import Audio.WebAudio.Types (AudioContext)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
+import Data.Lens (lens')
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Domination.Capability.Broadcast (Broadcaster)
-import Domination.Data.Card (Card)
+import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
-import Domination.Data.Stack (_card)
 import Message (RemoteMessage)
 
 type AppState =
@@ -31,6 +32,20 @@ type AppState =
   , longGame :: Boolean
   , maybeAudioContext :: Maybe AudioContext
   }
+
+_card :: Lens' CardSpec Card
+_card = lens' f
+  where
+    f :: CardSpec -> Tuple Card (Card -> CardSpec)
+    f (IndependentCard c) = Tuple c IndependentCard
+    f (CardWithRequirements { card: c, requirements }) = Tuple c (\c1 -> CardWithRequirements { card: c1, requirements })
+
+
+_cardSpec :: Lens' CardSpecSelection CardSpec
+_cardSpec = (prop (SProxy :: SProxy "cardSpec"))
+
+_cardSpecCard :: Lens' CardSpecSelection Card
+_cardSpecCard = _cardSpec <<< _card
 
 _id :: Lens' AppState String
 _id = prop (SProxy :: SProxy "id")
@@ -88,8 +103,10 @@ newConfig =
   , longGame: false
   }
 
-defaultKingdom :: Array { card :: Card, selected :: Boolean }
-defaultKingdom = ({ card: _, selected: true }) <$> Cards.cardMap
+type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
+
+defaultKingdom :: Array CardSpecSelection
+defaultKingdom = ({ cardSpec: _, selected: true }) <$> Cards.cardSpecMap
 
 type Selection = { card :: Card, selected :: Boolean }
 
@@ -101,12 +118,12 @@ _selected = prop (SProxy :: SProxy "selected")
 type Config =
   { nextPlayerIndex :: Int
   , nextPlayerCount :: Int
-  , kingdom :: Array Selection
+  , kingdom :: Array CardSpecSelection
   , longGame :: Boolean
   }
 
-upgradeSelection :: Selection -> Selection
-upgradeSelection = _card %~ Cards.upgrade
+upgradeSelection :: CardSpecSelection -> CardSpecSelection
+upgradeSelection = _cardSpecCard %~ Cards.upgrade
 
 upgradeConfig :: Config -> Config
 upgradeConfig = _kingdom %~ map upgradeSelection

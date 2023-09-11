@@ -7,7 +7,7 @@ import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Actions (actions)
 import Domination.Data.Bonus (Bonus(..))
-import Domination.Data.Card (Card, Command(..), Special)
+import Domination.Data.Card (Card, CardSpec, Command(..), Special, cardWithRequirements, independentCard)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
 import Domination.Data.Choice (Choice(..))
@@ -28,7 +28,10 @@ upgrade card = fromMaybe card
   $ find ((_.name >>> (_ == card.name))) cardMap
 
 cardMap :: Array Card
-cardMap =
+cardMap = Card._card <$> cardSpecMap
+
+cardSpecMap :: Array CardSpec
+cardSpecMap =
   [ copper
   , silver
   , gold
@@ -91,52 +94,52 @@ emptyChoice = GainBonus
   , resolution
   }
 
-copper :: Card
-copper = Card.treasure { name = "Copper", treasure = one }
+copper :: CardSpec
+copper = independentCard $ Card.treasure { name = "Copper", treasure = one }
 
-silver :: Card
-silver = Card.treasure { name = "Silver", cost = 3, treasure = 2 }
+silver :: CardSpec
+silver = independentCard $ Card.treasure { name = "Silver", cost = 3, treasure = 2 }
 
-gold :: Card
-gold = Card.treasure { name = "Gold", cost = 6, treasure = 3 }
+gold :: CardSpec
+gold = independentCard $ Card.treasure { name = "Gold", cost = 6, treasure = 3 }
 
-platinum :: Card
-platinum = Card.treasure { name = "Platinum", cost = 9, treasure = 5 }
+platinum :: CardSpec
+platinum = independentCard $ Card.treasure { name = "Platinum", cost = 9, treasure = 5 }
 
-estate :: Card
-estate = Card.victory
+estate :: CardSpec
+estate = independentCard $ Card.victory
   { name = "Estate"
   , cost = 2
   , victoryPoints = one
   }
 
-duchy :: Card
-duchy = Card.victory
+duchy :: CardSpec
+duchy = independentCard $ Card.victory
   { name = "Duchy"
   , cost = 5
   , victoryPoints = points 3
   }
 
-province :: Card
-province = Card.victory
+province :: CardSpec
+province = independentCard $ Card.victory
   { name = "Province"
   , cost = 8
   , victoryPoints = points 6
   }
 
-colony :: Card
-colony = Card.victory
+colony :: CardSpec
+colony = independentCard $ Card.victory
   { name = "Colony"
   , cost = 11
   , victoryPoints = points 10
   }
 
-curse :: Card
-curse =
+curse :: CardSpec
+curse = independentCard $ 
   Card.card { types = [Curse], name = "Curse", victoryPoints = -one }
 
-greatHall :: Card
-greatHall = Card.victory
+greatHall :: CardSpec
+greatHall = independentCard $ Card.victory
   { types = [Action, Victory]
   , name = "Great Hall"
   , cost = 3
@@ -145,35 +148,35 @@ greatHall = Card.victory
   , victoryPoints = one
   }
 
-village :: Card
-village = Card.action
+village :: CardSpec
+village = independentCard $ Card.action
   { name = "Village"
   , cost = 3
   , cards = one
   , actions = actions 2
   }
 
-woodCutter :: Card
-woodCutter = Card.action
+woodCutter :: CardSpec
+woodCutter = independentCard $ Card.action
   { name = "Wood Cutter"
   , cost = 3
   , buys = one
   , treasure = 2
   }
 
-laboratory :: Card
-laboratory = Card.action
+laboratory :: CardSpec
+laboratory = independentCard $ Card.action
   { name = "Laboratory"
   , cost = 5
   , cards = 2
   , actions = one
   }
 
-smithy :: Card
-smithy = Card.action { name = "Smithy", cost = 4, cards = 3 }
+smithy :: CardSpec
+smithy = independentCard $ Card.action { name = "Smithy", cost = 4, cards = 3 }
 
-festival :: Card
-festival = Card.action
+festival :: CardSpec
+festival = independentCard $ Card.action
   { name = "Festival"
   , cost = 5
   , actions = actions 2
@@ -181,8 +184,8 @@ festival = Card.action
   , treasure = 2
   }
 
-market :: Card
-market = Card.action
+market :: CardSpec
+market = independentCard $ Card.action
   { name = "Market"
   , cost = 5
   , actions = one
@@ -191,8 +194,8 @@ market = Card.action
   , treasure = one
   }
 
-harem :: Card
-harem = Card.treasure
+harem :: CardSpec
+harem = independentCard $ Card.treasure
   { types = [Treasure, Victory]
   , name = "Harem"
   , cost = 6
@@ -200,8 +203,8 @@ harem = Card.treasure
   , victoryPoints = points 2
   }
 
-bazaar :: Card
-bazaar = Card.action
+bazaar :: CardSpec
+bazaar = independentCard $ Card.action
   { name = "Bazaar"
   , cost = 5
   , cards = one
@@ -209,8 +212,8 @@ bazaar = Card.action
   , treasure = one
   }
 
-monument :: Card
-monument = Card.action
+monument :: CardSpec
+monument = independentCard $ Card.action
   { types = [Action, Victory]
   , name = "Monument"
   , cost = 4
@@ -218,8 +221,8 @@ monument = Card.action
   , victoryPoints = one
   }
 
-workersVillage :: Card
-workersVillage = Card.action
+workersVillage :: CardSpec
+workersVillage = independentCard $ Card.action
   { name = "Worker's Village"
   , cost = 4
   , cards = one
@@ -227,13 +230,18 @@ workersVillage = Card.action
   , buys = one
   }
 
-witch :: Card
-witch = Card.actionAttack
-  { name = "Witch"
-  , cost = 5
-  , cards = 2
-  , special = Just witchSpecial
-  }
+witch :: CardSpec
+witch = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.actionAttack
+      { name = "Witch"
+      , cost = 5
+      , cards = 2
+      , special = Just witchSpecial
+      }
+    rs :: Array CardSpec
+    rs = [curse]
 
 gainCurse :: Choice
 gainCurse = let attack = true in GainCards
@@ -251,8 +259,8 @@ witchSpecial =
   , description: "Each other player gains a Curse."
   }
 
-councilRoom :: Card
-councilRoom = Card.action
+councilRoom :: CardSpec
+councilRoom = independentCard $ Card.action
   { name = "Council Room"
   , cost = 5
   , cards = 4
@@ -274,9 +282,9 @@ councilRoomSpecial =
   , description: "Each other player draws a card."
   }
 
-scholar :: Card
+scholar :: CardSpec
 scholar =
-  Card.action
+  independentCard $ Card.action
   { name = "Scholar"
   , cost = 5
   , special = Just scholarSpecial
@@ -310,9 +318,9 @@ scholarSpecial =
   , description: "Discard your hand and draw 7 cards"
   }
 
-chapel :: Card
+chapel :: CardSpec
 chapel =
-  Card.action
+  independentCard $ Card.action
   { name = "Chapel"
   , cost = 2
   , special = Just chapelSpecial
@@ -335,9 +343,9 @@ chapelSpecial =
   , description: "Trash up to 4 cards from your hand"
   }
 
-militia :: Card
+militia :: CardSpec
 militia =
-  Card.actionAttack
+  independentCard $ Card.actionAttack
   { name = "Militia"
   , cost = 4
   , treasure = 2
@@ -361,18 +369,18 @@ militiaSpecial =
   , description: "Each other player discards down to 3 cards"
   }
 
-moat :: Card
+moat :: CardSpec
 moat =
-  Card.actionReaction
+  independentCard $ Card.actionReaction
   { name = "Moat"
   , cost = 2
   , cards = 2
   , reaction = Just BlockAttack
   }
 
-nobles :: Card
+nobles :: CardSpec
 nobles =
-  Card.actionVictory
+  independentCard $ Card.actionVictory
   { name = "Nobles"
   , cost = 6
   , victoryPoints = points 2
@@ -396,9 +404,9 @@ noblesSpecial =
   , description: "Choose one: +3 cards or +2 actions"
   }
 
-steward :: Card
+steward :: CardSpec
 steward =
-  Card.action
+  independentCard $ Card.action
   { name = "Steward"
   , cost = 3
   , special = Just stewardSpecial
@@ -430,8 +438,8 @@ stewardSpecial =
     "Choose 1: + 2 cards, + $2, or trash 2 cards from your hand"
   }
 
-pawn :: Card
-pawn = Card.action
+pawn :: CardSpec
+pawn = independentCard $ Card.action
   { name = "Pawn"
   , cost = 2
   , special = Just pawnSpecial
@@ -457,13 +465,18 @@ pawnSpecial =
   , description: "Choose 2 of: + $1, + 1 card, + 1 action, or +1 buy"
   }
 
-torturer :: Card
-torturer = Card.actionAttack
-  { name = "Torturer"
-  , cost = 5
-  , cards = 3
-  , special = Just torturerSpecial
-  }
+torturer :: CardSpec
+torturer = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.actionAttack
+      { name = "Torturer"
+      , cost = 5
+      , cards = 3
+      , special = Just torturerSpecial
+      }
+    rs :: Array CardSpec
+    rs = [curse]
 
 torturerChoice :: Choice
 torturerChoice = let attack = true in
@@ -498,12 +511,17 @@ torturerSpecial =
     "Each other player either discards 2 cards or gains a Curse to their hand, their choice. (They may pick an option they can't do.)"
   }
 
-consolation :: Card
-consolation = Card.action
-  { name = "Consolation"
-  , cost = 2
-  , special = Just consolationSpecial
-  }
+consolation :: CardSpec
+consolation = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.action
+      { name = "Consolation"
+      , cost = 2
+      , special = Just consolationSpecial
+      }
+    rs :: Array CardSpec
+    rs = [estate]
 
 consolationChoice :: Choice
 consolationChoice = let attack = false in
@@ -526,12 +544,17 @@ consolationSpecial =
   , description: "If you have an Estate in your hand, + $2"
   }
 
-moneyLender :: Card
-moneyLender = Card.action
-  { name = "Money Lender"
-  , cost = 4
-  , special = Just moneyLenderSpecial
-  }
+moneyLender :: CardSpec
+moneyLender = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.action
+      { name = "Money Lender"
+      , cost = 4
+      , special = Just moneyLenderSpecial
+      }
+    rs :: Array CardSpec
+    rs = [copper]
 
 moneyLenderChoice :: Choice
 moneyLenderChoice = let attack = false in
@@ -572,8 +595,8 @@ moneyLenderSpecial =
   , description: "You may trash a copper from your hand for + $3"
   }
 
-harbinger :: Card
-harbinger = Card.action
+harbinger :: CardSpec
+harbinger = independentCard $ Card.action
   { name = "Harbinger"
   , cost = 3
   , cards = one
@@ -599,13 +622,18 @@ harbingerSpecial =
     <> " You may put a card from it onto your deck."
   }
 
-baron :: Card
-baron = Card.action
-  { name = "Baron"
-  , cost = 4
-  , buys = one
-  , special = Just baronSpecial
-  }
+baron :: CardSpec
+baron = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.action
+      { name = "Baron"
+      , cost = 4
+      , buys = one
+      , special = Just baronSpecial
+      }
+    rs :: Array CardSpec
+    rs = [estate]
 
 gain4Cash :: Choice
 gain4Cash = GainBonus
@@ -664,13 +692,18 @@ baronSpecial =
     <> " If you don't, gain an Estate."
   }
 
-goldfish :: Card
-goldfish = Card.action
-  { name = "Goldfish"
-  , cost = 4
-  , buys = one
-  , special = Just goldfishSpecial
-  }
+goldfish :: CardSpec
+goldfish = cardWithRequirements c rs
+  where
+  c :: Card
+  c = Card.action
+    { name = "Goldfish"
+    , cost = 4
+    , buys = one
+    , special = Just goldfishSpecial
+    }
+  rs :: Array CardSpec
+  rs = [gold]
 
 goldfishSpecial :: Special
 goldfishSpecial =
@@ -694,18 +727,23 @@ goldfishChoice = let attack = false in If
   , resolution
   }
 
-mountebank :: Card
-mountebank = Card.actionAttack
-  { name = "Mountebank"
-  , cost = 5
-  , treasure = 2
-  , special = Just
-    { target: EveryoneElse
-    , command: Choose mountebankChoice
-    , description: "Each other player may discard a Curse."
-      <> "If they don't, they gain a Curse and a Copper."
-    }
-  }
+mountebank :: CardSpec
+mountebank = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.actionAttack
+      { name = "Mountebank"
+      , cost = 5
+      , treasure = 2
+      , special = Just
+        { target: EveryoneElse
+        , command: Choose mountebankChoice
+        , description: "Each other player may discard a Curse."
+          <> "If they don't, they gain a Curse and a Copper."
+        }
+      }
+    rs :: Array CardSpec
+    rs = [curse, copper]
 
 mountebankChoice :: Choice
 mountebankChoice = let attack = true in If
@@ -752,8 +790,8 @@ gainCurseAndCopper = let attack = true in And
   , resolution
   }
 
-margrave :: Card
-margrave = let attack = true in Card.actionAttack
+margrave :: CardSpec
+margrave = let attack = true in independentCard $ Card.actionAttack
   { name = "Margrave"
   , cost = 5
   , cards = 3
@@ -773,8 +811,8 @@ margrave = let attack = true in Card.actionAttack
     }
   }
 
-huntingLodge :: Card
-huntingLodge = let attack = false in Card.action
+huntingLodge :: CardSpec
+huntingLodge = let attack = false in independentCard $ Card.action
   { name = "Hunting Lodge"
   , cost = 5
   , actions = actions 2
@@ -801,63 +839,74 @@ huntingLodge = let attack = false in Card.action
     }
   }
 
-oldWitch :: Card
-oldWitch = let attack = true in
-  Card.actionAttack
-  { name = "Old Witch"
-  , cost = 5
-  , cards = 3
-  , special = Just
-    { target: EveryoneElse
-    , command: Choose $ And
-      { choices:
-        [ gainCurse
-        , If
-          { condition: HasCard "Curse"
-          , choice: MoveFromTo
-            { n: UpTo one
-            , filter: Filter.HasName "Curse"
-            , source: Pile.Hand
-            , destination: Pile.Trash
-            , attack
-            , resolution
-            }
-          , otherwise: Nothing
-          , attack
+oldWitch :: CardSpec
+oldWitch = cardWithRequirements c rs
+  where
+    attack :: Boolean
+    attack = true
+    c :: Card
+    c = Card.actionAttack
+      { name = "Old Witch"
+      , cost = 5
+      , cards = 3
+      , special = Just
+        { target: EveryoneElse
+        , command: Choose $ And
+          { choices:
+            [ gainCurse
+            , If
+              { condition: HasCard "Curse"
+              , choice: MoveFromTo
+                { n: UpTo one
+                , filter: Filter.HasName "Curse"
+                , source: Pile.Hand
+                , destination: Pile.Trash
+                , attack
+                , resolution
+                }
+              , otherwise: Nothing
+              , attack
+              , resolution
+              }
+            ]
           , resolution
+          , attack
           }
-        ]
-      , resolution
-      , attack
+        , description: "Each other player gains a Curse"
+          <> " and may trash a Curse from their hand."
+        }
       }
-    , description: "Each other player gains a Curse"
-      <> " and may trash a Curse from their hand."
-    }
-  }
+    rs :: Array CardSpec
+    rs = [curse]
 
-settlers :: Card
-settlers = Card.action
-  { name = "Settlers"
-  , cost = 2
-  , cards = one
-  , actions = one
-  , special = Just
-    { target: Self
-    , command: Choose $ MoveFromTo
-      { n: UpTo one
-      , filter: Filter.HasName "Copper"
-      , source: Pile.Discard
-      , destination: Pile.Hand
-      , resolution
-      , attack: false
+settlers :: CardSpec
+settlers = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.action
+      { name = "Settlers"
+      , cost = 2
+      , cards = one
+      , actions = one
+      , special = Just
+        { target: Self
+        , command: Choose $ MoveFromTo
+          { n: UpTo one
+          , filter: Filter.HasName "Copper"
+          , source: Pile.Discard
+          , destination: Pile.Hand
+          , resolution
+          , attack: false
+          }
+        , description: "Look through your discard pile."
+          <> "You may reveal a Copper from it and put it into your hand."
+        }
       }
-    , description: "Look through your discard pile."
-      <> "You may reveal a Copper from it and put it into your hand."
-    }
-  }
+    rs :: Array CardSpec
+    rs = [copper]
 
-junkDealer :: Card
-junkDealer = Card.action
+junkDealer :: CardSpec
+junkDealer = independentCard $ Card.action
   { name = "Junk Dealer"
   , cost = 5
   , cards = one
@@ -877,8 +926,8 @@ junkDealer = Card.action
     }
   }
 
-stables :: Card
-stables = let attack = false in Card.action
+stables :: CardSpec
+stables = let attack = false in independentCard $ Card.action
   { name = "Stables"
   , cost = 5
   , special = Just
@@ -922,8 +971,8 @@ stables = let attack = false in Card.action
     }
   }
 
-workshop :: Card
-workshop = let attack = false in Card.action
+workshop :: CardSpec
+workshop = let attack = false in independentCard $ Card.action
   { name = "Workshop"
   , cost = 3
   , special = Just
@@ -938,8 +987,8 @@ workshop = let attack = false in Card.action
     }
   }
 
-artisan :: Card
-artisan = let attack = false in Card.action
+artisan :: CardSpec
+artisan = let attack = false in independentCard $ Card.action
   { name = "Artisan"
   , cost = 6
   , special = Just
@@ -969,8 +1018,8 @@ artisan = let attack = false in Card.action
     }
   }
 
-armory :: Card
-armory = let attack = false in Card.action
+armory :: CardSpec
+armory = let attack = false in independentCard $ Card.action
   { name = "Armory"
   , cost = 4
   , special = Just
@@ -985,8 +1034,8 @@ armory = let attack = false in Card.action
     }
   }
 
-altar :: Card
-altar = let attack = false in Card.action
+altar :: CardSpec
+altar = let attack = false in independentCard $ Card.action
   { name = "Altar"
   , cost = 6
   , special = Just
@@ -1016,8 +1065,8 @@ altar = let attack = false in Card.action
     }
   }
 
-courtyard :: Card
-courtyard = Card.action
+courtyard :: CardSpec
+courtyard = independentCard $ Card.action
   { name = "Courtyard"
   , cost = 2
   , cards = 3
@@ -1035,8 +1084,8 @@ courtyard = Card.action
     }
   }
 
-lurker :: Card
-lurker = let attack = false in Card.action
+lurker :: CardSpec
+lurker = let attack = false in independentCard $ Card.action
   { name = "Lurker"
   , cost = 2
   , actions = one
@@ -1067,11 +1116,11 @@ lurker = let attack = false in Card.action
     }
   }
 
-cellar :: Card
+cellar :: CardSpec
 cellar = let
   attack = false
   description = "Discard N cards, then draw N cards."
-  in Card.action
+  in independentCard $ Card.action
   { name = "Cellar"
   , cost = 2
   , actions = one
@@ -1098,12 +1147,12 @@ cellar = let
     }
   }
 
-remodel :: Card
+remodel :: CardSpec
 remodel = let
   attack = false
   description = "Trash a card from your hand."
     <> " Gain a card costing up to 2 more than it."
-  in Card.action
+  in independentCard $ Card.action
   { name = "Remodel"
   , cost = 4
   , special = Just
@@ -1137,51 +1186,57 @@ remodel = let
     }
   }
 
-tradingPost :: Card
-tradingPost = let
-  attack = false
-  description = "Trash 2 cards from your hand."
-    <> " If you did, gain a Silver to your hand."
-  in Card.action
-  { name = "Trading Post"
-  , cost = 5
-  , special = Just
-    { target: Self
-    , command: Choose $ StackChoice
-      { expression:
-        [ StackChooseCards
-          { cards: Unbound
-          , filter: Bound Filter.Any
-          , from: Bound Pile.Hand
-          , n: Bound $ Exactly 2
+tradingPost :: CardSpec
+tradingPost = cardWithRequirements c rs
+    where
+      attack :: Boolean
+      attack = false
+      description :: String
+      description = "Trash 2 cards from your hand."
+        <> " If you did, gain a Silver to your hand."
+      c :: Card
+      c = Card.action
+        { name = "Trading Post"
+        , cost = 5
+        , special = Just
+          { target: Self
+          , command: Choose $ StackChoice
+            { expression:
+              [ StackChooseCards
+                { cards: Unbound
+                , filter: Bound Filter.Any
+                , from: Bound Pile.Hand
+                , n: Bound $ Exactly 2
+                }
+              , StackDuplicate
+              , StackTrash
+              , StackLength
+              , StackIf
+                { condition: [ StackEquals $ StackInt 2 ]
+                , following:
+                  [ StackPush $ StackString ((_.name <<< Card._card) silver)
+                  , StackGainTo Pile.Hand
+                  ]
+                , otherwise: [ ]
+                }
+              ]
+            , stack: []
+            , attack
+            , description
+            }
+          , description
           }
-        , StackDuplicate
-        , StackTrash
-        , StackLength
-        , StackIf
-          { condition: [ StackEquals $ StackInt 2 ]
-          , following:
-            [ StackPush $ StackString silver.name
-            , StackGainTo Pile.Hand
-            ]
-          , otherwise: [ ]
-          }
-        ]
-      , stack: []
-      , attack
-      , description
-      }
-    , description
-    }
-  }
+        }
+      rs :: Array CardSpec
+      rs = [silver]
 
-mine :: Card
+mine :: CardSpec
 mine = let
   attack = false
   description = "You may trash a Treasure card from your hand."
     <> " Gain a Treasure card to your hand"
     <> " costing up to $3 more than it."
-  in Card.action
+  in independentCard $ Card.action
   { name = "Mine"
   , cost = 5
   , special = Just
@@ -1217,11 +1272,11 @@ mine = let
     }
   }
 
-mill :: Card
+mill :: CardSpec
 mill = let
   attack = false
   description = "You may discard 2 cards, for +$2"
-  in Card.actionVictory
+  in independentCard $ Card.actionVictory
   { name = "Mill"
   , cost = 4
   , cards = one

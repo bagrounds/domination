@@ -2,6 +2,7 @@ module Domination.UI.Domination where
 
 import Prelude
 
+import AppAction (CardSpecSelection)
 import AppState (Config)
 import AppState as AppState
 import Audio.WebAudio.Types (AudioContext)
@@ -20,7 +21,7 @@ import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random)
 import Domination.Capability.Storage (class Storage)
-import Domination.Data.Card (Card, passFilter)
+import Domination.Data.Card (Card, _card, passFilter)
 import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
@@ -101,7 +102,7 @@ component config audioContext =
     , state: Game.new one kingdom config.longGame
     , showSupply: true
     }
-  kingdom = _.card <$> _.selected `filter` config.kingdom
+  kingdom = (_.cardSpec >>> _card) <$> _.selected `filter` config.kingdom
   render = renderPlayerN
   eval = H.mkEval H.defaultEval
     { handleAction = handleAction audioContext
@@ -176,7 +177,9 @@ handleQuery audioContext = case _ of
       } = config
 
     H.modify_ $ _playerIndex .~ playerIndex
-    let supply = _.card <$> _.selected `filter` kingdom
+    let (selecteds :: Array CardSpecSelection) = _.selected `filter` kingdom
+    let (f :: CardSpecSelection -> Card) = (_.cardSpec >>> _card)
+    let (supply :: Array Card) = f <$> selecteds
     playAndReport
       playerIndex
       (NewGame { playerCount, supply, longGame })

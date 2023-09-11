@@ -26,6 +26,7 @@ _card
   :: forall a b r
   . Lens { card :: a | r } { card :: b | r } a b
 _card = prop (SProxy :: SProxy "card")
+
 _count
   :: forall a b r
   . Lens { count :: a | r } { count :: b | r } a b
