@@ -15,6 +15,7 @@ import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
+import Domination.Capability.Log (class Log)
 import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
@@ -37,6 +38,7 @@ import Util (indices, withIndices)
 makeAutoPlay
   :: forall m
   . Random m
+  => Log m
   => Play
   -> Game
   -> m (Either String Game)
@@ -51,6 +53,7 @@ makePlay
   :: forall m
   . MonadError String m
   => Random m
+  => Log m
   => Play
   -> Game
   -> m Game

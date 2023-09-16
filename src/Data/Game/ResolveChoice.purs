@@ -9,6 +9,7 @@ import Data.Lens.Fold ((^?))
 import Data.Lens.Setter (over, (.~))
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..))
+import Domination.Capability.Log (class Log, log)
 import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card, passFilter)
 import Domination.Data.Choice (Choice(..))
@@ -36,10 +37,14 @@ resolveChoice
   :: forall m
   . MonadError String m
   => Random m
+  => Log m
   => { playerIndex :: Int, choice :: Choice }
   -> Game
   -> m Game
-resolveChoice { playerIndex, choice } state =
+resolveChoice { playerIndex, choice } state = do
+  log
+    $ "resolveChoice\nplayerIndex=" <> show playerIndex
+    <> "\n choice=" <> show choice
   case choice of
     StackChoice
       { attack
@@ -64,7 +69,10 @@ resolveChoice { playerIndex, choice } state =
             , expr :: Array StackExpression
             , stack :: Array StackValue
             }
-        evalStackChoice expression stack state' =
+        evalStackChoice expression stack state' = do
+          log
+            $ " evalStackChoice\nexpr=" <> show expression
+            <> "\n  stack=" <> show stack
           case uncons expression of
             Nothing -> pure { state: state', expr: [], stack }
 
@@ -73,7 +81,7 @@ resolveChoice { playerIndex, choice } state =
                 state'' <- modifyPlayer
                   playerIndex
                   (Player.gainBonus bonus)
-                  state
+                  state'
                 evalStackChoice expressionTail stack state''
 
               StackIf { condition, following, otherwise } -> do
@@ -184,7 +192,7 @@ resolveChoice { playerIndex, choice } state =
                     _source = Game._pile source playerIndex
                     stack' = StackArrayInt cardIndices : stack
                   sourcePile <- fromJust "failed to get source"
-                    $ state ^? _source
+                    $ state' ^? _source
                   selected <- takeIndices cardIndices sourcePile
                   remaining <- dropIndices cardIndices sourcePile
                   Constraint.check
