@@ -1279,32 +1279,23 @@ mill = let
   in independentCard $ Card.actionVictory
   { name = "Mill"
   , cost = 4
-  , cards = one
-  , actions = one
   , victoryPoints = one
   , special = Just
     { target: Self
     , command: Choose $ StackChoice
       { expression:
-        [ StackOption Unbound
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Filter.Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly 2
+          }
+        , StackDuplicate
+        , StackDiscard
+        , StackLength
         , StackIf
-          { condition: [ StackEquals $ StackBool true ]
-          , following:
-            [ StackChooseCards
-              { cards: Unbound
-              , filter: Bound Filter.Any
-              , from: Bound Pile.Hand
-              , n: Bound $ Exactly 2
-              }
-            , StackDuplicate
-            , StackDiscard
-            , StackLength
-            , StackIf
-              { condition: [ StackEquals $ StackInt 2 ]
-              , following: [ StackGainBonus $ Cash 2 ]
-              , otherwise: []
-              }
-            ]
+          { condition: [ StackEquals $ StackInt 2 ]
+          , following: [ StackGainBonus $ Cash 2 ]
           , otherwise: []
           }
         ]
