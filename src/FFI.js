@@ -55,8 +55,7 @@ exports.copyToClipboard = id => () => {
 
 exports.detail = ({ detail }) => detail
 
-exports.makeBugoutFFI = tuple =>
-  left =>
+exports.makeBugoutFFI = left =>
   right =>
   connections =>
   seen =>

@@ -5,7 +5,6 @@ import Prelude
 import Data.ArrayBuffer.Types (ArrayBuffer)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (Canceler, Error)
 import Message (LocalMessage(..))
@@ -26,15 +25,13 @@ makeBugout
   -> (Either Error Bugout -> Effect Unit)
   -> Effect Canceler
 makeBugout = makeBugoutFFI
-  Tuple
   Left
   Right
   ConnectionsMessage
   SeenMessage
 
 foreign import makeBugoutFFI
-  :: (forall a b. a -> b -> Tuple a b) -- Tuple
-  -> (forall l r. l -> Either l r) -- Left
+  :: (forall l r. l -> Either l r) -- Left
   -> (forall l r. r -> Either l r) -- Right
   -> (Int -> LocalMessage) -- ConnectionsWireMessage
   -> (String -> LocalMessage) -- SeenWireMessage
