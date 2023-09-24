@@ -55,6 +55,20 @@ exports.copyToClipboard = id => () => {
 
 exports.detail = ({ detail }) => detail
 
+const MESSAGE_BUFFER_LENGTH = 4
+const messageBuffer = []
+
+const newMessage = (message) => {
+  if (messageBuffer.includes(message)) {
+    return false
+  }
+  messageBuffer.push(message)
+  while (messageBuffer.length > MESSAGE_BUFFER_LENGTH) {
+    messageBuffer.shift()
+  }
+  return true
+}
+
 exports.makeBugoutFFI = left =>
   right =>
   connections =>
@@ -96,9 +110,17 @@ exports.makeBugoutFFI = left =>
     })
 
     bugout.on("message", (address, message) => {
-      logInfo("incoming message length: ", message.length)
-      address === bugout.address()
-        || broadcastEvent(remoteMessageTarget)(message)
+      logInfo(`Incoming message from address '${address}'. Message length: (${message.length}).`)
+      if (!newMessage(message)) {
+        logInfo('Ignoring duplicate message.')
+      } else {
+        if (address === bugout.address()) {
+          logInfo('Ignoring message from our own address.')
+        } else {
+          logInfo('Broadcasting new remote message')
+          broadcastEvent(remoteMessageTarget)(message)
+        }
+      }
     })
 
     bugout.on("seen", address => {
