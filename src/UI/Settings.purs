@@ -3,7 +3,7 @@ module Domination.UI.Settings where
 import Prelude
 
 import AppAction (AppAction(..), CardSpecSelection)
-import AppState (AppState)
+import AppState (AppState, defaultKingdom)
 import Data.Array (elem, mapWithIndex)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
@@ -120,10 +120,14 @@ render cs@{ showMenu, dominationConfig } = let
       ]
     ]
   , HH.button
-    [ HE.onClick \_ -> RandomizeKingdom
-    , HP.class_ Css.randomizeKingdomButton
-    ]
+    [ HE.onClick \_ -> ChooseKingdom ((prop (Proxy :: Proxy "selected") %~ not) <$> defaultKingdom) ]
+    [ HH.text "Select None" ]
+  , HH.button
+    [ HE.onClick \_ -> RandomizeKingdom ]
     [ HH.text "Randomize Kingdom" ]
+  , HH.button
+    [ HE.onClick \_ -> ChooseKingdom defaultKingdom ]
+    [ HH.text "Select All" ]
   , renderKingdom kingdom
   ]
 
