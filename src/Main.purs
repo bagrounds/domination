@@ -209,9 +209,6 @@ handleAction audioContext = case _ of
 
     roomCode <- H.gets _.roomCode
 
-    maybeBroadcaster <- maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget
-
     eKingdom <- load "kingdom"
     kingdom <- case eKingdom of
       Left e -> do
@@ -249,7 +246,6 @@ handleAction audioContext = case _ of
     H.modify_ $ (_id .~ uuid)
       >>> (_username .~ username)
       >>> (_usernames %~ HashMap.insert uuid username)
-      >>> (_maybeBroadcaster .~ maybeBroadcaster)
       >>> (_dominationConfig <<< _kingdom .~ kingdom)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
@@ -257,6 +253,12 @@ handleAction audioContext = case _ of
       >>> (_messages .~ messages)
 
     loadGame "game_state"
+
+    maybeBroadcaster <- maybeCreateBroadcaster
+      roomCode remoteMessageTarget localMessageTarget
+
+    H.modify_ (_maybeBroadcaster .~ maybeBroadcaster)
+
 
   ToggleMenu -> H.modify_ $ _showMenu %~ not
 
