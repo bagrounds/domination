@@ -49,7 +49,7 @@ instance resultRenderText :: RenderText Result where
     Victory playerIndex ->
       "Victory: Player " <> show (playerIndex + one)
     Tie playerIndices ->
-      "Tie: Players " <> (intercalate ", " $ show <$> playerIndices)
+      "Tie: Players " <> (intercalate ", " $ (_ + one) >>> show <$> playerIndices)
 
 instance versionRenderText :: RenderText Version where
   renderText (Version major minor patch) = HH.text $ "v"
