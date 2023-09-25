@@ -674,30 +674,43 @@ renderNextPhaseButton { playerIndex, state } =
     [ HP.class_ Css.nextPhase
     , HE.onClick $ const $ MakePlay $ EndPhase { playerIndex }
     ]
-    [ HH.span_ if state.turn == playerIndex
-      then if Game.choicesOutstanding state
-        then [ HH.text $ "Waiting for Player "
-          <> show (Game.choiceTurn state + one)
-          <> " to Choose" ]
-        else case state.phase of
-          ActionPhase ->
-            [ HH.text "Complete "
-            , Icons.actions
-            , HH.text " Phase"
-            ]
-          BuyPhase ->
-            [ HH.text "Complete "
-            , Icons.buys
-            , HH.text " Phase"
-            ]
-          CleanupPhase ->
-            pure $ HH.text "Complete Turn"
+    [ HH.span_
+      if Game.choicesOutstanding state
+      then
+        if Game.choiceTurn state == playerIndex
+        then waitingForYouToChoose
+        else waitingForPlayerToChoose
       else
-        [ HH.text $ "Waiting for Player "
-          <> show (state.turn + one) <> " | "
-        , renderText state.phase
-        ]
+        if state.turn == playerIndex
+        then
+          case state.phase of
+            ActionPhase -> completeActionPhase
+            BuyPhase -> competeBuyPhase
+            CleanupPhase -> completeTurn
+        else waitingForPlayerTurn
     ]
+  where
+    completeActionPhase :: Array (HTML w Action)
+    completeActionPhase = [HH.text "Complete ", Icons.actions, HH.text " Phase"]
+    competeBuyPhase :: Array (HTML w Action)
+    competeBuyPhase = [HH.text "Complete ", Icons.buys, HH.text " Phase"]
+    completeTurn :: Array (HTML w Action)
+    completeTurn = pure $ HH.text "Complete Turn"
+    waitingForPlayerTurn :: Array (HTML w Action)
+    waitingForPlayerTurn =
+      [ HH.text
+      $ "Waiting for Player " <> show (state.turn + one) <> " | "
+      , renderText state.phase
+      ]
+    waitingForPlayerToChoose :: Array (HTML w Action)
+    waitingForPlayerToChoose =
+      [ HH.text
+      $ "Waiting for Player "
+      <> show (Game.choiceTurn state + one)
+      <> " to Choose"
+      ]
+    waitingForYouToChoose :: Array (HTML w Action)
+    waitingForYouToChoose = [HH.text "Waiting for you to Choose"]
 
 renderAtPlay
   :: forall query r m
