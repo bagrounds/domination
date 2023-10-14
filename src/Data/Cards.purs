@@ -1299,7 +1299,7 @@ mill = let
         , StackLength
         , StackIf
           { condition: [ StackEquals $ StackInt 2 ]
-          , following: [ StackGainBonus $ Cash 2 ]
+          , following: [ StackPush $ StackInt 2, StackGainBonusCash ]
           , otherwise: []
           }
         ]
@@ -1311,11 +1311,11 @@ mill = let
     }
   }
 
-secretChamber :: Card
+secretChamber :: CardSpec
 secretChamber = let
   attack = false
   description = "Discard N cards, +$N."
-  in Card.actionReaction
+  in independentCard $ Card.actionReaction
   { name = "Secret Chamber"
   , cost = 2
   , special = Just

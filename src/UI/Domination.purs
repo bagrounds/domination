@@ -180,10 +180,26 @@ handleQuery audioContext = case _ of
     let (selecteds :: Array CardSpecSelection) = _.selected `filter` kingdom
     let (f :: CardSpecSelection -> Card) = (_.cardSpec >>> _card)
     let (supply :: Array Card) = f <$> selecteds
-    playAndReport
-      playerIndex
-      (NewGame { playerCount, supply, longGame })
-      audioContext
+
+    game <- Game.setup $ Game.new playerCount supply longGame
+    eGame <- Game.makeAutoPlay (EndPhase { playerIndex: 0 }) game
+    case eGame of
+      Left e ->
+        log $ "makeAutoPlay EndPhase failed for new game: " <> e
+      Right game' -> do
+        let
+          newActiveState =
+            { playerIndex
+            , playerCount
+            , state: game'
+            , i: zero
+            , showSupply: playerIndex == 0
+            }
+
+        H.put newActiveState
+        H.raise $ CreateNewGame newActiveState
+
+    beep audioContext Sound.Acknowledge
     pure $ Just a
 
 type ChildComponents query r m =
