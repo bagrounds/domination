@@ -69,6 +69,8 @@ const newMessage = (message) => {
   return true
 }
 
+exports.showBugout = bugout => bugout.ek
+
 exports.makeBugoutFFI = left =>
   right =>
   connections =>
@@ -76,16 +78,14 @@ exports.makeBugoutFFI = left =>
   roomCode =>
   remoteMessageTarget =>
   localMessageTarget =>
+  announce =>
   callback =>
   () => {
   const options = {
     heartbeat: 10000,
     timeout: 25000,
     seed: (localStorage || {}).seed,
-    announce: [
-      "wss://p2p-tracker-24is.onrender.com",
-      "wss://tracker.btorrent.xyz"
-    ]
+    announce: [announce]
   }
 
   var fresh = true
@@ -150,6 +150,7 @@ exports.makeBugoutFFI = left =>
 
   try {
     const bugout = new Bugout(roomCode, options)
+    logInfo(`new Bugout(roomCode='${roomCode}', options=${JSON.stringify(options)})`)
     reloadOnNetworkChange()
     try {
       localStorage.seed = bugout.seed

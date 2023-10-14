@@ -16,20 +16,29 @@ import Halogen (HalogenM)
 
 newtype Broadcaster = Broadcaster FFI.Bugout
 
+instance showBroadcaster :: Show Broadcaster where
+  show (Broadcaster bugout) = FFI.showBugout bugout
+
 class Monad m <= Broadcast m where
-  create :: String -> String -> String -> m (Either Error Broadcaster)
+  create :: String -> String -> String -> String -> m (Either Error Broadcaster)
   address :: Broadcaster -> m String
   broadcast :: Broadcaster -> String -> m Unit
 
 instance broadcastHalogenM :: Broadcast m => Broadcast (HalogenM st act slots msg m) where
-  broadcast broadcaster = lift <<< broadcast broadcaster
-  create a b = lift <<< create a b
+  create :: String -> String -> String -> String -> (HalogenM st act slots msg m) (Either Error Broadcaster)
+  create a b c = lift <<< create a b c
+  address :: Broadcaster -> (HalogenM st act slots msg m) String
   address = lift <<< address
+  broadcast :: Broadcaster -> String -> (HalogenM st act slots msg m) Unit
+  broadcast broadcaster = lift <<< broadcast broadcaster
 
 instance broadcastAppM :: Broadcast AppM where
-  broadcast broadcaster = liftAff <<< broadcastMessage broadcaster
-  create a b = liftAff <<< createBroadcaster a b
+  create :: String -> String -> String -> String -> AppM (Either Error Broadcaster)
+  create a b c = liftAff <<< createBroadcaster a b c
+  address :: Broadcaster -> AppM String
   address = liftAff <<< getAddress
+  broadcast :: Broadcaster -> String -> AppM Unit
+  broadcast broadcaster = liftAff <<< broadcastMessage broadcaster
 
 newtype BroadcastM a = BroadcastM (Aff a)
 
@@ -43,7 +52,7 @@ derive newtype instance monadAffBroadcastM :: MonadAff BroadcastM
 
 instance broadcastBroadcastM :: Broadcast BroadcastM where
   broadcast broadcaster = liftAff <<< broadcastMessage broadcaster
-  create a b = liftAff <<< createBroadcaster a b
+  create a b c = liftAff <<< createBroadcaster a b c
   address = liftAff <<< getAddress
 
 runBroadcastM :: BroadcastM ~> Aff
@@ -56,12 +65,13 @@ createBroadcaster
   :: String
   -> String
   -> String
+  -> String
   -> Aff (Either Error Broadcaster)
-createBroadcaster remoteMessageTarget localMessageTarget roomCode =
+createBroadcaster remoteMessageTarget localMessageTarget roomCode announce =
   try
   $ Broadcaster
   <$> makeAff
-  (FFI.makeBugout remoteMessageTarget localMessageTarget roomCode)
+  (FFI.makeBugout remoteMessageTarget localMessageTarget roomCode announce)
 
 getAddress :: Broadcaster -> Aff String
 getAddress (Broadcaster bugout) = liftEffect $ FFI.address bugout
@@ -73,10 +83,10 @@ maybeCreateBroadcaster
   => String
   -> String
   -> String
+  -> String
   -> m (Maybe Broadcaster)
-maybeCreateBroadcaster roomCode remoteMessageTarget localMessageTarget = do
-  eBroadcaster <- create
-    roomCode remoteMessageTarget localMessageTarget
+maybeCreateBroadcaster roomCode remoteMessageTarget localMessageTarget announce = do
+  eBroadcaster <- create roomCode remoteMessageTarget localMessageTarget announce
   case eBroadcaster of
     Left e -> do
       log $ "Error creating broadcaster: " <> show e

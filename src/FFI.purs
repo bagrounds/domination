@@ -18,10 +18,13 @@ foreign import detail :: forall a. Event -> a
 
 foreign import data Bugout :: Type
 
+foreign import showBugout :: Bugout -> String
+
 makeBugout
   :: String -- remote message target
   -> String -- local message target
   -> String -- room code
+  -> String -- announce
   -> (Either Error Bugout -> Effect Unit)
   -> Effect Canceler
 makeBugout = makeBugoutFFI
@@ -35,6 +38,7 @@ foreign import makeBugoutFFI
   -> (forall l r. r -> Either l r) -- Right
   -> (Int -> LocalMessage) -- ConnectionsWireMessage
   -> (String -> LocalMessage) -- SeenWireMessage
+  -> String
   -> String
   -> String
   -> String

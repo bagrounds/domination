@@ -16,6 +16,7 @@ import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.RenderText (renderText)
+import Domination.UI.AnnounceInput as AnnounceInput
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
 import Halogen.Component (ComponentSlot)
@@ -76,6 +77,7 @@ render cs@{ showMenu, dominationConfig } = let
       [ HH.text "Back" ]
     ]
   , renderText version
+  , AnnounceInput.render { onInput: WriteAnnounce, state: cs }
   , UsernameInput.render { onInput: WriteUsername, state: cs }
   , Util.incrementer
     { label: "Players: "

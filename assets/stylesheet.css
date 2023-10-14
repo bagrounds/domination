@@ -215,6 +215,11 @@ button span,
   border: 1px solid black;
 }
 
+.announce-input input {
+  height: 7vh;
+  width: 50vw;
+}
+
 .username-input input {
   height: 7vh;
   width: 50vw;

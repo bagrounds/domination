@@ -128,6 +128,8 @@ settings :: ClassName
 settings = ClassName "settings"
 usernameInput :: ClassName
 usernameInput = ClassName "username-input"
+announceInput :: ClassName
+announceInput = ClassName "announce-input"
 connections :: ClassName
 connections = ClassName "connections"
 statsContainer :: ClassName

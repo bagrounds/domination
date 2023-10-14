@@ -20,6 +20,7 @@ import Message (RemoteMessage)
 type AppState =
   { connectionCount :: Int
   , id :: String
+  , announce :: String
   , username :: String
   , usernames :: HashMap String String
   , message :: String
@@ -59,6 +60,8 @@ _usernames :: Lens' AppState (HashMap String String)
 _usernames = prop (SProxy :: SProxy "usernames")
 _username :: Lens' AppState String
 _username = prop (SProxy :: SProxy "username")
+_announce :: Lens' AppState String
+_announce = prop (SProxy :: SProxy "announce")
 _maybeBroadcaster :: Lens' AppState (Maybe Broadcaster)
 _maybeBroadcaster = prop (SProxy :: SProxy "maybeBroadcaster")
 _dominationConfig :: Lens' AppState Config
@@ -78,11 +81,15 @@ _maybeAudioContext = prop (SProxy :: SProxy "maybeAudioContext")
 globalRoomCode :: String
 globalRoomCode = "global-dev"
 
+defaultAnnounce :: String
+defaultAnnounce = "wss://p2p-tracker-24is.onrender.com"
+
 newApp :: AppState
 newApp =
   { connectionCount: 0
   , id: ""
   , username: ""
+  , announce: defaultAnnounce
   , usernames: HashMap.empty
   , message: ""
   , messages: []

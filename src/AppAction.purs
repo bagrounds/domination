@@ -18,6 +18,7 @@ data AppAction
   | ToggleLongGame
   | RandomizeKingdom
   | ChooseKingdom (Array CardSpecSelection)
+  | WriteAnnounce String
   | WriteUsername String
   | Write (Lens' AppState String) String
   | SendMessage

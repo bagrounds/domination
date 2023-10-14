@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _announce, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultAnnounce, defaultKingdom, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -54,6 +54,7 @@ import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
+import Web.HTML.Event.EventTypes (offline)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -63,6 +64,9 @@ localMessageTarget = "local-message-target"
 
 uuidKey :: String
 uuidKey = "player-id"
+
+announceKey :: String
+announceKey = "announce"
 
 usernameKey :: String
 usernameKey = "username"
@@ -188,10 +192,11 @@ handleAction
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
 handleAction audioContext = case _ of
   Initialize -> do
+    log "Initialize"
     eUuid <- load uuidKey
     uuid <- case eUuid of
       Left e -> do
-        log $ "no existing uuid found, generating a new one."
+        log $ "Initialize: no existing uuid found, generating a new one."
           <> " error: " <> e
         uuid <- genUuid
         save uuidKey uuid
@@ -201,7 +206,7 @@ handleAction audioContext = case _ of
     eUsername <- load usernameKey
     username <- case eUsername of
       Left e -> do
-        log $ "no existing username found, using default."
+        log $ "Initialize: no existing username found, using default."
           <> " error: " <> e
         emoji <- fromMaybe ":)" <$> randomElement emojis
         pure $ emoji <> "lurker" <> emoji
@@ -212,7 +217,7 @@ handleAction audioContext = case _ of
     eKingdom <- load "kingdom"
     kingdom <- case eKingdom of
       Left e -> do
-        log $ "Failed to load kingdom. Falling back to default."
+        log $ "Initialize: Failed to load kingdom. Falling back to default."
           <> "Error: " <> e
         pure defaultKingdom
       Right k ->
@@ -223,7 +228,7 @@ handleAction audioContext = case _ of
     ePlayerIndex <- load "player_index"
     nextPlayerIndex <- case ePlayerIndex of
       Left e -> do
-        log $ "Failed to load playerIndex. Falling back to default."
+        log $ "Initialize: Failed to load playerIndex. Falling back to default."
           <> "Error: " <> e
         pure 0
       Right i -> pure i
@@ -231,7 +236,7 @@ handleAction audioContext = case _ of
     ePlayerCount <- load "player_count"
     nextPlayerCount <- case ePlayerCount of
       Left e -> do
-        log $ "Failed to load playerCount. Falling back to default."
+        log $ "Initialize: Failed to load playerCount. Falling back to default."
           <> "Error: " <> e
         pure 1
       Right i -> pure i
@@ -239,10 +244,11 @@ handleAction audioContext = case _ of
     eMessages <- load chatKey
     messages <- case eMessages of
       Left e -> do
-        log $ "Failed to load messages. Error: " <> e
+        log $ "Initialize: Failed to load messages. Error: " <> e
         pure []
       Right m -> pure m
 
+    log "Initialize: modify a bunch of stuff..."
     H.modify_ $ (_id .~ uuid)
       >>> (_username .~ username)
       >>> (_usernames %~ HashMap.insert uuid username)
@@ -251,14 +257,33 @@ handleAction audioContext = case _ of
       >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
       >>> (_maybeAudioContext .~ Just audioContext)
       >>> (_messages .~ messages)
+    log "Initialize: done modifying a bunch of stuff..."
 
+    log "Initialize: load game..."
     loadGame "game_state"
+    log "Initialize: done loading game..."
+
+    eAnnounce <- load announceKey
+    announce <- case eAnnounce of
+      Left e -> do
+        log $ "Initialize: no existing announce found, using default."
+          <> " error: " <> e
+        pure $ defaultAnnounce
+      Right u -> pure u
+
+    log $ "Initialize: announce: " <> announce
+    H.modify_ (_announce .~ announce)
 
     maybeBroadcaster <- maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget
+      roomCode remoteMessageTarget localMessageTarget announce
+
+    log $ "Initialize: broadcaster: " <> show maybeBroadcaster
 
     H.modify_ (_maybeBroadcaster .~ maybeBroadcaster)
 
+    broadcaster <- H.gets _.maybeBroadcaster
+
+    log $ "Initialize: broadcaster: " <> show broadcaster
 
   ToggleMenu -> H.modify_ $ _showMenu %~ not
 
@@ -314,12 +339,18 @@ handleAction audioContext = case _ of
     loadGame "game_state"
     H.modify_ $ _showMenu .~ false
 
+  WriteAnnounce announce -> do
+    save announceKey announce
+    log $ "saving announce: " <> announce
+    H.modify_ $ set _announce announce
+
   WriteUsername username -> do
     { id } <- H.get
-    save "username" username
+    save usernameKey username
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
     sendMessage $ UsernameMessage { username, id }
+
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
   ReceiveLocalMessage customEvent -> do
@@ -423,26 +454,35 @@ handleAction audioContext = case _ of
       saveChat
       sendMessage chat
 
-    sendMessage
-      :: RemoteMessage
-      -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
-    sendMessage message' = do
-      let message = view Message._toWire message'
-      { roomCode, maybeBroadcaster, id } <- H.get
-      let wireEnvelope = Tuple id message
+sendMessage
+  :: forall t1 r o1 q1 output m
+  . Log m
+  => Broadcast m
+  => WireCodec m
+  => RemoteMessage
+  -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
+sendMessage message' = do
+  let message = view Message._toWire message'
+  { roomCode, maybeBroadcaster, id } <- H.get
+  log $ "maybeBroadcaster: " <> show maybeBroadcaster
 
-      maybeBroadcaster' <- case maybeBroadcaster of
-        Nothing -> maybeCreateBroadcaster
-          roomCode remoteMessageTarget localMessageTarget
-        Just b -> pure (Just b)
+  let wireEnvelope = Tuple id message
 
-      case maybeBroadcaster' of
-        Nothing ->
-          log "no broadcaster to send message"
-        Just broadcaster -> do
-          eString <- writeWire wireEnvelope
-          case eString of
-            Left e -> error e
-            Right string ->
-              broadcast broadcaster string
+  announce <- H.gets _.announce
+
+  maybeBroadcaster' <- case maybeBroadcaster of
+    Nothing -> maybeCreateBroadcaster
+      roomCode remoteMessageTarget localMessageTarget announce
+    Just b -> pure (Just b)
+
+  case maybeBroadcaster' of
+    Nothing ->
+      log "no broadcaster to send message"
+    Just broadcaster -> do
+      H.modify_ (_maybeBroadcaster .~ maybeBroadcaster')
+      eString <- writeWire wireEnvelope
+      case eString of
+        Left e -> error e
+        Right string ->
+          broadcast broadcaster string
 
