@@ -10,7 +10,7 @@ import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over)
 import Data.Symbol (SProxy(..))
-import Relation (Relation, is)
+import Relationship (Relationship, is)
 
 type Predicate a = a -> Boolean
 
@@ -112,7 +112,7 @@ infixr 4 appendError as <>!
 lengthIs
   :: forall a
   . Show a
-  => Relation
+  => Relationship
   -> Int
   -> Rule (Array a)
 lengthIs r n = length >>> (is r n)

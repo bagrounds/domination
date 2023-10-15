@@ -29,7 +29,7 @@ import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Supply (indexOfStack, nonEmptyStacks, stackByName)
 import Domination.Data.Var (Var(..))
 import Record (merge)
-import Relation (Relation(..))
+import Relationship (Relationship(..))
 import Rule (check, lengthIs, (!<>), (!>), (<>!), (<@!))
 import Util (dropIndices, fromJust, moveAll, takeIndices)
 

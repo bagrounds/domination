@@ -38,7 +38,7 @@ import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
-import Relation (Relation, is)
+import Relationship (Relationship, is)
 import Rule (Rule, check, (!>), (<@!))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (.^), (:~), (<$>~))
 
@@ -354,7 +354,7 @@ assertHasCash i = assert (cash >>> (_ >= i)) "not enough treasure!"
 hasCash :: Int -> Rule Player
 hasCash i = cash >>> (_ >= i) !> ("need $" <> show i)
 
-handSizeIs :: Relation -> Int -> Rule Player
+handSizeIs :: Relationship -> Int -> Rule Player
 handSizeIs r i = _.hand >>> length >>> is r i
   !> "must have " <> show r <> " " <> show i <> " cards in hand"
 

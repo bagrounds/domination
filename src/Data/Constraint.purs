@@ -18,7 +18,7 @@ import Data.HeytingAlgebra ((&&), (||))
 import Data.Semiring (zero)
 import Data.Show (class Show)
 import Data.Unit (Unit, unit)
-import Relation (Relation(..))
+import Relationship (Relationship(..))
 import Rule (lengthIs, (<>!), (<@!))
 import Rule as Rule
 
