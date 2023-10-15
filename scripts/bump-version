@@ -67,13 +67,14 @@ changes_are_staged () (
   ! git diff --cached --exit-code
 )
 
-commit_version () (
+add_commit_and_tag_version () (
   git add $VERSION_FILE
   major=$(version_number major)
   minor=$(version_number minor)
   patch=$(version_number patch)
   version="v${major}.${minor}.${patch}"
   git commit -m "$version"
+  git tag -a "$version" -m "$version"
 )
 
 main () (
@@ -90,7 +91,7 @@ main () (
 
   update_file "$component"
 
-  commit_version
+  add_commit_and_tag_version
 )
 
 main "$1"
