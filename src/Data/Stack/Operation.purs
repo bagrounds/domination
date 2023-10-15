@@ -3,22 +3,22 @@ module Data.Stack.Operation where
 import Control.Category (class Category, (<<<))
 import Control.Semigroupoid (class Semigroupoid)
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.AssociativeCategory (lassoc, rassoc)
 import Data.Eq (class Eq)
 import Data.EuclideanRing (class EuclideanRing, (/))
-import Data.Function (($))
+import Data.Function (flip, ($))
 import Data.Function as Function
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.MonoidalProduct (first)
 import Data.Ring (class Ring, (-))
 import Data.Semiring (class Semiring, (*), (+))
 import Data.Show (class Show)
-import Data.Stack.Primitive (class StackPrimitive, Primitive(..), ReifiedPrimitive)
+import Data.Show.Generic (genericShow)
+import Data.Stack.Primitive (class StackPrimitive, Primitive(..), ReifiedPrimitive(..))
 import Data.Stack.Primitive as Primitive
 import Data.Tuple (Tuple(..), uncurry)
 
@@ -38,17 +38,29 @@ instance stackOperationOperation
   push = Operation rassoc
   pop = Operation lassoc
 
+data ReifiedOperation :: forall k1 k2. k1 -> k2 -> Type
 data ReifiedOperation a b
   = ReifiedPrimitiveOp (ReifiedPrimitive a b)
   | ReifiedPush
   | ReifiedPop
 
--- can't implement primitive
---instance stackOperationReifiedOperation
---  :: StackOperation ReifiedOperation ReifiedPrimitive a b where
---  primitive rp = ReifiedPrimitiveOp ?help
---  push = ReifiedPush
---  pop = ReifiedPop
+instance stackOperationReifiedOperation
+  :: StackOperation ReifiedOperation ReifiedPrimitive a b where
+  primitive ExtractLeft = ReifiedPrimitiveOp ExtractLeft
+  primitive ExtractRight = ReifiedPrimitiveOp ExtractRight
+  primitive Duplicate = ReifiedPrimitiveOp Duplicate
+  primitive InjectLeft = ReifiedPrimitiveOp InjectLeft
+  primitive InjectRight = ReifiedPrimitiveOp InjectRight
+  primitive Jam = ReifiedPrimitiveOp Jam
+  primitive Swap = ReifiedPrimitiveOp Swap
+  primitive Id = ReifiedPrimitiveOp Id
+  primitive Add = ReifiedPrimitiveOp Add
+  primitive Mul = ReifiedPrimitiveOp Mul
+  primitive Sub = ReifiedPrimitiveOp Sub
+  primitive Negate = ReifiedPrimitiveOp Negate
+  primitive Div = ReifiedPrimitiveOp Div
+  push = ReifiedPush
+  pop = ReifiedPop
 
 derive instance eqReifiedOperation
   :: (Eq a, Eq b)
@@ -117,13 +129,13 @@ sub :: forall n. Ring n => PrimBinOp n n n
 sub = primitive Primitive.sub
 
 subN :: forall n. Ring n => n -> PrimOp n n
-subN = primOp <<< (-)
+subN = primOp <<< flip (-)
 
 div :: forall n. EuclideanRing n => PrimBinOp n n n
 div = primitive Primitive.div
 
 divN :: forall n. EuclideanRing n => n -> PrimOp n n
-divN = primOp <<< (/)
+divN = primOp <<< flip (/)
 
 const :: forall a b z. b -> Operation (Tuple a z) (Tuple b z)
 const = primitive <<< const' where

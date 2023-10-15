@@ -2,9 +2,11 @@ module Data.Stack.Operations where
 
 import Control.Category (identity, (<<<))
 import Control.Semigroupoid (class Semigroupoid)
-import Data.Stack.Operation (Operation(..), ReifiedOperation)
-import Data.Tuple (Tuple)
+import Data.Stack.Operation (Operation(..), ReifiedOperation(..))
+import Data.Stack.Primitive (ReifiedPrimitive(..))
+import Data.Tuple (Tuple(..))
 
+class StackOperations :: forall k. (k -> k -> Type) -> (k -> k -> Type) -> Constraint
 class StackOperations ops op | ops -> op where
   nil :: forall a. ops a a
   cons :: forall a b c. op a b -> ops b c -> ops a c
@@ -22,13 +24,43 @@ instance stackOperationsOperations
 instance semigroupoidOperations :: Semigroupoid Operations where
   compose a b = Operations (evalOperations a <<< evalOperations b)
 
-data ReifiedOperations a b
+data ReifiedOperations a c
   = Nil
-  | Cons (forall m. Tuple (ReifiedOperation a m) (ReifiedOperations m b))
+  | Cons (forall b. Tuple (ReifiedOperation a b) (ReifiedOperations b c))
 
---instance stackOperationsReifiedOperations
---  :: StackOperations ReifiedOperations ReifiedOperation where
---    nil = Nil
---    cons op ops1 = case ops1 of
---      Nil -> Cons (Tuple op Nil)
+instance stackOperationsReifiedOperations
+  :: StackOperations ReifiedOperations ReifiedOperation where
+    nil :: forall a. ReifiedOperations a a
+    nil = Nil
+    cons :: forall a b c. ReifiedOperation a b -> ReifiedOperations b c -> ReifiedOperations a c
+    cons (ReifiedPrimitiveOp ExtractLeft) Nil = Cons (Tuple (ReifiedPrimitiveOp ExtractLeft) Nil)
+    cons (ReifiedPrimitiveOp ExtractRight) Nil = Cons (Tuple (ReifiedPrimitiveOp ExtractRight) Nil)
+    cons (ReifiedPrimitiveOp Duplicate) Nil = Cons (Tuple (ReifiedPrimitiveOp Duplicate) Nil)
+    cons (ReifiedPrimitiveOp InjectLeft) Nil = Cons (Tuple (ReifiedPrimitiveOp InjectLeft) Nil)
+    cons (ReifiedPrimitiveOp InjectRight) Nil = Cons (Tuple (ReifiedPrimitiveOp InjectRight) Nil)
+    cons (ReifiedPrimitiveOp Jam) Nil = Cons (Tuple (ReifiedPrimitiveOp Jam) Nil)
+    cons (ReifiedPrimitiveOp Swap) Nil = Cons (Tuple (ReifiedPrimitiveOp Swap) Nil)
+    cons (ReifiedPrimitiveOp Id) Nil = Cons (Tuple (ReifiedPrimitiveOp Id) Nil)
+    cons (ReifiedPrimitiveOp Add) Nil = Cons (Tuple (ReifiedPrimitiveOp Add) Nil)
+    cons (ReifiedPrimitiveOp Mul) Nil = Cons (Tuple (ReifiedPrimitiveOp Mul) Nil)
+    cons (ReifiedPrimitiveOp Sub) Nil = Cons (Tuple (ReifiedPrimitiveOp Sub) Nil)
+    cons (ReifiedPrimitiveOp Negate) Nil = Cons (Tuple (ReifiedPrimitiveOp Negate) Nil)
+    cons (ReifiedPrimitiveOp Div) Nil = Cons (Tuple (ReifiedPrimitiveOp Div) Nil)
+    cons ReifiedPush Nil = Cons (Tuple ReifiedPush Nil)
+    cons ReifiedPop Nil = Cons (Tuple ReifiedPop Nil)
+    cons (ReifiedPrimitiveOp ExtractLeft) xs = cons (ReifiedPrimitiveOp ExtractLeft) xs
+    cons (ReifiedPrimitiveOp ExtractRight) xs = cons (ReifiedPrimitiveOp ExtractRight) xs
+    cons (ReifiedPrimitiveOp Duplicate) xs = cons (ReifiedPrimitiveOp Duplicate) xs
+    cons (ReifiedPrimitiveOp InjectLeft) xs = cons (ReifiedPrimitiveOp InjectLeft) xs
+    cons (ReifiedPrimitiveOp InjectRight) xs = cons (ReifiedPrimitiveOp InjectRight) xs
+    cons (ReifiedPrimitiveOp Jam) xs = cons (ReifiedPrimitiveOp Jam) xs
+    cons (ReifiedPrimitiveOp Swap) xs = cons (ReifiedPrimitiveOp Swap) xs
+    cons (ReifiedPrimitiveOp Id) xs = cons (ReifiedPrimitiveOp Id) xs
+    cons (ReifiedPrimitiveOp Add) xs = cons (ReifiedPrimitiveOp Add) xs
+    cons (ReifiedPrimitiveOp Mul) xs = cons (ReifiedPrimitiveOp Mul) xs
+    cons (ReifiedPrimitiveOp Sub) xs = cons (ReifiedPrimitiveOp Sub) xs
+    cons (ReifiedPrimitiveOp Negate) xs = cons (ReifiedPrimitiveOp Negate) xs
+    cons (ReifiedPrimitiveOp Div) xs = cons (ReifiedPrimitiveOp Div) xs
+    cons ReifiedPush xs = cons ReifiedPush xs
+    cons ReifiedPop xs = cons ReifiedPop xs
 

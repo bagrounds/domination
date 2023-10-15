@@ -3,9 +3,9 @@ module Data.Stack.Primitive where
 import Control.Category (class Category, identity)
 import Control.Semigroupoid (class Semigroupoid)
 import Data.Argonaut.Decode.Class (class DecodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.BraidedCategory (class BraidedCategory)
 import Data.Cartesian (class Cartesian)
@@ -13,11 +13,11 @@ import Data.Cocartesian (class Cocartesian)
 import Data.Eq (class Eq)
 import Data.EuclideanRing (class EuclideanRing, (/))
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.MonoidalProduct (class MonoidalProduct)
 import Data.Ring (class Ring, zero, (-))
 import Data.Semiring (class Semiring, (*), (+))
 import Data.Show (class Show)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple, uncurry)
 
 class (Cocartesian p, Cartesian p, BraidedCategory p)
@@ -58,6 +58,7 @@ instance stackPrimitiveReifiedPrimitive
   negate = Negate
   div = Div
 
+data ReifiedPrimitive :: forall k1 k2. k1 -> k2 -> Type
 data ReifiedPrimitive a b
   = ExtractLeft
   | ExtractRight
@@ -72,7 +73,7 @@ data ReifiedPrimitive a b
   | Sub
   | Negate
   | Div
-  -- the "forall z." breaks my Generic typeclass instance
+  -- the "forall z." breaks the Generic typeclass instance
   -- | First (Maybe (ReifiedPrimitive a b)) (forall z. ReifiedPrimitive (Tuple a z) (Tuple b z))
 
 instance braidedCategoryReifiedPrimitive
