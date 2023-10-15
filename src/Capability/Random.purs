@@ -4,9 +4,11 @@ import Prelude
 
 import Control.Monad.Except.Trans (ExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (drop, length, take, (!!))
+import Data.Array (drop, fromFoldable, length, take, uncons, (!!))
+import Data.Foldable (class Foldable)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..), fst)
+import Data.Unfoldable (class Unfoldable, unfoldr)
 import Domination.AppM (AppM)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -19,6 +21,19 @@ class Monad m <= Random m where
   randomElement :: forall a. Array a -> m (Maybe a)
   randomIntBetween :: Int -> Int -> m Int
   randomBoolean :: m Boolean
+
+unfoldingShuffle
+  :: forall f g a m
+  . Random m
+  => Foldable f
+  => Unfoldable g
+  => Eq a
+  => f a
+  -> m (g a)
+unfoldingShuffle = map (unfoldr step) <<< shuffle <<< fromFoldable
+  where
+    step = map toTuple <<< uncons
+    toTuple { head, tail } = Tuple head tail
 
 instance randomHalogenM :: Random m => Random (HalogenM st act slots msg m) where
   shuffle = lift <<< shuffle
