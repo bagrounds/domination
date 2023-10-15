@@ -4,6 +4,7 @@
 # - otherwise, update and commit version file
 set -ue
 
+: "${1?please provide argument 1 specifying major minor or patch}"
 VERSION_FILE=src/Version.purs
 
 fail () (
