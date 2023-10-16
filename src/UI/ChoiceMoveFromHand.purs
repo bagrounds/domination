@@ -11,6 +11,7 @@ import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Game (Game)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
+import Domination.Data.Stack (stacksToCards)
 import Domination.UI.CardChooser as CardChooser
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.RenderText (renderText)
@@ -66,8 +67,11 @@ component state player choice baseSlotNumber =
 
     cards = case pile of
       Pile.Trash -> state.trash
+      Pile.Supply -> stacksToCards state.supply
+      Pile.AtPlay -> player.atPlay
       Pile.Hand -> player.hand
       Pile.Discard -> player.discard
-      Pile.ToDiscard -> player.toDiscard
+      Pile.Buying -> player.buying
+      Pile.Discarding -> player.toDiscard
       Pile.Deck -> player.deck
 

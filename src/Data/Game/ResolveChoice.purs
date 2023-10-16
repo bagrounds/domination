@@ -7,7 +7,7 @@ import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (all, filter, head, length, replicate, uncons, (!!), (:))
 import Data.Lens.Fold ((^?))
 import Data.Lens.Setter (over, (.~))
-import Data.Lens.Traversal (traverseOf)
+import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..))
 import Domination.Capability.Log (class Log, log)
 import Domination.Capability.Random (class Random)
@@ -24,6 +24,7 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Player (describes)
 import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
+import Domination.Data.Stack (_stacksToCardsIso)
 import Domination.Data.Stack as Stack
 import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Supply (indexOfStack, nonEmptyStacks, stackByName)
@@ -189,7 +190,7 @@ resolveChoice { playerIndex, choice } state = do
                 , n: Bound constraint
                 } -> do
                   let
-                    _source = Game._pile source playerIndex
+                    _source = Game._pile source playerIndex <<< _stacksToCardsIso
                     stack' = StackArrayInt cardIndices : stack
                   sourcePile <- fromJust "failed to get source"
                     $ state' ^? _source
@@ -310,7 +311,7 @@ resolveChoice { playerIndex, choice } state = do
                       { filter: Filter.Any
                       , n: Unlimited
                       , source: Pile.Hand
-                      , destination: Pile.ToDiscard
+                      , destination: Pile.Discarding
                       , resolution: Just cardIndices
                       , attack
                       }
@@ -512,8 +513,10 @@ moveFromTo playerIndex state
   , resolution: Just cardIndices
   } = do
   let
-    _source = Game._pile source playerIndex
-    _destination = Game._pile destination playerIndex
+    _source :: Traversal' Game (Array Card)
+    _source = Game._pile source playerIndex <<< _stacksToCardsIso
+    _destination :: Traversal' Game (Array Card)
+    _destination = Game._pile destination playerIndex <<< _stacksToCardsIso
   sourcePile <- fromJust "failed to get source" $ state ^? _source
   selected <- takeIndices cardIndices sourcePile
   remaining <- dropIndices cardIndices sourcePile
@@ -535,7 +538,7 @@ gainCards
   -> { n :: Int, cardName :: String, destination :: Pile }
   -> m Game
 gainCards playerIndex state { n, cardName, destination } = do
-  let _destination = Game._pile destination playerIndex
+  let _destination = Game._pile destination playerIndex <<< _stacksToCardsIso
   { card, count } <- stackByName cardName state.supply
   stackIndex <- indexOfStack card state.supply
   let
@@ -555,7 +558,7 @@ gainCard
   -> { filter :: Filter, cardName :: String, destination :: Pile }
   -> m Game
 gainCard playerIndex state { destination, cardName } = do
-  let _destination = Game._pile destination playerIndex
+  let _destination = Game._pile destination playerIndex <<< _stacksToCardsIso
   stack <- stackByName cardName state.supply
   stackIndex <- indexOfStack stack.card state.supply
   let cards = [ stack.card ]

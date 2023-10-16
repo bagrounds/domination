@@ -3,11 +3,16 @@ module Domination.Data.Stack where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, filter, foldr, head, length, nub, replicate, reverse, (:))
-import Data.Lens.Lens (Lens)
+import Data.Array (catMaybes, concatMap, filter, foldr, head, nub, replicate, (:))
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NonEmpty
+import Data.Foldable (length)
+import Data.Lens.Iso (Iso', iso)
+import Data.Lens.Lens (Lens, Lens', lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Cards as Cards
 import Domination.Data.Points (Points)
@@ -21,6 +26,15 @@ type Stack =
 
 toCards :: Stack -> Array Card
 toCards { count, card } = replicate count card
+
+fromCards :: NonEmptyArray Card -> Stack
+fromCards cards = { card: NonEmpty.head cards, count: length cards }
+
+fromPotentiallyEmptyCards :: Card -> Array Card -> Stack
+fromPotentiallyEmptyCards card cards = { card, count: length cards }
+
+_toCards :: Card -> Iso' Stack (Array Card)
+_toCards card = iso toCards (fromPotentiallyEmptyCards card)
 
 _card
   :: forall a b r
@@ -44,10 +58,31 @@ assertNotEmpty = assert (_.count >>> (_ > zero)) "stack is empty!"
 new :: Card -> Int -> Stack
 new card count = { card, count }
 
+_fromCard :: Lens' Card Stack
+_fromCard = lens' f
+  where
+    f :: Card -> Tuple Stack (Stack -> Card)
+    f card = Tuple (new card 1) (_.card)
+
+_stacksFromCardsIso :: Iso' (Array Card) (Array Stack)
+_stacksFromCardsIso = iso stackCards stacksToCards
+
+_stacksToCardsIso :: Iso' (Array Stack) (Array Card)
+_stacksToCardsIso = iso stacksToCards stackCards
+
+stacksToCards :: Array Stack -> Array Card
+stacksToCards = concatMap toCards
+
+_stacksFromCards :: Lens' (Array Card) (Array Stack)
+_stacksFromCards = lens' f
+  where
+    f :: (Array Card) -> Tuple (Array Stack) (Array Stack -> Array Card)
+    f cards = Tuple (stackCards cards) stacksToCards
+
 stackCards :: Array Card -> Array Stack
 stackCards cards = catMaybes (foldr f [] names)
   where
-    names = nub $ _.name <$> reverse cards
+    names = nub $ _.name <$> cards
     f name stacks =
       ({ card: _, count: length cards' } <$> head cards')
         : stacks

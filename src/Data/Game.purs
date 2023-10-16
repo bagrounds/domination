@@ -24,7 +24,7 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player, newPlayer)
 import Domination.Data.Player as Player
 import Domination.Data.Result (Result)
-import Domination.Data.Stack (Stack)
+import Domination.Data.Stack (Stack, _stacksFromCards)
 import Domination.Data.Supply (Supply, getStack, makeSupply)
 import Domination.Data.Supply as Supply
 import Type.Proxy (Proxy(..))
@@ -79,13 +79,16 @@ _stack i = _supply <<< Supply._stack i
 _ofPhase :: Phase -> Prism' Game Game
 _ofPhase phase = prism' identity $ justIf ((==) phase <<< _.phase)
 
-_pile :: Pile -> Int -> Traversal' Game (Array Card)
+_pile :: Pile -> Int -> Traversal' Game (Array Stack)
 _pile pile playerIndex = case pile of
-  Pile.Hand -> _player playerIndex <<< Player._hand
-  Pile.Trash -> _trash
-  Pile.Deck -> _player playerIndex <<< Player._deck
-  Pile.Discard -> _player playerIndex <<< Player._discard
-  Pile.ToDiscard -> _player playerIndex <<< Player._toDiscard
+  Pile.AtPlay -> _player playerIndex <<< Player._atPlay <<< _stacksFromCards
+  Pile.Buying -> _player playerIndex <<< Player._buying <<< _stacksFromCards
+  Pile.Deck -> _player playerIndex <<< Player._deck <<< _stacksFromCards
+  Pile.Discard -> _player playerIndex <<< Player._discard <<< _stacksFromCards
+  Pile.Discarding -> _player playerIndex <<< Player._toDiscard <<< _stacksFromCards
+  Pile.Hand -> _player playerIndex <<< Player._hand <<< _stacksFromCards
+  Pile.Supply -> _supply
+  Pile.Trash -> _trash <<< _stacksFromCards
 
 new :: Int -> Array Card -> Boolean -> Game
 new playerCount cards longGame =

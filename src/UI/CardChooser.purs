@@ -16,6 +16,7 @@ import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
+import Domination.Data.Stack (stacksToCards)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
@@ -81,11 +82,14 @@ component
   initialState _ = (\x -> Tuple x false) <$> cards
     where
       cards = case pile of
+        Pile.AtPlay -> player.atPlay
         Pile.Hand -> player.hand
         Pile.Discard -> player.discard
-        Pile.ToDiscard -> player.toDiscard
+        Pile.Buying -> player.buying
+        Pile.Discarding -> player.toDiscard
         Pile.Deck -> player.deck
         Pile.Trash -> state.trash
+        Pile.Supply -> stacksToCards state.supply
 
   render xs =
     case Player.firstChoice player >>= renderChoice of

@@ -1,7 +1,7 @@
 module Domination.UI.ChooseCards where
 
-import Prim hiding (Constraint)
 import Prelude
+import Prim hiding (Constraint)
 
 import Data.Array (filter, length)
 import Data.FunctorWithIndex (mapWithIndex)
@@ -15,6 +15,7 @@ import Domination.Data.Game (Game)
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
+import Domination.Data.Stack (stacksToCards)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
@@ -107,10 +108,13 @@ component
           ]
 
     cards = case pile of
+      Pile.AtPlay -> player.atPlay
       Pile.Hand -> player.hand
       Pile.Discard -> player.discard
-      Pile.ToDiscard -> player.toDiscard
+      Pile.Buying -> player.buying
+      Pile.Discarding -> player.toDiscard
       Pile.Deck -> player.deck
       Pile.Trash -> state.trash
+      Pile.Supply -> stacksToCards state.supply
 
 

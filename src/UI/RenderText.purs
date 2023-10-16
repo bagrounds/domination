@@ -25,6 +25,7 @@ import Domination.Data.Points as Points
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
+import Domination.Data.Stack (_stacksToCardsIso)
 import Domination.Data.Wire.Int as Int
 import Domination.UI.Icons as Icons
 import Domination.UI.Util (h2__)
@@ -135,11 +136,14 @@ instance choiceRenderTextInContext
       MoveFromTo
         { source, destination, resolution: (Just cardIndices) } ->
         case destination of
+          Pile.Supply -> [ HH.text $ "returned to supply: " ] <> cards
           Pile.Trash -> [ HH.text $ "trashed: " ] <> cards
           Pile.Discard -> [ HH.text $ "discarded: " ] <> cards
-          Pile.ToDiscard -> [ HH.text $ "will discard: " ] <> cards
+          Pile.Discarding -> [ HH.text $ "will discard: " ] <> cards
           Pile.Hand -> gainedCardsToTheir "hand"
           Pile.Deck -> gainedCardsToTheir "deck"
+          Pile.AtPlay -> [ HH.text $ "played: " ] <> cards
+          Pile.Buying -> gainedCardsToTheir "buying pile"
         where
           gainedCardsToTheir pile = [ HH.text $ "gained: " ]
             <> cards
@@ -155,11 +159,14 @@ instance choiceRenderTextInContext
       GainCard { destination, resolution: Just cardName } ->
         let
           suffix = case destination of
+            Pile.AtPlay -> " to play"
             Pile.Hand -> " to their hand"
-            Pile.Discard -> ""
-            Pile.ToDiscard -> ""
+            Pile.Discard -> " to their discard pile"
+            Pile.Discarding -> " to their discarding pile"
+            Pile.Buying -> " to their buying pile"
             Pile.Deck -> " onto their deck"
             Pile.Trash -> " into the trash for some reason"
+            Pile.Supply -> " into the supply for some reason"
         in [ HH.text $ "gained a " <> cardName <> " " <> suffix ]
 
       GainActions { n } -> [ HH.text "+", renderText n ]
@@ -229,17 +236,23 @@ instance choiceRenderText :: RenderText Choice where
           Filter.Any -> "card(s)"
           Filter.And f1 f2 -> description f1 <> " and " <> description f2
         suffix = case source of
-          Pile.Hand -> ""
+          Pile.AtPlay -> "from at play"
+          Pile.Hand -> "from your hand"
           Pile.Discard -> "from your discard pile"
-          Pile.ToDiscard -> "from your to-discard pile"
+          Pile.Buying -> "from your buying pile"
+          Pile.Discarding -> "from your to-discard pile"
           Pile.Deck -> "from your deck"
           Pile.Trash -> "from the trash"
+          Pile.Supply -> "from the supply"
         verb = case destination of
+          Pile.AtPlay -> "Play"
           Pile.Hand -> "Gain to your hand"
           Pile.Discard -> "Discard"
-          Pile.ToDiscard -> "Discard"
+          Pile.Buying -> "Buy"
+          Pile.Discarding -> "Discard"
           Pile.Deck -> "Put onto your deck"
           Pile.Trash -> "Trash"
+          Pile.Supply -> "Put into the supply"
 
     GainCards { n, cardName } ->
       [ HH.text $ "Gain " <> cardName <> " x" <> show n ]
@@ -247,11 +260,14 @@ instance choiceRenderText :: RenderText Choice where
     GainCard { filter, destination } ->
       let
         verb = case destination of
+          Pile.AtPlay -> "Play"
           Pile.Hand -> "Gain to your hand"
           Pile.Discard -> "Gain"
-          Pile.ToDiscard -> "Gain"
+          Pile.Buying -> "Buy"
+          Pile.Discarding -> "Gain"
           Pile.Deck -> "Gain onto your deck"
           Pile.Trash -> "Trash"
+          Pile.Supply -> "Put into the supply"
         card = case _ of
           Filter.HasName name -> "1 " <> name
           Filter.HasType cardType -> "a card of type " <> show cardType
@@ -282,7 +298,7 @@ getCardName source playerIndex state cardIndex = HH.text
   $ fromMaybe "???"
   $ _.name
   <$> state
-  ^? Game._pile source playerIndex
+  ^? Game._pile source playerIndex <<< _stacksToCardsIso
   <<< ix cardIndex
 
 parenthesize :: forall w i. HTML w i -> Array (HTML w i)
