@@ -1,11 +1,11 @@
 module Domination.Data.PlayerID where
 
 import Data.Bounded (class Bounded, bottom, top)
-import Data.Enum (class BoundedEnum, class Enum, Cardinality(..), defaultFromEnum, defaultToEnum)
+import Data.Enum (class BoundedEnum, class Enum, Cardinality(..), defaultFromEnum, defaultToEnum, succ)
 import Data.Eq (class Eq)
 import Data.Function (($))
 import Data.Hashable (class Hashable)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Ord (class Ord, (<), (>))
 import Data.Ring ((-))
 import Data.Semiring ((+))
@@ -38,3 +38,5 @@ instance boundedEnumPlayerID :: BoundedEnum PlayerID where
   toEnum = defaultToEnum
   fromEnum = defaultFromEnum
 
+nextPlayer :: PlayerID -> PlayerID
+nextPlayer p = fromMaybe bottom $ succ p

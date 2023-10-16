@@ -10,7 +10,7 @@ import Data.Array as Array
 import Data.Foldable (elem, foldr)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Getter (view)
-import Data.Lens.Lens (Lens')
+import Data.Lens.Lens (Lens', lens')
 import Data.Lens.Prism (Prism', is, prism')
 import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
@@ -20,6 +20,7 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Domination.Data.Actions (Actions)
 import Domination.Data.Buys (Buys)
 import Domination.Data.CardType (CardType(..))
@@ -109,6 +110,8 @@ _maybeSpecial :: Lens' Card (Maybe Special)
 _maybeSpecial = prop (SProxy :: SProxy "special")
 _reaction :: Traversal' Card Reaction
 _reaction = prop (SProxy :: SProxy "reaction") <<< _Just
+_special :: Traversal' Card Special
+_special = prop (SProxy :: SProxy "special") <<< _Just
 
 _ofType :: CardType -> Prism' Card Card
 _ofType cardType = prism' identity $ justIf $ elem cardType <<< _.types
@@ -184,6 +187,12 @@ _description = prop (SProxy :: SProxy "description")
 
 data Command
   = Choose Choice
+
+_choice :: Lens' Command Choice
+_choice = lens' f
+  where
+    f (Choose choice) = Tuple choice Choose
+
 
 derive instance genericCommand :: Generic Command _
 derive instance eqCommand :: Eq Command
