@@ -31,6 +31,7 @@ import Domination.Data.Choice (isAttack) as Choice
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
+import Domination.Data.Stack (sortByStacks)
 import Domination.Data.Wire.Bonus (WireBonus)
 import Domination.Data.Wire.Bonus (_toWire) as Bonus
 import Domination.Data.Wire.Card (_toWire) as Card
@@ -298,8 +299,11 @@ drawCard player = do
   let discarded = if null player.deck
     then []
     else player.discard
-  let player' = player { deck = deck, discard = discarded }
-  pure $ drawIfPossible player'
+  let
+    player' = player { deck = deck, discard = discarded }
+    player'' = drawIfPossible player'
+    player''' = over _hand sortByStacks player''
+  pure player'''
 
 drawIfPossible :: Player -> Player
 drawIfPossible p = fromMaybe p $ moveOne _deck _hand $ p

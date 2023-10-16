@@ -73,6 +73,9 @@ _stacksToCardsIso = iso stacksToCards stackCards
 stacksToCards :: Array Stack -> Array Card
 stacksToCards = concatMap toCards
 
+sortByStacks :: Array Card -> Array Card
+sortByStacks = stacksToCards <<< stackCards
+
 _stacksFromCards :: Lens' (Array Card) (Array Stack)
 _stacksFromCards = lens' f
   where

@@ -110,6 +110,9 @@ infixl 8 reviewOn as .^
 prependOver :: forall s a. ArrayLens' s a -> a -> s -> s
 prependOver lens x = over lens (x : _)
 
+pushOver :: forall s a. ArrayLens' s a -> a -> s -> s
+pushOver lens x = over lens (_ <> [x])
+
 infixr 4 prependOver as :~
 
 mapOver
@@ -143,7 +146,7 @@ moveOne
   -> Maybe s
 moveOne lens1 lens2 s = do
   x <- firstOf lens1 s
-  let s' = prependOver lens2 x s
+  let s' = pushOver lens2 x s
   dropFirstOf lens1 s'
 
 moveUpTo

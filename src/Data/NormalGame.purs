@@ -3,7 +3,7 @@ module Domination.Data.NormalGame where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, elemIndex, nubEq, zipWith, (!!), (..))
+import Data.Array (catMaybes, elemIndex, nubEq, (!!))
 import Data.Enum (class BoundedEnum, class Enum, Cardinality(..))
 import Data.Enum.Generic (genericPred, genericSucc)
 import Data.FunctorWithIndex (mapWithIndex)
