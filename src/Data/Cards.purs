@@ -65,6 +65,7 @@ cardSpecMap =
   , moneyLender
   , armory
   , remodel
+  , innkeeper
   , bazaar
   , festival
   , laboratory
@@ -402,6 +403,56 @@ noblesSpecial =
   { target: Self
   , command: Choose noblesChoice
   , description: "Choose one: +3 cards or +2 actions"
+  }
+
+innkeeper :: CardSpec
+innkeeper =
+  let attack = false in
+  independentCard $ Card.action
+  { name = "Innkeeper"
+  , cost = 4
+  , actions = one
+  , special = Just
+    { target: Self
+    , command: Choose $ Or
+      { choices:
+        [ Draw { n: 1, attack, resolution }
+        , And
+          { choices:
+            [ Draw { n: 3, attack, resolution }
+            , MoveFromTo
+              { n: Exactly 3
+              , filter: Filter.Any
+              , source: Pile.Hand
+              , destination: Pile.Discarding
+              , attack
+              , resolution
+              }
+            ]
+            , resolution
+            , attack
+          }
+        , And
+          { choices:
+            [ Draw { n: 5, attack, resolution }
+            , MoveFromTo
+              { n: Exactly 6
+              , filter: Filter.Any
+              , source: Pile.Hand
+              , destination: Pile.Discarding
+              , attack
+              , resolution
+              }
+            ]
+            , resolution
+            , attack
+          }
+        ]
+      , resolution
+      , attack
+      }
+    , description: "Choose one: +1 Card; or +3 Cards, then discard 3 cards; or +5 Cards, then discard 6 cards."
+    }
   }
 
 steward :: CardSpec
