@@ -56,6 +56,7 @@ cardSpecMap =
   , steward
   , harbinger
   , workshop
+  , oasis
   , mill
   , goldfish
   , baron
@@ -286,6 +287,28 @@ councilRoomSpecial =
   { target: EveryoneElse
   , command: Choose draw1Card
   , description: "Each other player draws a card."
+  }
+
+oasis :: CardSpec
+oasis = let attack = false in
+  independentCard $ Card.action
+  { name = "Oasis"
+  , cost = 3
+  , actions = one
+  , cards = one
+  , treasure = one
+  , special = Just
+    { target: Self
+    , command: Choose $ MoveFromTo
+      { n: Exactly 1
+      , filter: Filter.Any
+      , source: Pile.Hand
+      , destination: Pile.Discarding
+      , resolution
+      , attack
+      }
+    , description: "Discard a card."
+    }
   }
 
 scholar :: CardSpec
