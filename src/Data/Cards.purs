@@ -7,6 +7,7 @@ import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Domination.Data.Actions (actions)
 import Domination.Data.Bonus (Bonus(..))
+import Domination.Data.Buys (buys)
 import Domination.Data.Card (Card, CardSpec, Command(..), Special, cardWithRequirements, independentCard)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
@@ -67,6 +68,7 @@ cardSpecMap =
   , remodel
   , innkeeper
   , catpurse
+  , spiceMerchant
   , bazaar
   , festival
   , laboratory
@@ -1373,6 +1375,70 @@ tradingPost = cardWithRequirements c rs
         }
       rs :: Array CardSpec
       rs = [silver]
+
+spiceMerchant :: CardSpec
+spiceMerchant = independentCard c
+  where
+    attack :: Boolean
+    attack = false
+    description :: String
+    description = "You may trash a Treasure from your hand to choose one:"
+      <> " +2 Cards and +1 Action; or +1 Buy and +$2"
+    c :: Card
+    c = Card.action
+      { name = "Spice Merchant"
+      , cost = 4
+      , special = Just
+        { target: Self
+        , command: Choose $ Option
+          { choice: If
+            { condition: HasCardType Treasure
+            , otherwise: Nothing
+            , choice: And
+              { choices:
+                [ MoveFromTo
+                  { n: Exactly 1
+                  , filter: Filter.HasType Treasure
+                  , source: Pile.Hand
+                  , destination: Pile.Trash
+                  , resolution
+                  , attack
+                  }
+                , Or
+                  { choices:
+                    [ And
+                      { choices:
+                        [ Draw { n: 2, resolution, attack }
+                        , GainActions { n: actions 1, attack, resolution }
+                        ]
+                        , resolution
+                        , attack
+                      }
+                    , And
+                      { choices:
+                        [ GainBuys { n: buys 1, resolution, attack }
+                        , GainBonus { bonus: Cash 2, attack, resolution }
+                        ]
+                        , resolution
+                        , attack
+                      }
+                    ]
+                    , resolution
+                    , attack
+                  }
+                ]
+                , attack
+                , resolution
+              }
+          , attack
+          , resolution
+          }
+        , attack
+        , resolution
+        }
+      , description
+      }
+    }
 
 mine :: CardSpec
 mine = let
