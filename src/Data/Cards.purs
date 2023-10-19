@@ -87,6 +87,7 @@ cardSpecMap =
   , nobles
   , artisan
   , altar
+  , expand
   ]
 
 emptyChoice :: Choice
@@ -1244,6 +1245,45 @@ remodel = let
         , StackNth zero
         , StackCostOf
         , StackAddN 2
+        , StackMakeFilterCostUpTo
+        , StackBind "filter"
+        , StackChooseCardFromSupply
+          { cardName: Unbound
+          , filter: Unbound
+          }
+        , StackGainTo Pile.Discarding
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  }
+
+expand :: CardSpec
+expand = let
+  attack = false
+  description = "Trash a card from your hand."
+    <> " Gain a card costing up to 3 more than it."
+  in independentCard $ Card.action
+  { name = "Expand"
+  , cost = 7
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Filter.Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly one
+          }
+        , StackDuplicate
+        , StackTrash
+        , StackNth zero
+        , StackCostOf
+        , StackAddN 3
         , StackMakeFilterCostUpTo
         , StackBind "filter"
         , StackChooseCardFromSupply
