@@ -83,6 +83,7 @@ cardSpecMap =
   , stables
   , tradingPost
   , mine
+  , countingHouse
   , harem
   , nobles
   , artisan
@@ -975,6 +976,30 @@ settlers = cardWithRequirements c rs
           }
         , description: "Look through your discard pile."
           <> "You may reveal a Copper from it and put it into your hand."
+        }
+      }
+    rs :: Array CardSpec
+    rs = [copper]
+
+countingHouse :: CardSpec
+countingHouse = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.action
+      { name = "Counting House"
+      , cost = 5
+      , special = Just
+        { target: Self
+        , command: Choose $ MoveFromTo
+          { n: Unlimited
+          , filter: Filter.HasName "Copper"
+          , source: Pile.Discard
+          , destination: Pile.Hand
+          , resolution
+          , attack: false
+          }
+        , description: "Look through your discard pile."
+          <> "Reveal any number of Copper from it and put them into your hand."
         }
       }
     rs :: Array CardSpec
