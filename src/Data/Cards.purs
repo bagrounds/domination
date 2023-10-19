@@ -66,6 +66,7 @@ cardSpecMap =
   , armory
   , remodel
   , innkeeper
+  , catpurse
   , bazaar
   , festival
   , laboratory
@@ -859,6 +860,28 @@ margrave = let attack = true in independentCard $ Card.actionAttack
       }
     , description: "Each other player draws a card"
       <> ", then discards down to 3 cards in hand."
+    }
+  }
+
+discardCopper :: Choice
+discardCopper = let attack = true in MoveFromTo
+  { n: Exactly 1
+  , filter: Filter.HasName "Copper"
+  , source: Pile.Hand
+  , destination: Pile.Discard
+  , resolution
+  , attack
+  }
+
+catpurse :: CardSpec
+catpurse = independentCard $ Card.actionAttack
+  { name = "Catpurse"
+  , cost = 4
+  , treasure = 2
+  , special = Just
+    { target: EveryoneElse
+    , command: Choose discardCopper
+    , description: "Each other player discards a Copper."
     }
   }
 
