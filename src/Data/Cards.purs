@@ -876,16 +876,21 @@ discardCopper = let attack = true in MoveFromTo
   }
 
 catpurse :: CardSpec
-catpurse = independentCard $ Card.actionAttack
-  { name = "Catpurse"
-  , cost = 4
-  , treasure = 2
-  , special = Just
-    { target: EveryoneElse
-    , command: Choose discardCopper
-    , description: "Each other player discards a Copper."
-    }
-  }
+catpurse = cardWithRequirements c rs
+  where
+    c :: Card
+    c = Card.actionAttack
+      { name = "Catpurse"
+      , cost = 4
+      , treasure = 2
+      , special = Just
+        { target: EveryoneElse
+        , command: Choose discardCopper
+        , description: "Each other player discards a Copper."
+        }
+      }
+    rs :: Array CardSpec
+    rs = [copper]
 
 huntingLodge :: CardSpec
 huntingLodge = let attack = false in independentCard $ Card.action
