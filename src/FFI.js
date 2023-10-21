@@ -71,6 +71,13 @@ const newMessage = (message) => {
 
 exports.showBugout = bugout => bugout.ek
 
+const getBugout = () => {
+  // TODO: check if bugout is in a good state, or if it needs to be destroyed
+  if (window.bugout instanceof Bugout) {
+    return window.bugout
+  }
+}
+
 exports.makeBugoutFFI = left =>
   right =>
   connections =>
@@ -81,6 +88,15 @@ exports.makeBugoutFFI = left =>
   announce =>
   callback =>
   () => {
+
+  const existingBugout = getBugout()
+
+  if (existingBugout) {
+    logInfo('using existing bugout: ', existingBugout)
+    callback(right(existingBugout))()
+    return
+  }
+
   const options = {
     heartbeat: 10000,
     timeout: 25000,
@@ -150,6 +166,7 @@ exports.makeBugoutFFI = left =>
 
   try {
     const bugout = new Bugout(roomCode, options)
+    window.bugout = bugout
     logInfo(`new Bugout(roomCode='${roomCode}', options=${JSON.stringify(options)})`)
     reloadOnNetworkChange()
     try {
