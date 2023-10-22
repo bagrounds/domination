@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _announce, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultAnnounce, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _announce, _chatNumber, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultAnnounce, defaultKingdom, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -448,9 +448,12 @@ handleAction audioContext = case _ of
         (state unit)
       pure unit
     sendChatMessage = do
-      { id, message } <- H.get
-      let chat = ChatMessage { username: id, message }
-      H.modify_ $ (_message .~ "") <<< (_messages :~ chat)
+      { id, message, chatNumber: oldChatNumber } <- H.get
+      let
+        chatNumber = oldChatNumber + 1
+        chat = ChatMessage { username: id, message, chatNumber }
+      H.modify_
+        $ (_message .~ "") <<< (_messages :~ chat) <<< (_chatNumber .~ chatNumber)
       saveChat
       sendMessage chat
 

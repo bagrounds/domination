@@ -25,6 +25,7 @@ type AppState =
   , usernames :: HashMap String String
   , message :: String
   , messages :: Array RemoteMessage
+  , chatNumber :: Int
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe Broadcaster
   , roomCode :: String
@@ -54,6 +55,8 @@ _messages :: Lens' AppState (Array RemoteMessage)
 _messages = prop (SProxy :: SProxy "messages")
 _message :: Lens' AppState String
 _message = prop (SProxy :: SProxy "message")
+_chatNumber :: Lens' AppState Int
+_chatNumber = prop (SProxy :: SProxy "chatNumber")
 _connectionCount :: Lens' AppState Int
 _connectionCount = prop (SProxy :: SProxy "connectionCount")
 _usernames :: Lens' AppState (HashMap String String)
@@ -93,6 +96,7 @@ newApp =
   , usernames: HashMap.empty
   , message: ""
   , messages: []
+  , chatNumber: 0
   , gameOn: false
   , maybeBroadcaster: Nothing
   , roomCode: globalRoomCode

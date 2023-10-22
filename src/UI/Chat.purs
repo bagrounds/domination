@@ -38,11 +38,12 @@ render { sendEvent, onInput, state, nothing } =
     $
     ( Message.renderHtml
       <<< case _ of
-        ChatMessage { username, message } ->
+        ChatMessage { username, message, chatNumber } ->
           ChatMessage
             { username: fromMaybe username
               $ HashMap.lookup username usernames
             , message
+            , chatNumber
             }
         y -> y
       <$> messages

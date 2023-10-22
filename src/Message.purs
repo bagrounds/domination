@@ -40,7 +40,7 @@ wrapMessage :: String -> RemoteMessage -> Envelope
 wrapMessage id message = { id, message }
 
 data RemoteMessage
-  = ChatMessage { username :: String, message :: String }
+  = ChatMessage { username :: String, message :: String, chatNumber :: Int }
   | UsernameMessage { username :: String, id :: String }
   | GameMessage
     { i :: Int
@@ -71,7 +71,7 @@ instance decodeJsonRemoteMessage :: DecodeJson RemoteMessage where
   decodeJson = genericDecodeJson
 
 data WireMessage
-  = ChatWireMessage (Tuple String String)
+  = ChatWireMessage String String WireInt
   | UsernameWireMessage (Tuple String String)
   | GameWireMessage
     (Tuple WireInt
@@ -86,8 +86,8 @@ data WireMessage
 _toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
   to = case _ of
-    ChatMessage { username, message } ->
-      ChatWireMessage (Tuple username message)
+    ChatMessage { username, message, chatNumber } ->
+      ChatWireMessage username message (view Int._toWire chatNumber)
     UsernameMessage { username, id} ->
       UsernameWireMessage (Tuple username id)
     GameMessage { i, state, playMade } ->
@@ -103,8 +103,8 @@ _toWire = iso to from where
           (view Int._toWire playerIndex)
           (view Game._toWire state)
   from = case _ of
-    ChatWireMessage (Tuple username message) ->
-      ChatMessage { username, message }
+    ChatWireMessage username message chatNumber ->
+      ChatMessage { username, message, chatNumber: review Int._toWire chatNumber }
     UsernameWireMessage (Tuple username id) ->
       UsernameMessage { username, id}
     GameWireMessage (Tuple i (Tuple state maybePlayMade)) ->
