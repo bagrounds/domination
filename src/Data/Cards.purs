@@ -23,6 +23,7 @@ import Domination.Data.StackEvaluation (StackExpression(..), StackValue(..))
 import Domination.Data.Target (Target(..))
 import Domination.Data.Var (Var(..))
 import Domination.Data.Wire.Int as Int
+import Type.Data.Boolean (class If)
 
 upgrade :: Card -> Card
 upgrade card = fromMaybe card
@@ -910,7 +911,13 @@ catpurse = cardWithRequirements c rs
       , treasure = 2
       , special = Just
         { target: EveryoneElse
-        , command: Choose discardCopper
+        , command: Choose $ If
+          { condition: HasCard "Copper"
+          , choice: discardCopper
+          , otherwise: Nothing
+          , attack: true
+          , resolution
+          }
         , description: "Each other player discards a Copper."
         }
       }

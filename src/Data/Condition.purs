@@ -16,6 +16,7 @@ data Condition
   = HasCard String
   | HasCardType CardType
   | HasDiscard
+  | DiscardContains String
   | Randomly WireInt
 
 derive instance genericCondition :: Generic Condition _

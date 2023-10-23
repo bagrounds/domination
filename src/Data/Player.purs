@@ -381,6 +381,7 @@ describes = case _ of
   HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
   HasCardType cardType -> pure <<< _.hand >>> any (hasType cardType)
   HasDiscard -> pure <<< _.discard >>> (not <<< null)
+  DiscardContains name -> pure <<< _.discard >>> any (_.name >>> (_ == name))
   Randomly percent -> const
     $ (_ > (percent .^ Int._toWire))
     <$> randomIntBetween zero 100
