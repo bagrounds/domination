@@ -3,6 +3,7 @@ module Domination.Data.Game where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
+import Data.Array (null)
 import Data.Array.NonEmpty (NonEmptyArray, replicate, updateAt)
 import Data.Foldable (any)
 import Data.Lens.Fold ((^?))
@@ -14,10 +15,12 @@ import Data.Lens.Record (prop)
 import Data.Lens.Setter (set, (%~))
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Domination.Data.Card (Card)
+import Domination.Capability.Random (class Random, randomIntBetween)
+import Domination.Data.Card (Card, hasType)
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice as Choice
+import Domination.Data.Condition (Condition(..))
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
@@ -27,8 +30,9 @@ import Domination.Data.Result (Result)
 import Domination.Data.Stack (Stack, _stacksFromCards)
 import Domination.Data.Supply (Supply, getStack, makeSupply)
 import Domination.Data.Supply as Supply
+import Domination.Data.Wire.Int as Int
 import Type.Proxy (Proxy(..))
-import Util (assert, fromJust, justIf)
+import Util (assert, fromJust, justIf, (.^))
 
 type Game =
   { phase :: Phase
@@ -239,4 +243,16 @@ assertChoicesResolved
 assertChoicesResolved = assert
   (not <<< choicesOutstanding)
   "error: play: choices outstanding!"
+
+describes :: forall m. Random m => Game -> Condition -> Player -> m Boolean
+describes game = case _ of
+  HasCard name -> pure <<< _.hand >>> any (_.name >>> (_ == name))
+  HasCardType cardType -> pure <<< _.hand >>> any (hasType cardType)
+  HasDiscard -> pure <<< _.discard >>> (not <<< null)
+  DiscardContains name -> pure <<< _.discard >>> any (_.name >>> (_ == name))
+  DiscardContainsCardType cardType -> pure <<< _.discard >>> any (hasType cardType)
+  TrashContainsCardType cardType -> pure <<< const (_.trash game) >>> any (hasType cardType)
+  Randomly percent -> const
+    $ (_ > (percent .^ Int._toWire))
+    <$> randomIntBetween zero 100
 

@@ -1230,17 +1230,25 @@ lurker = let attack = false in independentCard $ Card.action
     { target: Self
     , command: Choose $ Or
       { choices:
-        [ GainCard
-          { filter: Filter.HasType Action
+        [ MoveFromTo
+          { n: Exactly one
+          , filter: Filter.HasType Action
+          , source: Pile.Supply
           , destination: Pile.Trash
           , attack
           , resolution
           }
-        , MoveFromTo
-          { n: Exactly one
-          , filter: Filter.HasType Action
-          , source: Pile.Trash
-          , destination: Pile.Discarding
+        , If
+          { condition: TrashContainsCardType Action
+          , choice: MoveFromTo
+            { n: Exactly one
+            , filter: Filter.HasType Action
+            , source: Pile.Trash
+            , destination: Pile.Discarding
+            , attack
+            , resolution
+            }
+          , otherwise: Nothing
           , attack
           , resolution
           }

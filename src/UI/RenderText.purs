@@ -100,6 +100,10 @@ instance conditionRenderText :: RenderText Condition where
       <> show cardType
     HasDiscard -> "discard pile is not empty"
     DiscardContains name -> "discard contains " <> name
+    DiscardContainsCardType cardType -> "discard contains a card of type "
+      <> show cardType
+    TrashContainsCardType cardType -> "trash contains a card of type "
+      <> show cardType
     Randomly percent -> "randomly (" <> percentString <> "% chance)"
       where
         percentString = show $ percent .^ Int._toWire

@@ -17,11 +17,10 @@ import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Constraint as Constraint
 import Domination.Data.Filter (Filter)
 import Domination.Data.Filter as Filter
-import Domination.Data.Game (Game, getPlayer, modifyPlayer, modifyPlayerM, modifyStack)
+import Domination.Data.Game (Game, describes, getPlayer, modifyPlayer, modifyPlayerM, modifyStack)
 import Domination.Data.Game as Game
 import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
-import Domination.Data.Player (describes)
 import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (_stacksToCardsIso)
@@ -437,7 +436,7 @@ resolveChoice { playerIndex, choice } state = do
       modifyPlayer playerIndex (Player.gainBonus bonus) state
     If { choice: choice', otherwise, condition, resolution: Just _ } -> do
       player <- getPlayer playerIndex state
-      ok <- condition `describes` player
+      ok <- describes state condition player
       modifyPlayer playerIndex (playerUpdate ok) state
       where
         playerUpdate ok player = do
