@@ -49,6 +49,7 @@ data Sound
   | Purchase
   | Error
   | Attacked
+  | Benefitted
   | YourTurn
 
 beep :: forall m. Audio m => AudioContext -> Sound -> m Unit
@@ -57,6 +58,7 @@ beep context = case _ of
   Purchase -> marioCoin context
   Error -> note context ab4 0.0 0.05
   Attacked -> suspense context
+  Benefitted -> goodNews context
   YourTurn -> doorbell context
 
 note'
@@ -147,6 +149,14 @@ suspense context = compose context
   , { frequency: fH4, duration: 0.3, start: 0.4 }
   ]
 
+goodNews :: forall m. Audio m => AudioContext -> m Unit
+goodNews context = compose context
+  [ { frequency: c4, duration: 0.07, start: 0.0 }
+  , { frequency: e4, duration: 0.07, start: 0.12 }
+  , { frequency: g4, duration: 0.07, start: 0.24 }
+  , { frequency: c5, duration: 0.2, start: 0.4 }
+  ]
+
 a4Minor :: Array Number
 a4Minor = [a4, c5, e5]
 
@@ -166,6 +176,8 @@ fH3 :: Number
 fH3 = 185.00
 c4 :: Number
 c4 = 261.63
+e4 :: Number
+e4 = 329.628
 eb4 :: Number
 eb4 = 311.13
 ab4 :: Number
@@ -176,6 +188,8 @@ b4 :: Number
 b4 = 493.88
 fH4 :: Number
 fH4 = 369.99
+g4 :: Number
+g4 = 391.995
 c5 :: Number
 c5 = 523.25
 cH5 :: Number

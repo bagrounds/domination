@@ -25,7 +25,7 @@ import Domination.Data.Card (Card, _card, passFilter)
 import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
-import Domination.Data.Game (hasReaction, new, choicesOutstanding, isAttacked) as Game
+import Domination.Data.Game (choicesOutstanding, hasReaction, isAttacked, isBenefitted, new) as Game
 import Domination.Data.Game.Engine (choiceTurn, makeAutoPlay) as Game
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
@@ -135,6 +135,8 @@ handleQuery audioContext = case _ of
 
     if Game.isAttacked activeGame.playerIndex state
     then beep audioContext Sound.Attacked
+    else if Game.isBenefitted activeGame.playerIndex state
+    then beep audioContext Sound.Benefitted
     else
       if activeGame.state.turn /= activeGame.playerIndex
       && state.turn == activeGame.playerIndex

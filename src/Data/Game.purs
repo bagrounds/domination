@@ -194,6 +194,10 @@ isAttacked :: Int -> Game -> Boolean
 isAttacked playerIndex state =
   fromMaybe false (Choice.isAttack <$> firstChoice playerIndex state)
 
+isBenefitted :: Int -> Game -> Boolean
+isBenefitted playerIndex state =
+  fromMaybe false (not <<< Choice.isAttack <$> firstChoice playerIndex state)
+
 firstChoice :: Int -> Game -> Maybe Choice
 firstChoice playerIndex state =
   state ^? _player playerIndex >>= Player.firstChoice
