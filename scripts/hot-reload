@@ -6,6 +6,7 @@ inotify_command () (
 )
 
 main () {
+  cp assets/* dist
   npm run bundle
   ./node_modules/.bin/parcel ./assets/index.html &
   inotify_command | while read path action file; do
