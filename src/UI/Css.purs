@@ -18,8 +18,6 @@ handInfos :: ClassName
 handInfos = ClassName "hand-infos"
 handInfo :: ClassName
 handInfo = ClassName "hand-info"
-handInfoArea :: ClassName
-handInfoArea = ClassName "hand-info-area"
 play :: ClassName
 play = ClassName "play"
 playTitle :: ClassName
@@ -28,8 +26,6 @@ buying :: ClassName
 buying = ClassName "buying"
 buyingTitle :: ClassName
 buyingTitle = ClassName "buying-title"
-deckArea :: ClassName
-deckArea = ClassName "deck-area"
 deck :: ClassName
 deck = ClassName "deck"
 discard :: ClassName
@@ -38,26 +34,16 @@ card :: ClassName
 card = ClassName "card"
 curseCard :: ClassName
 curseCard = ClassName "curse-card"
-noCurseCard :: ClassName
-noCurseCard = ClassName "no-curse-card"
 attackCard :: ClassName
 attackCard = ClassName "attack-card"
-noAttackCard :: ClassName
-noAttackCard = ClassName "no-attack-card"
 actionCard :: ClassName
 actionCard = ClassName "action-card"
 reactionCard :: ClassName
 reactionCard = ClassName "reaction-card"
-noActionCard :: ClassName
-noActionCard = ClassName "no-action-card"
 treasureCard :: ClassName
 treasureCard = ClassName "treasure-card"
-noTreasureCard :: ClassName
-noTreasureCard = ClassName "no-treasure-card"
 victoryCard :: ClassName
 victoryCard = ClassName "victory-card"
-noVictoryCard :: ClassName
-noVictoryCard = ClassName "no-victory-card"
 cardName :: ClassName
 cardName = ClassName "card-name"
 cardCards :: ClassName
@@ -114,8 +100,6 @@ showing :: ClassName
 showing = ClassName "showing"
 collapsed :: ClassName
 collapsed = ClassName "collapsed"
-supplyContainer :: ClassName
-supplyContainer = ClassName "supply-container"
 settingsButton :: ClassName
 settingsButton = ClassName "settings-button"
 backButton :: ClassName
@@ -146,8 +130,6 @@ toggleLongGame :: ClassName
 toggleLongGame = ClassName "toggle-long-game"
 check :: ClassName
 check = ClassName "check"
-randomizeKingdomButton :: ClassName
-randomizeKingdomButton = ClassName "randomize-kingdom-button"
 
 incrementer :: ClassName
 incrementer = ClassName "incrementer"
@@ -155,8 +137,6 @@ dialogue :: ClassName
 dialogue = ClassName "dialogue"
 domination :: ClassName
 domination = ClassName "domination"
-dominationContainer :: ClassName
-dominationContainer = ClassName "domination-container"
 title :: ClassName
 title = ClassName "title"
 playerName :: ClassName
