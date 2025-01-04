@@ -9,6 +9,7 @@ import Effect (Effect)
 import Effect.Aff (Canceler, Error)
 import Message (LocalMessage(..))
 import Web.Event.Event (Event)
+import Web.Storage.Storage (Storage)
 
 foreign import registerServiceWorker :: Effect Unit
 
@@ -66,3 +67,11 @@ foreign import decompressStringFFI
   -> String
   -> Maybe String
 
+foreign import setItem
+  :: (forall l r. l -> Either l r) -- left constructor
+  -> (forall l r. r -> Either l r) -- right constructor
+  -> Unit -- in case we need to return unit
+  -> String -- key
+  -> String -- value
+  -> Storage -- local storage
+  -> Effect (Either String Unit) -- error message or nothing (unit)

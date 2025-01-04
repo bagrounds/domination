@@ -11,7 +11,7 @@ import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array (deleteAt, drop, filter, length, nub, take, (!!), (:))
 import Data.Bifunctor (lmap)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Foldable (any, elem, notElem)
 import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
 import Data.Lens.Getter (view, (^.))
@@ -212,3 +212,6 @@ _composePredicate _l p = p <<< view _l
 
 infixr 8 _composePredicate as <<~
 
+mapLeft :: forall a b c. (a -> c) -> Either a b -> Either c b
+mapLeft f (Left a) = Left (f a)
+mapLeft _ (Right b) = Right b
