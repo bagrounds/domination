@@ -249,3 +249,11 @@ exports.decompressStringFFI = just => nothing => s => {
     : just(result)
 }
 
+exports.setItem = left => right => unit => key => value => storage => () => {
+  try {
+    storage.setItem(key, value)
+    return right(unit)
+  } catch (e) {
+    return left(`Error: setItem: key='${key}', value='${value}', error message: '${e.message || e}'`)
+  }
+}

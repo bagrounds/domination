@@ -54,7 +54,6 @@ import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
-import Web.HTML.Event.EventTypes (offline)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -172,11 +171,13 @@ saveChat
   => EncodeJson messages
   => DecodeJson messages
   => Log m
-  => m Unit
+  => m (Either String Unit)
 saveChat = do
   messages <- H.gets _.messages
-  save chatKey messages
+  result <- save chatKey messages
   log "saved chat messages"
+  pure result
+
 
 handleAction
   :: forall output m t1 r o1 q1
@@ -199,7 +200,7 @@ handleAction audioContext = case _ of
         log $ "Initialize: no existing uuid found, generating a new one."
           <> " error: " <> e
         uuid <- genUuid
-        save uuidKey uuid
+        save uuidKey uuid >>= logErrorToChat
         pure $ show uuid
       Right uuid -> pure uuid
 
@@ -294,8 +295,8 @@ handleAction audioContext = case _ of
       newPlayerCount = max (index + one) nextPlayerCount
     H.modify_ $ (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
-    save "player_index" newPlayerIndex
-    save "player_count" newPlayerCount
+    save "player_index" newPlayerIndex >>= logErrorToChat
+    save "player_count" newPlayerCount >>= logErrorToChat
 
   WritePlayerCount count -> do
     { nextPlayerIndex } <- H.gets _.dominationConfig
@@ -305,8 +306,8 @@ handleAction audioContext = case _ of
     H.modify_
       $ (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
-    save "player_index" newPlayerIndex
-    save "player_count" newPlayerCount
+    save "player_index" newPlayerIndex >>= logErrorToChat
+    save "player_count" newPlayerCount >>= logErrorToChat
 
   RandomizeKingdom -> do
     { kingdom } <- H.gets _.dominationConfig
@@ -315,14 +316,14 @@ handleAction audioContext = case _ of
       cardsToKeep = take 16 $ _.cardSpec <$> shuffledKingdom
       newKingdom = selectIfElement cardsToKeep <$> kingdom
     H.modify_ $ _dominationConfig <<< _kingdom .~ newKingdom
-    save "kingdom" newKingdom
+    save "kingdom" newKingdom >>= logErrorToChat
     where
       selectIfElement :: Array CardSpec -> CardSpecSelection -> CardSpecSelection
       selectIfElement keepers { cardSpec } =
         { cardSpec, selected: cardSpec `elem` keepers }
 
   ChooseKingdom kingdom -> do
-    save "kingdom" kingdom
+    save "kingdom" kingdom >>= logErrorToChat
     H.modify_ $ _dominationConfig <<< _kingdom .~ kingdom
 
   ToggleLongGame ->
@@ -340,13 +341,13 @@ handleAction audioContext = case _ of
     H.modify_ $ _showMenu .~ false
 
   WriteAnnounce announce -> do
-    save announceKey announce
+    save announceKey announce >>= logErrorToChat
     log $ "saving announce: " <> announce
     H.modify_ $ set _announce announce
 
   WriteUsername username -> do
     { id } <- H.get
-    save usernameKey username
+    save usernameKey username >>= logErrorToChat
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
     sendMessage $ UsernameMessage { username, id }
@@ -383,7 +384,7 @@ handleAction audioContext = case _ of
             H.modify_
               $ (_messages :~ msg)
               >>> (_messages %~ take 250)
-            saveChat
+            saveChat >>= logErrorToChat
             if message == "PING"
               then do
                 H.modify_ $ _message .~ "PONG"
@@ -439,8 +440,8 @@ handleAction audioContext = case _ of
       let
         saveNumber = activeState.i `mod` 10
         key = "game_state_" <> show saveNumber
-      save key activeState
-      save "game_state" activeState
+      save key activeState >>= logErrorToChat
+      save "game_state" activeState >>= logErrorToChat
     queryGame state = do
       _ <- H.query
         Domination._component
@@ -454,8 +455,12 @@ handleAction audioContext = case _ of
         chat = ChatMessage { username: id, message, chatNumber }
       H.modify_
         $ (_message .~ "") <<< (_messages :~ chat) <<< (_chatNumber .~ chatNumber)
-      saveChat
-      sendMessage chat
+      saveChat >>= logErrorToChat
+    logErrorToChat result = case result of
+      Left err -> do
+        H.modify_ $ _message .~ ("ERROR: " <> err)
+        sendChatMessage
+      Right _ -> pure unit
 
 sendMessage
   :: forall t1 r o1 q1 output m

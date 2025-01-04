@@ -7,19 +7,19 @@ import Data.Argonaut.Core (stringify)
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Either as Either
 import Domination.AppM (AppM)
-import Domination.Capability.Log (class Log, log)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
+import FFI (setItem)
 import Halogen.Query.HalogenM (HalogenM)
-import Util (readJson)
+import Util (mapLeft, readJson)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
-import Web.Storage.Storage (clear, getItem, removeItem, setItem)
+import Web.Storage.Storage (getItem)
 
 class Monad m <= Storage m where
-  save :: forall a. EncodeJson a => DecodeJson a => String -> a -> m Unit
+  save :: forall a. EncodeJson a => DecodeJson a => String -> a -> m (Either String Unit)
   load :: forall a. EncodeJson a => DecodeJson a => String -> m (Either String a)
 
 instance storageHalogenM :: Storage m => Storage (HalogenM st act slots msg m) where
@@ -51,13 +51,16 @@ saveStorage
   . MonadEffect m
   => EncodeJson a
   => DecodeJson a
-  => String -> a -> m Unit
-saveStorage key x = liftEffect do
-  w <- window
-  ls <- localStorage w
-  let json = encodeJson x
-  let string = stringify json
-  setItem key string ls
+  => String -> a -> m (Either String Unit)
+saveStorage key value = liftEffect do
+  result <- window >>= localStorage >>= setItem Left Right unit key stringValue
+  pure $ contextualizeError `mapLeft` result
+  where
+    stringValue = (stringify <<< encodeJson) value
+    contextualizeError error = "Error saving to local storage."
+      <> " key: '" <> key <> "'"
+      <> " value: '" <> stringValue <> "'"
+      <> " error: '" <> error <> "'"
 
 loadStorage
   :: forall a m
@@ -66,24 +69,8 @@ loadStorage
   => DecodeJson a
   => String -> m (Either String a)
 loadStorage key = liftEffect $ do
-  w <- window
-  ls <- localStorage w
-  item <- getItem key ls
-  pure $ case item of
-    Nothing -> Left $ "Error retrieving from storage: " <> key
-    Just x -> readJson x
-
-example :: forall m. MonadEffect m => Log m => m Unit
-example = do
-  w <- liftEffect window
-  s <- liftEffect $ localStorage w
-  liftEffect $ setItem "this-is-my-key" "Here is my value." s
-  v <- liftEffect $ getItem "this-is-my-key" s
-  log $ show v
-
-  liftEffect $ removeItem "this-is-my-key" s
-  v' <- liftEffect $ getItem "this-is-my-key" s
-  log "It is gone!"
-  log $ show v'
-
-  liftEffect $ clear s
+  maybeItem <- window >>= localStorage >>= getItem key
+  let eitherItemOrError = Either.note error maybeItem
+  pure $ eitherItemOrError >>= readJson
+  where
+    error = "Error loading item from storage at key: '" <> key <> "'"
