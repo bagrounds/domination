@@ -456,6 +456,7 @@ handleAction audioContext = case _ of
       H.modify_
         $ (_message .~ "") <<< (_messages :~ chat) <<< (_chatNumber .~ chatNumber)
       saveChat >>= logErrorToChat
+      sendMessage chat
     logErrorToChat result = case result of
       Left err -> do
         H.modify_ $ _message .~ ("ERROR: " <> err)
