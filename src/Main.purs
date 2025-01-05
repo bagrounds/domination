@@ -455,7 +455,11 @@ handleAction audioContext = case _ of
         chat = ChatMessage { username: id, message, chatNumber }
       H.modify_
         $ (_message .~ "") <<< (_messages :~ chat) <<< (_chatNumber .~ chatNumber)
-      saveChat >>= logErrorToChat
+      -- if we log errors to chat while sending messages: infinite loop?
+      errorOrUnit <- saveChat
+      case errorOrUnit of
+        Left message -> error message
+        Right _ -> pure unit
       sendMessage chat
     logErrorToChat result = case result of
       Left err -> do
