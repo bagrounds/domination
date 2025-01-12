@@ -6,5 +6,5 @@ version :: Version
 version = Version major minor patch where
   major = 0
   minor = 33
-  patch = 2
+  patch = 3
 
