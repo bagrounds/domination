@@ -4,6 +4,11 @@
 • Defines an `exCellar` effect, but does not provide implementation details.
 -}
 module Data.Stack.Machine where
+{-| Human implementation notes:
+- http://conal.net/papers/calculating-compilers-categorically
+- PureScript doesn't have GADTs; use tagless final encoding instead
+- https://medium.com/@hgiasac/purescript-gadts-alternatives-recap-7960daf4acd8
+-}
 
 import Data.Function (($))
 import Data.Show (show)
@@ -55,4 +60,14 @@ exampleStackMachineComputation input = let
 
 exCellar :: Effect Unit
 exCellar = do
+-- TODO: figure out how to define Cellar in terms of Program
+--  let
+--    p =
+--      [ StackChooseCardsFromHand Nothing
+--      , StackDuplicate
+--      , StackDiscard
+--      , StackLength
+--      , StackDraw
+--      ]
   Console.log $ show "hi"
+
