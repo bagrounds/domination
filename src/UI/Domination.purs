@@ -173,7 +173,7 @@ handleQuery audioContext = case _ of
       <> ". Received i = " <> (show i)
 
     let
-      newShowSupply = updateShowSupply(activeGame state)
+      newShowSupply = updateShowSupply activeGame state
       newActiveState =
         { playerIndex: activeGame.playerIndex
         , playerCount: length state.players
