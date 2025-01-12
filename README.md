@@ -36,28 +36,34 @@ Try it at [domination.fun](https://domination.fun/)
 * Game AI players
 * More thorough tests
 
-## Install
+## Miscelaneous Notes
+- Gitlab doesn't support PureScript syntax highlighting...
+  - so we pretend that we're writing Haskell code in markdown code blocks, etc.
+  - The languages are similar enough that it works pretty well.
+
+## Development
+### Install
 ```sh
 npm install
 ```
 
-## Build
+### Build
 ```sh
 npm run build
 ```
 
-## Test
+### Test
 ```sh
 npm run test
 ```
 
-## Deploy
+### Deploy
 ```sh
 # compiles, bundles, minifies, and gzips all assets in public directory
 npm run deploy
 ```
 
-## Start an HTTP server to host the public directory
+### Start an HTTP server to host the public directory
 ```sh
 # prompts to install node-static if it isn't already installed
 # then starts a web server to host the static files in the public directory
@@ -66,8 +72,9 @@ npm run deploy
 npm run serve
 ```
 
-## Write header comments for PureScript files with Ollama
-2025-01-12: This script ran for about an hour and a half after I went to bed to generate comments for all 100 PureScript files in the codebase.
+### Write header comments for PureScript files with Ollama
+Assumes Ollama is installed locally. See the script for more info.
+2025-01-12: This script ran for about an hour and a half after I went to bed (😎) to generate comments for all 100 PureScript files in the codebase.
 ```sh
 ./scripts/ai-header-comments
 ```
