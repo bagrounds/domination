@@ -57,3 +57,11 @@ npm run test
 npm run deploy
 ```
 
+# Start an HTTP server to host the public directory
+```sh
+# prompts to install node-static if it isn't already installed
+# then starts a web server to host the static files in the public directory
+# on port 8080
+# open localhost:8080 in your browser to view the web app after this
+npm run serve
+```

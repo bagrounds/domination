@@ -7,13 +7,14 @@
     "assets/stylesheet.css"
   ],
   "scripts": {
-    "clean": "rm -rf .cache dist public",
+    "clean": "rm -rf node_modules .cache dist public .parcel-cache",
     "prebuild": "stylelint assets/*.css",
     "build": "spago build",
     "build-watch": "spago build --watch",
     "prebundle": "npm run test",
     "bundle": "spago bundle-app --main Main --to dist/app.js",
     "deploy": "./scripts/deploy",
+    "serve": "npx node-static -p 8080 public",
     "hot-reload": "./scripts/hot-reload",
     "run": "spago run",
     "test": "spago test",
