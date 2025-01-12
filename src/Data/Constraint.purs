@@ -1,3 +1,17 @@
+{-|
+Module for defining constraints in the game.
+
+This module provides data types and functions for defining and working with constraints in the game.
+It includes definitions for different types of constraints and utility functions for checking constraints.
+
+Key Components:
+- Constraint: Represents a constraint in the game.
+- Utility Functions: Functions for checking constraints.
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures.
+* Newtype: A wrapper around an existing type to create a distinct type.
+-}
 module Domination.Data.Constraint where
 
 import Prim hiding (Constraint)

@@ -1,3 +1,15 @@
+{-|
+Module      : Domination.UI.PickN
+Description : UI component for selecting N items from a list of choices
+
+This module provides a reusable component that:
+- Displays a list of choices to the user
+- Allows selecting exactly N items from the list
+- Shows selection status with visual feedback
+- Handles validation of selection count
+- Provides a completion button once N items are selected
+-}
+
 module Domination.UI.PickN
   ( component
   ) where

@@ -1,3 +1,16 @@
+{-
+  This module defines the 'Pile' data type and related instances for the Domination game.
+  It includes various instances for equality, ordering, JSON encoding/decoding, and more.
+
+  Key Components:
+  - Pile: Represents different piles in the game (e.g., Supply, Trash, Deck, Hand).
+  - Instances: Various instances for equality, ordering, JSON encoding/decoding, etc.
+
+  Technical Concepts:
+  * Generic: Automatically derives instances for data types.
+  * EncodeJson/DecodeJson: JSON serialization and deserialization.
+  * DynamicByteLength: Calculates the byte length of data for binary encoding.
+-}
 module Domination.Data.Pile where
 
 import Prelude

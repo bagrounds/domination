@@ -1,3 +1,18 @@
+{-|
+Module for storage capabilities.
+
+This module provides functions and types for working with storage in the application.
+It includes functions for saving and loading data, as well as instances for various storage-related type classes.
+
+Key Components:
+- Storage: Type class for storage capabilities.
+- Functions: Functions for saving and loading data.
+- Instances: Instances for various storage-related type classes.
+
+Technical Concepts:
+* Type Classes: Define a set of functions that can be implemented by different types.
+* MonadEffect: Represents computations that can perform side effects.
+-}
 module Domination.Capability.Storage where
 
 import Prelude

@@ -1,3 +1,17 @@
+{-|
+Module for resolving choices in the game.
+
+This module provides functions and types for resolving choices in the game.
+It includes functions for evaluating and resolving different types of choices.
+
+Key Components:
+- Choice Resolution: Functions for resolving choices in the game.
+- Utility Functions: Functions for evaluating and resolving different types of choices.
+
+Technical Concepts:
+* MonadError: Represents computations that can handle errors.
+* Lenses: Functional getters and setters for nested data structures.
+-}
 module Domination.Data.Game.ResolveChoice where
 
 import Prelude hiding (Ordering(..))

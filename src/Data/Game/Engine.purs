@@ -1,3 +1,17 @@
+{-|
+Module for the game engine.
+
+This module provides functions and types for the game engine, which handles the core game logic.
+It includes functions for making plays, advancing phases, and resolving choices.
+
+Key Components:
+- Game Engine: Functions for handling core game logic.
+- Utility Functions: Functions for making plays, advancing phases, and resolving choices.
+
+Technical Concepts:
+* MonadError: Represents computations that can handle errors.
+* Random: Represents computations that can generate random values.
+-}
 module Domination.Data.Game.Engine where
 
 import Prelude hiding (Ordering(..))

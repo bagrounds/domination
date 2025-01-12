@@ -1,3 +1,33 @@
+{-
+Module      : Util
+Description : Utility functions and types used throughout the application.
+
+This module provides a collection of utility functions and types that are 
+commonly used across the application. These utilities include functions for 
+working with JSON, arrays, lenses, and other common data structures. The 
+module aims to encapsulate reusable logic to promote code reuse and 
+maintainability.
+
+Functions and Types:
+- JSON Utilities: Functions for encoding, decoding, and parsing JSON data.
+- Array Utilities: Functions for manipulating arrays, such as filtering, 
+  taking, and deleting elements.
+- Lens Utilities: Functions and types for working with lenses, including 
+  getters, setters, and traversals.
+- Error Handling: Functions and types for error handling within monadic 
+  contexts.
+- Miscellaneous: Other helper functions and types that do not fit into the 
+  above categories but are still widely used.
+
+Dependencies:
+- Various PureScript libraries for functional programming, JSON handling, 
+  and lens operations.
+
+Usage:
+Import this module to access the utility functions and types provided. 
+Example usage can be found in the documentation for each function and type.
+-}
+
 module Util where
 
 import Prelude

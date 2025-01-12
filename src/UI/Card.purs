@@ -1,3 +1,21 @@
+{-|
+Module for rendering card components in the game UI.
+
+This module provides functions to render individual cards with their
+properties and actions.
+
+Key Components:
+- render: Renders a card with its properties and actions
+
+Technical Concepts:
+* HTML: Represents HTML elements in Halogen
+* Event Handling: Attaches event handlers to HTML elements
+* Properties: Sets properties on HTML elements
+
+Usage:
+Import this module to render card components in your Halogen application.
+-}
+
 module Domination.UI.Card
   ( render
   ) where

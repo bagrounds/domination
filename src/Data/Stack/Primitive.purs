@@ -1,3 +1,22 @@
+{-|
+Module      : Data.Stack.Primitive
+Description : Core primitives for stack-based computation
+
+This module provides primitive operations and type classes for stack-based computations.
+It defines two main implementations:
+- Primitive: A direct implementation using functions
+- ReifiedPrimitive: A data type representing primitive operations
+
+Key features:
+* Stack manipulation primitives (swap, duplicate, etc.)
+* Basic arithmetic operations (add, mul, sub, div)
+* Categorical structure (Cartesian, Cocartesian, BraidedCategory)
+* Generic derivations for JSON encoding/decoding and ArrayBuffer operations
+
+The StackPrimitive typeclass combines Cocartesian, Cartesian, and BraidedCategory
+to provide a complete interface for stack manipulation and computation.
+-}
+
 module Data.Stack.Primitive where
 
 import Control.Category (class Category, identity)

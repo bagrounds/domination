@@ -1,3 +1,17 @@
+{-|
+This module provides a UI component for card selection in the Domination game.
+It allows players to choose cards from different piles (hand, deck, discard, etc.)
+according to specified constraints (exactly N, up to N, etc.).
+
+The component renders a list of cards with toggle functionality and tracks the
+selection state. It supports various selection constraints and provides visual
+feedback for selected/unselected cards. A "Done" button allows confirming the
+selection, which then emits the indices of selected cards.
+
+The component is used across different game scenarios where card selection
+is required, such as choosing cards to trash, discard, or keep.
+-}
+
 module Domination.UI.ChooseCards where
 
 import Prelude

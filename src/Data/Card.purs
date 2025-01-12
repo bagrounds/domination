@@ -1,3 +1,19 @@
+{-|
+Module for defining cards in the game.
+
+This module provides data types and functions for defining and working with cards in the game.
+It includes definitions for different types of cards, lenses for accessing card properties, and utility functions.
+
+Key Components:
+- Card: Represents a card in the game.
+- CardSpec: Represents a card specification with additional requirements.
+- Lenses: Functional getters and setters for card properties.
+- Utility Functions: Functions for working with cards.
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures.
+* Newtype: A wrapper around an existing type to create a distinct type.
+-}
 module Domination.Data.Card where
 
 import Prelude

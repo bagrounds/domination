@@ -1,3 +1,22 @@
+{-|
+Module for defining and handling network messages.
+
+This module provides data types and functions for encoding, decoding,
+and handling network messages used in the game.
+
+Key Components:
+- LocalMessage: Data type representing a message sent locally
+- RemoteMessage: Data type representing a message sent over the network
+- WireEnvelope: Data type representing a wrapped message for network transmission
+
+Technical Concepts:
+* JSON Encoding/Decoding: Automatic derivation of JSON codecs for messages
+* ArrayBuffer Encoding/Decoding: Automatic derivation of binary codecs for messages
+
+Usage:
+Import this module to work with network messages in your application.
+-}
+
 module Message where
 
 import Prelude

@@ -1,3 +1,9 @@
+{-
+CSS class names used throughout the user interface.
+This module defines various CSS class names as constants to ensure
+consistency and avoid typos in class names.
+-}
+
 module Domination.UI.Css where
 
 import Halogen (ClassName(..))

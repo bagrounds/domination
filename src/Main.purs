@@ -1,3 +1,28 @@
+{-|
+Main entry point for the Domination card game application.
+
+Key functionality:
+- Initializes the game state and audio context
+- Manages game UI components and routing
+- Handles WebRTC peer-to-peer communication between players
+- Manages local storage for game state persistence
+- Processes chat messages between players
+- Controls game settings and configuration
+
+Core imports:
+- AppState/AppAction: Core game state and action types
+- Domination.UI.*: Game UI components and views  
+- Domination.Capability.*: Effect capabilities for audio, storage, etc.
+- Halogen: UI framework components and effects
+- Message: Network message types and codecs
+
+Main components:
+- root: Top-level component that initializes the app
+- component: Main app component with game logic
+- handleAction: Processes all app actions and state updates
+- render: Renders the main UI layout
+-}
+
 module Main where
 
 import Prelude

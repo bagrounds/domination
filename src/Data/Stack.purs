@@ -1,3 +1,18 @@
+{-
+  This module defines the 'Stack' data type and related functions for the Domination game.
+  It includes functions to create and manipulate stacks, as well as lenses for
+  accessing and modifying stack properties.
+
+  Key Components:
+  - Stack: Represents a stack of cards in the game.
+  - Functions: Various functions to update and modify stacks.
+  - Lenses: Functional getters and setters for stack properties.
+
+  Technical Concepts:
+  * Lenses: Functional getters and setters for nested data structures.
+  * Iso: An isomorphism between two types.
+  * MonadError: Type class for monads that can handle errors.
+-}
 module Domination.Data.Stack where
 
 import Prelude

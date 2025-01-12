@@ -1,3 +1,23 @@
+{-|
+Data types and lenses for representing and manipulating game plays.
+
+This module defines the `Play` data type, which represents different actions
+that can be taken in the game, such as starting a new game, playing a card,
+or making a purchase.
+
+Key Components:
+- Play: Sum type representing different game actions
+- Lenses: Accessors for nested fields within the `Play` type
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures
+* JSON Encoding/Decoding: Automatic derivation of JSON codecs for `Play`
+
+Usage:
+Import this module to work with game actions and use lenses to access or modify
+specific fields within those actions.
+-}
+
 module Domination.Data.Play where
 
 import Prelude

@@ -1,3 +1,20 @@
+{-|
+Module      : Domination.UI.Domination
+Description : Main UI component for the Domination card game
+
+This module implements the core game interface managing:
+- Game state and player turn flow
+- Card interactions (playing, buying, discarding)
+- Game phases (action, buy, cleanup)
+- Player decisions and choice dialogs
+- Supply/deck/hand visualization
+- Audio feedback for game events
+- Multi-player coordination
+
+The component orchestrates all UI elements and game logic,
+serving as the primary interface between players and game state.
+-}
+
 module Domination.UI.Domination where
 
 import Prelude
@@ -150,7 +167,7 @@ handleQuery audioContext = case _ of
       <> ". Received i = " <> (show i)
 
     let
-      newShowSupply = updateShowSupply activeGame state
+      newShowSupply = updateShowSupply(activeGame state)
       newActiveState =
         { playerIndex: activeGame.playerIndex
         , playerCount: length state.players

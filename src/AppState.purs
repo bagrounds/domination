@@ -1,3 +1,18 @@
+{-|
+Module for defining the application state.
+
+This module defines the `AppState` type, which represents the state of the application.
+It includes various fields such as connection count, user information, game state, and more.
+Lenses are provided for accessing and modifying these fields.
+
+Key Components:
+- AppState: Represents the overall state of the application.
+- Lenses: Functional getters and setters for nested data structures.
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures.
+* HashMap: A data structure for storing key-value pairs.
+-}
 module AppState where
 
 import Prelude

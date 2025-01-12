@@ -1,3 +1,18 @@
+{-
+  This module defines the 'Operations' data type and related functions for the Domination game.
+  It includes functions to create and manipulate operations on stacks.
+
+  Key Components:
+  - Operations: Represents a sequence of operations on stacks.
+  - Functions: Various functions to create and compose operations.
+  - Instances: Instances for showing and encoding/decoding operations.
+
+  Technical Concepts:
+  * Semigroup: Combines two values of the same type.
+  * Monoid: A semigroup with an identity element.
+  * JSON Encoding/Decoding: Serialization and deserialization of operations.
+-}
+
 module Data.Stack.Operations where
 
 import Control.Category (identity, (<<<))

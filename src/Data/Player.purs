@@ -1,3 +1,18 @@
+{-
+  This module defines the 'Player' data type and related functions for the Domination game.
+  It includes functions to create and manipulate player states, as well as lenses for
+  accessing and modifying player properties.
+
+  Key Components:
+  - Player: Represents a player in the game with various properties.
+  - Functions: Various functions to update and modify player states.
+  - Lenses: Functional getters and setters for player properties.
+
+  Technical Concepts:
+  * Lenses: Functional getters and setters for nested data structures.
+  * MonadError: Type class for monads that can handle errors.
+  * Traversals: Functional operations over data structures.
+-}
 module Domination.Data.Player where
 
 import Prelude

@@ -1,3 +1,21 @@
+{-|
+Module for rendering the Heads-Up Display (HUD) in the game UI.
+
+This module provides functions to render various components of the HUD,
+such as player hand information, actions, and resources.
+
+Key Components:
+- renderHandInfos: Renders information about the player's hand, including deck size, actions, and resources
+
+Technical Concepts:
+* HTML: Represents HTML elements in Halogen
+* Event Handling: Attaches event handlers to HTML elements
+* Properties: Sets properties on HTML elements
+
+Usage:
+Import this module to render HUD components in your Halogen application.
+-}
+
 module Domination.UI.Hud where
 
 import Prelude

@@ -1,3 +1,17 @@
+{-|
+Module for defining choices in the game.
+
+This module provides data types and functions for defining and working with choices in the game.
+It includes definitions for different types of choices and utility functions for evaluating choices.
+
+Key Components:
+- Choice: Represents a choice in the game.
+- Utility Functions: Functions for evaluating choices.
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures.
+* Newtype: A wrapper around an existing type to create a distinct type.
+-}
 module Domination.Data.Choice where
 
 import Prim hiding (Constraint)

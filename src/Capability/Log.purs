@@ -1,3 +1,21 @@
+{-|
+Module      : Domination.Capability.Log
+Description : Logging capability for the application
+
+This module provides a type class and instances for logging functionality
+across different monad transformers and application contexts.
+
+Key features:
+* Log typeclass with log and error methods
+* Instances for common monad transformers (HalogenM, ExceptT)
+* LogM newtype wrapper for pure logging effects
+* Implementation for application-specific AppM and RandomM monads
+
+The Log class provides a uniform interface for logging across different
+contexts in the application, allowing for consistent logging behavior
+regardless of the specific monad stack being used.
+-}
+
 module Domination.Capability.Log where
 
 import Prelude

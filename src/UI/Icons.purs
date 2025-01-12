@@ -1,3 +1,18 @@
+{-|
+This module provides a collection of icon components used throughout the Domination game UI.
+It offers a standardized way to render various game-related icons like actions, buys,
+cards, money, points, settings, and more.
+
+The module includes:
+- A generic 'icon' function for creating icons with specific CSS classes
+- An 'empty' icon for placeholder purposes
+- Pre-configured icon components for common game elements
+- Consistent styling through CSS class application
+
+Each icon is implemented as a Halogen HTML component, making them easily
+composable within the game's interface components.
+-}
+
 module Domination.UI.Icons where
 
 import Domination.UI.Css as Css

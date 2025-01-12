@@ -1,3 +1,9 @@
+{-
+  This module defines the 'PileID' newtype, which represents the ID of a pile
+  in the Domination game. It includes instances for JSON encoding/decoding,
+  bounded enumeration, and hashing. The module also defines various utility
+  functions and instances for working with 'PileID'.
+-}
 module Domination.Data.PileID where
 
 import Prelude

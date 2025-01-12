@@ -1,3 +1,19 @@
+{-
+  This module defines the 'Points' newtype, which represents points in the game.
+  It includes functions to create 'Points' from an 'Int' and an ISO for converting
+  between 'Points' and 'Int'. It also derives various instances for 'Points' to
+  support JSON encoding/decoding, array buffer encoding/decoding, and more.
+
+  Key Components:
+  - Points: Represents points in the game.
+  - Functions: Functions to create and manipulate points.
+  - Instances: Various instances for JSON encoding/decoding, array buffer encoding/decoding, etc.
+
+  Technical Concepts:
+  * Newtype: A wrapper around an existing type to create a distinct type.
+  * Iso: An isomorphism between two types.
+  * JSON Encoding/Decoding: Serialization and deserialization of points.
+-}
 module Domination.Data.Points
   ( Points(..)
   , points

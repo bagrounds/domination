@@ -1,3 +1,20 @@
+{-|
+Module      : Domination.Data.Wire.Filter
+Description : Wire format representation of card filters
+
+This module provides the WireFilter data type which represents the serializable
+format of card filters used for network transmission. It supports filtering by:
+
+* Card name
+* Card type
+* Cost threshold
+* Combining filters with AND
+* Matching any card
+
+Includes an isomorphism with the core Filter type and implements serialization
+type classes for JSON and binary formats.
+-}
+
 module Domination.Data.Wire.Filter where
 
 import Prelude

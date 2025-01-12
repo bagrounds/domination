@@ -1,3 +1,18 @@
+{-|
+Module      : Domination.UI.RenderText
+Description : Text rendering utilities for game elements
+
+This module provides type classes and instances for consistently rendering
+game elements as HTML. It handles:
+- Game results (victory/tie conditions)
+- Game phases (action/buy/cleanup)
+- Card choices and prompts
+- Game events and reactions
+- Resource counts (actions/buys/points)
+- Bonus effects and conditions
+- Stack expressions and choices
+-}
+
 module Domination.UI.RenderText where
 
 import Prelude

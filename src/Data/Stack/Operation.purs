@@ -1,3 +1,18 @@
+{-
+  This module defines various operations for manipulating stacks in the Domination game.
+  It includes primitive operations and functions to create and compose operations.
+
+  Key Components:
+  - PrimOp: Represents a primitive operation on stacks.
+  - Functions: Various functions to create and compose operations.
+  - Instances: Instances for showing and encoding/decoding operations.
+
+  Technical Concepts:
+  * Semiring/Ring/EuclideanRing: Mathematical structures for operations on numbers.
+  * Primitive: Represents a basic operation on stacks.
+  * JSON Encoding/Decoding: Serialization and deserialization of operations.
+-}
+
 module Data.Stack.Operation where
 
 import Control.Category (class Category, (<<<))

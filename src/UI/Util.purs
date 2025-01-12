@@ -1,3 +1,24 @@
+{-|
+Utility functions and components for the user interface.
+
+This module provides helper functions and components for rendering
+various UI elements such as headers and buttons.
+
+Key Components:
+- chooseOne: Renders a selection of buttons
+- acknowledge: Renders a message with an acknowledgment button
+- incrementer: Renders a numeric incrementer with min/max constraints
+- h1__, h2__, h3__: Renders headers of different levels
+
+Technical Concepts:
+* HTML: Represents HTML elements in Halogen
+* Event Handling: Attaches event handlers to HTML elements
+* Properties: Sets properties on HTML elements
+
+Usage:
+Import this module to use the provided UI components in your Halogen application.
+-}
+
 module Domination.UI.Util where
 
 import Prelude

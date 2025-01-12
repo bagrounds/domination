@@ -1,3 +1,17 @@
+{-|
+Module for defining specific cards in the game.
+
+This module provides definitions for specific cards used in the game.
+It includes various card specifications and utility functions for creating and working with these cards.
+
+Key Components:
+- Card Specifications: Definitions for specific cards used in the game.
+- Utility Functions: Functions for creating and working with cards.
+
+Technical Concepts:
+* CardSpec: Represents a card specification with additional requirements.
+* Lenses: Functional getters and setters for nested data structures.
+-}
 module Domination.Data.Cards where
 
 import Prelude

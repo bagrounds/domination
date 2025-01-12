@@ -1,3 +1,9 @@
+{-
+  This module defines the 'Actions' newtype, which represents actions in the game.
+  It includes instances for various type classes such as 'Semiring', 'Ring', 'Show',
+  'EncodeJson', 'DecodeJson', and more. The module also defines an ISO for converting
+  between 'Actions' and 'Int'.
+-}
 module Domination.Data.Actions
   ( Actions(..)
   , actions

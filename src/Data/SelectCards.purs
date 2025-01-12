@@ -1,3 +1,20 @@
+{-|
+Module      : Domination.Data.SelectCards
+Description : Data type for card selection operations in a card game
+
+This module provides the SelectCards data type which represents different ways
+of selecting cards in a card game. Currently implements:
+
+* SelectAll - Selects all available cards
+
+The type implements standard type class instances including:
+* Generic (for deriving instances)
+* Eq (for equality comparison)
+* Show (for string representation)
+* EncodeJson/DecodeJson (for JSON serialization)
+* DynamicByteLength/EncodeArrayBuffer/DecodeArrayBuffer (for binary serialization)
+-}
+
 module Domination.Data.SelectCards where
 
 import Prelude

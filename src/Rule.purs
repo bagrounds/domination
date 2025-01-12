@@ -1,3 +1,21 @@
+{-|
+Module for defining and checking game rules.
+
+This module provides data types and functions for defining game rules
+and checking if certain conditions are met.
+
+Key Components:
+- Rule: Data type representing a game rule with an error message and a predicate
+- check: Function to check if a rule is satisfied
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures
+* MonadError: Type class for monads that can handle errors
+
+Usage:
+Import this module to define and check game rules in your application.
+-}
+
 module Rule where
 
 import Prelude

@@ -1,3 +1,18 @@
+{-|
+Module for audio capabilities.
+
+This module provides functions and types for working with audio in the application.
+It includes functions for composing and playing notes, as well as predefined musical notes.
+
+Key Components:
+- Audio: Type class for audio capabilities.
+- Functions: Functions for composing and playing notes.
+- Predefined Notes: Constants for various musical notes.
+
+Technical Concepts:
+* Type Classes: Define a set of functions that can be implemented by different types.
+* AudioContext: Represents the audio context for managing and playing audio.
+-}
 module Domination.Capability.Audio where
 
 import Prelude hiding (compose)

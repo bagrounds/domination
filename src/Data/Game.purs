@@ -1,3 +1,19 @@
+{-|
+Module for defining the game state and logic.
+
+This module provides data types and functions for defining and working with the game state and logic.
+It includes definitions for the game state, phases, players, and utility functions for modifying the game state.
+
+Key Components:
+- Game: Represents the state of the game.
+- Phases: Represents different phases of the game.
+- Players: Represents players in the game.
+- Utility Functions: Functions for modifying the game state.
+
+Technical Concepts:
+* Lenses: Functional getters and setters for nested data structures.
+* Traversals: A type of lens for focusing on multiple parts of a data structure.
+-}
 module Domination.Data.Game where
 
 import Prelude

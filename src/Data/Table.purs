@@ -1,3 +1,11 @@
+{-
+  This module defines the 'Table' type and various operations on it.
+  A 'Table' is a collection of elements with set-like properties.
+  It supports operations like union, intersection, and difference.
+  The module also defines instances for various type classes like
+  'JoinSemilattice', 'MeetSemilattice', 'HeytingAlgebra', and 'BooleanAlgebra'.
+  Additionally, it defines the 'Relation' type class for relational algebra.
+-}
 module Domination.Data.Table where
 
 import Prelude hiding (compose)

@@ -1,3 +1,21 @@
+{-|
+Module for Foreign Function Interface (FFI) bindings.
+
+This module provides FFI bindings for various JavaScript functions
+used in the application, such as service worker registration and
+clipboard operations.
+
+Key Components:
+- registerServiceWorker: Registers a service worker
+- copyToClipboard: Copies a string to the clipboard
+- detail: Extracts detail from a JavaScript event
+- Bugout: Foreign data type for Bugout library
+- makeBugout: Creates a Bugout instance for peer-to-peer communication
+
+Usage:
+Import this module to use the provided FFI bindings in your application.
+-}
+
 module FFI where
 
 import Prelude
