@@ -66,6 +66,23 @@ Try it at [domination.fun](https://domination.fun/)
   - so we pretend that we're writing Haskell code in markdown code blocks, etc.
   - The languages are similar enough that it works pretty well.
 
+## PureScript
+- [purescript.org](https://www.purescript.org)
+- [Pursuit](https://pursuit.purescript.org) is the home of PureScript documentation
+- [PureScript Discourse](https://discourse.purescript.org)
+- [PureScript Discord](https://purescript.org/chat)
+- [PureScript by Example](https://book.purescript.org)
+- [PureScript: Jordan's Reference](https://jordanmartinez.github.io/purescript-jordans-reference-site)
+- [Halogen is better than React at everything](https://chrisdone.com/posts/halogen-is-better-than-react)
+- [Client-side web programming in Haskell: A retrospective](https://chrisdone.com/posts/clientside-programming-haskell)
+- [PureScript in Production](https://medium.com/@zelenya/purescript-in-production-c27686e2163)
+
+### Libraries
+- [Halogen](https://github.com/purescript-halogen/purescript-halogen#halogen) - for building user interfaces
+- [Argonaut](https://github.com/purescript-contrib/purescript-argonaut#argonaut) - for working with JSON
+- [arraybuffer-class](https://github.com/athanclark/purescript-arraybuffer-class) - for binary serialization
+- [webaudio](https://github.com/adkelley/purescript-webaudio#purescript-webaudio) - for the HTML5 [Web Audio API](https://webaudio.github.io/web-audio-api)
+
 ## Development
 ### Install
 ```sh
