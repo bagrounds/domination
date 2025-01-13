@@ -22,8 +22,8 @@
 
 set -eu
 #MODEL='phi4:14b'
-MODEL='codellama:7b'
-#MODEL='llama3.2:3b'
+#MODEL='codellama:7b'
+MODEL='llama3.2:3b'
 #MODEL='llama3.2:1b'
 #MODEL='qwen2.5-coder:0.5b'
 
@@ -62,7 +62,7 @@ generate_comment() (
     stripped_content=$(echo "$file_content" | sed '/^{-/,/-}/{/-}/d;d};/^--/d')
     
     # Get responses for each section
-    description_prompt="Summarize this PureScript module in 1 line. Use natural language only; no code or markdown. Be direct and concise. Don't use complete sentences; just get to the point (e.g. 'A module for managing game state')."
+    description_prompt="Summarize this PureScript module in 1 line. Use natural language only; no code or markdown. Be direct and concise. Don't use complete sentences; just get to the point."
     concepts_prompt="List the 1-3 most important high-level concepts necessary to understand this module. Use markdown bullet points. Be direct and concise. Don't explain what you're about to say, just say it."
 
     description=$(query_ollama "$description_prompt" "$stripped_content")
