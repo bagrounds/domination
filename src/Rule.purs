@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A library for creating and manipulating logical rules with errors.
+--|
+--| ### Key Concepts
+--| * `Predicate` type and its use in defining rules
+--| * `Rule` type and its components (`error` and `predicate`)
+--| * `Logic` type and its operations (e.g. `Not`, `And`, `Or`, `Implies`)
+
 module Rule where
 
 import Prelude
@@ -117,4 +127,3 @@ lengthIs
   -> Rule (Array a)
 lengthIs r n = length >>> (is r n)
   !> "must have " <> show r <> " " <> show n
-

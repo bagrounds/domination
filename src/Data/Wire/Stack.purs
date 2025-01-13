@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines an ISO lens mapping between a Stack data type and its wire representation.
+--|
+--| ### Key Concepts
+--| * Domain-specific concepts: Stack, WireStack, Card, and related data types.
+--| * Lens-based data transformations: Iso', Setter (%~), Getter (view), Iso (iso).
+--| * Data structure manipulation: Tuple, conversion functions to/from tuples.
 module Domination.Data.Wire.Stack where
 
 import Prelude
@@ -24,4 +33,3 @@ _toWire = iso to from where
     >>> (_count %~ review Int._toWire)
   toTuple { card, count } = Tuple card count
   fromTuple (Tuple card count) = { card, count }
-

@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines a MonoidalSum class for composing functions over Either values.
+--|
+--| ### Key Concepts
+--| * Monoidal Sum as a Binary Operation
+--| * Either Type as a Monoidal Context
+--| * Identity for the Monoidal Sum Operation
 module Data.MonoidalSum where
 
 import Data.Either (Either(..))
@@ -17,4 +26,3 @@ instance monoidalSumFunction :: MonoidalSum (->) where
   right g = case _ of
     Left a -> Left a
     Right b -> Right (g b)
-

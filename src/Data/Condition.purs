@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A PureScript module defining a `Condition` data type with various encoding and decoding options.
+--|
+--| ### Key Concepts
+--| * Condition data type and its variants
+--| * Generic functionality for encoding/decoding and showing the type
+--| * Encoding/decoding instances for JSON, ArrayBuffer, and equality checks
 module Domination.Data.Condition where
 
 import Prelude
@@ -38,4 +47,3 @@ instance encodeArrayBufferCondition
 instance decodeArrayBufferCondition
   :: DecodeArrayBuffer Condition where
   readArrayBuffer = genericReadArrayBuffer
-

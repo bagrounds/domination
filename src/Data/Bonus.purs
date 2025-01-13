@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines data type and functions for representing bonus values in the context of dominoes.
+--|
+--| ### Key Concepts
+--| * The `Bonus` data type represents a single bonus, which can be either `Cash Int`.
+--| * A `cashValue` function is defined to calculate the total value of an array of bonuses.
+--| * The `hash` function for `Bonus` relies on the `cashValue1` function to derive a hash value.
 module Domination.Data.Bonus where
 
 import Prelude

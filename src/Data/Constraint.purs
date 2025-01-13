@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Definition of a 'Constraint' type and associated functions.
+--|
+--| ### Key Concepts
+--| * `Constraint` data type and its variants (`UpTo`, `Exactly`, `DownTo`, `Unlimited`)
+--| * `check` function that takes a constraint, selected cards, remaining cards, and source pile as input
+--| * Rule's `check` function is used to validate constraints on the input arrays
 module Domination.Data.Constraint where
 
 import Prim hiding (Constraint)
@@ -72,4 +81,3 @@ instance encodeJsonConstraint :: EncodeJson Constraint where
   encodeJson = genericEncodeJson
 instance decodeJsonConstraint :: DecodeJson Constraint where
   decodeJson = genericDecodeJson
-

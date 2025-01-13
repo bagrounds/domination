@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A data type and associated types for representing a bonus wire in the Domination game.
+--|
+--| ### Key Concepts
+--| *   WireBonus data structure and its variants (Cash, WireCash)
+--| *   `_toWire` Iso' function for encoding Bonus to WireBonus
+--| *   Derived instances for decoding and encoding JSON, showing, and encoding/decoding arrays
 module Domination.Data.Wire.Bonus where
 
 import Prelude
@@ -41,4 +50,3 @@ instance encodeArrayBuffeWireBonus :: EncodeArrayBuffer WireBonus where
   putArrayBuffer = genericPutArrayBuffer
 instance decodeArrayBuffeWireBonus :: DecodeArrayBuffer WireBonus where
   readArrayBuffer = genericReadArrayBuffer
-

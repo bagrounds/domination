@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A library providing various types and functions for working with stacks in PureScript.
+--|
+--| ### Key Concepts
+--| * `BraidedCategory`, `Cartesian`, and `Cocartesian` types are used to define the structure of primitive operations.
+--| * `ReifiedPrimitive` is a newtype that represents reified primitive operations, which are instances of these types.
+--| * The `StackPrimitive` typeclass defines a set of primitive operations with associated methods.
+
 module Data.Stack.Primitive where
 
 import Control.Category (class Category, identity)
@@ -128,4 +138,3 @@ instance showReifiedPrimitive
   :: (Show a, Show b)
   => Show (ReifiedPrimitive a b) where
   show = genericShow
-

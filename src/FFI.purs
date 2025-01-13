@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| FFI bindings for various web-related functions.
+--|
+--| ### Key Concepts
+--| * Service worker management and UI interaction
+--| * Data compression and storage
+--| * FFI bindings for interacting with web APIs
+
 module FFI where
 
 import Prelude

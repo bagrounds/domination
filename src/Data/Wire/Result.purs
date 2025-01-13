@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A PureScript module defining the data and encoding/decoding functionality for a wire format used in Domination game.
+--|
+--| ### Key Concepts
+--| * `Iso'` to map between `Result` and `WireResult`
+--| * `Generic` instance for `WireResult`
+--| * Encoding/decoding logic for `WireResult`
 module Domination.Data.Wire.Result where
 
 import Prelude

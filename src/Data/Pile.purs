@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Module defines and derives instances for a data type representing player piles in a card game.
+--|
+--| ### Key Concepts
+--| * The `Pile` data type and its associated types and instances.
+--| * The use of Argonaut for encoding, decoding, and showing JSON.
+--| * The array buffer support for serializing and deserializing the `Pile` type.
 module Domination.Data.Pile where
 
 import Prelude
@@ -74,4 +83,3 @@ playerPiles =
   , Discarding
   , Hand
   ]
-

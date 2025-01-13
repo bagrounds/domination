@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Provides functions for working with monoidal products in a categorical context.
+--|
+--| ### Key Concepts
+--| * **Monoidal Product**: A way of combining two objects in a category to form a new object.
+--| * **Higher-Kinded Types**: The monoidal product is applied to types, not just objects.
+--| * **Categorical Functions**: Functions that can be composed with the categorical operations (e.g. `<<<`) to manipulate the monoidal product.
 module Data.MonoidalProduct where
 
 import Control.Category ((<<<))
@@ -13,4 +22,3 @@ instance monoidalProductFunction :: MonoidalProduct (->) where
   cross f g = first f <<< second g
   first f (Tuple a b) = Tuple (f a) b
   second g = swap <<< first g <<< swap
-

@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A module for creating a WireCodec monad that provides functions for encoding and decoding wire messages.
+--|
+--| ### Key Concepts
+--| * `Monad` class for handling wire codec operations.
+--| * `DynamicByteLength` and `EncodeArrayBuffer` type classes.
+--| * `liftEffect` function for lifting effects.
 module Domination.Capability.WireCodec where
 
 import Prelude
@@ -74,4 +83,3 @@ readWire' string =
       maybeA <- decodeArrayBuffer
         $ FFI.stringAsArrayBuffer decompressed
       pure $ note "Failed to decode ArrayBuffer" maybeA
-

@@ -1,0 +1,29 @@
+{
+  // Editor Settings
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "files.autoSave": "onFocusChange",
+  "task.autoDetect": "off",
+  // GitHub Settings
+  "github.copilot.enable": {
+    "*": true
+  },
+  // Shell Settings
+  "shellcheck.enable": true,
+  // PureScript Settings
+  "purescript.addNpmPath": true,
+  "purescript.addSpagoSources": true,
+  "purescript.buildCommand": "spago build --purs-args --json-errors",
+  "purescript.buildOpenedFiles": true,
+  "purescript.exportsCodeLens": true,
+  "purescript.formatter": "purs-tidy",
+  "purescript.fullBuildOnSave": true,
+  "purescript.outputDirectory": "output",
+  "purescript.packagePath": "packages",
+  "purescript.sourcePath": "src",
+  // Language Overrides
+  "[purescript]": {
+    "editor.defaultFormatter": "nwolverson.ide-purescript",
+    "editor.formatOnSave": false
+  }
+}

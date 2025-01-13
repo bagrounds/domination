@@ -1,3 +1,14 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Provides logging functionality for different monadic contexts.
+--|
+--| ### Key Concepts
+--| * MonadEffect typeclass for logging effects
+--| * Functor, Applicative, and Monad instances for `LogM`
+--|  
+--| Note: `AppM` is not included in the list as it's not a part of the standard library. It might be a custom type or module specific to the Domination library.
+
 module Domination.Capability.Log where
 
 import Prelude
@@ -47,4 +58,3 @@ instance logLogM :: Log LogM where
 
 runLogM :: LogM ~> Effect
 runLogM (LogM m) = liftEffect m
-

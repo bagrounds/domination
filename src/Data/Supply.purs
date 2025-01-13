@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Data structures and functions for handling game supplies.
+--|
+--| ### Key Concepts
+--| * `Traversal` for updating and indexing elements in the `Supply` array.
+--| * `Array` operations (filter, findIndex, length, updateAt) for manipulating elements in the supply.
+--| * `Maybe` and `MonadError` for error handling in functions like `indexOfStack`, `updateStack`, and `stackByName`.
 module Domination.Data.Supply where
 
 import Prelude
@@ -116,4 +125,3 @@ highestVictoryCardStackIsEmpty =
   highestVictoryCardStack
   >>> map isEmpty
   >>> (_ == Just true)
-

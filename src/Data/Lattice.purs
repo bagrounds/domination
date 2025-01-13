@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Lattice data structure for algebraic types.
+--|
+--| ### Key Concepts
+--| * Join semilattre: A class that defines the join operation.
+--| * Meet semilattre: A class that defines the meet operation.
+--| * Bounded versions of semilattres: Classes that define bottom and top elements.
 module Domination.Data.Lattice where
 
 class JoinSemilattice a where
@@ -23,4 +32,3 @@ class JoinSemilattice a <= BoundedJoinSemilattice a where
 
 class MeetSemilattice a <= BoundedMeetSemilattice a where
   top :: a
-

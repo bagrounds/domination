@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Module for creating a monadic type alias for an application's state.
+--|
+--| ### Key Concepts
+--| * The `AppM` type alias represents a context-dependent effectful computation.
+--| * `AppM` is a functor, applicative, and monad, providing a way to compose effects in a predictable manner.
+--| * It's an extension of the `ReaderT` type, which adds the ability to perform effects.
 module Domination.AppM where
 
 import Prelude
@@ -20,4 +29,3 @@ derive newtype instance bindAppM :: Bind AppM
 derive newtype instance monadAppM :: Monad AppM
 derive newtype instance monadEffectAppM :: MonadEffect AppM
 derive newtype instance monadAffAppM :: MonadAff AppM
-

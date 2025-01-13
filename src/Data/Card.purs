@@ -1,3 +1,14 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Definition of a Card data type with various lenses, prisms, and functions for manipulating cards.
+--|
+--| ### Key Concepts
+--| * `Card` data structure
+--| * `Lens` functions for accessing and manipulating `Card` fields
+--| * `_ofType` function for checking if a card has a specific type
+--| * `hasType` function as an alias for `_ofType`
+--| * `card`, `treasure`, `victory`, and other predefined `Card` values
 module Domination.Data.Card where
 
 import Prelude
@@ -217,4 +228,3 @@ passFilter = case _ of
   CostUpTo cost' -> (_ <= cost') <<< (view _cost)
   Any -> const true
   Filter.And f1 f2 -> passFilter f1 && passFilter f2
-

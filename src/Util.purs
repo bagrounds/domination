@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Purescript utility functions for working with data structures, including arrays and lenses.
+--|
+--| ### Key Concepts
+--| * The `Array` type and its associated functions (`dropIndex`, `withIndices`, `takeIndices`, etc.)
+--| * The Lens library and its usage patterns (e.g. `lens'`, `over`, `view`, `set`)
+--| * The Argonaut library for JSON encoding and decoding (`encodeJson`, `decodeJson`, `stringify`)
+
 module Util where
 
 import Prelude

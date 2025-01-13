@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A collection of CSS class names for a card game UI.
+--|
+--| ### Key Concepts
+--| * Domination is a UI module for managing game state and interactions.
+--| * It uses Halogen's `ClassName` type to define various CSS classes for styling the UI.
+--| * The module defines numerous classes that are likely used to organize and style different components of the game.
+
 module Domination.UI.Css where
 
 import Halogen (ClassName(..))
@@ -162,4 +172,3 @@ points :: ClassName
 points = ClassName "points"
 cards :: ClassName
 cards = ClassName "cards"
-

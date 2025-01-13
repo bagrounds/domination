@@ -16,6 +16,8 @@
     "deploy": "./scripts/deploy",
     "serve": "npx node-static -p 8080 public",
     "hot-reload": "./scripts/hot-reload",
+    "ai-header-comments": "./scripts/ai-header-comments",
+    "docs": "spago docs",
     "run": "spago run",
     "test": "spago test",
     "minify-js": "parcel build dist/app.js",

@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Module defines data and instances for representing different phases in a game.
+--|
+--| ### Key Concepts
+--| * The concept of a `Phase` data type, representing different stages in a game process.
+--| * A simple finite state machine with three possible states: `ActionPhase`, `BuyPhase`, and `CleanupPhase`.
+--| * The implementation of the `next` function, which transitions between these phases.
 module Domination.Data.Phase where
 
 import Prelude
@@ -35,4 +44,3 @@ next :: Phase -> Phase
 next ActionPhase = BuyPhase
 next BuyPhase = CleanupPhase
 next CleanupPhase = ActionPhase
-
