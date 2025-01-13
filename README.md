@@ -121,6 +121,11 @@ Assumes Ollama is installed locally. See the script for more info.
 ./scripts/ai-header-comments
 ```
 
+### Generate Pursuit API Documentation
+```sh
+npm run docs
+```
+
 ## AI Summaries
 ### Project Overview
 Domination is a modern web-based deck building game that emphasizes peer-to-peer gameplay. The core architecture features:
