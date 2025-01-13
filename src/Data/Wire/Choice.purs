@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines data types and encoding/decoding functions for a wire data structure in the context of card games.
+--|
+--| ### Key Concepts
+--| * Iso for conversion between `WireChoice` and its constituent data structures
+--| * Generic functions (`genericDecodeJson`, `genericEncodeJson`) for encoding/decoding JSON representations of `WireChoice`
+--| * Lens-like operations (e.g. `_toWire`, `.^`) for manipulating `WireChoice` values
 module Domination.Data.Wire.Choice where
 
 import Prelude
@@ -231,4 +240,3 @@ instance encodeArrayBuffeWireChoice
 instance decodeArrayBuffeWireChoice
   :: DecodeArrayBuffer WireChoice where
   readArrayBuffer x = genericReadArrayBuffer x
-

@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A data type for representing programs, with various instance definitions providing category and monoidal product operations.
+--|
+--| ### Key Concepts
+--| * A category where the identity element is of type `forall z. Operations (Tuple a z) (Tuple b z)`
+--| * A monoidal product with special instances for swapping and extracting elements
+--| * A primitive that can be lifted to a program operation, along with a function to create a stack function from a program
 module Data.Stack.Program where
 
 import Control.Category (class Category, (<<<))
@@ -45,4 +54,3 @@ evalProgram = evalStackFunction <<< programFunction
 
 primitiveProgram :: forall a b. Primitive a b -> Program a b
 primitiveProgram p = Program (primitive p `cons` nil)
-

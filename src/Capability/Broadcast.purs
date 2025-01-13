@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Broadcasting system for sending messages over a network.
+--|
+--| ### Key Concepts
+--| * `create` function for establishing a new connection to broadcast messages.
+--| * `broadcastMessage` function for sending a message through the established connection.
+--| * `address` function for retrieving the remote target of a broadcaster.
 module Domination.Capability.Broadcast where
 
 import Prelude

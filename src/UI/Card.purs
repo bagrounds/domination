@@ -1,3 +1,16 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| DOM-based UI component for displaying a card with various information.
+--|
+--| ### Key Concepts
+--| * The `render` function is responsible for rendering the UI components of a Dominion card.
+--| * The function takes in an `onClick` handler, an array of CSS classes to apply to the button, and a `Card` object as input.
+--| * It returns an HTML element representing the rendered component.
+--|
+--| * 
+--| * The `descriptionComponent` function generates a description for a card based on its properties and values.
+
 module Domination.UI.Card
   ( render
   ) where
@@ -175,5 +188,3 @@ descriptionComponent card' =
             H.modify_ \{ visible } -> { visible: not visible, card: card }
       , receive = \card -> Just { event: Nothing, reset: true, card }
       }
-
-

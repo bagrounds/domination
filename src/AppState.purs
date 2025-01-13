@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A data type representing the state of an application.
+--|
+--| ### Key Concepts
+--| * `AppState` data type and its various lenses for accessing and updating its fields.
+--| * `Config` data type and its lenses for accessing and updating its fields.
+--| * The `upgradeSelection` and `upgradeConfig` functions, which upgrade the selection of cards in the kingdom.
 module AppState where
 
 import Prelude
@@ -151,4 +160,3 @@ _kingdom
   :: forall a b r
   . Lens { kingdom :: a | r } { kingdom :: b | r } a b
 _kingdom = prop (SProxy :: SProxy "kingdom")
-

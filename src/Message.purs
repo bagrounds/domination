@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Module provides data types and functions for serializing and deserializing game-related messages.
+--|
+--| ### Key Concepts
+--| * `RemoteMessage` and `WireMessage` data types
+--| * `_toWire` and `_fromWire` Iso's for encoding/decoding to/from wire format
+--| * `renderHtml` function that generates HTML elements from `RemoteMessage` values
+
 module Message where
 
 import Prelude
@@ -202,4 +212,3 @@ getPlayerCardName playerIndex state cardIndex = fromMaybe "???"
   $ state ^? Game._player playerIndex
     <<< Player._cardInHand cardIndex
     <<< Card._name
-

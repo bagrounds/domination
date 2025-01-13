@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines a data type and associated functions for filtering cards in a deck.
+--|
+--| ### Key Concepts
+--| * Deriving instances for `Generic`, `Eq`, and other data types.
+--| * Defining a data type with variant constructors and associated values.
+--| * Using Argonaut's decoding and encoding functionality.
 module Domination.Data.Filter where
 
 import Prelude
@@ -25,4 +34,3 @@ instance encodeJsonFilter :: EncodeJson Filter where
   encodeJson a = genericEncodeJson a
 instance decodeJsonFilter :: DecodeJson Filter where
   decodeJson a = genericDecodeJson a
-

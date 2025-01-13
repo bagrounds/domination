@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Definition of a data type called `SelectCards` with various encoding and decoding instances.
+--|
+--| ### Key Concepts
+--| * Data type `SelectCards` and its instances.
+--| * Encoding/Decoding JSON for `SelectCards`.
+--| * Array Buffer encoding/decoding for `SelectCards`.
+
 module Domination.Data.SelectCards where
 
 import Prelude
@@ -12,9 +22,6 @@ import Data.Show.Generic (genericShow)
 
 data SelectCards
   = SelectAll
---  | SelectOne Int
---  | SelectSome (Array Int)
---  | SelectNone
 
 derive instance genericSelectCards :: Generic SelectCards _
 derive instance eqSelectCards :: Eq SelectCards
@@ -35,4 +42,3 @@ instance encodeArrayBuffeSelectCards
 instance decodeArrayBuffeSelectCards
   :: DecodeArrayBuffer SelectCards where
   readArrayBuffer = genericReadArrayBuffer
-

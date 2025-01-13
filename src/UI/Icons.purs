@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Provides a set of icons for use in a UI application.
+--|
+--| ### Key Concepts
+--| * Halogen HTML generation and CSS class manipulation
+--| * Using `icon` function to generate HTML elements with custom CSS classes
+--| * Custom HTML elements for various use cases (e.g., actions, buys, cards, etc.)
+
 module Domination.UI.Icons where
 
 import Domination.UI.Css as Css
@@ -31,4 +41,3 @@ settings = icon Css.settings
 
 check :: forall w i. HTML w i
 check = icon Css.check
-

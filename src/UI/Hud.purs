@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| UI layer for a game state, including player information and statistics.
+--|
+--| ### Key Concepts
+--| * **ActiveState**: A data structure representing the current state of a game, including player index, turn number, game phase, and game state.
+--| * **Render Functionality**: A function that takes an `ActiveState` as input and returns a Halogen HTML element representing the UI for the current game state.
+--| * **Halogen Components**: Various Halogen HTML components used to render specific UI elements, such as `HH.div`, `HH.h1`, `HH.text`, and `HH.ul`.
+
 module Domination.UI.Hud where
 
 import Prelude
@@ -18,7 +28,6 @@ import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 
--- TODO: move ActiveState to own module to prevent cycle/duplication
 type ActiveState =
   { i :: Int
   , playerIndex :: Int

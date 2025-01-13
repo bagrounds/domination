@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines lenses and an upgrade function for managing game states in Domination UI.
+--|
+--| ### Key Concepts
+--| * `Lens` and `prop` types for accessing and modifying record fields
+--| * `ActiveState` record type with its constituent field definitions
+--| * `_state Lens` upgrade function to modify the `Game.state` field of an `ActiveState` record.
 module Domination.UI.Domination.ActiveState where
 
 import Data.Lens.Lens (Lens', Lens)
@@ -34,4 +43,3 @@ _state = prop (SProxy :: SProxy "state")
 
 upgrade :: ActiveState -> ActiveState
 upgrade = _state %~ Game.upgrade
-

@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Component that manages choosing cards from a supply.
+--|
+--| ### Key Concepts
+--| * **Domination Capability**: Understanding the `Dom` and `Log` classes, which provide the foundation for Domination's functionality.
+--| * **Component Structure**: Recognizing the component's main components, including `initialState`, `render`, and `eval`.
+--| * **State and Actions**: Familiarity with the `State` type and the two types of actions: `Toggle Int` and `Done`.
 module Domination.UI.ChooseFromSupply where
 
 import Prelude
@@ -52,10 +61,6 @@ component { cards, baseSlotNumber } =
           ]
           <> renderCard `mapWithIndex` xs
 
---    eval
---      :: forall a
---      . HalogenQ query Action input a
---      -> HalogenM State Action () Choice m a
     eval = H.mkEval H.defaultEval
       { handleAction = case _ of
         Toggle i -> do
@@ -82,4 +87,3 @@ component { cards, baseSlotNumber } =
             then Css.toTrash
             else Css.toKeep
           ]
-

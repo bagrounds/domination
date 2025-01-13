@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Data type for serializing and deserializing stack expressions in a wire format.
+--|
+--| ### Key Concepts
+--| * `WireStackExpression` data type and its variants.
+--| * `_toWire` iso for converting `StackExpression` to `WireStackExpression`.
+--| * Instances of `Generic`, `Eq`, `Show`, `EncodeJson`, `DecodeJson`, `DynamicByteLength`, `EncodeArrayBuffer`, and `DecodeArrayBuffer`.
 module Domination.Data.Wire.StackExpression where
 
 import Prelude
@@ -153,4 +162,3 @@ instance encodeArrayBuffeWireStackExpression
 instance decodeArrayBuffeWireStackExpression
   :: DecodeArrayBuffer WireStackExpression where
   readArrayBuffer x = genericReadArrayBuffer x
-

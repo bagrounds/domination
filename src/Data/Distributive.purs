@@ -1,5 +1,11 @@
--- apparently I've already imported a Distributive module, so I'm
--- adding an X just to resolve the naming conflict
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines Distributive typeclass for working with Cartesian and cocartesian data types.
+--|
+--| ### Key Concepts
+--| * Distributivity over left and right sides.
+--| * The distributive laws for tuples with Either values.
 module Data.DistributiveX where
 
 import Data.Cartesian (class Cartesian)
@@ -22,4 +28,3 @@ instance distributiveFunction :: Distributive (->) where
   distr (Tuple eitherUV b) = case eitherUV of
     Left u -> Left (Tuple u b)
     Right v -> Right (Tuple v b)
-

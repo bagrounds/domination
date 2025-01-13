@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Halogen-based UI component for selecting choices.
+--|
+--| ### Key Concepts
+--| * Halogen component lifecycle and data types (Component, query, input, State, Action)
+--| * The HalogenM Query monad for handling actions and updating the state
+--| * The component's rendering logic using Halogen's `render` function and HTML elements
+
 module Domination.UI.PickN
   ( component
   ) where
@@ -70,4 +80,3 @@ component { n, title, choices } =
             else { i, selected, choice }
         Done -> ((filter (_.selected) >>> map _.choice) <$> H.get) >>= H.raise
       }
-

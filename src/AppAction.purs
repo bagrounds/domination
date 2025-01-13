@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Defines a set of actions for an application.
+--|
+--| ### Key Concepts
+--| * Type alias `CardSpecSelection`
+--| * Enumerations defining actions that can be taken in the game
+--| * Lens for interacting with `AppState`
 module AppAction where
 
 import AppState (AppState)
@@ -26,4 +35,3 @@ data AppAction
   | ReceiveLocalMessage Event
   | HandleGameEvent GameEvent
   | DoNothing
-

@@ -86,9 +86,9 @@ run_test test_case = do
 
 -- | Test suite covering core game functionality
 test_cases :: Array { name :: String, test :: Result }
-test_cases = 
+test_cases =
   (map
-    (\player_count -> 
+    (\player_count ->
       { name: "Wire serialization roundtrip with " <> show player_count <> " player game"
       , test: test_game_wire_serialization player_count
       })
