@@ -36,6 +36,31 @@ Try it at [domination.fun](https://domination.fun/)
 * Game AI players
 * More thorough tests
 
+## Principles
+1. Catch and prevent bugs as early as possible
+    1. Write tickets, think, and discuss before doing
+    2. Use strong static types to get instant editor squiggles and type-checking errors that prevent writing bugs
+    3. Use automated tests to catch bugs we can't catch with static types
+    4. Run all quality tests in controlled environments on every build and before allowing merges
+    5. Use well-designed, principled abstractions when possible
+    6. Constraints liberate; liberties constrain - the less power we have in code, the more guarantees tooling can provide.
+2. Automate aggressively
+3. Always strive for simplicity
+5. Aim for broad platform support by using open, standard technologies
+6. Zero cost infrastructure
+    1. By running the game code on clients (browsers) we don't need to pay for expensive servers
+
+## Design Decisions & Rationale
+1. Progressive Web App
+    1. Implement once, support every device, minimizing development and maintenance costs
+2. All style, graphics, animations, etc are handled in pure CSS
+    1. Complete separation of concerns
+    2. All you need to know is CSS to make style, graphic, and animation changes
+    3. Avoid all the bugs and complications that come with JavaScript in styling
+3. Data is code
+    1. The game engine is written such that logic can be programmed with JSON
+    2. This allows us to make the logic customizable and put that power in the hands of non-programmer users
+
 ## Miscelaneous Notes
 - Gitlab doesn't support PureScript syntax highlighting...
   - so we pretend that we're writing Haskell code in markdown code blocks, etc.
