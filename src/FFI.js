@@ -183,12 +183,12 @@ exports.makeBugoutFFI = left =>
 const reloadOnNetworkChange = () => {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
   let type = connection.effectiveType
-  
+
   function updateConnectionStatus() {
     logInfo("Connection type changed from " + type + " to " + connection.effectiveType)
     location.reload()
   }
-  
+
   connection.addEventListener('change', updateConnectionStatus);
 }
 

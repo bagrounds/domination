@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "nwolverson.ide-purescript",
+    "timonwong.shellcheck",
+    "eamodio.gitlens",
+    "github.copilot",
+    "dhall.dhall-lang"
+  ]
+}

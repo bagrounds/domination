@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Definition for representing constraint values in wire format.
+--|
+--| ### Key Concepts
+--| * `WireConstraint` data type
+--| * `toWire` and `fromWire` conversions between `Constraint` and `WireConstraint`
+--| * Deriving instances for `Generic`, `Eq`, `Show`, `EncodeJson`, `DecodeJson`, `DynamicByteLength`, and `EncodeArrayBuffer`
 module Domination.Data.Wire.Constraint where
 
 import Prim hiding (Constraint)
@@ -57,4 +66,3 @@ instance encodeArrayBuffeWireConstraint
 instance decodeArrayBuffeWireConstraint
   :: DecodeArrayBuffer WireConstraint where
   readArrayBuffer = genericReadArrayBuffer
-

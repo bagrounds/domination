@@ -1,3 +1,13 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A data structure for stack operations with support for primitive and reified operations.
+--|
+--| ### Key Concepts
+--| * The concept of an operation as a binary function that takes two arguments and returns a result, represented by the `Operation` type.
+--| * The relationship between operations and stack primitives, where each operation is defined in terms of one or more stack primitives.
+--| * The distinction between primitive operations (represented by `PrimOp`) and higher-level operations (represented by `Operation`).
+
 module Data.Stack.Operation where
 
 import Control.Category (class Category, (<<<))
@@ -144,4 +154,3 @@ const = primitive <<< const' where
 
 id :: forall a. PrimOp a a
 id = primitive Primitive.id
-

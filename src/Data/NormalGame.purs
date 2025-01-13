@@ -1,3 +1,90 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| This is a Haskell implementation of the game Carcassonne, a popular tile-laying game.
+--|
+--| Here's an overview of what this code does:
+--|
+--| **Game structure**
+--|
+--| The `NormalGame` type represents the state of a normal game of Carcassonne. It has several fields that represent different aspects of the game:
+--|
+--| * `card`: a table of all card IDs in the game
+--| * `card_class`: a table of all card class IDs in the game (currently empty)
+--| * `card_pile`: a table of all pile IDs in the game, linked to their corresponding cards
+--| * `card_order`: a table of all order IDs in the game (currently empty)
+--| * `pile`: a table of all pile IDs in the game
+--| * `pile_owner`: a table of all pile owner IDs in the game
+--| * `pile_type`: a table of all pile type IDs in the game
+--| * `player`: a table of all player IDs in the game, initialized with one player
+--| * `player_actions`, `player_bonus`, and `player_buys` are tables representing actions taken by players (currently empty)
+--| * `player_choice` is a table of all player choice IDs in the game (currently empty)
+--|
+--| **New game creation**
+--|
+--| The `new` function creates a new game with the specified number of players, cards, and long game duration. It initializes several tables with default values:
+--|
+--| * `allCards`: an array of all card IDs
+--| * `card_class`: an array of all possible card classes
+--| * `pileCount`: the number of piles in the game (2 + 6 times the number of players)
+--| * `pile`: a table of all pile IDs, initialized with two empty piles and six piles for each player
+--| * `player`: a table of all player IDs, initialized with one player
+--|
+--| **Game logic**
+--|
+--| The code is currently incomplete, but it provides a foundation for implementing game logic. Some possible next steps could be:
+--|
+--| * Implementing the `turn` function to handle a single turn in the game
+--| * Defining rules for building and placing tiles (e.g., following existing lines, avoiding intersections)
+--| * Handling player actions, such as placing followers on features or moving players
+--| * Implementing scoring and winning conditions
+--|
+--| Note that this code is likely a starting point, and significant additional work will be needed to fully implement the game logic.
+--|
+--| ### Key Concepts
+--| This is a Haskell implementation of the Gloomhaven card game. Here's a brief overview of the code:
+--|
+--| **Data Structures**
+--|
+--| The code defines several data structures to represent the game state and cards, including:
+--|
+--| * `Card`: a type representing individual cards
+--| * `ChoiceID`: a type representing choices that players can make during their turns
+--| * `Game`: a type representing the game state, which includes various game components such as phase, result, turn, player actions, etc.
+--|
+--| **Functions**
+--|
+--| The code defines several functions to manipulate the game state and create new games:
+--|
+--| * `new`: creates a new game with a given number of players, cards, and long game mode. It initializes the game state with all necessary data structures.
+--| * `SupplyObject.makeSupply`: creates a supply object for generating random card numbers.
+--|
+--| **Data Manipulation**
+--|
+--| The code uses various functions to manipulate data structures, such as:
+--|
+--| * `Table.fromFoldable`: creates a table from a foldable data structure
+--| * `Table.toUnfoldable`: converts a table to an unfoldable data structure
+--| * `Table2.fromFoldable`: creates a table of tables from a foldable data structure
+--|
+--| **Pattern Matching**
+--|
+--| The code uses pattern matching extensively, including:
+--|
+--| * `catMaybes` and `nubEq`: extracts values from arrays or sets
+--| * `mapWithIndex`, `sequenceTupleMaybeFst`, and `sequenceTupleMaybeSnd`: manipulate tuples and arrays with indices
+--|
+--| **Type Aliases**
+--|
+--| The code defines several type aliases for convenience, such as `Array Card` and `Table2 ChoiceID`.
+--|
+--| Overall, this implementation provides a foundation for the Gloomhaven game engine, but it may require additional features and functionality to fully implement the game.
+--|
+--| Example use case:
+--| ```haskell
+--| new 2 [Card1, Card2] True -- creates a new game with 2 players, cards from 1-2, and long game mode set to true
+--| ```
+--| This code creates a new game instance with the specified parameters and initializes the game state accordingly.
 module Domination.Data.NormalGame where
 
 import Prelude
@@ -397,4 +484,3 @@ sequenceTupleMaybeFst (Tuple maybeA b) = (flip Tuple b) <$> maybeA
 sequenceTupleMaybeSnd
   :: forall a b. Tuple a (Maybe b) -> Maybe (Tuple a b)
 sequenceTupleMaybeSnd (Tuple a maybeB) = (Tuple a) <$> maybeB
-

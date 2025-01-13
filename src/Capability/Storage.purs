@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A module for managing local storage in a web application.
+--|
+--| ### Key Concepts
+--| * Storage Monad
+--| * Local Storage Interaction
+--| * HalogenM Integration
 module Domination.Capability.Storage where
 
 import Prelude

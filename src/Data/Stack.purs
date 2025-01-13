@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Data structures for managing game stacks and cards.
+--|
+--| ### Key Concepts
+--| * `Stack` data type and its representation as a record with `card` and `count` fields.
+--| * `_toCards` and `_fromCards` functions for converting between stacks and arrays of cards.
+--| * `_card` and `_count` lenses for accessing the individual components of a stack.
 module Domination.Data.Stack where
 
 import Prelude
@@ -103,4 +112,3 @@ positivePoints = max zero <<< points
 
 negativePoints :: Stack -> Points
 negativePoints = min zero <<< points
-

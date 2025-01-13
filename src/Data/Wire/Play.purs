@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Definition of a data type WirePlay used to represent the state of a game in Domination, including various actions and choices.
+--|
+--| ### Key Concepts
+--| * `Iso` for data transformation between `Play` and `WirePlay`
+--| * `Generic` for deriving instance methods on `WirePlay`
+--| * `EncodeJson` for encoding `WirePlay` to JSON
 module Domination.Data.Wire.Play where
 
 import Prelude
@@ -98,4 +107,3 @@ instance encodeArrayBuffeWirePlay :: EncodeArrayBuffer WirePlay where
   putArrayBuffer = genericPutArrayBuffer
 instance decodeArrayBuffeWirePlay :: DecodeArrayBuffer WirePlay where
   readArrayBuffer = genericReadArrayBuffer
-

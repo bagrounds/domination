@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A PureScript module providing randomization capabilities for different monads.
+--|
+--| ### Key Concepts
+--| * `Monad RandomM` and its associated types and functions, specifically `shuffle`, `randomElement`, `randomIntBetween`, and `randomBoolean`
+--| * The interaction between `RandomM` and other monads, such as `AppM` and `ExceptT String m`
+--| * The implementation of the `shuffle` function in terms of the underlying random number generation
 module Domination.Capability.Random where
 
 import Prelude
@@ -91,4 +100,3 @@ pickRandomElement :: forall a m . MonadEffect m => Array a -> m (Maybe a)
 pickRandomElement xs = do
   i <- liftEffect $ randomInt 0 (length xs - 1)
   pure $ xs !! i
-

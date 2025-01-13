@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Data types and functions for representing choices in a card game.
+--|
+--| ### Key Concepts
+--| * `Choice` data type and its various constructors
+--| * `isAttack` function to check if a `Choice` is an attack action
+--| * `generic*` instances for `Generic`, `Eq`, `Show`, `EncodeJson`, and `DecodeJson` classes applied to the `Choice` type
 module Domination.Data.Choice where
 
 import Prim hiding (Constraint)
@@ -131,4 +140,3 @@ instance encodeJsonChoice :: EncodeJson Choice where
 
 instance decodeJsonChoice :: DecodeJson Choice where
   decodeJson a = genericDecodeJson a
-

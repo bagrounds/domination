@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Definition for mapping between a supply and an array of wire stacks.
+--|
+--| ### Key Concepts
+--| * Iso and Prism lenses
+--| * Data types: `Supply`, `WireSupply`, `WireStack`
+--| * `_toWire` function
 module Domination.Data.Wire.Supply where
 
 import Prelude
@@ -15,4 +24,3 @@ _toWire :: Iso' Supply WireSupply
 _toWire = iso to from where
   to = map $ view Stack._toWire
   from = map $ review Stack._toWire
-

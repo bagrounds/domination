@@ -1,7 +1,18 @@
--- http://conal.net/papers/calculating-compilers-categorically
--- PureScript doesn't have GADTs; use tagless final encoding instead
--- https://medium.com/@hgiasac/purescript-gadts-alternatives-recap-7960daf4acd8
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Provides a PureScript implementation of a stack machine.
+--|
+--| ### Key Concepts
+--| * `StackMachineChoice`: a data structure representing the choice between two stacks, with fields for input and program.
+--| * `Program`: a data structure representing a stack program, which is a list of stack operations.
+--| * `evalProgram`: a function evaluating a program on a given input value.
 module Data.Stack.Machine where
+--| ## Human implementation notes
+--| * http://conal.net/papers/calculating-compilers-categorically
+--| * PureScript doesn't have GADTs; use tagless final encoding instead
+--| * https://medium.com/@hgiasac/purescript-gadts-alternatives-recap-7960daf4acd8
+
 
 import Data.Function (($))
 import Data.Show (show)

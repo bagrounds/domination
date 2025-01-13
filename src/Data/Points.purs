@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| A data type for representing points on a wire, derived from an integer value.
+--|
+--| ### Key Concepts
+--| * Deriving instances for `Eq`, `Ord`, `Semiring`, `Ring`, `Generic`, and `Show` on the `Points` newtype.
+--| * Implementing `EncodeJson`, `DecodeJson`, `EncodeArrayBuffer`, `DecodeArrayBuffer`, and `DynamicByteLength` instances for `Points`.
+--| * Defining an `Iso` instance `_int` that transforms a `Points` value to an underlying `Int`.
 module Domination.Data.Points
   ( Points(..)
   , points
@@ -46,4 +55,3 @@ derive newtype instance dynamicByteLengthPoints
 
 _int :: Iso' Points Int
 _int = _Newtype <<< (re Int._toWire)
-

@@ -1,3 +1,12 @@
+--| ## AI Generated Module Summary (llama3.2:3b)
+--|
+--| ### Description
+--| Halogen component for displaying and choosing cards.
+--|
+--| ### Key Concepts
+--| * `ComponentSpec` data structure, which defines the properties of a Card Chooser component.
+--| * `renderChoice` function, which generates HTML elements for a single choice in the card chooser.
+--| * `initialState` function, which initializes the component's state based on the game's state and player's hand.
 module Domination.UI.CardChooser where
 
 import Prelude
@@ -139,4 +148,3 @@ component
           then Css.toTrash
           else Css.toKeep
         ]
-
