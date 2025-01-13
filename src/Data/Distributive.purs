@@ -6,6 +6,10 @@
 ‣ Function implementations use Tuple and Either data types.
 -}
 module Data.DistributiveX where
+{-| Human notes
+- apparently I've already imported a Distributive module, so I'm
+- adding an X just to resolve the naming conflict
+-}
 
 import Data.Cartesian (class Cartesian)
 import Data.Cocartesian (class Cocartesian)
