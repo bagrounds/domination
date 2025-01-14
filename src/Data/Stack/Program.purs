@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A data type for representing programs, with various instance definitions providing category and monoidal product operations.
+--| PureScript module for working with programs as stack operations.
 --|
 --| ### Key Concepts
---| * A category where the identity element is of type `forall z. Operations (Tuple a z) (Tuple b z)`
---| * A monoidal product with special instances for swapping and extracting elements
---| * A primitive that can be lifted to a program operation, along with a function to create a stack function from a program
+--| * **Category Theory**: Understanding concepts like categories, semigroupoids, braided categories, monoidal products, and cartesian products.
+--| * **Monoidal Product**: Concepts related to a type with both left and right adjoints, including the first and second functors.
+--| * **Stack Functions**: Evaluating operations on a stack data structure, involving primitive functions.
 module Data.Stack.Program where
 
 import Control.Category (class Category, (<<<))

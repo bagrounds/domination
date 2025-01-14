@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A PureScript module defining a `Condition` data type with various encoding and decoding options.
+--| Defines a data type called `Condition` with various possible values, along with associated functions for encoding, decoding, showing, and more.
 --|
 --| ### Key Concepts
---| * Condition data type and its variants
---| * Generic functionality for encoding/decoding and showing the type
---| * Encoding/decoding instances for JSON, ArrayBuffer, and equality checks
+--| *   Data types: `Condition` with various variants
+--| *   Encoding and decoding: `EncodeJson`, `DecodeJson`, `encodeJson`, and `decodeJson`
+--| *   Generic programming: use of `genericShow`, `genericDecodeJson`, `genericEncodeJson`, and generic instance methods
 module Domination.Data.Condition where
 
 import Prelude

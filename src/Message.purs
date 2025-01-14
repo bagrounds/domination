@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Module provides data types and functions for serializing and deserializing game-related messages.
+--| Module providing data types, encoding/decoding functions, and rendering HTML for various game-related messages.
 --|
 --| ### Key Concepts
---| * `RemoteMessage` and `WireMessage` data types
---| * `_toWire` and `_fromWire` Iso's for encoding/decoding to/from wire format
---| * `renderHtml` function that generates HTML elements from `RemoteMessage` values
+--| * RemoteMessage data type with various variants (ChatMessage, UsernameMessage, GameMessage, PlayMadeMessage)
+--| * WireMessage data type with various variants (ChatWireMessage, UsernameWireMessage, GameWireMessage, PlayMadeWireMessage) and an Iso' transformation for conversion to/from
+--| * Usage of Argonaut's genericDecodeJson, genericEncodeJson, deriveGeneric, eqRemoteMessage, showRemoteMessage, encodeJsonWireMessage, decodeJsonWireMessage, dynamicByteLengthWireMessage, and encodeArrayBuffeWireMessage
 
 module Message where
 

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A module for creating a WireCodec monad that provides functions for encoding and decoding wire messages.
+--| Defines a WireCodec typeclass for encoding/decoding data over wires, using FFI for compression/decompression.
 --|
 --| ### Key Concepts
---| * `Monad` class for handling wire codec operations.
---| * `DynamicByteLength` and `EncodeArrayBuffer` type classes.
---| * `liftEffect` function for lifting effects.
+--| * **Monad**: A monad is a way to compose effects in a pure functional programming context.
+--| * **WireCodecM**: WireCodecM is the type for this module, which represents a wire codec effect that can be used with Halogen and AppM.
+--| * **Halogen and AppM Integration**: The module provides instances of `WireCodec` for Halogen (`wireCodecHalogenM`) and AppM (`wireCodecAppM`) to enable using wire codec effects with these state management systems.
 module Domination.Capability.WireCodec where
 
 import Prelude

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A module for managing local storage in a web application.
+--| A PureScript module providing a basic storage capability for storing and retrieving data locally via JavaScript's localStorage.
 --|
 --| ### Key Concepts
---| * Storage Monad
---| * Local Storage Interaction
---| * HalogenM Integration
+--| * **Storage Monad**: A monad for storing data in local storage.
+--| * **Effectful Storage**: The `StorageM` type is an effectful version of the traditional storage monad, allowing for side effects like interacting with local storage.
+--| * **Local Storage API**: The module provides a set of functions for saving and loading data to/from local storage using the Web Storage API.
 module Domination.Capability.Storage where
 
 import Prelude

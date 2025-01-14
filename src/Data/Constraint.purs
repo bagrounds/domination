@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition of a 'Constraint' type and associated functions.
+--| Defines a set of constraint data types for determining valid moves in card games.
 --|
 --| ### Key Concepts
---| * `Constraint` data type and its variants (`UpTo`, `Exactly`, `DownTo`, `Unlimited`)
---| * `check` function that takes a constraint, selected cards, remaining cards, and source pile as input
---| * Rule's `check` function is used to validate constraints on the input arrays
+--| *   **Constraint Data Type**: A type that represents different types of constraints in a card game.
+--| *   **Rule Validation**: The `check` function validates rules based on the given constraint and selected/remaining cards.
+--| *   **Generic and Derived Instances**: Derive instances for generic, equality, show, encodeJson, and decodeJson functions for the Constraint data type.
 module Domination.Data.Constraint where
 
 import Prim hiding (Constraint)

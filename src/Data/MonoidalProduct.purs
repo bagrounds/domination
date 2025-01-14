@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Provides functions for working with monoidal products in a categorical context.
+--| Defines a MonoidalProduct class for functions, enabling combination of left and right unitary actions.
 --|
 --| ### Key Concepts
---| * **Monoidal Product**: A way of combining two objects in a category to form a new object.
---| * **Higher-Kinded Types**: The monoidal product is applied to types, not just objects.
---| * **Categorical Functions**: Functions that can be composed with the categorical operations (e.g. `<<<`) to manipulate the monoidal product.
+--| * Monoidal Product
+--| * Category Theory (specifically, instances of the `Category` class)
+--| * Tuple data type
 module Data.MonoidalProduct where
 
 import Control.Category ((<<<))

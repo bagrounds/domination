@@ -1,13 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Provides logging functionality for different monadic contexts.
+--| Provides a custom Monad for logging messages with different modes (Halogen, RandomM, AppM).
 --|
 --| ### Key Concepts
---| * MonadEffect typeclass for logging effects
---| * Functor, Applicative, and Monad instances for `LogM`
---|  
---| Note: `AppM` is not included in the list as it's not a part of the standard library. It might be a custom type or module specific to the Domination library.
+--| * **Monad**: A concept in functional programming that allows for the abstraction of effects.
+--| * **Logging**: The capability to log messages with a given monad, used for tracking or debugging purposes.
+--| * **Effect**: A type-level concept representing a computational effect, such as input/output operations.
 
 module Domination.Capability.Log where
 

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a data type for game events in the Domination game.
+--| Defines a data type for game events in a turn-based strategy game.
 --|
 --| ### Key Concepts
---| * Game events and their types.
---| * The structure of a game event as a union of different variants.
---| * Associations between game states and active state.
+--| * Game Events
+--| * Data Types (GameEvent)
+--| * Context (Domination.UI.Domination)
 module Domination.UI.Domination.GameEvent where
 
 import Data.Maybe (Maybe)

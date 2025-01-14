@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition of a data type called `SelectCards` with various encoding and decoding instances.
+--| Defines a data type `SelectCards` with various encoding, decoding, and generic instance implementations for it.
 --|
 --| ### Key Concepts
---| * Data type `SelectCards` and its instances.
---| * Encoding/Decoding JSON for `SelectCards`.
---| * Array Buffer encoding/decoding for `SelectCards`.
+--| * Argonaut library usage
+--| * Generic data types and their instances
+--| * JSON encoding and decoding with Argonaut
 
 module Domination.Data.SelectCards where
 

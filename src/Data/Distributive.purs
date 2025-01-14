@@ -1,11 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines Distributive typeclass for working with Cartesian and cocartesian data types.
+--| Defines a Distributive class for types involving tuples and either values.
 --|
 --| ### Key Concepts
---| * Distributivity over left and right sides.
---| * The distributive laws for tuples with Either values.
+--| * Distributive laws
+--| * Cartesian product
+--| * Cocartesian product
 module Data.DistributiveX where
 
 import Data.Cartesian (class Cartesian)

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Broadcasting system for sending messages over a network.
+--| Defines a broadcaster capability for sending messages over a network.
 --|
 --| ### Key Concepts
---| * `create` function for establishing a new connection to broadcast messages.
---| * `broadcastMessage` function for sending a message through the established connection.
---| * `address` function for retrieving the remote target of a broadcaster.
+--| * **Broadcasting**: a mechanism for sending messages over a network.
+--| * **Monads for Broadcasting**: specialized monads (`AppM`, `HalogenM`) that provide a way to work with broadcasting in different contexts (e.g., applicative effects, Halogen state management).
+--| * **FFI Integration**: the module provides an interface to interact with a low-level library (`Bugout`) using Foreign Function Interface (FFI).
 module Domination.Capability.Broadcast where
 
 import Prelude

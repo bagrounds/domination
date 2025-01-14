@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition of a monad for generating universally unique identifiers (UUIDs).
+--| Provides a Monad class for generating unique IDs, with various instance implementations for HalogenM, AppM, and Effect.
 --|
 --| ### Key Concepts
---| * `Monad` class with a single method `genUuid`
---| * `HalogenM`, `AppM`, and generic types like `a`, `st`, `act`, `slots`, `msg`, and `m` are related to the module's context but not crucial for understanding this specific module.
---| * Effect handling, specifically instances of `liftEffect`
+--| * Monad for generating UUIDs
+--| * Lift functions for converting between different monads
+--| * Effectful monad for generating UUIDs with side effects
 module Domination.Capability.GenUuid where
 
 import Prelude

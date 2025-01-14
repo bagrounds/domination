@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| FFI bindings for various web-related functions.
+--| Provides a set of foreign function interfaces for interacting with web technologies, including browser events, storage, and clipboard functionality.
 --|
 --| ### Key Concepts
---| * Service worker management and UI interaction
---| * Data compression and storage
---| * FFI bindings for interacting with web APIs
+--| * Foreign Function Interface (FFI)
+--| * Web Storage API
+--| * Message Passing with Event Dispatchers
 
 module FFI where
 

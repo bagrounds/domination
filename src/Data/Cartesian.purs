@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Provides functions for working with tuples in PureScript, allowing extraction and duplication of tuple elements.
+--| Defines a Cartesian class for functions, enabling left, right extraction and duplicate functionality.
 --|
 --| ### Key Concepts
---| * Type class `Cartesian` for functions of type `(->)`
---| * Laws for the laws of function types: `extractLeft`, `extractRight`, and `duplicate`
---| * Example instance for `Function -> Cartesian`
+--| * Type class for Cartesian transformations
+--| * Tuple data structure
+--| * Function composition (instance of the `Cartesian` type class)
 module Data.Cartesian where
 
 import Data.Tuple (Tuple(..), fst, snd)

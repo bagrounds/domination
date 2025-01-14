@@ -1,14 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition of a Card data type with various lenses, prisms, and functions for manipulating cards.
+--| Module for defining and manipulating a card data structure used in a card game.
 --|
 --| ### Key Concepts
---| * `Card` data structure
---| * `Lens` functions for accessing and manipulating `Card` fields
---| * `_ofType` function for checking if a card has a specific type
---| * `hasType` function as an alias for `_ofType`
---| * `card`, `treasure`, `victory`, and other predefined `Card` values
+--| * **Data Structures**: Understanding `Card` data type, its components, and their relationships.
+--| * **Lens and Traversal**: Familiarity with using lenses to access and manipulate individual fields of the `Card` data type.
+--| * **Prism and Generic Data Types**: Knowledge of using prisms to validate data types and working with generic data types like `CardSpec`.
 module Domination.Data.Card where
 
 import Prelude

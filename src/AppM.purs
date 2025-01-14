@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Module for creating a monadic type alias for an application's state.
+--| A module for creating monads with effects, specifically the AppM type.
 --|
 --| ### Key Concepts
---| * The `AppM` type alias represents a context-dependent effectful computation.
---| * `AppM` is a functor, applicative, and monad, providing a way to compose effects in a predictable manner.
---| * It's an extension of the `ReaderT` type, which adds the ability to perform effects.
+--| * Reader Monad
+--| * Effect System
+--| * Monad Instances
 module Domination.AppM where
 
 import Prelude

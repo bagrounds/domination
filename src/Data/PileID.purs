@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A custom data type for representing pile IDs with integral values.
+--| Defines a newtype PileID representing a pile ID as an integer, providing various type classes for encoding, decoding, showing, and comparing purposes.
 --|
 --| ### Key Concepts
---| * Bounded Enum: Understanding how to work with bounded enums and their related types (e.g. `bottom`, `top`, `Cardinality`).
---| * Generic Types: Recognizing the use of generic type classes and functions (e.g. `genericEncodeJson`, `genericDecodeJson`) for encoding and decoding data.
---| * Integral Representation: Grasping how integers are used to represent values in a bounded enum type (`PileID`).
+--| * **Newtype**: A new type defined over an existing type.
+--| * **Deriving instances**: Automatically generating implementations for certain classes or traits based on the definition of a type.
+--| * **Generic**: A class that allows generic programming using a generic type parameter.
 module Domination.Data.PileID where
 
 import Prelude

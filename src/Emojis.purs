@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A list of 74 emojis.
+--| List of emojis.
 --|
 --| ### Key Concepts
 --| * Array data structure
---| * List of emojis as strings
---| * Importing and defining a module
+--| * Module definition
+--| * Importing/Exporting modules
 module Emojis where
 
 emojis :: Array String

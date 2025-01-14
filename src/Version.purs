@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a simple version number data type with pre-defined values for major, minor, and patch numbers.
+--| Defines a version data type with three integer components (major, minor, patch).
 --|
 --| ### Key Concepts
---| * Data types and pattern matching
---| * Defining a data type with associated values
---| * Pattern binding in a data definition
+--| * Data types
+--| * Module definition
+--| * Pattern matching
 
 module Version where
 

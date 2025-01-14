@@ -1,17 +1,13 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Provides a PureScript implementation of a stack machine.
+--| Defines a stack machine with basic operations like push, pop, add, subtract, multiply, and divide, using a program that evaluates to a specific input result.
 --|
 --| ### Key Concepts
---| * `StackMachineChoice`: a data structure representing the choice between two stacks, with fields for input and program.
---| * `Program`: a data structure representing a stack program, which is a list of stack operations.
---| * `evalProgram`: a function evaluating a program on a given input value.
+--| * Stack Machine: a simple abstract machine for evaluating mathematical expressions.
+--| * Program: a sequence of stack operations that can be executed on input values.
+--| * Evaluation: the process of running a program on an input value, resulting in an output value.
 module Data.Stack.Machine where
---| ## Human implementation notes
---| * http://conal.net/papers/calculating-compilers-categorically
---| * PureScript doesn't have GADTs; use tagless final encoding instead
---| * https://medium.com/@hgiasac/purescript-gadts-alternatives-recap-7960daf4acd8
 
 
 import Data.Function (($))
@@ -64,14 +60,4 @@ exampleStackMachineComputation input = let
 
 exCellar :: Effect Unit
 exCellar = do
--- TODO: figure out how to define Cellar in terms of Program
---  let
---    p =
---      [ StackChooseCardsFromHand Nothing
---      , StackDuplicate
---      , StackDiscard
---      , StackLength
---      , StackDraw
---      ]
   Console.log $ show "hi"
-

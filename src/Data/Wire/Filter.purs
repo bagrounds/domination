@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Module defines wire data types for filtering card collections.
+--|  Defines a data type WireFilter with various attributes, along with deriving instances for encoding and decoding JSON, showing, and array buffer manipulation.
 --|
 --| ### Key Concepts
---| * `Iso' Filter WireFilter`: a bijective mapping between two types.
---| * `Generic WireFilter _`: a way to represent and manipulate the structure of `WireFilter` types.
---| * `EncodeJson/DecodeJson/Show/Eq/DynamicByteLength/EncodeArrayBuffe/DecodeArrayBuffe WireFilter`: instances of various encoding and decoding functions for `WireFilter`.
+--| * Data types and their encoding/decoding
+--| * Type classes for encoding and decoding (EncodeJson, DecodeJson)
+--| * Lens-based data transformation (Iso', (^_))
 
 module Domination.Data.Wire.Filter where
 

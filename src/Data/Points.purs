@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A data type for representing points on a wire, derived from an integer value.
+--| Provides data type and functions for working with points, including encoding and decoding to/from JSON and arrays.
 --|
 --| ### Key Concepts
---| * Deriving instances for `Eq`, `Ord`, `Semiring`, `Ring`, `Generic`, and `Show` on the `Points` newtype.
---| * Implementing `EncodeJson`, `DecodeJson`, `EncodeArrayBuffer`, `DecodeArrayBuffer`, and `DynamicByteLength` instances for `Points`.
---| * Defining an `Iso` instance `_int` that transforms a `Points` value to an underlying `Int`.
+--| * Deriving type classes for a data type
+--| * Using Argonaut for JSON encoding and decoding
+--| * Newtype data types and their associated functions
 module Domination.Data.Points
   ( Points(..)
   , points

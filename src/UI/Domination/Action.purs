@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines actions for a domination game.
+--| Defines a set of possible actions related to playing a game.
 --|
 --| ### Key Concepts
---| * Data type for actions in the module.
---| * Types of actions that can be performed.
---| * No action results in no change.
+--| * Domain-specific data (Play and ActiveState)
+--| * Action types
+--| * State transition management
 module Domination.UI.Domination.Action where
 
 import Domination.Data.Play (Play)
