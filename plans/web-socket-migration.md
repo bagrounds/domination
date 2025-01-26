@@ -14,18 +14,22 @@
 
 ## 3. Client Implementation
 - ✅ Create new WebSocket FFI module
-- Current: Create WebSocketBroadcaster
-  1. Create WebSocket.Broadcaster type with Ref for connection state
-  2. Add `create` function to initialize broadcaster
-  3. Add basic message handling (send/receive)
-  4. Add connection status tracking
-- Next: Broadcast typeclass implementation
-  1. Update Broadcast typeclass for WebSocket
-  2. Add error handling
-  3. Add reconnection logic
-- Final: Wire up in Main.purs
-  1. Replace Bugout with WebSocket broadcaster
-  2. Update app initialization
+- Next: Refactor Broadcast Implementation
+  1. Split Broadcast.purs into:
+     - Broadcast.purs (typeclass + generic functions)
+     - Capability/Broadcast/Bugout.purs (existing implementation)
+  2. Move types:
+     - Move `Broadcaster` to Bugout module
+     - Rename to `BugoutBroadcaster`
+  3. Move functions:
+     - Move implementation-specific functions to Bugout module
+     - Keep generic helpers in Broadcast module
+  4. Update imports in dependent modules
+- Then: Implement WebSocket Broadcaster
+  1. Create WebSocket.Broadcaster type
+  2. Implement Broadcast typeclass
+  3. Add connection handling
+  4. Wire up in Main.purs
 
 ## 4. Testing
 - Test locally with new WebSocket server
@@ -58,6 +62,15 @@
 - `src/Domination/Env.purs` ✅
 - `src/FFI/WebSocket.purs` ✅
 - `src/FFI/WebSocket.js` ✅
-- Next: `src/Domination/Capability/Broadcast/WebSocket.purs` (new)
-- Next: `src/Domination/Capability/Broadcast.purs`
-- `src/Main.purs`
+- Current: Split broadcast implementation
+  - `src/Domination/Capability/Broadcast.purs` (simplify)
+  - `src/Domination/Capability/Broadcast/Bugout.purs` (new, existing implementation)
+- Then: Add WebSocket implementation
+  - `src/Domination/Capability/Broadcast/WebSocket.purs` (new)
+  - `src/Main.purs`
+
+## Implementation Notes
+- Pure refactoring step first
+- No functionality changes during split
+- Better separation of concerns
+- Easier to maintain multiple implementations
