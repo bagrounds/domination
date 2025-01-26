@@ -14,10 +14,18 @@
 
 ## 3. Client Implementation
 - ✅ Create new WebSocket FFI module
-- Next: Create WebSocketBroadcaster type
-- Next: Implement Broadcast typeclass for WebSocketBroadcaster
-- Add connection status handling
-- Add reconnection logic
+- Current: Create WebSocketBroadcaster
+  1. Create WebSocket.Broadcaster type with Ref for connection state
+  2. Add `create` function to initialize broadcaster
+  3. Add basic message handling (send/receive)
+  4. Add connection status tracking
+- Next: Broadcast typeclass implementation
+  1. Update Broadcast typeclass for WebSocket
+  2. Add error handling
+  3. Add reconnection logic
+- Final: Wire up in Main.purs
+  1. Replace Bugout with WebSocket broadcaster
+  2. Update app initialization
 
 ## 4. Testing
 - Test locally with new WebSocket server
