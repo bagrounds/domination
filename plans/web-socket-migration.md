@@ -13,9 +13,9 @@
 - Can add environment-based config later if needed
 
 ## 3. Client Implementation
-- Create new WebSocket FFI module
-- Implement new Broadcaster type
-- Update existing Broadcast typeclass implementation
+- ✅ Create new WebSocket FFI module
+- Next: Create WebSocketBroadcaster type
+- Next: Implement Broadcast typeclass for WebSocketBroadcaster
 - Add connection status handling
 - Add reconnection logic
 
@@ -38,16 +38,18 @@
 ## Implementation Order
 1. ✅ Basic server with message broadcasting
 2. ✅ Simple configuration in Env module
-3. Client WebSocket connection
-4. Message handling
-5. Error handling & reconnection
-6. Deployment
-7. Cleanup
+3. ✅ WebSocket FFI module
+4. Create WebSocketBroadcaster
+5. Implement Broadcast typeclass
+6. Add connection handling
+7. Testing & deployment
+8. Cleanup
 
 ## Files to Change
 - `/server/*` (new) ✅
 - `src/Domination/Env.purs` ✅
-- `src/Domination/Capability/Broadcast.purs`
-- `src/FFI.purs`
-- `src/FFI.js`
+- `src/FFI/WebSocket.purs` ✅
+- `src/FFI/WebSocket.js` ✅
+- Next: `src/Domination/Capability/Broadcast/WebSocket.purs` (new)
+- Next: `src/Domination/Capability/Broadcast.purs`
 - `src/Main.purs`
