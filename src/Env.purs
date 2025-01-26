@@ -9,4 +9,11 @@
 --| * Empty data type
 module Domination.Env where
 
-type Env = {}
+type Env =
+  { wsUrl :: String
+  }
+
+env :: Env
+env =
+  { wsUrl: "ws://localhost:8080"
+  }
