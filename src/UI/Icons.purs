@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Provides a set of icons for use in a UI application.
+--| Defines a set of reusable icons for a UI component.
 --|
 --| ### Key Concepts
---| * Halogen HTML generation and CSS class manipulation
---| * Using `icon` function to generate HTML elements with custom CSS classes
---| * Custom HTML elements for various use cases (e.g., actions, buys, cards, etc.)
+--| * Halogen HTML library
+--| * Functional programming style
+--| * Higher-order functions (e.g. `icon`)
 
 module Domination.UI.Icons where
 

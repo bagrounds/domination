@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A module for working with sets in PureScript.
+--| Defines a set data type and associated semilattice operations for ordinals.
 --|
 --| ### Key Concepts
 --| * Set data structure
---| * Union and intersection operations on Sets
---| * Join and Meet semilattices on Sets
+--| * JoinSemilattice class
+--| * MeetSemilattice class
 module Domination.Data.Table2 where
 
 import Prelude

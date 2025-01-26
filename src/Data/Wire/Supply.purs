@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition for mapping between a supply and an array of wire stacks.
+--| Definition of an ISO between Supply data type and a WireSupply array of WireStacks.
 --|
 --| ### Key Concepts
---| * Iso and Prism lenses
---| * Data types: `Supply`, `WireSupply`, `WireStack`
---| * `_toWire` function
+--| * **Lenses**: A way to abstractly manipulate data by creating lenses that traverse the structure of a value.
+--| * **Iso (Isomorphism)**: A type of lens that establishes an equivalence between two types.
+--| * **Type conversion**: The process of converting one type into another, often using lenses.
 module Domination.Data.Wire.Supply where
 
 import Prelude

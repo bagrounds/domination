@@ -1,12 +1,11 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A data type for different types of targets with associated encoding and decoding instances.
+--| Defines an enumeration for different targets with associated encoding and decoding instances.
 --|
 --| ### Key Concepts
---| * Generic and generic-related typeclasses
---| * Deriving instances for `Generic` and `Eq`
---| * Encoding/Decoding using Argonaut's generic utilities
+--| * Argonaut library for JSON encoding and decoding
+--| * Data types and instances related to JSON serialization/deserialization
 module Domination.Data.Target where
 
 import Prelude

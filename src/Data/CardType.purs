@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a data type for card types in a game.
+--| Defines a set of data types for card types in a card game.
 --|
 --| ### Key Concepts
---| * Generic data type for representing card types in the Domination game.
---| * Support for JSON encoding and decoding, as well as array buffer encoding and decoding.
---| * Deriving instances for various Argonaut classes.
+--| * Data types and instances for CardType
+--| * Encoding and decoding JSON for CardType
+--| * Array buffer encoding and decoding for CardType
 module Domination.Data.CardType where
 
 import Prelude

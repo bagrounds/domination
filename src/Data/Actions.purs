@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A PureScript module for defining and deriving various properties of an "Actions" data type related to game logic.
+--| Defines a new data type 'Actions' as an instance of WireInt with additional encoding, decoding and showing capabilities.
 --|
 --| ### Key Concepts
---| * **Actions Data Type**: A newtype wrapper around `WireInt`.
---| * **Deriving Instances**: Various deriving instances for standard data type classes.
---| * **Iso' (_int)**: An ISO instance mapping between `Actions` and `Int`.
+--| * Actions: A newtype data structure wrapping a `WireInt` value.
+--| * Generic programming: Various deriving instances for generic functions like `Eq`, `Ord`, `Show`, and more.
+--| * Argonaut encoding and decoding: Instances for serializing and deserializing `Actions` values to and from JSON.
 module Domination.Data.Actions
   ( Actions(..)
   , actions

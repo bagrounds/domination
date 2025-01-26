@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Module defines data and instances for representing different phases in a game.
+--| Defines a Phase data type with various encoding, decoding, and generation instances for Argonaut JSON serialization and deserialization.
 --|
 --| ### Key Concepts
---| * The concept of a `Phase` data type, representing different stages in a game process.
---| * A simple finite state machine with three possible states: `ActionPhase`, `BuyPhase`, and `CleanupPhase`.
---| * The implementation of the `next` function, which transitions between these phases.
+--| * Data types (e.g. `Phase`)
+--| * Functionality (e.g. `next` function)
+--| * Type classes (e.g. `DecodeJson`, `EncodeJson`)
 module Domination.Data.Phase where
 
 import Prelude

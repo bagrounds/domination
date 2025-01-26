@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines data type and functions for representing bonus values in the context of dominoes.
+--| This module defines a data type Bonus representing money, along with associated functions for encoding, decoding, and manipulating its value.
 --|
 --| ### Key Concepts
---| * The `Bonus` data type represents a single bonus, which can be either `Cash Int`.
---| * A `cashValue` function is defined to calculate the total value of an array of bonuses.
---| * The `hash` function for `Bonus` relies on the `cashValue1` function to derive a hash value.
+--| * Data types and encoding/decoding schemes for representing bonus data.
+--| * Array folding and aggregation operations.
+--| * Generic programming with Argonaut's decoding and encoding functionality.
 module Domination.Data.Bonus where
 
 import Prelude

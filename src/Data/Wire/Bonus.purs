@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A data type and associated types for representing a bonus wire in the Domination game.
+--|  Defines an Iso type alias for converting Bonus data types to and from WireBonus data types, including encoding and decoding capabilities.
 --|
 --| ### Key Concepts
---| *   WireBonus data structure and its variants (Cash, WireCash)
---| *   `_toWire` Iso' function for encoding Bonus to WireBonus
---| *   Derived instances for decoding and encoding JSON, showing, and encoding/decoding arrays
+--| * Iso (isomorphism) for converting between Bonus and WireBonus
+--| * Generic programming using Data.Generic.Rep
+--| * Deriving instance for encoding/decoding/showing using Argonaut's generic functions
 module Domination.Data.Wire.Bonus where
 
 import Prelude

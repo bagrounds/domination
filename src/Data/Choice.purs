@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Data types and functions for representing choices in a card game.
+--| Defines a data type `Choice` for different game actions with associated data types and functions for encoding, decoding, and displaying choices.
 --|
 --| ### Key Concepts
---| * `Choice` data type and its various constructors
---| * `isAttack` function to check if a `Choice` is an attack action
---| * `generic*` instances for `Generic`, `Eq`, `Show`, `EncodeJson`, and `DecodeJson` classes applied to the `Choice` type
+--| * **Data types**: The module defines various data types such as `Choice`, `If`, `And`, `Or`, `PickN`, `Option`, `MoveFromTo`, `GainCard`, etc.
+--| * **Pattern matching**: The module uses pattern matching to define the behavior of different data types, including the `isAttack` function.
+--| * **Instance definitions**: The module defines instances for various type classes such as `Generic`, `Eq`, `Show`, `EncodeJson`, and `DecodeJson`.
 module Domination.Data.Choice where
 
 import Prim hiding (Constraint)

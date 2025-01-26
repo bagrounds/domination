@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition of Var type with various instance definitions for Argonaut data encoding and decoding.
+--| Defines a data type Var with two variants, Unbound and Bound(a), along with various instance declarations for Argonaut serialization and deserialization.
 --|
 --| ### Key Concepts
---| * Variants: `Unbound` and `Bound a`
---| * Type class derivation for `Generic`, `Eq`, `Functor`, `Show`, `EncodeJson`, and `DecodeJson`
---| * Instance definitions for various type classes on the `Var` data type
+--| * Generic type class for deriving instances
+--| * Argonaut library (JSON encoding and decoding)
+--| * Array buffer manipulation using generic functions
 module Domination.Data.Var where
 
 import Prelude
