@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| PureScript module for serializing and deserializing game state in a wire format.
+--| Defines types, conversions, and encodings for representing a game state in wire format.
 --|
 --| ### Key Concepts
---| * Data transformations and encoding/decoding mechanisms
---| * Game state structure and data types
---| * Lens-based data manipulation techniques
+--| * Data transformation between WireGame and Game using an Iso
+--| * Generic encoding/decoding for WireGame using Argonaut's generic functions
+--| * Lens-based getters and setters for accessing WireGame fields
 module Domination.Data.Wire.Game where
 
 import Prelude

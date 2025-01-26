@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Empty data type for environment variables.
+--| Empty environment type definition.
 --|
 --| ### Key Concepts
---| * Minimalistic data structure
---| * Empty object
---| * Simple domain model
+--| * Type
+--| * Environment (data structure)
+--| * Empty data type
 module Domination.Env where
 
 type Env = {}

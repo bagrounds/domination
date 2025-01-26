@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Data types and instances for representing stack expressions and values in a card game.
+--| Defines data types for stack expressions and values used in a card game, along with encoding and decoding functionality.
 --|
 --| ### Key Concepts
---| * Generic data types and derive instances for `Generic`, `Eq`, `Show`, `EncodeJson`, and `DecodeJson`.
---| * Argument-based data types with optional fields (e.g. `StackChooseCards`).
---| * Recursive data type to represent expression evaluation (StackExpression).
+--| * **Stack Expressions**: The core data structure of the module, representing different operations on a stack.
+--| * **Stack Values**: The possible values that can be stored or manipulated in a stack, including arrays, integers, strings, filters, and booleans.
+--| * **Generic Encoding and Decoding**: The use of generic functions to encode and decode instances of `StackExpression` and `StackValue`, allowing for flexible serialization and deserialization.
 module Domination.Data.StackEvaluation where
 
 import Prelude

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a MonoidalSum class for composing functions over Either values.
+--| Defines functions for summing monoids over Either types.
 --|
 --| ### Key Concepts
---| * Monoidal Sum as a Binary Operation
---| * Either Type as a Monoidal Context
---| * Identity for the Monoidal Sum Operation
+--| * MonoidalSum class
+--| * Left and Right injectors
+--| * Monoid instance for (->)
 module Data.MonoidalSum where
 
 import Data.Either (Either(..))

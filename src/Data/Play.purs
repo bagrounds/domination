@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| This module defines data types and functions for handling game state in a card game.
+--| Provides a data type for representing different phases of a game, along with associated encoding and decoding functionality.
 --|
 --| ### Key Concepts
---| * **Data types**: Understanding the `Play` data type and its variants (`NewGame`, `EndPhase`, etc.).
---| * **Lens**: Familiarity with the `Lens'` concept, specifically the `_playerIndex'` lens.
---| * **Traversal**: Understanding how to use the `wander` function to create a traversal for traversing nested fields in the `Play` data type.
+--| * Lens: a powerful data transformation library for Haskell.
+--| * Argonaut: a JSON serialization and deserialization framework for Haskell.
+--| * Generic programming: a paradigm for writing reusable code that can work with multiple data types using generic functions and types.
 
 module Domination.Data.Play where
 

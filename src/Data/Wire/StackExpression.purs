@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Data type for serializing and deserializing stack expressions in a wire format.
+--| Definition of a WireStackExpression data type with various constructors and support for JSON encoding, decoding, and other utilities.
 --|
 --| ### Key Concepts
---| * `WireStackExpression` data type and its variants.
---| * `_toWire` iso for converting `StackExpression` to `WireStackExpression`.
---| * Instances of `Generic`, `Eq`, `Show`, `EncodeJson`, `DecodeJson`, `DynamicByteLength`, `EncodeArrayBuffer`, and `DecodeArrayBuffer`.
+--| * Iso abstraction for converting `StackExpression` to `WireStackExpression`
+--| * Generic encoding/decoding functionality for `WireStackExpression` using Argonaut
+--| * Lens-based data transformations and accessors for `WireStackExpression`
 module Domination.Data.Wire.StackExpression where
 
 import Prelude

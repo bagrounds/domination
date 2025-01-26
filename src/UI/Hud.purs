@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| UI layer for a game state, including player information and statistics.
+--| Creates a graphical user interface (GUI) for a Domination game's HUD, displaying player information and game state.
 --|
 --| ### Key Concepts
---| * **ActiveState**: A data structure representing the current state of a game, including player index, turn number, game phase, and game state.
---| * **Render Functionality**: A function that takes an `ActiveState` as input and returns a Halogen HTML element representing the UI for the current game state.
---| * **Halogen Components**: Various Halogen HTML components used to render specific UI elements, such as `HH.div`, `HH.h1`, `HH.text`, and `HH.ul`.
+--| * **Halogen HTML**: Halogen is a HTML library for Haskell, used to build user interfaces.
+--| * **Data Transformation**: The code uses various functions like `mapWithIndex`, `toArray`, and `renderText` to transform data structures into HTML elements.
+--| * **State Management**: The module deals with game state management, including player positions, phases, and actions.
 
 module Domination.UI.Hud where
 

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition of a data type WirePlay used to represent the state of a game in Domination, including various actions and choices.
+--| Provides an Iso instance for converting between a Play data type and a WirePlay wire format.
 --|
 --| ### Key Concepts
---| * `Iso` for data transformation between `Play` and `WirePlay`
---| * `Generic` for deriving instance methods on `WirePlay`
---| * `EncodeJson` for encoding `WirePlay` to JSON
+--| * **Iso'**: A mapping between two data types that can be used for encoding and decoding.
+--| * **WirePlay**: The wire format representation of a Play state, which consists of multiple wire formats (e.g., WireNewGame, WireEndPhase) combined with various types of values (e.g., Int, Cards, Choice).
+--| * **Iso' from to**: A specific implementation of Iso' that maps between the Play state and the WirePlay wire format.
 module Domination.Data.Wire.Play where
 
 import Prelude

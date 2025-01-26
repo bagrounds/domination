@@ -1,49 +1,13 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| This is a Haskell implementation of the game Scythe, written by Jamey Stegmaier. It's a deck-building game with area control and resource management mechanics.
---|
---| Here's a brief overview of what this code does:
---|
---| 1. **Game setup**: The `play` function sets up a new game state, which includes the player index, card index, and the game supply (representing resources).
---| 2. **Player actions**: When a player takes their turn, they can play cards from their hand to perform various actions, such as:
---| 	* Playing cards to gain points or build structures
---| 	* Using special abilities on cards or other players
---| 	* Moving armies to adjacent provinces
---| 3. **Card effects**: Cards have special effects that are applied when played. These effects can include bonuses, penalties, or changes to the game state.
---| 4. **Game state management**: The `modifyPlayer` and `modifyStack` functions update the player's and stack's states accordingly, reflecting changes made by cards or actions taken by players.
---| 5. **Game logic**: The code uses a combination of monads (e.g., `MonadState`) and functions like `finalResult` to manage the game state and enforce rules, such as:
---| 	* Checking for game over conditions
---| 	* Updating scores and victory points
---| 	* Managing the supply of resources
---| 6. **Monadic computations**: Many parts of the code are written in a monadic style, using functions like `modifyPlayer`, `modifyStack`, and `applySpecialToTargets` to perform computations that modify the game state.
---|
---| Some notable aspects of this implementation include:
---|
---| * The use of a `Maybe Result` return type for the `finalResult` function, which represents the outcome of the game.
---| * The separation of concerns between different functions (e.g., `play`, `modifyPlayer`, `applySpecialToTargets`) that focus on specific tasks within the game.
---| * The use of monads to manage game state and enforce rules, making the code more predictable and easier to reason about.
---|
---| If you're interested in learning more about Scythe or deck-building games, I'd be happy to help with any questions!
+--| Automates card playing and special effects for a deck-building game, including player actions, reaction handling, and final outcome determination.
 --|
 --| ### Key Concepts
---| This is a Haskell code that implements various game logic for a popular board game. The game appears to be about building and managing colonies on a planet, while also fighting off enemies and trying to win the most points.
---|
---| Here's a high-level overview of what each part of the code does:
---|
---| 1. **Game setup**: The `Game` type is defined with various fields such as `players`, `supply`, and `mode`. The `mode` field determines whether the game is played in Solo or Long mode.
---| 2. **Player actions**: The `play` function allows a player to perform an action, such as playing a card from their hand or choosing a reaction. The `applySpecialsToTargets` function applies special abilities to targets.
---| 3. **Choice turn**: The `choiceTurn` function determines the current turn order based on the players' choices and scores.
---| 4. **Game result**: The `gameResult` function calculates the final score for each player, including any ties or losses.
---| 5. **Final game state**: The `finalResult` function checks if the game is over based on various conditions, such as empty stack count or remaining points.
---|
---| Some specific interesting parts of the code include:
---|
---| * The use of type classes and generic programming to define functions like `applySpecialsToTargets`, which can work with different types of players and targets.
---| * The use of pattern matching to handle different game modes (Solo, Short, Long) and edge cases.
---| * The implementation of various conditions for determining if the game is over, such as empty stack count or remaining points.
---|
---| Overall, this code appears to be well-structured and follows good design principles. However, without more context about the specific requirements and constraints of the game, it's difficult to provide more detailed feedback on its quality or suggest improvements.
+--| * **Modularity**: The code is organized into separate functions for each gameplay step, making it easier to understand and maintain.
+--| * **State Management**: The game state is passed as arguments between functions, ensuring that the state remains consistent throughout the gameplay process.
+--| * **Reactivity**: Functions modify the state directly when certain conditions are met, such as `modifyPlayer` or `modifyStack`, allowing for immediate reactions to player actions.
+--| * **Abstraction**: High-level concepts like `Target` and `Special` provide a layer of abstraction, hiding specific implementation details and making the code more focused on gameplay logic.
 module Domination.Data.Game.Engine where
 
 import Prelude hiding (Ordering(..))

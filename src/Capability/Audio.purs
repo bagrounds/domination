@@ -1,13 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A PureScript module for generating various sound effects and music compositions using the Web Audio API.
+--| A PureScript module for generating audio using Web Audio API.
 --|
 --| ### Key Concepts
---| * Audio context management and manipulation
---| * Sound generation using WebAudio
---| * Composition of sound patterns using arrays and functions
---| * Utilization of predefined sounds and frequencies for musical notes
+--| * Audio Context Management: Creating, manipulating, and controlling audio contexts.
+--| * Audio Generation: Generating sound using WebAudio's oscillator nodes, gain nodes, and effect chains.
+--| * Functional Programming Principles: Applying functional programming concepts (e.g., recursion, composition) to audio generation and manipulation.
 module Domination.Capability.Audio where
 
 import Prelude hiding (compose)

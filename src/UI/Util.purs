@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Creates UI components for inputting and managing numeric values with constraints.
+--| Utility functions for building HTML elements and handling user input with incrementer-like functionality.
 --|
 --| ### Key Concepts
---| * `IncrementerInput`: a type representing an incrementer input with label, minimum and maximum bounds, value, and a setter function.
---| * `chooseOne` and `acknowledge`: functions for generating buttons or acknowledging messages with optional click events.
---| * `incrementer`: a function that generates an HTML element for an incrementer input.
+--| * **Halogen**: A functional HTML builder library.
+--| * **Incrementer**: A UI component for inputting an integer value with bounds (optional).
+--| * **Component Composition**: Building reusable UI components by combining smaller elements like labels, buttons, and input fields.
 
 module Domination.UI.Util where
 

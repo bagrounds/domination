@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Component that manages choosing cards from a supply.
+--| Domination UI component for choosing cards from supply.
 --|
 --| ### Key Concepts
---| * **Domination Capability**: Understanding the `Dom` and `Log` classes, which provide the foundation for Domination's functionality.
---| * **Component Structure**: Recognizing the component's main components, including `initialState`, `render`, and `eval`.
---| * **State and Actions**: Familiarity with the `State` type and the two types of actions: `Toggle Int` and `Done`.
+--| * `Dom` and `Log` capabilities
+--| * Halogen component lifecycle (initial state, render, eval)
+--| * Card rendering and management within the component
 module Domination.UI.ChooseFromSupply where
 
 import Prelude

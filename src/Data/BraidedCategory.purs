@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a class for braided categories with a swapping function.
+--| Provides a class for defining braided categories, specifically for function types.
 --|
 --| ### Key Concepts
---| * A BraidedCategory is a monoid with an additional operation that swaps the elements of pairs.
---| * The swap operation must take any pair as input and return another pair with the elements swapped.
---| * The Swap operation can be implemented differently for different types, such as `(->)` in this example.
+--| * Braided Category
+--| * Swapping data types
+--| * Typeclass instance
 module Data.BraidedCategory where
 
 import Data.Tuple (Tuple(..))

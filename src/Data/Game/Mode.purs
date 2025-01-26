@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| It defines a data type for game modes and functions to parse game state into one of three possible modes: Solo, Short, or Long.
+--| Defines a Mode data type for game modes (Solo, Short, Long) and functions to parse game mode from player information.
 --|
 --| ### Key Concepts
---| * `Mode` data type with three constructors: `Solo`, `Short`, and `Long`.
---| * The purpose of the `mode` function, which returns the game mode based on the number of players and whether it's a long game.
---| * Pattern matching is used to determine the game mode.
+--| * Monads
+--| * Pattern matching
+--| * Data constructors
 module Domination.Data.Game.Mode where
 
 import Prelude

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines an enum for relationships between two values and functions to express them.
+--| Defines a data type for relationship comparisons between two values.
 --|
 --| ### Key Concepts
---| * Ord class and its methods for comparing values
---| * Relationship data type and its constructors
---| * Show instance for displaying the relationship value
+--| * Ord class
+--| * Case expressions (pattern matching)
+--| * Show instance for a data type
 module Relationship where
 
 import Data.Eq ((/=), (==))

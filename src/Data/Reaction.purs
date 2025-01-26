@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Module defines data type and encoding/decoding functions for "Reaction" in game Domination.
+--| Defines data types, derives instances for serialization and deserialization of a specific type called Reaction.
 --|
 --| ### Key Concepts
---| * Data types and instances for encoding/decoding reactions.
---| * Derivations for genericShow, encodeJson, decodeJson, dynamicByteLength, encodeArrayBuffer, and decodeArrayBuffer.
---| * Generic classes and functions.
+--| * Argonaut encoding and decoding framework
+--| * Generic data types with derived instance of `Generic` class
+--| * Deriving instances for various data type classes (e.g. `Show`, `Eq`, `EncodeJson`, etc.)
 module Domination.Data.Reaction where
 
 import Prelude

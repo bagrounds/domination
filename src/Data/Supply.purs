@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Data structures and functions for handling game supplies.
+--| Data structures, functions, and utilities for a card game, including supply management and stack operations.
 --|
 --| ### Key Concepts
---| * `Traversal` for updating and indexing elements in the `Supply` array.
---| * `Array` operations (filter, findIndex, length, updateAt) for manipulating elements in the supply.
---| * `Maybe` and `MonadError` for error handling in functions like `indexOfStack`, `updateStack`, and `stackByName`.
+--| * **Supply**: A data structure representing a collection of stacks.
+--| * **Stack traversal**: Traversing the Supply data structure using lenses.
+--| * **Card management**: Manipulating cards within the supply, including finding, updating, and filtering stacks.
 module Domination.Data.Supply where
 
 import Prelude

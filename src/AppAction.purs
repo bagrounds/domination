@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a set of actions for an application.
+--| Defines a set of actions for an application's state changes.
 --|
 --| ### Key Concepts
---| * Type alias `CardSpecSelection`
---| * Enumerations defining actions that can be taken in the game
---| * Lens for interacting with `AppState`
+--| * **Actions**: A set of discrete events that can be triggered in the application.
+--| * **State Updates**: How the application's state changes in response to these actions.
+--| * **Event Handling**: The process of responding to incoming events and messages.
 module AppAction where
 
 import AppState (AppState)

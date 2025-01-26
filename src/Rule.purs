@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A library for creating and manipulating logical rules with errors.
+--| Defines various data types, functions, and rules for working with logic statements in a domain-specific language (DSL).
 --|
 --| ### Key Concepts
---| * `Predicate` type and its use in defining rules
---| * `Rule` type and its components (`error` and `predicate`)
---| * `Logic` type and its operations (e.g. `Not`, `And`, `Or`, `Implies`)
+--| * **Monads for Error Handling**: Understanding how `MonadError` is used to handle errors in the code.
+--| * **Lens**: Knowing how Lens (a type of generic lens) is used to define getters and setters for rule fields.
+--| * **Logic Type System**: Understanding the basics of the `Logic` type system, including its syntax, instances, and operations.
 
 module Rule where
 

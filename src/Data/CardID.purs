@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A module defining a newtype called CardID that wraps an integer, with various type class instances for common data structures like lists and hash tables.
+--| A data type for unique card IDs with various derived instance methods for equality, ordering, hashing, and enumerating possible values.
 --|
 --| ### Key Concepts
---| * Enum and Bounded types for a unique integer ID
---| * CardID type as a newtype of Int with added enum-like behavior
---| * Deriving instances for Eq, Ord, Hashable, Bounded, Enum, and BoundedEnum classes.
+--| * **CardID data type**: A newtype alias for an Int representing a unique identifier.
+--| * **BoundedEnum**: An instance of the BoundedEnum class for CardID, defining its bounds and ordering properties.
+--| * **Enum and Eq instances**: Instances that allow CardID to be treated as an enum and comparable with other values.
 module Domination.Data.CardID where
 
 import Data.Bounded (class Bounded, bottom, top)

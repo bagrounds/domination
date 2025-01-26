@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A UI component for choosing to move a card from one pile to another in a Dominion game.
+--| Creates a UI component for making a choice in a card game, including rendering options and handling selection and resolution.
 --|
 --| ### Key Concepts
---| * The `component` function is a Halogen component that wraps another component (`CardChooser.component`) and uses it to render a `Choice.MoveFromTo` UI.
---| * The `choice` parameter determines the type of move being made (e.g. MoveFromTo, etc.) and affects various functions within the component.
---| * The `baseSlotNumber` parameter is used as a slot number in the `CardChooser.component`.
+--| * `Dom` and `Log` classes
+--| * `Game` data type
+--| * `Choice` data type (specifically `MoveFromTo`)
 module Domination.UI.ChoiceMoveFromTo where
 
 import Prelude

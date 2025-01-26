@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines a lens for converting a Domination.Data.Card to an integer wire representation.
+--| Defines an Iso type for converting between a Card and its corresponding WireInt value.
 --|
 --| ### Key Concepts
---| * Iso and Prism concepts for lens manipulation
---| * Conversion between `Card` data type and `WireInt` data type
---| * Use of `fromMaybe` and `findIndex` functions to handle optional values
+--| * Iso' and Prism
+--| * Lens (Getter and Iso')
+--| * Data mapping between Card and WireInt
 module Domination.Data.Wire.Card where
 
 import Prelude
