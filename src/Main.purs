@@ -64,6 +64,7 @@ import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
+import Domination.Env (env)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -92,7 +93,7 @@ main = launchAff_ $ do
   runUI (root audioContext) unit body
 
 root :: forall s query o. AudioContext -> Component query o s Aff
-root audioContext = H.hoist (runAppM {}) (component audioContext)
+root audioContext = H.hoist (runAppM env) (component audioContext)
 
 component
   :: forall m s query o
