@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A PureScript module for handling event propagation in a DOM-based application.
+--| Defines a Monad class for handling events in a Halogen application.
 --|
 --| ### Key Concepts
---| * **Monad of Effects**: Understand the `Dom` class and its instances as a monad for effects.
---| * **Halogen Monad**: Recognize how Halogen's `HalogenM` is related to the `Dom` monad.
---| * **Event Handling**: Know how event propagation is handled in the `Dom` monad.
+--| * **Monads for Event Handling**: Understanding how monads are used to manage event handling in the Dom module.
+--| * **Propagation Control**: Knowing how to use `stopPropagation` to control event propagation in a Halogen application.
+--| * **Effect Lift**: Recognizing how effects are lifted from internal effects to external effects using `liftEffect`.
 module Domination.Capability.Dom where
 
 import Prelude

@@ -1,57 +1,14 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| It appears that you have shared a large code snippet from the Haskell programming language, specifically related to a set of functions and classes for working with relations, monads, and foldable data structures.
---|
---| To help you better, I'll ask some clarifying questions:
---|
---| 1. What is your current level of proficiency in Haskell?
---| 2. Are there specific parts of the code that you'd like me to explain or provide additional information on?
---| 3. Do you have a particular use case or problem you're trying to solve that involves these functions and classes?
---|
---| Assuming you're looking for a brief explanation, I'll break down some key points:
---|
---| * The `relationFilter` function is used to filter relations based on a given predicate.
---| * The `project` function projects a relation onto a specific part of its domain or codomain.
---| * The `msplit` function splits an action in the monad into two separate actions, one for success and one for failure (represented as `Maybe`).
---| * The `reflect` function reflects a `Tuple` containing a value and a monadic result back to the original value.
---|
---| Let me know if you have any specific questions or if there's anything else I can help with!
+--| Monadic logic library for working with relations, tables, and data transformations.
 --|
 --| ### Key Concepts
---| This is a Haskell code snippet that defines various functions and classes for working with monads in a logic-based context. Here's a breakdown of the code:
---|
---| **Types and Classes**
---|
---| * `Relation`: A type class for relations between sets.
---| * `Table`: A type alias for a relation between two types, often used to represent a table or a collection of pairs.
---| * `MonadLogic`: A type class that extends the `Monad` type class with additional methods for working with logic-based monads.
---|
---| **Functions**
---|
---| * `relationFilter`: A function that filters a relation based on a predicate.
---| * `relationFilterL`, `relationFilterLEq`, `relationFilterR`, and `relationFilterREq`: Functions that filter relations based on predicates, where the `L` variants take a left-hand side argument, and the `Eq` variants take an equality predicate. The `R` variants are similar but for right-hand side arguments.
---| * `project'`: A function that projects a relation onto a specific lens (a type of data structure that represents a mapping from one type to another).
---| * `fromFoldable`, `toUnfoldable`: Functions that convert between tables and unfoldable data structures.
---|
---| **Instances**
---|
---| The code defines several instances for the `Relation` class, including:
---|
---| * `relationFilter`: An instance for filtering relations based on predicates.
---| * `relationFilter'`: An instance for filtering relations in the opposite direction.
---| * `relationFilterLEq`, `relationFilterREq`: Instances for filtering relations with equality predicates.
---|
---| **MonadPlus**
---|
---| The code defines a type class `MonadLogic` that extends the `Monad` type class with additional methods. Specifically, it adds a method `msplit` that splits an input value into two parts: a tuple and a second value of the same type. The `reflect` function is also defined as part of this type class.
---|
---| **Other**
---|
---| * `plusempty`: A constant value representing the empty monad.
---| * `LL.nubEq`, `LL.fromFoldable`, `LL.toUnfoldable`: Functions from the `LL` library (likely a Haskell library for working with logic-based data structures).
---|
---| Overall, this code provides a set of utilities and classes for working with relations and monads in a logic-based context.
+--| * **Table**: A data structure used to represent sets of values.
+--| * **Relation**: A binary relation between two tables.
+--| * **MonadLogic**: A monad that represents logical operations on tables.
+--| * **Monads**: Mathematical structures for managing computations with effects.
+--| * **Filters**: Ways to manipulate relations by selecting or rejecting values.
 module Domination.Data.Table where
 
 import Prelude hiding (compose)

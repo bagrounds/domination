@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A data type representing the state of an application.
+--| Defines a data type for the application state of an online game or chat platform.
 --|
 --| ### Key Concepts
---| * `AppState` data type and its various lenses for accessing and updating its fields.
---| * `Config` data type and its lenses for accessing and updating its fields.
---| * The `upgradeSelection` and `upgradeConfig` functions, which upgrade the selection of cards in the kingdom.
+--| * **State Management**: The concept of managing state in the application.
+--| * **Data Lensing**: The use of data lenses to abstractly access and manipulate values within complex data structures.
+--| * **Configurable Game State**: The design of a game with configurable state (e.g., game mode, rules) using enums and functions.
 module AppState where
 
 import Prelude

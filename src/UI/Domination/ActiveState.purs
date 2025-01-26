@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines lenses and an upgrade function for managing game states in Domination UI.
+--| Defines data types, lenses, and functions for managing game states of a Domination game.
 --|
 --| ### Key Concepts
---| * `Lens` and `prop` types for accessing and modifying record fields
---| * `ActiveState` record type with its constituent field definitions
---| * `_state Lens` upgrade function to modify the `Game.state` field of an `ActiveState` record.
+--| * Lens (Data.Lens.Lens) for data manipulation
+--| * Record types and props (Data.Lens.Record.prop)
+--| * Data transformation using Setter (%~)
 module Domination.UI.Domination.ActiveState where
 
 import Data.Lens.Lens (Lens', Lens)

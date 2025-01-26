@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A PureScript module providing randomization capabilities for different monads.
+--| Random number generation utilities for PureScript.
 --|
 --| ### Key Concepts
---| * `Monad RandomM` and its associated types and functions, specifically `shuffle`, `randomElement`, `randomIntBetween`, and `randomBoolean`
---| * The interaction between `RandomM` and other monads, such as `AppM` and `ExceptT String m`
---| * The implementation of the `shuffle` function in terms of the underlying random number generation
+--| * **Monads for Randomness**: A monad that handles randomness in a composable way.
+--| * **Random Data Manipulation**: Functions for generating random elements from arrays and handling randomness in effectful computations.
+--| * **Integration with Halogen and AppM**: Integrating the random monad with other libraries, such as Halogen and AppM.
 module Domination.Capability.Random where
 
 import Prelude

@@ -1,52 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| This code appears to be written in a functional programming language, likely Haskell, given the use of monads and higher-order functions.
---|
---| The provided code is a part of a game-like system, possibly a card game. It defines various data structures and functions for representing cards, piles, filters, and game state.
---|
---| Here's a brief overview of what the code does:
---|
---| 1. **Card representation**: The `getCardName` function takes a source pile, player index, game state, and card index as input. It returns the name of the card at that index in the specified pile.
---|
---| 2. **Pile representation**: The `_stacksToCardsIso` function is used to convert a pile into an array of cards.
---|
---| 3. **Game state representation**: The `Game._pile` accessors are used to retrieve piles from the game state.
---|
---| 4. **Filtering cards**: The `Filter` module defines various filters, such as `HasName`, `HasType`, and `CostUpTo`. These filters can be used to narrow down a pile of cards to match specific criteria.
---|
---| 5. **Game logic functions**: The code includes several functions for handling game actions, such as discarding a hand, drawing cards, and gaining cards based on filters. These functions seem to be part of a larger game system.
---|
---| 6. **UI rendering**: Although not explicitly shown in this code snippet, it's likely that the `render` function from the `Game` module is used to display the current game state, including piles, cards, and filters.
---|
---| The code uses several functional programming concepts, such as:
---|
---| * **Monads**: The `Game` module likely uses a monad to manage its state and effects.
---| * **Higher-order functions**: Functions like `parenthesize` and `_stacksToCardsIso` take other functions or values as arguments, allowing for flexible and composable code.
---|
---| Overall, this code appears to be part of a larger game development project that aims to create a modular, reusable, and maintainable game system.
+--| A PureScript module for generating HTML for card games.
 --|
 --| ### Key Concepts
---| This appears to be a Haskell code snippet that defines a set of functions and types for working with game-related data structures. I'll break down the main components:
---|
---| 1. **Game data structure**: The `Game` type is defined as a record (similar to an object in other languages) with several fields, including:
---| 	* `_pile`: a field representing the current pile (e.g., hand, discard, etc.)
---| 	* `_stacksToCardsIso`: a function that transforms a stack of cards into an array of cards
---| 2. **Pile data structure**: The `Pile` type is defined as a record with several fields, including:
---| 	* `name`
---| 	* `type`
---| 3. **Stack of cards**: A stack of cards is represented as an `Array` of cards.
---| 4. **Card data structure**: A card has two fields: `name` and `type`.
---| 5. **Filter functions**: Several filter functions are defined, such as `Filter.HasName`, `Filter.HasType`, and `Filter.CostUpTo`. These filters take a name or type parameter and return a boolean indicating whether the card matches.
---| 6. **Card gain functions**: Functions like `GainCards` and `GainCard` update the game state by adding cards to the current pile.
---|
---| Some notable features of this code include:
---|
---| * **Pattern matching**: The code uses pattern matching to destructure data structures, making it easier to work with complex data types.
---| * **Type classes**: Although not explicitly defined in this snippet, type classes are likely used throughout the codebase to define common interfaces for different data structures and functions.
---| * **Higher-order functions**: Functions like `parenthesize` take a single argument and return an array of HTML elements.
---|
---| Overall, this code appears to be part of a larger game development framework, providing a way to manage game-related data structures and perform operations on them.
+--| * **Game Logic**: The module implements game logic for a card-based game.
+--| * **Pile Management**: It manages cards in different piles (e.g., hands, discard pile, deck).
+--| * **Card Interactions**: It defines how cards interact with each other and the player's actions (e.g., drawing, playing).
 
 module Domination.UI.RenderText where
 

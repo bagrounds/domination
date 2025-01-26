@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines data types for slots on a game board and areas within those slots.
+--| Defines data types for game areas and slots.
 --|
 --| ### Key Concepts
---| * `DomSlot` and `Area` are data types representing a DOM slot and areas, respectively.
---| * `genericShow` is used to derive a `Show` instance for both types, which allows them to be converted into strings.
---| * The `DeriveGeneric` pragma automatically derives generic instances for both types, including `Eq`, `Ord`, and `Generic`.
+--| * DomSlot and its variants (AreaSlot, CardSlot)
+--| * Area types
+--| * Generic and derived instances for DomSlot and Area
 module Domination.UI.DomSlot where
 
 import Data.Eq (class Eq)

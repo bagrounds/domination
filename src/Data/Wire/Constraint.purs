@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Definition for representing constraint values in wire format.
+--| Defines a data type for wire constraints and its corresponding encoding/decoding functionality.
 --|
 --| ### Key Concepts
---| * `WireConstraint` data type
---| * `toWire` and `fromWire` conversions between `Constraint` and `WireConstraint`
---| * Deriving instances for `Generic`, `Eq`, `Show`, `EncodeJson`, `DecodeJson`, `DynamicByteLength`, and `EncodeArrayBuffer`
+--| * **Iso** (Isomorphism) data types
+--| * **Generic** typeclass with related functions (e.g. `genericShow`, `genericEncodeJson`)
+--| * **Dynamic Byte Length** typeclass for efficient serialization/deserialization
 module Domination.Data.Wire.Constraint where
 
 import Prim hiding (Constraint)

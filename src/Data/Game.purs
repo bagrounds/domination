@@ -1,14 +1,13 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A data structure and utility library for a game.
+--| Game management utilities for a card game.
 --|
 --| ### Key Concepts
---| *   `Phase` and `ActionPhase` are important high-level concepts in this module, representing the current phase of the game.
---| *   `Game` is the main data structure that encapsulates all the state and functionality of the game.
---| *   The different functions such as `upgrade`, `currentPlayer`, `hasReaction`, `isAttacked`, and `isBenefitted` are crucial for understanding how the game progresses and what actions can be taken by players.
---| *   Concepts like "choices outstanding" and "assertTurn" are key to understanding the game's logic and ensuring that all interactions are valid and well-behaved.
---| *   Understanding the `Condition` type, which represents different conditions under which a player should act or receive certain information, is also important for comprehending how the game makes decisions.
+--| * **Game Structure**: The module defines a game structure that includes players, stacks, choices, and phases.
+--| * **Game State Management**: The module provides functions for updating the game state, such as `updatePlayer`, `updateStack`, and `modifyPlayer`.
+--| * **Turn Management**: The module manages turns, including checking if it's a player's turn (`assertTurn`) and resolving choices (`choicesOutstanding`).
+--| * **Phase Management**: The module ensures that the game is in the correct phase (`assertPhase`).
 module Domination.Data.Game where
 
 import Prelude

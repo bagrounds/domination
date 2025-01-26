@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Data structures for managing game stacks and cards.
+--| A set of data types, functions, and lenses for working with stacks of cards in a card game.
 --|
 --| ### Key Concepts
---| * `Stack` data type and its representation as a record with `card` and `count` fields.
---| * `_toCards` and `_fromCards` functions for converting between stacks and arrays of cards.
---| * `_card` and `_count` lenses for accessing the individual components of a stack.
+--| * **Data Structures**: Understanding the `Stack` data structure and its conversion to and from other data structures (e.g., `Array Card`).
+--| * **Lens**: Familiarity with the `Lens` module, including creating and using lenses to access and modify fields in a `Stack` record.
+--| * **Iso**: Understanding Iso's (Isomorphic Functions) role in converting between different data representations.
 module Domination.Data.Stack where
 
 import Prelude

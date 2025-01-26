@@ -89,7 +89,7 @@ query_ollama() (
     printf "\n${COLOR_PROMPT}%s${COLOR_RESET}\n" "$prompt" >&2
     printf "%s\n" "----------------------------------------" >&2
     
-    full_prompt="${prompt}\n\n${context}"
+    full_prompt="${prompt}\n\n${context}\n\n${prompt}"
     data=$(jq -n --arg p "$full_prompt" '{
         "model": "'"$MODEL"'",
         "prompt": $p,

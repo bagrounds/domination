@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A React-like UI component for displaying and editing an announce input field.
+--| Provides a UI component for inputting an announcement message.
 --|
 --| ### Key Concepts
---| * State monad for managing input value and any other state
---| * RenderInput type alias for a component that renders an HTML input field with announcement text
---| * `render` function that returns an HTML element representing the input field.
+--| * **State and Render Input**: Understand the definitions of `State` and `RenderInput` types.
+--| * **Rendering HTML Components**: Recognize how to render an HTML component using the `render` function.
+--| * **Event Handling**: Understand how event handling is implemented through the use of `HE.onValueInput` and `onInput` function.
 module Domination.UI.AnnounceInput where
 
 import Prelude

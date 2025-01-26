@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines data types and encoding/decoding functions for a wire data structure in the context of card games.
+--| Defines an ISO type and its associated data structures for wire protocol choices.
 --|
 --| ### Key Concepts
---| * Iso for conversion between `WireChoice` and its constituent data structures
---| * Generic functions (`genericDecodeJson`, `genericEncodeJson`) for encoding/decoding JSON representations of `WireChoice`
---| * Lens-like operations (e.g. `_toWire`, `.^`) for manipulating `WireChoice` values
+--| * **Generic Programming**: This module demonstrates how to use Haskell's generic programming techniques to encode and decode complex data structures.
+--| * **Iso and Prism**: The module uses the `Iso'` and `Prism` types from the `Data.Lens` library to define a conversion between a generic data structure (`Choice`) and a specific wire format (`WireChoice`).
+--| * **Deriving Generic Instances**: The module shows how to derive generic instances for common Haskell types (e.g. `Generic`, `Eq`, `Show`, `EncodeJson`, etc.) using the `generic` function from the `Data.Generic.Rep` library.
 module Domination.Data.Wire.Choice where
 
 import Prelude

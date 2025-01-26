@@ -1,11 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines associativity property for categories with function types.
+--| Defines AssociativeCategory typeclass with right and left associativity laws for arbitrary types.
 --|
 --| ### Key Concepts
---| * Associative Category class with right and left associativity constraints.
---| * Function instance for the -> type to satisfy these constraints.
+--| * Associative category
+--| * Left associativity
+--| * Right associativity
 module Data.AssociativeCategory where
 
 import Data.Tuple (Tuple(..))

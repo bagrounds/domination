@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| A PureScript module for a card choice component in a card game.
+--| Builds a UI component for choosing cards in a card game.
 --|
 --| ### Key Concepts
---| * `Dom` and `Log` classes are used for game-related functionality.
---| * The `Game` type represents the current state of the game, including cards and constraints.
---| * The `ComponentSpec` type defines the layout and behavior of the component.
+--| * Halogen component for card selection
+--| * Game state management with Log
+--| * Card rendering and filtering
 
 module Domination.UI.ChooseCards where
 

@@ -1,12 +1,12 @@
 --| ## AI Generated Module Summary (llama3.2:3b)
 --|
 --| ### Description
---| Defines an ISO lens mapping between a Stack data type and its wire representation.
+--| Converts a stack data structure into a tuple of wire integers.
 --|
 --| ### Key Concepts
---| * Domain-specific concepts: Stack, WireStack, Card, and related data types.
---| * Lens-based data transformations: Iso', Setter (%~), Getter (view), Iso (iso).
---| * Data structure manipulation: Tuple, conversion functions to/from tuples.
+--| * **Lens**: A powerful functional programming technique for manipulating data structures.
+--| * **Isomorphism**: A bijective mapping between two types that preserves their structure.
+--| * **Type Transformation**: The process of creating a new type from an existing one using functions and higher-order types.
 module Domination.Data.Wire.Stack where
 
 import Prelude
