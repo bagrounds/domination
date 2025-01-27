@@ -1,5 +1,37 @@
 'use strict'
 
+// Add singleton management at the top
+const getWebSocket = () => window._singletonWebSocket
+const setWebSocket = (ws) => { window._singletonWebSocket = ws }
+const clearWebSocket = () => {
+  const ws = getWebSocket()
+  if (ws) {
+    try {
+      ws.close()
+      logInfo('Closed existing WebSocket connection')
+    } catch (e) {
+      logError('Error closing existing WebSocket:', e)
+    }
+  }
+  window._singletonWebSocket = null
+}
+
+// Add message buffer constants and functions at the top
+const MESSAGE_BUFFER_LENGTH = 4
+const messageBuffer = []
+
+const newMessage = (message) => {
+  if (messageBuffer.includes(message)) {
+    logInfo('Duplicate message detected, ignoring')
+    return false
+  }
+  messageBuffer.push(message)
+  while (messageBuffer.length > MESSAGE_BUFFER_LENGTH) {
+    messageBuffer.shift()
+  }
+  return true
+}
+
 const log = level => (...args) => console[level]('WebSocket FFI: ', ...args)
 const logInfo = (...args) => log('log')(...args)
 const logError = (...args) => log('error')(...args)
@@ -32,12 +64,22 @@ exports.makeWebSocketFFI = left =>
   callback =>
   () => {
     try {
+      // Check for existing connection
+      const existing = getWebSocket()
+      if (existing) {
+        logInfo('Reusing existing WebSocket connection')
+        callback(right(existing))()
+        return () => {} // No-op cleanup for reused connection
+      }
+
       const ws = new WebSocket(`ws://localhost:8081`)
       ws.address = crypto.randomUUID()
+      setWebSocket(ws)
 
       const shutdown = (event) => {
         try {
           ws.close()
+          clearWebSocket()
           logInfo(`closed websocket on '${event.type}'`)
         } catch (e) {
           logInfo(`failed to close websocket on '${event.type}'`)
@@ -63,10 +105,14 @@ exports.makeWebSocketFFI = left =>
         const processMessage = data => {
           if (data instanceof Blob) {
             data.text().then(text => {
-              broadcastEvent(remoteMessageTarget)(text)
+              if (newMessage(text)) {
+                broadcastEvent(remoteMessageTarget)(text)
+              }
             })
           } else {
-            broadcastEvent(remoteMessageTarget)(data)
+            if (newMessage(data)) {
+              broadcastEvent(remoteMessageTarget)(data)
+            }
           }
         }
         processMessage(event.data)
