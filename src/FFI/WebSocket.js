@@ -7,11 +7,15 @@ const logError = (...args) => log('error')(...args)
 const broadcastEvent = messageTarget => event => {
   const eventTarget = document.querySelector('#' + messageTarget)
   if (eventTarget) {
-    eventTarget.dispatchEvent(new CustomEvent('purescript', { detail: event }))
-  } else {
-    logError(`#${messageTarget} undefined, cannot dispatch event: `, event)
+    eventTarget.dispatchEvent(customEvent(event))
+  }
+  else {
+    logError(`${domQuery} undefined, cannot dispatch event: `, event)
   }
 }
+
+const customEvent = detail =>
+  new CustomEvent('purescript', { detail })
 
 exports.detail = ({ detail }) => detail
 
