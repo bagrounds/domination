@@ -17,10 +17,18 @@ exports.detail = ({ detail }) => detail
 
 exports.showWebSocket = ws => `WebSocket(${ws.url})`
 
-exports.makeWebSocketFFI = left => right => connections => seen =>
-  remoteMessageTarget => localMessageTarget => roomCode => announce => callback => () => {
+exports.makeWebSocketFFI = left =>
+  right =>
+  connections =>
+  seen =>
+  roomCode =>
+  remoteMessageTarget =>
+  localMessageTarget =>
+  announce =>
+  callback =>
+  () => {
     try {
-      const ws = new WebSocket(`ws://192.168.254.72:8081`)
+      const ws = new WebSocket(`ws://localhost:8081`)
       ws.address = crypto.randomUUID()
 
       const shutdown = (event) => {
