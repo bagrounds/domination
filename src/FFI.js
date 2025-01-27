@@ -240,10 +240,12 @@ exports.stringAsArrayBuffer = string => {
 // cannot eta-reduce this function because LZString does not
 // exist in our test suite - we currently import the library
 // in an HTML script tag
-exports.compressString = s => LZString.compress(s)
+// https://github.com/pieroxy/lz-string/issues/167#issuecomment-1319644753
+exports.compressString = s => LZString.compressToUTF16(s)
 
 exports.decompressStringFFI = just => nothing => s => {
-  const result = LZString.decompress(s)
+// https://github.com/pieroxy/lz-string/issues/167#issuecomment-1319644753
+  const result = LZString.decompressFromUTF16(s)
   return result == null
     ? nothing
     : just(result)
