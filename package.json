@@ -14,7 +14,7 @@
     "prebundle": "npm run test",
     "bundle": "spago bundle-app --main Main --to dist/app.js",
     "deploy": "./scripts/deploy",
-    "serve": "npx node-static -p 8080 public",
+    "serve": "npx node-static -p 8080 public -a",
     "hot-reload": "./scripts/hot-reload",
     "ai-header-comments": "./scripts/ai-header-comments",
     "docs": "spago docs",
