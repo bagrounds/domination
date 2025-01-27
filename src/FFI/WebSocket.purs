@@ -1,23 +1,44 @@
 module FFI.WebSocket where
 
 import Prelude
+
+import Data.Either (Either(..))
 import Effect (Effect)
+import Effect.Aff (Canceler, Error)
+import Message (LocalMessage(..))
+import Web.Event.Event (Event)
+
+foreign import detail :: forall a. Event -> a
 
 foreign import data WebSocket :: Type
 
-foreign import createImpl :: String -> Effect WebSocket
-foreign import onMessageImpl :: WebSocket -> (String -> Effect Unit) -> Effect Unit
-foreign import sendImpl :: WebSocket -> String -> Effect Unit
-foreign import closeImpl :: WebSocket -> Effect Unit
+foreign import showWebSocket :: WebSocket -> String
 
-create :: String -> Effect WebSocket
-create = createImpl
+makeWebSocket
+  :: String -- remote message target
+  -> String -- local message target
+  -> String -- room code
+  -> String -- announce
+  -> (Either Error WebSocket -> Effect Unit)
+  -> Effect Canceler
+makeWebSocket = makeWebSocketFFI
+  Left
+  Right
+  ConnectionsMessage
+  SeenMessage
 
-onMessage :: WebSocket -> (String -> Effect Unit) -> Effect Unit
-onMessage = onMessageImpl
+foreign import makeWebSocketFFI
+  :: (forall l r. l -> Either l r) -- Left
+  -> (forall l r. r -> Either l r) -- Right
+  -> (Int -> LocalMessage) -- ConnectionsWireMessage
+  -> (String -> LocalMessage) -- SeenWireMessage
+  -> String
+  -> String
+  -> String
+  -> String
+  -> (Either Error WebSocket -> Effect Unit)
+  -> Effect Canceler
 
-send :: WebSocket -> String -> Effect Unit
-send = sendImpl
+foreign import send :: WebSocket -> String -> Effect Unit
 
-close :: WebSocket -> Effect Unit
-close = closeImpl
+foreign import address :: WebSocket -> Effect String
