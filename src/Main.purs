@@ -29,6 +29,7 @@ import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
+import Domination.Capability.Broadcast.Bugout (BugoutBroadcaster(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
@@ -36,6 +37,7 @@ import Domination.Capability.Random (class Random, randomElement, shuffle)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Card (CardSpec)
+import Domination.Env (env)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
@@ -64,7 +66,6 @@ import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
-import Domination.Env (env)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -102,7 +103,7 @@ component
   => Log m
   => Random m
   => GenUuid m
-  => Broadcast m
+  => Broadcast BugoutBroadcaster m
   => WireCodec m
   => Audio m
   => AudioContext
@@ -197,7 +198,7 @@ handleAction
   => Log m
   => GenUuid m
   => Random m
-  => Broadcast m
+  => Broadcast BugoutBroadcaster m
   => WireCodec m
   => AudioContext
   -> AppAction
@@ -481,7 +482,7 @@ handleAction audioContext = case _ of
 sendMessage
   :: forall t1 r o1 q1 output m
   . Log m
-  => Broadcast m
+  => Broadcast BugoutBroadcaster m
   => WireCodec m
   => RemoteMessage
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit

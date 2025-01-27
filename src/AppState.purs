@@ -21,7 +21,7 @@ import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Domination.Capability.Broadcast (Broadcaster)
+import Domination.Capability.Broadcast.Bugout (BugoutBroadcaster)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
@@ -36,7 +36,7 @@ type AppState =
   , messages :: Array RemoteMessage
   , chatNumber :: Int
   , gameOn :: Boolean
-  , maybeBroadcaster :: Maybe Broadcaster
+  , maybeBroadcaster :: Maybe BugoutBroadcaster
   , roomCode :: String
   , dominationConfig :: Config
   , showMenu :: Boolean
@@ -74,7 +74,7 @@ _username :: Lens' AppState String
 _username = prop (SProxy :: SProxy "username")
 _announce :: Lens' AppState String
 _announce = prop (SProxy :: SProxy "announce")
-_maybeBroadcaster :: Lens' AppState (Maybe Broadcaster)
+_maybeBroadcaster :: Lens' AppState (Maybe BugoutBroadcaster)
 _maybeBroadcaster = prop (SProxy :: SProxy "maybeBroadcaster")
 _dominationConfig :: Lens' AppState Config
 _dominationConfig = prop (SProxy :: SProxy "dominationConfig")
