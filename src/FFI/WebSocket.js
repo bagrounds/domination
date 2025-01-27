@@ -60,7 +60,16 @@ exports.makeWebSocketFFI = left =>
 
       ws.onmessage = event => {
         logInfo('Received message:', event.data)
-        broadcastEvent(remoteMessageTarget)(event.data)
+        const processMessage = data => {
+          if (data instanceof Blob) {
+            data.text().then(text => {
+              broadcastEvent(remoteMessageTarget)(text)
+            })
+          } else {
+            broadcastEvent(remoteMessageTarget)(data)
+          }
+        }
+        processMessage(event.data)
       }
 
       ws.onerror = error => {
