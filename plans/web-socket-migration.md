@@ -14,18 +14,18 @@
 
 ## 3. Client Implementation
 - ✅ Create new WebSocket FFI module
-- Next: Refactor Broadcast Implementation
-  1. Split Broadcast.purs into:
+- ✅ Refactor Broadcast Implementation
+  1. ✅ Split Broadcast.purs into:
      - Broadcast.purs (typeclass + generic functions)
      - Capability/Broadcast/Bugout.purs (existing implementation)
-  2. Move types:
+  2. ✅ Move types:
      - Move `Broadcaster` to Bugout module
      - Rename to `BugoutBroadcaster`
-  3. Move functions:
+  3. ✅ Move functions:
      - Move implementation-specific functions to Bugout module
      - Keep generic helpers in Broadcast module
-  4. Update imports in dependent modules
-- Then: Implement WebSocket Broadcaster
+  4. ✅ Update imports in dependent modules
+- Current: Implement WebSocket Broadcaster
   1. Create WebSocket.Broadcaster type
   2. Implement Broadcast typeclass
   3. Add connection handling
@@ -51,21 +51,22 @@
 1. ✅ Basic server with message broadcasting
 2. ✅ Simple configuration in Env module
 3. ✅ WebSocket FFI module
-4. Create WebSocketBroadcaster
-5. Implement Broadcast typeclass
-6. Add connection handling
-7. Testing & deployment
-8. Cleanup
+4. ✅ Split Broadcast implementation
+5. Current: Create WebSocketBroadcaster
+6. Next: Implement Broadcast typeclass
+7. Add connection handling
+8. Testing & deployment
+9. Cleanup
 
 ## Files to Change
 - `/server/*` (new) ✅
 - `src/Domination/Env.purs` ✅
 - `src/FFI/WebSocket.purs` ✅
 - `src/FFI/WebSocket.js` ✅
-- Current: Split broadcast implementation
-  - `src/Domination/Capability/Broadcast.purs` (simplify)
-  - `src/Domination/Capability/Broadcast/Bugout.purs` (new, existing implementation)
-- Then: Add WebSocket implementation
+- ✅ Split broadcast implementation
+  - `src/Domination/Capability/Broadcast.purs` (simplified)
+  - `src/Domination/Capability/Broadcast/Bugout.purs` (moved existing implementation)
+- Current: Add WebSocket implementation
   - `src/Domination/Capability/Broadcast/WebSocket.purs` (new)
   - `src/Main.purs`
 
@@ -74,3 +75,6 @@
 - No functionality changes during split
 - Better separation of concerns
 - Easier to maintain multiple implementations
+- Next focus: WebSocket implementation with proper error handling
+- Consider adding reconnection logic
+- Keep both implementations available initially for easy rollback
