@@ -34,7 +34,13 @@ const newMessage = (message) => {
 
 const log = level => (...args) => console[level]('WebSocket FFI: ', ...args)
 const logInfo = (...args) => log('log')(...args)
-const logError = (...args) => log('error')(...args)
+const logError = (...args) => {
+  log('error')(...args)
+  const errorMessage = args.map(arg =>
+    typeof arg === 'object' ? JSON.stringify(arg) : arg
+  ).join(' ')
+  alert('Error: ' + errorMessage)
+}
 
 const broadcastEvent = messageTarget => event => {
   const eventTarget = document.querySelector('#' + messageTarget)
@@ -72,7 +78,7 @@ exports.makeWebSocketFFI = left =>
         return () => {} // No-op cleanup for reused connection
       }
 
-      const ws = new WebSocket(`wss://purescript-wip.onrender.com:10000`)
+      const ws = new WebSocket('wss://purescript-wip.onrender.com')
       ws.address = crypto.randomUUID()
       setWebSocket(ws)
 
@@ -95,9 +101,19 @@ exports.makeWebSocketFFI = left =>
         callback(right(ws))()
       }
 
-      ws.onclose = () => {
-        logInfo('WebSocket disconnected')
+      ws.onclose = (event) => {
+        logInfo('WebSocket disconnected', event.code, event.reason)
         broadcastEvent(localMessageTarget)(connections(0))
+
+        // Attempt reconnection if not intentionally closed
+        if (event.code !== 1000 && event.code !== 1001) {
+          logInfo('Attempting to reconnect in 5 seconds...')
+          setTimeout(() => {
+            clearWebSocket()
+            exports.makeWebSocketFFI(left)(right)(connections)(seen)(roomCode)
+              (remoteMessageTarget)(localMessageTarget)(announce)(callback)()
+          }, 5000)
+        }
       }
 
       ws.onmessage = event => {
@@ -125,6 +141,7 @@ exports.makeWebSocketFFI = left =>
 
       return () => shutdown({ type: 'cancel' })
     } catch (error) {
+      logError('Connection setup error:', error)
       callback(left(error))()
       return () => {}
     }
