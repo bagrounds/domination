@@ -72,7 +72,7 @@ exports.makeWebSocketFFI = left =>
         return () => {} // No-op cleanup for reused connection
       }
 
-      const ws = new WebSocket(`ws://localhost:8081`)
+      const ws = new WebSocket(`wss://purescript-wip.onrender.com:10000`)
       ws.address = crypto.randomUUID()
       setWebSocket(ws)
 
