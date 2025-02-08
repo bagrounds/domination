@@ -470,7 +470,7 @@ handleAction audioContext = case _ of
       -- if we log errors to chat while sending messages: infinite loop?
       errorOrUnit <- saveChat
       case errorOrUnit of
-        Left message -> error message
+        Left errorMessage -> error errorMessage
         Right _ -> pure unit
       sendMessage chat
     logErrorToChat result = case result of
