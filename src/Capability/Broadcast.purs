@@ -15,6 +15,8 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Domination.AppM (AppM)
+import Domination.Capability.Broadcast.Bugout (BugoutBroadcaster)
+import Domination.Capability.Broadcast.Bugout as Bugout
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Capability.Broadcast.WebSocket as WebSocket
 import Domination.Capability.Log (class Log, log)
@@ -24,16 +26,22 @@ import Effect.Class (class MonadEffect)
 import Halogen (HalogenM)
 
 -- Generic broadcaster type that can be implemented by different backends
-class Monad m <= Broadcast b m | m -> b where
+class Monad m <= Broadcast b m where
   create :: String -> String -> String -> String -> m (Either Error b)
   address :: b -> m String
   broadcast :: b -> String -> m Unit
 
-instance broadcastAppM :: Broadcast WebSocketBroadcaster AppM where
+instance webSocketBroadcasterAppM :: Broadcast WebSocketBroadcaster AppM where
   create roomCode remoteMessageTarget localMessageTarget announce =
     liftAff $ WebSocket.createWebSocketBroadcaster roomCode remoteMessageTarget localMessageTarget announce
   address = liftAff <<< WebSocket.getWebSocketAddress
   broadcast broadcaster = liftAff <<< WebSocket.broadcastWebSocketMessage broadcaster
+
+instance bugoutBroadcasterAppM :: Broadcast BugoutBroadcaster AppM where
+  create roomCode remoteMessageTarget localMessageTarget announce =
+    liftAff $ Bugout.createBugoutBroadcaster roomCode remoteMessageTarget localMessageTarget announce
+  address = liftAff <<< Bugout.getBugoutAddress
+  broadcast broadcaster = liftAff <<< Bugout.broadcastBugoutMessage broadcaster
 
 instance broadcastHalogenM :: Broadcast b m => Broadcast b (HalogenM st act slots msg m) where
   create a b c = lift <<< create a b c
