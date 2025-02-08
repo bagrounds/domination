@@ -85,7 +85,7 @@ exports.makeBugoutFFI = left =>
   roomCode =>
   remoteMessageTarget =>
   localMessageTarget =>
-  announce =>
+  serverUrl =>
   callback =>
   () => {
 
@@ -101,7 +101,7 @@ exports.makeBugoutFFI = left =>
     heartbeat: 10000,
     timeout: 25000,
     seed: (localStorage || {}).seed,
-    announce: [announce]
+    serverUrl: [serverUrl]
   }
 
   var fresh = true

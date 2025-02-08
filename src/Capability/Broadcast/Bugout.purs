@@ -26,9 +26,9 @@ broadcastBugoutMessage :: BugoutBroadcaster -> String -> Aff Unit
 broadcastBugoutMessage (BugoutBroadcaster bugout) = liftEffect <<< FFI.send bugout
 
 createBugoutBroadcaster :: String -> String -> String -> String -> Aff (Either Error BugoutBroadcaster)
-createBugoutBroadcaster roomCode remoteMessageTarget localMessageTarget announce =
+createBugoutBroadcaster roomCode remoteMessageTarget localMessageTarget serverUrl =
   try $ BugoutBroadcaster <$> makeAff
-    (FFI.makeBugout roomCode remoteMessageTarget localMessageTarget announce)
+    (FFI.makeBugout roomCode remoteMessageTarget localMessageTarget serverUrl)
 
 getBugoutAddress :: BugoutBroadcaster -> Aff String
 getBugoutAddress (BugoutBroadcaster bugout) = liftEffect $ FFI.address bugout

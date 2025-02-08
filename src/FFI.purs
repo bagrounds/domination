@@ -35,7 +35,7 @@ makeBugout
   :: String -- remote message target
   -> String -- local message target
   -> String -- room code
-  -> String -- announce
+  -> String -- serverUrl
   -> (Either Error Bugout -> Effect Unit)
   -> Effect Canceler
 makeBugout = makeBugoutFFI

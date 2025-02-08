@@ -66,7 +66,7 @@ exports.makeWebSocketFFI = left =>
   roomCode =>
   remoteMessageTarget =>
   localMessageTarget =>
-  announce =>
+  serverUrl =>
   callback =>
   () => {
     try {
@@ -111,7 +111,7 @@ exports.makeWebSocketFFI = left =>
           setTimeout(() => {
             clearWebSocket()
             exports.makeWebSocketFFI(left)(right)(connections)(seen)(roomCode)
-              (remoteMessageTarget)(localMessageTarget)(announce)(callback)()
+              (remoteMessageTarget)(localMessageTarget)(serverUrl)(callback)()
           }, 5000)
         }
       }

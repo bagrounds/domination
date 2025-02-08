@@ -32,14 +32,14 @@ class Monad m <= Broadcast b m where
   broadcast :: b -> String -> m Unit
 
 instance webSocketBroadcasterAppM :: Broadcast WebSocketBroadcaster AppM where
-  create roomCode remoteMessageTarget localMessageTarget announce =
-    liftAff $ WebSocket.createWebSocketBroadcaster roomCode remoteMessageTarget localMessageTarget announce
+  create roomCode remoteMessageTarget localMessageTarget serverUrl =
+    liftAff $ WebSocket.createWebSocketBroadcaster roomCode remoteMessageTarget localMessageTarget serverUrl
   address = liftAff <<< WebSocket.getWebSocketAddress
   broadcast broadcaster = liftAff <<< WebSocket.broadcastWebSocketMessage broadcaster
 
 instance bugoutBroadcasterAppM :: Broadcast BugoutBroadcaster AppM where
-  create roomCode remoteMessageTarget localMessageTarget announce =
-    liftAff $ Bugout.createBugoutBroadcaster roomCode remoteMessageTarget localMessageTarget announce
+  create roomCode remoteMessageTarget localMessageTarget serverUrl =
+    liftAff $ Bugout.createBugoutBroadcaster roomCode remoteMessageTarget localMessageTarget serverUrl
   address = liftAff <<< Bugout.getBugoutAddress
   broadcast broadcaster = liftAff <<< Bugout.broadcastBugoutMessage broadcaster
 
@@ -66,13 +66,13 @@ maybeCreateBroadcaster
   :: forall b m
   . Log m
   => Broadcast b m
-  => String
-  -> String
-  -> String
-  -> String
+  => String -- roomCode
+  -> String -- remoteMessageTarget
+  -> String -- localMessageTarget
+  -> String -- serverUrl
   -> m (Maybe b)
-maybeCreateBroadcaster roomCode remoteMessageTarget localMessageTarget announce = do
-  eBroadcaster <- create roomCode remoteMessageTarget localMessageTarget announce
+maybeCreateBroadcaster roomCode remoteMessageTarget localMessageTarget serverUrl = do
+  eBroadcaster <- create roomCode remoteMessageTarget localMessageTarget serverUrl
   case eBroadcaster of
     Left e -> do
       log $ "Error creating broadcaster: " <> show e

@@ -18,7 +18,7 @@ makeWebSocket
   :: String -- remote message target
   -> String -- local message target
   -> String -- room code
-  -> String -- announce
+  -> String -- serverUrl
   -> (Either Error WebSocket -> Effect Unit)
   -> Effect Canceler
 makeWebSocket = makeWebSocketFFI

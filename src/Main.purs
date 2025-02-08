@@ -13,7 +13,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _announce, _chatNumber, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultAnnounce, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _chatNumber, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -76,8 +76,8 @@ localMessageTarget = "local-message-target"
 uuidKey :: String
 uuidKey = "player-id"
 
-announceKey :: String
-announceKey = "announce"
+serverUrlKey :: String
+serverUrlKey = "server-url"
 
 usernameKey :: String
 usernameKey = "username"
@@ -276,19 +276,19 @@ handleAction audioContext = case _ of
     loadGame "game_state"
     log "Initialize: done loading game..."
 
-    eAnnounce <- load announceKey
-    announce <- case eAnnounce of
+    eServerUrl <- load serverUrlKey
+    serverUrl <- case eServerUrl of
       Left e -> do
-        log $ "Initialize: no existing announce found, using default."
+        log $ "Initialize: no existing server URL found, using default."
           <> " error: " <> e
-        pure $ defaultAnnounce
+        pure $ defaultServerUrl
       Right u -> pure u
 
-    log $ "Initialize: announce: " <> announce
-    H.modify_ (_announce .~ announce)
+    log $ "Initialize: server URL: " <> serverUrl
+    H.modify_ (_serverUrl .~ serverUrl)
 
     maybeBroadcaster <- maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget announce
+      roomCode remoteMessageTarget localMessageTarget serverUrl
 
     log $ "Initialize: broadcaster: " <> show maybeBroadcaster
 
@@ -352,10 +352,10 @@ handleAction audioContext = case _ of
     loadGame "game_state"
     H.modify_ $ _showMenu .~ false
 
-  WriteAnnounce announce -> do
-    save announceKey announce >>= logErrorToChat
-    log $ "saving announce: " <> announce
-    H.modify_ $ set _announce announce
+  WriteServerUrl serverUrl -> do
+    save serverUrlKey serverUrl >>= logErrorToChat
+    log $ "saving server URL: " <> serverUrl
+    H.modify_ $ set _serverUrl serverUrl
 
   WriteUsername username -> do
     { id } <- H.get
@@ -493,11 +493,11 @@ sendMessage message' = do
 
   let wireEnvelope = Tuple id message
 
-  announce <- H.gets _.announce
+  serverUrl <- H.gets _.serverUrl
 
   maybeBroadcaster' <- case maybeBroadcaster of
     Nothing -> maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget announce
+      roomCode remoteMessageTarget localMessageTarget serverUrl
     Just b -> pure (Just b)
 
   case maybeBroadcaster' of

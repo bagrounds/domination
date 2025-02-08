@@ -17,9 +17,9 @@ broadcastWebSocketMessage :: WebSocketBroadcaster -> String -> Aff Unit
 broadcastWebSocketMessage (WebSocketBroadcaster bugout) = liftEffect <<< FFI.send bugout
 
 createWebSocketBroadcaster :: String -> String -> String -> String -> Aff (Either Error WebSocketBroadcaster)
-createWebSocketBroadcaster roomCode remoteMessageTarget localMessageTarget announce =
+createWebSocketBroadcaster roomCode remoteMessageTarget localMessageTarget serverUrl =
   try $ WebSocketBroadcaster <$> makeAff
-    (FFI.makeWebSocket roomCode remoteMessageTarget localMessageTarget announce)
+    (FFI.makeWebSocket roomCode remoteMessageTarget localMessageTarget serverUrl)
 
 getWebSocketAddress :: WebSocketBroadcaster -> Aff String
 getWebSocketAddress (WebSocketBroadcaster bugout) = liftEffect $ FFI.address bugout
