@@ -101,14 +101,17 @@ add_commit_and_tag_version () (
 
 main () (
   component=$1
-  if file_changed
-  then
-    fail "${VERSION_FILE} is already changed!"
-  fi
 
-  if changes_are_staged
-  then
-    fail "changes are staged! Commit or reset first!"
+  if [ "$component" != "dev" ]; then
+    if file_changed
+    then
+      fail "${VERSION_FILE} is already changed!"
+    fi
+
+    if changes_are_staged
+    then
+      fail "changes are staged! Commit or reset first!"
+    fi
   fi
 
   if [ "$component" = "dev" ]; then
