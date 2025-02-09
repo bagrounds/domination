@@ -1,10 +1,18 @@
 #!/bin/bash
-# - if version file is already changed, exit with error
-# - if changes are staged, exit with error
-# - otherwise, update and commit version file
+# Updates version numbers in Version.purs and sw.js
+#
+# Usage:
+#   ./bump-version (major|minor|patch|dev)
+#
+# Options:
+#   major - increment major version, reset minor and patch to 0
+#   minor - increment minor version, reset patch to 0
+#   patch - increment patch version
+#   dev   - increment patch version without git commit/tag
+
 set -ue
 
-: "${1?please provide argument 1 specifying major minor or patch}"
+: "${1?Usage: $0 (major|minor|patch|dev)}"
 VERSION_FILE=src/Version.purs
 SW_FILE=assets/sw.js
 
@@ -40,7 +48,7 @@ zero () (
   sed -ri 's/('"$component"' = ).*/\10/' $VERSION_FILE
 )
 
-update_file () (
+update_files () (
   component=$1
   case $component in
     patch)
@@ -59,6 +67,8 @@ update_file () (
       fail "specify major minor or patch, not '${component}'"
       ;;
   esac
+
+  update_service_worker_cache_version
 )
 
 file_changed () (
@@ -70,17 +80,19 @@ changes_are_staged () (
 )
 
 update_service_worker_cache_version () (
-  version=$1
+  version=$(read_version)
   sed -ri "s/(^.*CACHE_NAME = ')[^']*('.*$)/\1${version}\2/" $SW_FILE
 )
 
-add_commit_and_tag_version () (
+read_version () (
   major=$(version_number major)
   minor=$(version_number minor)
   patch=$(version_number patch)
-  version="v${major}.${minor}.${patch}"
+  echo "v${major}.${minor}.${patch}"
+)
 
-  update_service_worker_cache_version "$version"
+add_commit_and_tag_version () (
+  version=$(read_version)
 
   git add $VERSION_FILE $SW_FILE
   git commit -m "$version"
@@ -99,9 +111,12 @@ main () (
     fail "changes are staged! Commit or reset first!"
   fi
 
-  update_file "$component"
-
-  add_commit_and_tag_version
+  if [ "$component" = "dev" ]; then
+    update_files "patch"
+  else
+    update_files "$component"
+    add_commit_and_tag_version
+  fi
 )
 
 main "$1"
