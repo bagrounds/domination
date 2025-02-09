@@ -1,6 +1,6 @@
 'use strict'
 
-const CACHE_NAME = 'domination-cache-v1'
+const CACHE_NAME = 'v0.33.3'
 const cacheAllowlist = [ CACHE_NAME ]
 const urlsToCache = [
   '/',
