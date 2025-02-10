@@ -13,7 +13,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _chatNumber, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -66,6 +66,7 @@ import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
+import Domination.Capability.Clock (class Clock, now)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -102,6 +103,7 @@ component
   => Dom m
   => Log m
   => Random m
+  => Clock m
   => GenUuid m
   => Broadcast WebSocketBroadcaster m
   => WireCodec m
@@ -198,6 +200,7 @@ handleAction
   => Log m
   => GenUuid m
   => Random m
+  => Clock m
   => Broadcast WebSocketBroadcaster m
   => WireCodec m
   => AudioContext
@@ -413,6 +416,20 @@ handleAction audioContext = case _ of
               Nothing -> pure unit
           PlayMadeMessage _ ->
             error "PlayMadeMessage should not be called"
+          JoinMessage { clientId } -> do
+            lastHeartbeat <- now
+            let clientInfo = { lastHeartbeat, clientId }
+            H.modify_ $ _connectedClients %~ HashMap.insert clientId clientInfo
+            log $ "Client joined: " <> clientId
+          HeartbeatMessage { clientId } -> do
+            timestamp <- now
+            H.modify_ $ _connectedClients %~ HashMap.update 
+              (\info -> Just $ info { lastHeartbeat = timestamp })
+              clientId
+            log $ "Heartbeat from: " <> clientId
+          LeaveMessage { clientId } -> do
+            H.modify_ $ _connectedClients %~ HashMap.delete clientId
+            log $ "Client left: " <> clientId
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of

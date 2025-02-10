@@ -259,3 +259,5 @@ exports.setItem = left => right => unit => key => value => storage => () => {
     return left(`Error: setItem: key='${key}', value='${value}', error message: '${e.message || e}'`)
   }
 }
+
+exports.now = () => performance.now()

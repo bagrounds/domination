@@ -85,3 +85,6 @@ foreign import setItem
   -> String -- value
   -> Storage -- local storage
   -> Effect (Either String Unit) -- error message or nothing (unit)
+
+foreign import now
+  :: Effect Int
