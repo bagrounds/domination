@@ -66,6 +66,9 @@ data RemoteMessage
     , playerIndex :: Int
     , state :: Game
     }
+  | JoinMessage { clientId :: String }
+  | HeartbeatMessage { clientId :: String }
+  | LeaveMessage { clientId :: String }
 
 data LocalMessage
   = SeenMessage String
@@ -92,6 +95,9 @@ data WireMessage
   | PlayMadeWireMessage
     (Tuple WirePlay
     (Tuple WireInt WireGame))
+  | JoinWireMessage String
+  | HeartbeatWireMessage String
+  | LeaveWireMessage String
 
 _toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
@@ -106,6 +112,12 @@ _toWire = iso to from where
       $ Tuple (view Game._toWire state) (pmm <$> playMade)
     PlayMadeMessage x ->
       PlayMadeWireMessage $ pmm x
+    JoinMessage { clientId } ->
+      JoinWireMessage clientId
+    HeartbeatMessage { clientId } ->
+      HeartbeatWireMessage clientId
+    LeaveMessage { clientId } ->
+      LeaveWireMessage clientId
     where
       pmm { play, playerIndex, state } =
         Tuple (view Play._toWire play)
@@ -125,6 +137,12 @@ _toWire = iso to from where
         }
     PlayMadeWireMessage x ->
       PlayMadeMessage $ pmm x
+    JoinWireMessage clientId ->
+      JoinMessage { clientId }
+    HeartbeatWireMessage clientId ->
+      HeartbeatMessage { clientId }
+    LeaveWireMessage clientId ->
+      LeaveMessage { clientId }
     where
       pmm (Tuple play (Tuple playerIndex state)) =
         { play: review Play._toWire play
@@ -151,6 +169,15 @@ instance decodeArrayBuffeWireMessage
   readArrayBuffer = genericReadArrayBuffer
 
 renderHtml :: forall w i. RemoteMessage -> HTML w i
+renderHtml (JoinMessage { clientId }) = HH.div
+  [ HH.class_ $ ClassName "join-message" ]
+  [ HH.text $ "(" <> clientId <> " has joined the game)" ]
+renderHtml (HeartbeatMessage { clientId }) = HH.div
+  [ HH.class_ $ ClassName "heartbeat-message" ]
+  [ HH.text $ "(" <> clientId <> " is alive " ]
+renderHtml (LeaveMessage { clientId }) = HH.div
+  [ HH.class_ $ ClassName "leave-message" ]
+  [ HH.text $ "(" <> clientId <> " has left the game)" ]
 renderHtml (ChatMessage { username, message }) =
   HH.div
     [ HH.class_ $ ClassName "chat-message" ]

@@ -26,6 +26,11 @@ import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
 
+type ClientInfo =
+  { lastHeartbeat :: Int
+  , clientId :: String
+  }
+
 type AppState =
   { connectionCount :: Int
   , id :: String
@@ -42,6 +47,9 @@ type AppState =
   , showMenu :: Boolean
   , longGame :: Boolean
   , maybeAudioContext :: Maybe AudioContext
+  , connectedClients :: HashMap String ClientInfo
+  , heartbeatInterval :: Int
+  , heartbeatTimeout :: Int
   }
 
 _card :: Lens' CardSpec Card
@@ -90,11 +98,26 @@ _maybeAudioContext
     a b
 _maybeAudioContext = prop (SProxy :: SProxy "maybeAudioContext")
 
+_connectedClients :: Lens' AppState (HashMap String ClientInfo)
+_connectedClients = prop (SProxy :: SProxy "connectedClients")
+
+_heartbeatInterval :: Lens' AppState Int
+_heartbeatInterval = prop (SProxy :: SProxy "heartbeatInterval")
+
+_heartbeatTimeout :: Lens' AppState Int
+_heartbeatTimeout = prop (SProxy :: SProxy "heartbeatTimeout")
+
 globalRoomCode :: String
 globalRoomCode = "global-dev"
 
 defaultServerUrl :: String
 defaultServerUrl = "wss://purescript-wip.onrender.com"
+
+defaultHeartbeatInterval :: Int
+defaultHeartbeatInterval = 5000
+
+defaultHeartbeatTimeout :: Int
+defaultHeartbeatTimeout = 15000
 
 newApp :: AppState
 newApp =
@@ -113,6 +136,9 @@ newApp =
   , showMenu: false
   , longGame: false
   , maybeAudioContext: Nothing
+  , connectedClients: HashMap.empty
+  , heartbeatInterval: defaultHeartbeatInterval
+  , heartbeatTimeout: defaultHeartbeatTimeout
   }
 
 newConfig :: Config
