@@ -474,26 +474,33 @@ handleAction audioContext = case _ of
             timestamp <- now
             -- First get current state
             clients <- H.gets _.connectedClients
+            let originalClientCount = HashMap.size clients
             timeout <- H.gets _.heartbeatTimeout
 
             -- Clean up stale clients first
             let activeClients = HashMap.filter (\info -> not $ (timestamp - info.timestamp) > timeout) clients
+            let activeClientCount = HashMap.size activeClients
 
             -- Update the current client's heartbeat
             let updatedClients = HashMap.insert
                   clientId
                   { timestamp, clientId }
                   activeClients
-            let count = HashMap.size updatedClients
+            let updatedClientCount = HashMap.size updatedClients
 
             -- Update state with clean list including current client
             H.modify_ $ _connectedClients .~ updatedClients
-            H.modify_ $ _connectionCount .~ count
+            H.modify_ $ _connectionCount .~ updatedClientCount
+
+            { username, id } <- H.get
+            if originalClientCount < updatedClientCount || activeClientCount < updatedClientCount
+              then sendMessage (UsernameMessage { username, id })
+              else pure unit
 
             log $ "Heartbeat from clientId(" <> clientId <> ")"
-              <> "; Clients before cleanup: " <> show (HashMap.size clients)
-              <> "; Clients after cleanup: " <> show (HashMap.size activeClients)
-              <> "; Clients after new heartbeat: " <> show count
+              <> "; Clients before cleanup: " <> show originalClientCount
+              <> "; Clients after cleanup: " <> show activeClientCount
+              <> "; Clients after new heartbeat: " <> show updatedClientCount
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
