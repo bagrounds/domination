@@ -305,6 +305,7 @@ handleAction audioContext = case _ of
     log $ "Initialize: broadcaster: " <> show broadcaster
 
     sendMessage $ JoinMessage { clientId: uuid }
+    sendMessage $ UsernameMessage { username, id: uuid }
 
     interval <- H.gets _.heartbeatInterval
     _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
