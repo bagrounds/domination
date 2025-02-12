@@ -490,10 +490,10 @@ handleAction audioContext = case _ of
             H.modify_ $ _connectedClients .~ updatedClients
             H.modify_ $ _connectionCount .~ count
 
-            log $ "Heartbeat from clientId(" <> clientId <> "). "
-              <> "Clients before cleanup: " <> show (HashMap.size clients)
-              <> "Clients after cleanup: " <> show (HashMap.size activeClients)
-              <> "Clients after new heartbeat: " <> show count
+            log $ "Heartbeat from clientId(" <> clientId <> ")"
+              <> "; Clients before cleanup: " <> show (HashMap.size clients)
+              <> "; Clients after cleanup: " <> show (HashMap.size activeClients)
+              <> "; Clients after new heartbeat: " <> show count
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
