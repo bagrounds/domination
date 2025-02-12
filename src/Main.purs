@@ -118,6 +118,7 @@ component audioContext =
   eval = H.mkEval H.defaultEval
     { handleAction = handleAction audioContext
     , initialize = Just Initialize
+    , finalize = Just Finalize
     }
   initialState _ = newApp
 
@@ -311,6 +312,11 @@ handleAction audioContext = case _ of
     _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
     pure unit
 
+  Finalize -> do
+    clientId <- H.gets _.id
+    sendMessage $ LeaveMessage { clientId }
+    pure unit
+
   ToggleMenu -> H.modify_ $ _showMenu %~ not
 
   WritePlayerIndex index -> do
@@ -379,6 +385,7 @@ handleAction audioContext = case _ of
 
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
+  -- LocalMessages Only used in Bugout version
   ReceiveLocalMessage customEvent -> do
     let localMessage = FFI.detail customEvent
     case localMessage of
