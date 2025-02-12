@@ -386,7 +386,8 @@ handleAction audioContext = case _ of
         log $ "I see you: " <> address
         { username, id } <- H.get
         sendMessage $ UsernameMessage { username, id }
-      ConnectionsMessage count ->
+      ConnectionsMessage count -> do
+        log $ "Local ConnectionsMessage " <> (show count)
         H.modify_ $ set _connectionCount count
 
   ReceiveRemoteMessage customEvent -> do

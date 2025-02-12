@@ -97,7 +97,6 @@ exports.makeWebSocketFFI = left =>
 
       ws.onopen = () => {
         logInfo('WebSocket connected')
-        broadcastEvent(localMessageTarget)(connections(1))
         callback(right(ws))()
       }
 
