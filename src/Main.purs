@@ -456,7 +456,7 @@ handleAction audioContext = case _ of
               count = HashMap.size activeClients
             H.modify_ $ _connectedClients .~ activeClients
             H.modify_ $ _connectionCount .~ count
-            log $ "Heartbeat from: " <> clientId
+            log $ "Heartbeat from: " <> clientId <> ", total clients: " <> show count
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
@@ -478,7 +478,8 @@ handleAction audioContext = case _ of
       loadGame key
   HeartbeatTick -> do
     clientId <- H.gets _.id
-    sendMessage $ HeartbeatMessage { clientId }
+    timestamp <- now
+    sendMessage $ HeartbeatMessage { clientId, timestamp }
   where
     loadGame key = do
       { nextPlayerIndex } <- H.gets _.dominationConfig

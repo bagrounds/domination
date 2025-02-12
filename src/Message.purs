@@ -67,7 +67,7 @@ data RemoteMessage
     , state :: Game
     }
   | JoinMessage { clientId :: String }
-  | HeartbeatMessage { clientId :: String }
+  | HeartbeatMessage { clientId :: String, timestamp :: Int }
   | LeaveMessage { clientId :: String }
 
 data LocalMessage
@@ -96,7 +96,7 @@ data WireMessage
     (Tuple WirePlay
     (Tuple WireInt WireGame))
   | JoinWireMessage String
-  | HeartbeatWireMessage String
+  | HeartbeatWireMessage String WireInt
   | LeaveWireMessage String
 
 _toWire :: Iso' RemoteMessage WireMessage
@@ -114,8 +114,8 @@ _toWire = iso to from where
       PlayMadeWireMessage $ pmm x
     JoinMessage { clientId } ->
       JoinWireMessage clientId
-    HeartbeatMessage { clientId } ->
-      HeartbeatWireMessage clientId
+    HeartbeatMessage { clientId, timestamp } ->
+      HeartbeatWireMessage clientId (view Int._toWire timestamp)
     LeaveMessage { clientId } ->
       LeaveWireMessage clientId
     where
@@ -139,8 +139,8 @@ _toWire = iso to from where
       PlayMadeMessage $ pmm x
     JoinWireMessage clientId ->
       JoinMessage { clientId }
-    HeartbeatWireMessage clientId ->
-      HeartbeatMessage { clientId }
+    HeartbeatWireMessage clientId timestamp ->
+      HeartbeatMessage { clientId, timestamp: review Int._toWire timestamp }
     LeaveWireMessage clientId ->
       LeaveMessage { clientId }
     where
