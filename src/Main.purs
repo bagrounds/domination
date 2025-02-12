@@ -31,7 +31,7 @@ import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Capability.Clock (class Clock, now)
-import Domination.Capability.Dom (class Dom)
+import Domination.Capability.Dom (class Dom, window)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random, randomElement, shuffle)
@@ -62,12 +62,15 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.Event (eventListener)
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
+import Web.HTML.Event.BeforeUnloadEvent.EventTypes as ET
+import Web.HTML.Window (toEventTarget)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -207,6 +210,7 @@ handleAction
   => Broadcast WebSocketBroadcaster m
   => WireCodec m
   => Timer m
+  => Dom m
   => AudioContext
   -> AppAction
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
@@ -310,6 +314,14 @@ handleAction audioContext = case _ of
 
     interval <- H.gets _.heartbeatInterval
     _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
+
+    w <- window
+    H.subscribe' \_ ->
+      eventListener
+        ET.beforeunload
+        (toEventTarget w)
+        \_ -> Just Finalize
+
     pure unit
 
   Finalize -> do
