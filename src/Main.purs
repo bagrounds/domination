@@ -30,11 +30,13 @@ import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
+import Domination.Capability.Clock (class Clock, now)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random, randomElement, shuffle)
 import Domination.Capability.Storage (class Storage, load, save)
+import Domination.Capability.Timer (class Timer, createTimer)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Card (CardSpec)
 import Domination.Env (env)
@@ -66,7 +68,6 @@ import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
-import Domination.Capability.Clock (class Clock, now)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
@@ -108,6 +109,7 @@ component
   => Broadcast WebSocketBroadcaster m
   => WireCodec m
   => Audio m
+  => Timer m
   => AudioContext
   -> Component query o s m
 component audioContext =
@@ -203,6 +205,7 @@ handleAction
   => Clock m
   => Broadcast WebSocketBroadcaster m
   => WireCodec m
+  => Timer m
   => AudioContext
   -> AppAction
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
@@ -300,6 +303,12 @@ handleAction audioContext = case _ of
     broadcaster <- H.gets _.maybeBroadcaster
 
     log $ "Initialize: broadcaster: " <> show broadcaster
+
+    sendMessage $ JoinMessage { clientId: uuid }
+
+    interval <- H.gets _.heartbeatInterval
+    _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
+    pure unit
 
   ToggleMenu -> H.modify_ $ _showMenu %~ not
 
@@ -420,16 +429,33 @@ handleAction audioContext = case _ of
             lastHeartbeat <- now
             let clientInfo = { lastHeartbeat, clientId }
             H.modify_ $ _connectedClients %~ HashMap.insert clientId clientInfo
-            log $ "Client joined: " <> clientId
+            -- After updating connected clients, broadcast the new count
+            clients <- H.gets _.connectedClients
+            let count = HashMap.size clients
+            H.modify_ $ _connectionCount .~ count
+            log $ "Client joined: " <> clientId <> ", total clients: " <> show count
+          LeaveMessage { clientId } -> do
+            H.modify_ $ _connectedClients %~ HashMap.delete clientId
+            -- After removing client, broadcast the new count
+            clients <- H.gets _.connectedClients
+            let count = HashMap.size clients
+            H.modify_ $ _connectionCount .~ count
+            log $ "Client left: " <> clientId <> ", total clients: " <> show count
           HeartbeatMessage { clientId } -> do
             timestamp <- now
             H.modify_ $ _connectedClients %~ HashMap.update 
               (\info -> Just $ info { lastHeartbeat = timestamp })
               clientId
+            -- Clean up stale clients using configured timeout
+            clients <- H.gets _.connectedClients
+            timeout <- H.gets _.heartbeatTimeout
+            let
+              isStale info = (timestamp - info.lastHeartbeat) > timeout
+              activeClients = HashMap.filter (\info -> not $ isStale info) clients
+              count = HashMap.size activeClients
+            H.modify_ $ _connectedClients .~ activeClients
+            H.modify_ $ _connectionCount .~ count
             log $ "Heartbeat from: " <> clientId
-          LeaveMessage { clientId } -> do
-            H.modify_ $ _connectedClients %~ HashMap.delete clientId
-            log $ "Client left: " <> clientId
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
@@ -449,6 +475,9 @@ handleAction audioContext = case _ of
         saveNumber = (i - 1) `mod` 10
         key = "game_state_" <> show saveNumber
       loadGame key
+  HeartbeatTick -> do
+    clientId <- H.gets _.id
+    sendMessage $ HeartbeatMessage { clientId }
   where
     loadGame key = do
       { nextPlayerIndex } <- H.gets _.dominationConfig

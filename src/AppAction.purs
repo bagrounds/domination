@@ -19,6 +19,7 @@ type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
 
 data AppAction
   = Initialize
+  | HeartbeatTick
   | StartNewGame
   | WritePlayerIndex Int
   | WritePlayerCount Int
