@@ -27,7 +27,7 @@ import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
 
 type ClientInfo =
-  { lastHeartbeat :: Int
+  { timestamp :: Int
   , clientId :: String
   }
 

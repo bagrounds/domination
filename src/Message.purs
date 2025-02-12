@@ -66,9 +66,9 @@ data RemoteMessage
     , playerIndex :: Int
     , state :: Game
     }
-  | JoinMessage { clientId :: String }
+  | JoinMessage { clientId :: String, timestamp :: Int }
   | HeartbeatMessage { clientId :: String, timestamp :: Int }
-  | LeaveMessage { clientId :: String }
+  | LeaveMessage { clientId :: String, timestamp :: Int }
 
 data LocalMessage
   = SeenMessage String
@@ -95,9 +95,9 @@ data WireMessage
   | PlayMadeWireMessage
     (Tuple WirePlay
     (Tuple WireInt WireGame))
-  | JoinWireMessage String
+  | JoinWireMessage String WireInt
   | HeartbeatWireMessage String WireInt
-  | LeaveWireMessage String
+  | LeaveWireMessage String WireInt
 
 _toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
@@ -112,12 +112,12 @@ _toWire = iso to from where
       $ Tuple (view Game._toWire state) (pmm <$> playMade)
     PlayMadeMessage x ->
       PlayMadeWireMessage $ pmm x
-    JoinMessage { clientId } ->
-      JoinWireMessage clientId
+    JoinMessage { clientId, timestamp } ->
+      JoinWireMessage clientId (view Int._toWire timestamp)
     HeartbeatMessage { clientId, timestamp } ->
       HeartbeatWireMessage clientId (view Int._toWire timestamp)
-    LeaveMessage { clientId } ->
-      LeaveWireMessage clientId
+    LeaveMessage { clientId, timestamp } ->
+      LeaveWireMessage clientId (view Int._toWire timestamp)
     where
       pmm { play, playerIndex, state } =
         Tuple (view Play._toWire play)
@@ -137,12 +137,12 @@ _toWire = iso to from where
         }
     PlayMadeWireMessage x ->
       PlayMadeMessage $ pmm x
-    JoinWireMessage clientId ->
-      JoinMessage { clientId }
+    JoinWireMessage clientId timestamp ->
+      JoinMessage { clientId, timestamp: review Int._toWire timestamp }
     HeartbeatWireMessage clientId timestamp ->
       HeartbeatMessage { clientId, timestamp: review Int._toWire timestamp }
-    LeaveWireMessage clientId ->
-      LeaveMessage { clientId }
+    LeaveWireMessage clientId timestamp ->
+      LeaveMessage { clientId, timestamp: review Int._toWire timestamp }
     where
       pmm (Tuple play (Tuple playerIndex state)) =
         { play: review Play._toWire play

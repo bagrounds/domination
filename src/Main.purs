@@ -309,7 +309,8 @@ handleAction audioContext = case _ of
 
     log $ "Initialize: broadcaster: " <> show broadcaster
 
-    sendMessage $ JoinMessage { clientId: uuid }
+    timestamp <- now
+    sendMessage $ JoinMessage { clientId: uuid, timestamp }
     sendMessage $ UsernameMessage { username, id: uuid }
 
     interval <- H.gets _.heartbeatInterval
@@ -332,7 +333,8 @@ handleAction audioContext = case _ of
 
   Finalize -> do
     clientId <- H.gets _.id
-    sendMessage $ LeaveMessage { clientId }
+    timestamp <- now
+    sendMessage $ LeaveMessage { clientId, timestamp }
     pure unit
 
   ToggleMenu -> H.modify_ $ _showMenu %~ not
@@ -453,8 +455,8 @@ handleAction audioContext = case _ of
           PlayMadeMessage _ ->
             error "PlayMadeMessage should not be called"
           JoinMessage { clientId } -> do
-            lastHeartbeat <- now
-            let clientInfo = { lastHeartbeat, clientId }
+            timestamp <- now
+            let clientInfo = { timestamp, clientId }
             H.modify_ $ _connectedClients %~ HashMap.insert clientId clientInfo
             -- After updating connected clients, broadcast the new count
             clients <- H.gets _.connectedClients
@@ -469,18 +471,18 @@ handleAction audioContext = case _ of
             H.modify_ $ _connectionCount .~ count
             log $ "Client left: " <> clientId <> ", total clients: " <> show count
           HeartbeatMessage { clientId } -> do
-            lastHeartbeat <- now
+            timestamp <- now
             -- First get current state
             clients <- H.gets _.connectedClients
             timeout <- H.gets _.heartbeatTimeout
 
             -- Clean up stale clients first
-            let activeClients = HashMap.filter (\info -> not $ (lastHeartbeat - info.lastHeartbeat) > timeout) clients
+            let activeClients = HashMap.filter (\info -> not $ (timestamp - info.timestamp) > timeout) clients
 
             -- Update the current client's heartbeat
             let updatedClients = HashMap.insert
                   clientId
-                  { lastHeartbeat, clientId }
+                  { timestamp, clientId }
                   activeClients
             let count = HashMap.size updatedClients
 
