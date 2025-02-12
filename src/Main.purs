@@ -469,20 +469,29 @@ handleAction audioContext = case _ of
             H.modify_ $ _connectionCount .~ count
             log $ "Client left: " <> clientId <> ", total clients: " <> show count
           HeartbeatMessage { clientId } -> do
-            timestamp <- now
-            H.modify_ $ _connectedClients %~ HashMap.update
-              (\info -> Just $ info { lastHeartbeat = timestamp })
-              clientId
-            -- Clean up stale clients using configured timeout
+            lastHeartbeat <- now
+            -- First get current state
             clients <- H.gets _.connectedClients
             timeout <- H.gets _.heartbeatTimeout
-            let
-              isStale info = (timestamp - info.lastHeartbeat) > timeout
-              activeClients = HashMap.filter (\info -> not $ isStale info) clients
-              count = HashMap.size activeClients
-            H.modify_ $ _connectedClients .~ activeClients
+
+            -- Clean up stale clients first
+            let activeClients = HashMap.filter (\info -> not $ (lastHeartbeat - info.lastHeartbeat) > timeout) clients
+
+            -- Update the current client's heartbeat
+            let updatedClients = HashMap.insert
+                  clientId
+                  { lastHeartbeat, clientId }
+                  activeClients
+            let count = HashMap.size updatedClients
+
+            -- Update state with clean list including current client
+            H.modify_ $ _connectedClients .~ updatedClients
             H.modify_ $ _connectionCount .~ count
-            log $ "Heartbeat from: " <> clientId <> ", total clients: " <> show count
+
+            log $ "Heartbeat from clientId(" <> clientId <> "). "
+              <> "Clients before cleanup: " <> show (HashMap.size clients)
+              <> "Clients after cleanup: " <> show (HashMap.size activeClients)
+              <> "Clients after new heartbeat: " <> show count
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
