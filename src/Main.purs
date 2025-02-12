@@ -322,6 +322,12 @@ handleAction audioContext = case _ of
         (toEventTarget w)
         \_ -> Just Finalize
 
+    H.subscribe' \_ ->
+      eventListener
+        (EventType "unload")
+        (toEventTarget w)
+        \_ -> Just Finalize
+
     pure unit
 
   Finalize -> do
@@ -464,7 +470,7 @@ handleAction audioContext = case _ of
             log $ "Client left: " <> clientId <> ", total clients: " <> show count
           HeartbeatMessage { clientId } -> do
             timestamp <- now
-            H.modify_ $ _connectedClients %~ HashMap.update 
+            H.modify_ $ _connectedClients %~ HashMap.update
               (\info -> Just $ info { lastHeartbeat = timestamp })
               clientId
             -- Clean up stale clients using configured timeout
