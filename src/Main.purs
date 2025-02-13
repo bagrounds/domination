@@ -472,9 +472,7 @@ handleAction audioContext = case _ of
             H.modify_ $ _connectionCount .~ updatedClientCount
 
             { username, id } <- H.get
-            if originalClientCount < updatedClientCount || activeClientCount < updatedClientCount
-              then sendMessage (UsernameMessage { username, id })
-              else pure unit
+            sendMessage (UsernameMessage { username, id })
 
             log $ "Heartbeat from clientId(" <> clientId <> ")"
               <> "; Clients before cleanup: " <> show originalClientCount
