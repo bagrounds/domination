@@ -16,22 +16,6 @@ const clearWebSocket = () => {
   window._singletonWebSocket = null
 }
 
-// Add message buffer constants and functions at the top
-const MESSAGE_BUFFER_LENGTH = 4
-const messageBuffer = []
-
-const newMessage = (message) => {
-  if (messageBuffer.includes(message)) {
-    logInfo('Duplicate message detected, ignoring')
-    return false
-  }
-  messageBuffer.push(message)
-  while (messageBuffer.length > MESSAGE_BUFFER_LENGTH) {
-    messageBuffer.shift()
-  }
-  return true
-}
-
 const log = level => (...args) => console[level]('WebSocket FFI: ', ...args)
 const logInfo = (...args) => log('log')(...args)
 const logError = (...args) => {
@@ -113,20 +97,13 @@ exports.makeWebSocketFFI = left =>
 
       ws.onmessage = event => {
         logInfo('Received message:', event.data)
-        const processMessage = data => {
-          if (data instanceof Blob) {
-            data.text().then(text => {
-              if (newMessage(text)) {
-                broadcastEvent(remoteMessageTarget)(text)
-              }
-            })
-          } else {
-            if (newMessage(data)) {
-              broadcastEvent(remoteMessageTarget)(data)
-            }
-          }
+        if (event.data instanceof Blob) {
+          event.data.text().then(text => {
+            broadcastEvent(remoteMessageTarget)(text)
+          })
+        } else {
+          broadcastEvent(remoteMessageTarget)(event.data)
         }
-        processMessage(event.data)
       }
 
       ws.onerror = error => {
