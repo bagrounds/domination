@@ -65,7 +65,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.Event (eventListener)
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
-import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
+import Message (RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
@@ -74,9 +74,6 @@ import Web.HTML.Window (toEventTarget)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
-
-localMessageTarget :: String
-localMessageTarget = "local-message-target"
 
 uuidKey :: String
 uuidKey = "player-id"
@@ -139,13 +136,6 @@ render audioContext state = HH.main_ $
   [ HH.div
     [ HP.id $ remoteMessageTarget
     , HE.handler (EventType "purescript") ReceiveRemoteMessage
-    ]
-    []
-  , HH.div
-    [ HP.id $ localMessageTarget
-    , HE.handler
-      (EventType "purescript")
-      (ReceiveLocalMessage)
     ]
     []
   , if state.showMenu
@@ -299,7 +289,7 @@ handleAction audioContext = case _ of
     H.modify_ (_serverUrl .~ serverUrl)
 
     maybeBroadcaster <- maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget serverUrl
+      roomCode remoteMessageTarget serverUrl
 
     log $ "Initialize: broadcaster: " <> show maybeBroadcaster
 
@@ -405,17 +395,6 @@ handleAction audioContext = case _ of
 
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
-  -- LocalMessages Only used in Bugout version
-  ReceiveLocalMessage customEvent -> do
-    let localMessage = FFI.detail customEvent
-    case localMessage of
-      SeenMessage address -> do
-        log $ "I see you: " <> address
-        { username, id } <- H.get
-        sendMessage $ UsernameMessage { username, id }
-      ConnectionsMessage count -> do
-        log $ "Local ConnectionsMessage " <> (show count)
-        H.modify_ $ set _connectionCount count
 
   ReceiveRemoteMessage customEvent -> do
     let detail = FFI.detail customEvent
@@ -589,7 +568,7 @@ sendMessage message' = do
 
   maybeBroadcaster' <- case maybeBroadcaster of
     Nothing -> maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget serverUrl
+      roomCode remoteMessageTarget serverUrl
     Just b -> pure (Just b)
 
   case maybeBroadcaster' of

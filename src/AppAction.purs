@@ -34,6 +34,5 @@ data AppAction
   | Write (Lens' AppState String) String
   | SendMessage
   | ReceiveRemoteMessage Event
-  | ReceiveLocalMessage Event
   | HandleGameEvent GameEvent
   | DoNothing

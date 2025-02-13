@@ -80,11 +80,8 @@ const getBugout = () => {
 
 exports.makeBugoutFFI = left =>
   right =>
-  connections =>
-  seen =>
   roomCode =>
   remoteMessageTarget =>
-  localMessageTarget =>
   serverUrl =>
   callback =>
   () => {
@@ -139,12 +136,6 @@ exports.makeBugoutFFI = left =>
       }
     })
 
-    bugout.on("seen", address => {
-      broadcastEvent(localMessageTarget)(seen(address))
-      const peers = Object.keys(bugout.peers || {}).length
-      broadcastEvent(localMessageTarget)(connections(peers))
-    })
-
     bugout.on("ping", address => {
       if (address !== bugout.address()) {
         logInfo("ping from: ", address)
@@ -154,8 +145,6 @@ exports.makeBugoutFFI = left =>
     })
 
     bugout.on("timeout", address => {
-      const peers = Object.keys(bugout.peers || {}).length
-      broadcastEvent(localMessageTarget)(connections(peers))
       if (address !== bugout.address()) {
         logInfo("timeout: ", address)
       } else {

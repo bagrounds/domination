@@ -25,10 +25,10 @@ instance showBugoutBroadcaster :: Show BugoutBroadcaster where
 broadcastBugoutMessage :: BugoutBroadcaster -> String -> Aff Unit
 broadcastBugoutMessage (BugoutBroadcaster bugout) = liftEffect <<< FFI.send bugout
 
-createBugoutBroadcaster :: String -> String -> String -> String -> Aff (Either Error BugoutBroadcaster)
-createBugoutBroadcaster roomCode remoteMessageTarget localMessageTarget serverUrl =
+createBugoutBroadcaster :: String -> String -> String -> Aff (Either Error BugoutBroadcaster)
+createBugoutBroadcaster roomCode remoteMessageTarget serverUrl =
   try $ BugoutBroadcaster <$> makeAff
-    (FFI.makeBugout roomCode remoteMessageTarget localMessageTarget serverUrl)
+    (FFI.makeBugout roomCode remoteMessageTarget serverUrl)
 
 getBugoutAddress :: BugoutBroadcaster -> Aff String
 getBugoutAddress (BugoutBroadcaster bugout) = liftEffect $ FFI.address bugout

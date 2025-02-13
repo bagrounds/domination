@@ -70,10 +70,6 @@ data RemoteMessage
   | HeartbeatMessage { clientId :: String, timestamp :: Int }
   | LeaveMessage { clientId :: String, timestamp :: Int }
 
-data LocalMessage
-  = SeenMessage String
-  | ConnectionsMessage Int
-
 derive instance genericRemoteMessage :: Generic RemoteMessage _
 derive instance eqRemoteMessage :: Eq RemoteMessage
 instance showRemoteMessage :: Show RemoteMessage where

@@ -61,11 +61,8 @@ exports.showWebSocket = ws => `WebSocket(${ws.url})`
 
 exports.makeWebSocketFFI = left =>
   right =>
-  connections =>
-  seen =>
   roomCode =>
   remoteMessageTarget =>
-  localMessageTarget =>
   serverUrl =>
   callback =>
   () => {
@@ -102,15 +99,14 @@ exports.makeWebSocketFFI = left =>
 
       ws.onclose = (event) => {
         logInfo('WebSocket disconnected', event.code, event.reason)
-        broadcastEvent(localMessageTarget)(connections(0))
 
         // Attempt reconnection if not intentionally closed
         if (event.code !== 1000 && event.code !== 1001) {
           logInfo('Attempting to reconnect in 5 seconds...')
           setTimeout(() => {
             clearWebSocket()
-            exports.makeWebSocketFFI(left)(right)(connections)(seen)(roomCode)
-              (remoteMessageTarget)(localMessageTarget)(serverUrl)(callback)()
+            exports.makeWebSocketFFI(left)(right)(roomCode)
+              (remoteMessageTarget)(serverUrl)(callback)()
           }, 5000)
         }
       }

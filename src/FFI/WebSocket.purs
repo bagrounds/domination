@@ -5,7 +5,6 @@ import Prelude
 import Data.Either (Either(..))
 import Effect (Effect)
 import Effect.Aff (Canceler, Error)
-import Message (LocalMessage(..))
 import Web.Event.Event (Event)
 
 foreign import detail :: forall a. Event -> a
@@ -16,7 +15,6 @@ foreign import showWebSocket :: WebSocket -> String
 
 makeWebSocket
   :: String -- remote message target
-  -> String -- local message target
   -> String -- room code
   -> String -- serverUrl
   -> (Either Error WebSocket -> Effect Unit)
@@ -24,15 +22,10 @@ makeWebSocket
 makeWebSocket = makeWebSocketFFI
   Left
   Right
-  ConnectionsMessage
-  SeenMessage
 
 foreign import makeWebSocketFFI
   :: (forall l r. l -> Either l r) -- Left
   -> (forall l r. r -> Either l r) -- Right
-  -> (Int -> LocalMessage) -- ConnectionsWireMessage
-  -> (String -> LocalMessage) -- SeenWireMessage
-  -> String
   -> String
   -> String
   -> String
