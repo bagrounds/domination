@@ -13,7 +13,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _announce, _chatNumber, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _showMenu, _username, _usernames, defaultAnnounce, defaultKingdom, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -29,13 +29,17 @@ import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
-import Domination.Capability.Dom (class Dom)
+import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
+import Domination.Capability.Clock (class Clock, now)
+import Domination.Capability.Dom (class Dom, window)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random, randomElement, shuffle)
 import Domination.Capability.Storage (class Storage, load, save)
+import Domination.Capability.Timer (class Timer, createTimer)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Card (CardSpec)
+import Domination.Env (env)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
@@ -58,24 +62,24 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.Event (eventListener)
 import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
-import Message (LocalMessage(..), RemoteMessage(..), WireEnvelope)
+import Message (RemoteMessage(..), WireEnvelope)
 import Message as Message
 import Util ((:~))
 import Web.Event.Event (EventType(..))
+import Web.HTML.Event.BeforeUnloadEvent.EventTypes as ET
+import Web.HTML.Window (toEventTarget)
 
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
 
-localMessageTarget :: String
-localMessageTarget = "local-message-target"
-
 uuidKey :: String
 uuidKey = "player-id"
 
-announceKey :: String
-announceKey = "announce"
+serverUrlKey :: String
+serverUrlKey = "server-url"
 
 usernameKey :: String
 usernameKey = "username"
@@ -92,7 +96,7 @@ main = launchAff_ $ do
   runUI (root audioContext) unit body
 
 root :: forall s query o. AudioContext -> Component query o s Aff
-root audioContext = H.hoist (runAppM {}) (component audioContext)
+root audioContext = H.hoist (runAppM env) (component audioContext)
 
 component
   :: forall m s query o
@@ -100,10 +104,12 @@ component
   => Dom m
   => Log m
   => Random m
+  => Clock m
   => GenUuid m
-  => Broadcast m
+  => Broadcast WebSocketBroadcaster m
   => WireCodec m
   => Audio m
+  => Timer m
   => AudioContext
   -> Component query o s m
 component audioContext =
@@ -112,6 +118,7 @@ component audioContext =
   eval = H.mkEval H.defaultEval
     { handleAction = handleAction audioContext
     , initialize = Just Initialize
+    , finalize = Just Finalize
     }
   initialState _ = newApp
 
@@ -129,13 +136,6 @@ render audioContext state = HH.main_ $
   [ HH.div
     [ HP.id $ remoteMessageTarget
     , HE.handler (EventType "purescript") ReceiveRemoteMessage
-    ]
-    []
-  , HH.div
-    [ HP.id $ localMessageTarget
-    , HE.handler
-      (EventType "purescript")
-      (ReceiveLocalMessage)
     ]
     []
   , if state.showMenu
@@ -196,8 +196,11 @@ handleAction
   => Log m
   => GenUuid m
   => Random m
-  => Broadcast m
+  => Clock m
+  => Broadcast WebSocketBroadcaster m
   => WireCodec m
+  => Timer m
+  => Dom m
   => AudioContext
   -> AppAction
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
@@ -274,19 +277,19 @@ handleAction audioContext = case _ of
     loadGame "game_state"
     log "Initialize: done loading game..."
 
-    eAnnounce <- load announceKey
-    announce <- case eAnnounce of
+    eServerUrl <- load serverUrlKey
+    serverUrl <- case eServerUrl of
       Left e -> do
-        log $ "Initialize: no existing announce found, using default."
+        log $ "Initialize: no existing server URL found, using default."
           <> " error: " <> e
-        pure $ defaultAnnounce
+        pure $ defaultServerUrl
       Right u -> pure u
 
-    log $ "Initialize: announce: " <> announce
-    H.modify_ (_announce .~ announce)
+    log $ "Initialize: server URL: " <> serverUrl
+    H.modify_ (_serverUrl .~ serverUrl)
 
     maybeBroadcaster <- maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget announce
+      roomCode remoteMessageTarget serverUrl
 
     log $ "Initialize: broadcaster: " <> show maybeBroadcaster
 
@@ -295,6 +298,34 @@ handleAction audioContext = case _ of
     broadcaster <- H.gets _.maybeBroadcaster
 
     log $ "Initialize: broadcaster: " <> show broadcaster
+
+    timestamp <- now
+    sendMessage $ JoinMessage { clientId: uuid, timestamp }
+    sendMessage $ UsernameMessage { username, id: uuid }
+
+    interval <- H.gets _.heartbeatInterval
+    _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
+
+    w <- window
+    H.subscribe' \_ ->
+      eventListener
+        ET.beforeunload
+        (toEventTarget w)
+        \_ -> Just Finalize
+
+    H.subscribe' \_ ->
+      eventListener
+        (EventType "unload")
+        (toEventTarget w)
+        \_ -> Just Finalize
+
+    pure unit
+
+  Finalize -> do
+    clientId <- H.gets _.id
+    timestamp <- now
+    sendMessage $ LeaveMessage { clientId, timestamp }
+    pure unit
 
   ToggleMenu -> H.modify_ $ _showMenu %~ not
 
@@ -350,10 +381,10 @@ handleAction audioContext = case _ of
     loadGame "game_state"
     H.modify_ $ _showMenu .~ false
 
-  WriteAnnounce announce -> do
-    save announceKey announce >>= logErrorToChat
-    log $ "saving announce: " <> announce
-    H.modify_ $ set _announce announce
+  WriteServerUrl serverUrl -> do
+    save serverUrlKey serverUrl >>= logErrorToChat
+    log $ "saving server URL: " <> serverUrl
+    H.modify_ $ set _serverUrl serverUrl
 
   WriteUsername username -> do
     { id } <- H.get
@@ -364,15 +395,6 @@ handleAction audioContext = case _ of
 
   Write lens value -> H.modify_ $ set lens value
   SendMessage -> sendChatMessage
-  ReceiveLocalMessage customEvent -> do
-    let localMessage = FFI.detail customEvent
-    case localMessage of
-      SeenMessage address -> do
-        log $ "I see you: " <> address
-        { username, id } <- H.get
-        sendMessage $ UsernameMessage { username, id }
-      ConnectionsMessage count ->
-        H.modify_ $ set _connectionCount count
 
   ReceiveRemoteMessage customEvent -> do
     let detail = FFI.detail customEvent
@@ -411,6 +433,51 @@ handleAction audioContext = case _ of
               Nothing -> pure unit
           PlayMadeMessage _ ->
             error "PlayMadeMessage should not be called"
+          JoinMessage { clientId } -> do
+            timestamp <- now
+            let clientInfo = { timestamp, clientId }
+            H.modify_ $ _connectedClients %~ HashMap.insert clientId clientInfo
+            -- After updating connected clients, broadcast the new count
+            clients <- H.gets _.connectedClients
+            let count = HashMap.size clients
+            H.modify_ $ _connectionCount .~ count
+            log $ "Client joined: " <> clientId <> ", total clients: " <> show count
+          LeaveMessage { clientId } -> do
+            H.modify_ $ _connectedClients %~ HashMap.delete clientId
+            -- After removing client, broadcast the new count
+            clients <- H.gets _.connectedClients
+            let count = HashMap.size clients
+            H.modify_ $ _connectionCount .~ count
+            log $ "Client left: " <> clientId <> ", total clients: " <> show count
+          HeartbeatMessage { clientId } -> do
+            timestamp <- now
+            -- First get current state
+            clients <- H.gets _.connectedClients
+            let originalClientCount = HashMap.size clients
+            timeout <- H.gets _.heartbeatTimeout
+
+            -- Clean up stale clients first
+            let activeClients = HashMap.filter (\info -> not $ (timestamp - info.timestamp) > timeout) clients
+            let activeClientCount = HashMap.size activeClients
+
+            -- Update the current client's heartbeat
+            let updatedClients = HashMap.insert
+                  clientId
+                  { timestamp, clientId }
+                  activeClients
+            let updatedClientCount = HashMap.size updatedClients
+
+            -- Update state with clean list including current client
+            H.modify_ $ _connectedClients .~ updatedClients
+            H.modify_ $ _connectionCount .~ updatedClientCount
+
+            { username, id } <- H.get
+            sendMessage (UsernameMessage { username, id })
+
+            log $ "Heartbeat from clientId(" <> clientId <> ")"
+              <> "; Clients before cleanup: " <> show originalClientCount
+              <> "; Clients after cleanup: " <> show activeClientCount
+              <> "; Clients after new heartbeat: " <> show updatedClientCount
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
@@ -430,6 +497,10 @@ handleAction audioContext = case _ of
         saveNumber = (i - 1) `mod` 10
         key = "game_state_" <> show saveNumber
       loadGame key
+  HeartbeatTick -> do
+    clientId <- H.gets _.id
+    timestamp <- now
+    sendMessage $ HeartbeatMessage { clientId, timestamp }
   where
     loadGame key = do
       { nextPlayerIndex } <- H.gets _.dominationConfig
@@ -468,7 +539,7 @@ handleAction audioContext = case _ of
       -- if we log errors to chat while sending messages: infinite loop?
       errorOrUnit <- saveChat
       case errorOrUnit of
-        Left message -> error message
+        Left errorMessage -> error errorMessage
         Right _ -> pure unit
       sendMessage chat
     logErrorToChat result = case result of
@@ -480,7 +551,7 @@ handleAction audioContext = case _ of
 sendMessage
   :: forall t1 r o1 q1 output m
   . Log m
-  => Broadcast m
+  => Broadcast WebSocketBroadcaster m
   => WireCodec m
   => RemoteMessage
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
@@ -491,11 +562,11 @@ sendMessage message' = do
 
   let wireEnvelope = Tuple id message
 
-  announce <- H.gets _.announce
+  serverUrl <- H.gets _.serverUrl
 
   maybeBroadcaster' <- case maybeBroadcaster of
     Nothing -> maybeCreateBroadcaster
-      roomCode remoteMessageTarget localMessageTarget announce
+      roomCode remoteMessageTarget serverUrl
     Just b -> pure (Just b)
 
   case maybeBroadcaster' of

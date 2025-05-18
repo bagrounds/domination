@@ -19,6 +19,8 @@ type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
 
 data AppAction
   = Initialize
+  | Finalize
+  | HeartbeatTick
   | StartNewGame
   | WritePlayerIndex Int
   | WritePlayerCount Int
@@ -27,11 +29,10 @@ data AppAction
   | ToggleLongGame
   | RandomizeKingdom
   | ChooseKingdom (Array CardSpecSelection)
-  | WriteAnnounce String
+  | WriteServerUrl String
   | WriteUsername String
   | Write (Lens' AppState String) String
   | SendMessage
   | ReceiveRemoteMessage Event
-  | ReceiveLocalMessage Event
   | HandleGameEvent GameEvent
   | DoNothing

@@ -1,6 +1,6 @@
 'use strict'
 
-const CACHE_NAME = 'domination-cache-v1'
+const CACHE_NAME = 'v0.33.14'
 const cacheAllowlist = [ CACHE_NAME ]
 const urlsToCache = [
   '/',
@@ -29,6 +29,7 @@ self.addEventListener('fetch', event =>
             const badRespones = !response
               || response.status !== 200
               || response.type !== 'basic'
+              || new URL(event.request.url).origin === location.origin
 
             if (badRespones) {
               return response
