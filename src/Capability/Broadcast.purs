@@ -11,43 +11,43 @@ module Domination.Capability.Broadcast where
 
 import Prelude
 
-import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Domination.AppM (AppM)
+import Domination.Capability.Broadcast.Bugout (BugoutBroadcaster)
+import Domination.Capability.Broadcast.Bugout as Bugout
+import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
+import Domination.Capability.Broadcast.WebSocket as WebSocket
 import Domination.Capability.Log (class Log, log)
-import Effect.Aff (Aff, Error, makeAff)
+import Effect.Aff (Aff, Error)
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Effect.Class (class MonadEffect, liftEffect)
-import FFI as FFI
+import Effect.Class (class MonadEffect)
 import Halogen (HalogenM)
 
-newtype Broadcaster = Broadcaster FFI.Bugout
+-- Generic broadcaster type that can be implemented by different backends
+class Monad m <= Broadcast b m where
+  create :: String -> String -> String -> m (Either Error b)
+  address :: b -> m String
+  broadcast :: b -> String -> m Unit
 
-instance showBroadcaster :: Show Broadcaster where
-  show (Broadcaster bugout) = FFI.showBugout bugout
+instance webSocketBroadcasterAppM :: Broadcast WebSocketBroadcaster AppM where
+  create roomCode remoteMessageTarget serverUrl =
+    liftAff $ WebSocket.createWebSocketBroadcaster roomCode remoteMessageTarget serverUrl
+  address = liftAff <<< WebSocket.getWebSocketAddress
+  broadcast broadcaster = liftAff <<< WebSocket.broadcastWebSocketMessage broadcaster
 
-class Monad m <= Broadcast m where
-  create :: String -> String -> String -> String -> m (Either Error Broadcaster)
-  address :: Broadcaster -> m String
-  broadcast :: Broadcaster -> String -> m Unit
+instance bugoutBroadcasterAppM :: Broadcast BugoutBroadcaster AppM where
+  create roomCode remoteMessageTarget serverUrl =
+    liftAff $ Bugout.createBugoutBroadcaster roomCode remoteMessageTarget serverUrl
+  address = liftAff <<< Bugout.getBugoutAddress
+  broadcast broadcaster = liftAff <<< Bugout.broadcastBugoutMessage broadcaster
 
-instance broadcastHalogenM :: Broadcast m => Broadcast (HalogenM st act slots msg m) where
-  create :: String -> String -> String -> String -> (HalogenM st act slots msg m) (Either Error Broadcaster)
-  create a b c = lift <<< create a b c
-  address :: Broadcaster -> (HalogenM st act slots msg m) String
+instance broadcastHalogenM :: Broadcast b m => Broadcast b (HalogenM st act slots msg m) where
+  create a b = lift <<< create a b
   address = lift <<< address
-  broadcast :: Broadcaster -> String -> (HalogenM st act slots msg m) Unit
+  broadcast :: b -> String -> (HalogenM st act slots msg m) Unit
   broadcast broadcaster = lift <<< broadcast broadcaster
-
-instance broadcastAppM :: Broadcast AppM where
-  create :: String -> String -> String -> String -> AppM (Either Error Broadcaster)
-  create a b c = liftAff <<< createBroadcaster a b c
-  address :: Broadcaster -> AppM String
-  address = liftAff <<< getAddress
-  broadcast :: Broadcaster -> String -> AppM Unit
-  broadcast broadcaster = liftAff <<< broadcastMessage broadcaster
 
 newtype BroadcastM a = BroadcastM (Aff a)
 
@@ -59,43 +59,19 @@ derive newtype instance monadBroadcastM :: Monad BroadcastM
 derive newtype instance monadEffectBroadcastM :: MonadEffect BroadcastM
 derive newtype instance monadAffBroadcastM :: MonadAff BroadcastM
 
-instance broadcastBroadcastM :: Broadcast BroadcastM where
-  broadcast broadcaster = liftAff <<< broadcastMessage broadcaster
-  create a b c = liftAff <<< createBroadcaster a b c
-  address = liftAff <<< getAddress
-
 runBroadcastM :: BroadcastM ~> Aff
-runBroadcastM (BroadcastM m) = liftAff m
-
-broadcastMessage :: Broadcaster -> String -> Aff Unit
-broadcastMessage (Broadcaster bugout) = liftEffect <<< FFI.send bugout
-
-createBroadcaster
-  :: String
-  -> String
-  -> String
-  -> String
-  -> Aff (Either Error Broadcaster)
-createBroadcaster remoteMessageTarget localMessageTarget roomCode announce =
-  try
-  $ Broadcaster
-  <$> makeAff
-  (FFI.makeBugout remoteMessageTarget localMessageTarget roomCode announce)
-
-getAddress :: Broadcaster -> Aff String
-getAddress (Broadcaster bugout) = liftEffect $ FFI.address bugout
+runBroadcastM (BroadcastM m) = m
 
 maybeCreateBroadcaster
-  :: forall m
+  :: forall b m
   . Log m
-  => Broadcast m
-  => String
-  -> String
-  -> String
-  -> String
-  -> m (Maybe Broadcaster)
-maybeCreateBroadcaster roomCode remoteMessageTarget localMessageTarget announce = do
-  eBroadcaster <- create roomCode remoteMessageTarget localMessageTarget announce
+  => Broadcast b m
+  => String -- roomCode
+  -> String -- remoteMessageTarget
+  -> String -- serverUrl
+  -> m (Maybe b)
+maybeCreateBroadcaster roomCode remoteMessageTarget serverUrl = do
+  eBroadcaster <- create roomCode remoteMessageTarget serverUrl
   case eBroadcaster of
     Left e -> do
       log $ "Error creating broadcaster: " <> show e
