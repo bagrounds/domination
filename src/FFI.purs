@@ -17,7 +17,6 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Canceler, Error)
-import Message (LocalMessage(..))
 import Web.Event.Event (Event)
 import Web.Storage.Storage (Storage)
 
@@ -33,23 +32,17 @@ foreign import showBugout :: Bugout -> String
 
 makeBugout
   :: String -- remote message target
-  -> String -- local message target
   -> String -- room code
-  -> String -- announce
+  -> String -- serverUrl
   -> (Either Error Bugout -> Effect Unit)
   -> Effect Canceler
 makeBugout = makeBugoutFFI
   Left
   Right
-  ConnectionsMessage
-  SeenMessage
 
 foreign import makeBugoutFFI
   :: (forall l r. l -> Either l r) -- Left
   -> (forall l r. r -> Either l r) -- Right
-  -> (Int -> LocalMessage) -- ConnectionsWireMessage
-  -> (String -> LocalMessage) -- SeenWireMessage
-  -> String
   -> String
   -> String
   -> String
@@ -85,3 +78,6 @@ foreign import setItem
   -> String -- value
   -> Storage -- local storage
   -> Effect (Either String Unit) -- error message or nothing (unit)
+
+foreign import now
+  :: Effect Int

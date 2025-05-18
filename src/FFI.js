@@ -80,12 +80,9 @@ const getBugout = () => {
 
 exports.makeBugoutFFI = left =>
   right =>
-  connections =>
-  seen =>
   roomCode =>
   remoteMessageTarget =>
-  localMessageTarget =>
-  announce =>
+  serverUrl =>
   callback =>
   () => {
 
@@ -101,7 +98,7 @@ exports.makeBugoutFFI = left =>
     heartbeat: 10000,
     timeout: 25000,
     seed: (localStorage || {}).seed,
-    announce: [announce]
+    serverUrl: [serverUrl]
   }
 
   var fresh = true
@@ -139,12 +136,6 @@ exports.makeBugoutFFI = left =>
       }
     })
 
-    bugout.on("seen", address => {
-      broadcastEvent(localMessageTarget)(seen(address))
-      const peers = Object.keys(bugout.peers || {}).length
-      broadcastEvent(localMessageTarget)(connections(peers))
-    })
-
     bugout.on("ping", address => {
       if (address !== bugout.address()) {
         logInfo("ping from: ", address)
@@ -154,8 +145,6 @@ exports.makeBugoutFFI = left =>
     })
 
     bugout.on("timeout", address => {
-      const peers = Object.keys(bugout.peers || {}).length
-      broadcastEvent(localMessageTarget)(connections(peers))
       if (address !== bugout.address()) {
         logInfo("timeout: ", address)
       } else {
@@ -240,10 +229,12 @@ exports.stringAsArrayBuffer = string => {
 // cannot eta-reduce this function because LZString does not
 // exist in our test suite - we currently import the library
 // in an HTML script tag
-exports.compressString = s => LZString.compress(s)
+// https://github.com/pieroxy/lz-string/issues/167#issuecomment-1319644753
+exports.compressString = s => LZString.compressToUTF16(s)
 
 exports.decompressStringFFI = just => nothing => s => {
-  const result = LZString.decompress(s)
+// https://github.com/pieroxy/lz-string/issues/167#issuecomment-1319644753
+  const result = LZString.decompressFromUTF16(s)
   return result == null
     ? nothing
     : just(result)
@@ -257,3 +248,5 @@ exports.setItem = left => right => unit => key => value => storage => () => {
     return left(`Error: setItem: key='${key}', value='${value}', error message: '${e.message || e}'`)
   }
 }
+
+exports.now = () => performance.now()

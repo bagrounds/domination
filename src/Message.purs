@@ -66,10 +66,9 @@ data RemoteMessage
     , playerIndex :: Int
     , state :: Game
     }
-
-data LocalMessage
-  = SeenMessage String
-  | ConnectionsMessage Int
+  | JoinMessage { clientId :: String, timestamp :: Int }
+  | HeartbeatMessage { clientId :: String, timestamp :: Int }
+  | LeaveMessage { clientId :: String, timestamp :: Int }
 
 derive instance genericRemoteMessage :: Generic RemoteMessage _
 derive instance eqRemoteMessage :: Eq RemoteMessage
@@ -92,6 +91,9 @@ data WireMessage
   | PlayMadeWireMessage
     (Tuple WirePlay
     (Tuple WireInt WireGame))
+  | JoinWireMessage String WireInt
+  | HeartbeatWireMessage String WireInt
+  | LeaveWireMessage String WireInt
 
 _toWire :: Iso' RemoteMessage WireMessage
 _toWire = iso to from where
@@ -106,6 +108,12 @@ _toWire = iso to from where
       $ Tuple (view Game._toWire state) (pmm <$> playMade)
     PlayMadeMessage x ->
       PlayMadeWireMessage $ pmm x
+    JoinMessage { clientId, timestamp } ->
+      JoinWireMessage clientId (view Int._toWire timestamp)
+    HeartbeatMessage { clientId, timestamp } ->
+      HeartbeatWireMessage clientId (view Int._toWire timestamp)
+    LeaveMessage { clientId, timestamp } ->
+      LeaveWireMessage clientId (view Int._toWire timestamp)
     where
       pmm { play, playerIndex, state } =
         Tuple (view Play._toWire play)
@@ -125,6 +133,12 @@ _toWire = iso to from where
         }
     PlayMadeWireMessage x ->
       PlayMadeMessage $ pmm x
+    JoinWireMessage clientId timestamp ->
+      JoinMessage { clientId, timestamp: review Int._toWire timestamp }
+    HeartbeatWireMessage clientId timestamp ->
+      HeartbeatMessage { clientId, timestamp: review Int._toWire timestamp }
+    LeaveWireMessage clientId timestamp ->
+      LeaveMessage { clientId, timestamp: review Int._toWire timestamp }
     where
       pmm (Tuple play (Tuple playerIndex state)) =
         { play: review Play._toWire play
@@ -151,6 +165,15 @@ instance decodeArrayBuffeWireMessage
   readArrayBuffer = genericReadArrayBuffer
 
 renderHtml :: forall w i. RemoteMessage -> HTML w i
+renderHtml (JoinMessage { clientId }) = HH.div
+  [ HH.class_ $ ClassName "join-message" ]
+  [ HH.text $ "(" <> clientId <> " has joined the game)" ]
+renderHtml (HeartbeatMessage { clientId }) = HH.div
+  [ HH.class_ $ ClassName "heartbeat-message" ]
+  [ HH.text $ "(" <> clientId <> " is alive " ]
+renderHtml (LeaveMessage { clientId }) = HH.div
+  [ HH.class_ $ ClassName "leave-message" ]
+  [ HH.text $ "(" <> clientId <> " has left the game)" ]
 renderHtml (ChatMessage { username, message }) =
   HH.div
     [ HH.class_ $ ClassName "chat-message" ]

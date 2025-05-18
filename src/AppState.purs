@@ -21,27 +21,35 @@ import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Domination.Capability.Broadcast (Broadcaster)
+import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
 
+type ClientInfo =
+  { timestamp :: Int
+  , clientId :: String
+  }
+
 type AppState =
   { connectionCount :: Int
   , id :: String
-  , announce :: String
+  , serverUrl :: String
   , username :: String
   , usernames :: HashMap String String
   , message :: String
   , messages :: Array RemoteMessage
   , chatNumber :: Int
   , gameOn :: Boolean
-  , maybeBroadcaster :: Maybe Broadcaster
+  , maybeBroadcaster :: Maybe WebSocketBroadcaster
   , roomCode :: String
   , dominationConfig :: Config
   , showMenu :: Boolean
   , longGame :: Boolean
   , maybeAudioContext :: Maybe AudioContext
+  , connectedClients :: HashMap String ClientInfo
+  , heartbeatInterval :: Int
+  , heartbeatTimeout :: Int
   }
 
 _card :: Lens' CardSpec Card
@@ -72,9 +80,9 @@ _usernames :: Lens' AppState (HashMap String String)
 _usernames = prop (SProxy :: SProxy "usernames")
 _username :: Lens' AppState String
 _username = prop (SProxy :: SProxy "username")
-_announce :: Lens' AppState String
-_announce = prop (SProxy :: SProxy "announce")
-_maybeBroadcaster :: Lens' AppState (Maybe Broadcaster)
+_serverUrl :: Lens' AppState String
+_serverUrl = prop (SProxy :: SProxy "serverUrl")
+_maybeBroadcaster :: Lens' AppState (Maybe WebSocketBroadcaster)
 _maybeBroadcaster = prop (SProxy :: SProxy "maybeBroadcaster")
 _dominationConfig :: Lens' AppState Config
 _dominationConfig = prop (SProxy :: SProxy "dominationConfig")
@@ -90,18 +98,33 @@ _maybeAudioContext
     a b
 _maybeAudioContext = prop (SProxy :: SProxy "maybeAudioContext")
 
+_connectedClients :: Lens' AppState (HashMap String ClientInfo)
+_connectedClients = prop (SProxy :: SProxy "connectedClients")
+
+_heartbeatInterval :: Lens' AppState Int
+_heartbeatInterval = prop (SProxy :: SProxy "heartbeatInterval")
+
+_heartbeatTimeout :: Lens' AppState Int
+_heartbeatTimeout = prop (SProxy :: SProxy "heartbeatTimeout")
+
 globalRoomCode :: String
 globalRoomCode = "global-dev"
 
-defaultAnnounce :: String
-defaultAnnounce = "wss://p2p-tracker-24is.onrender.com"
+defaultServerUrl :: String
+defaultServerUrl = "wss://purescript-wip.onrender.com"
+
+defaultHeartbeatInterval :: Int
+defaultHeartbeatInterval = 5000
+
+defaultHeartbeatTimeout :: Int
+defaultHeartbeatTimeout = 15000
 
 newApp :: AppState
 newApp =
   { connectionCount: 0
   , id: ""
   , username: ""
-  , announce: defaultAnnounce
+  , serverUrl: defaultServerUrl
   , usernames: HashMap.empty
   , message: ""
   , messages: []
@@ -113,6 +136,9 @@ newApp =
   , showMenu: false
   , longGame: false
   , maybeAudioContext: Nothing
+  , connectedClients: HashMap.empty
+  , heartbeatInterval: defaultHeartbeatInterval
+  , heartbeatTimeout: defaultHeartbeatTimeout
   }
 
 newConfig :: Config

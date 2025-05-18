@@ -18,16 +18,21 @@ import Effect.Class (class MonadEffect, liftEffect)
 import Halogen (HalogenM)
 import Web.Event.Event (Event)
 import Web.Event.Event as Event
+import Web.HTML as HTML
+import Web.HTML (Window)
 
 class Monad m <= Dom m where
   stopPropagation :: Event -> m Unit
+  window :: m Window
 
 instance domHalogenM
   :: Dom m => Dom (HalogenM st act slots msg m) where
   stopPropagation  = lift <<< stopPropagation
+  window = lift window
 
 instance domAppM :: Dom AppM where
   stopPropagation = liftEffect <<< Event.stopPropagation
+  window = liftEffect HTML.window
 
 newtype DomM a = DomM (Effect a)
 
@@ -40,6 +45,7 @@ derive newtype instance monadEffectDomM :: MonadEffect DomM
 
 instance domDomM :: Dom DomM where
   stopPropagation = liftEffect <<< Event.stopPropagation
+  window = liftEffect HTML.window
 
 runDomM :: DomM ~> Effect
 runDomM (DomM m) = liftEffect m
