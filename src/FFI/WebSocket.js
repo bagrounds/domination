@@ -32,7 +32,7 @@ const broadcastEvent = messageTarget => event => {
     eventTarget.dispatchEvent(customEvent(event))
   }
   else {
-    logError(`${domQuery} undefined, cannot dispatch event: `, event)
+    logError(`#${messageTarget} undefined, cannot dispatch event: `, event)
   }
 }
 
@@ -125,3 +125,35 @@ exports.send = ws => message => () => {
 }
 
 exports.address = ws => () => ws.address
+
+exports.makeWebSocket = function(roomCode) {
+  return function(remoteMessageTarget) {
+    return function(serverUrl) {
+      return function(onClose) {
+        return function() {
+          const ws = new WebSocket(serverUrl);
+          ws.onclose = function() {
+            onClose();
+          };
+          return ws;
+        };
+      };
+    };
+  };
+};
+
+exports.cleanup = function(ws) {
+  return function() {
+    ws.close();
+  };
+};
+
+exports.onClose = function(ws) {
+  return function(handler) {
+    return function() {
+      ws.onclose = function() {
+        handler();
+      };
+    };
+  };
+};
