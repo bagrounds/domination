@@ -35,3 +35,7 @@ foreign import makeWebSocketFFI
 foreign import send :: WebSocket -> String -> Effect Unit
 
 foreign import address :: WebSocket -> Effect String
+
+foreign import cleanup :: WebSocket -> Effect Unit
+
+foreign import onClose :: WebSocket -> Effect Unit -> Effect Unit
