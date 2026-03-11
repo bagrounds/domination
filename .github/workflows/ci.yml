@@ -23,7 +23,10 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libncurses5
+        run: |
+          # spago binary is linked against libtinfo.so.5 which is unavailable on Ubuntu 24.04
+          # Create a symlink from libtinfo.so.6 (available) to libtinfo.so.5 (expected)
+          sudo ln -sf /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5
 
       - name: Install npm dependencies
         run: npm ci
