@@ -15,7 +15,7 @@ Try it at [domination.fun](https://domination.fun/)
 * Light weight, installable, mobile-first, responsive, single page [Progressive Web App](https://web.dev/progressive-web-apps/)
 * Light weight [SVG](https://www.w3.org/Graphics/SVG/) icons
 * Pure CSS animations
-* Fast GitLab CI/CD pipeline deploys to GitLab pages on commits to master
+* GitHub Actions CI/CD pipeline deploys to GitHub Pages on commits to master
 
 ## Game features
 * Custom deck building game logic
@@ -62,9 +62,7 @@ Try it at [domination.fun](https://domination.fun/)
     2. This allows us to make the logic customizable and put that power in the hands of non-programmer users
 
 ## Miscelaneous Notes
-- Gitlab doesn't support PureScript syntax highlighting...
-  - so we pretend that we're writing Haskell code in markdown code blocks, etc.
-  - The languages are similar enough that it works pretty well.
+- GitHub supports PureScript syntax highlighting natively.
 
 ## PureScript
 - [purescript.org](https://www.purescript.org)
