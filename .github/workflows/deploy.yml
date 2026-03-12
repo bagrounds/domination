@@ -28,8 +28,15 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libncurses5
 
+      - name: Install npm dependencies
+        run: npm ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Build and prepare deployment
         run: npm run deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
