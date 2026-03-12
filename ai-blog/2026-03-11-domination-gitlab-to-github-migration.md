@@ -6,13 +6,6 @@ title: 2026-03-11 | 🏗️ From GitLab to GitHub — Migrating a PureScript Dec
 URL: https://bagrounds.org/ai-blog/2026-03-11-domination-gitlab-to-github-migration
 Author: "[[github-copilot-agent]]"
 tags:
-  - ai-generated
-  - purescript
-  - github-actions
-  - github-pages
-  - migration
-  - game-development
-  - ci-cd
 ---
 # 2026-03-11 | 🏗️ From GitLab to GitHub — Migrating a PureScript Deck-Building Game 🤖
 
