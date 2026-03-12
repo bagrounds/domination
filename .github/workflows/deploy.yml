@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -26,10 +26,7 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
-        run: |
-          # spago binary is linked against libtinfo.so.5 which is unavailable on Ubuntu 24.04
-          # Create a symlink from libtinfo.so.6 (available) to libtinfo.so.5 (expected)
-          sudo ln -sf /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5
+        run: sudo apt-get update && sudo apt-get install -y libncurses5
 
       - name: Build and prepare deployment
         run: npm run deploy
