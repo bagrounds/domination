@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16
+          cache: npm
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libncurses5
+
+      - name: Install npm dependencies
+        run: npm ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run tests
+        run: npm run test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
