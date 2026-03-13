@@ -7,15 +7,15 @@ import Data.Array ((..))
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, decodeArrayBuffer, encodeArrayBuffer)
-import Data.Either (Either(..), isLeft, isRight)
+import Data.Either (Either(..))
 import Data.Foldable (all, foldl, length, sum)
 import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso')
 import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..))
 import Data.Stack.Machine as Machine
-import Data.Traversable (traverse, traverse_)
-import Domination.Capability.Random (runRandomM)
+import Data.Traversable (traverse)
+import Domination.Capability.Random (RandomM, runRandomM)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Actions (Actions, actions)
 import Domination.Data.Buys (Buys, buys)
@@ -38,8 +38,8 @@ import Domination.Data.Wire.Game (_toWire) as Dom
 import Domination.Data.Wire.Play (_toWire) as Play
 import Effect (Effect)
 import Effect.Console (log)
-import Test.QuickCheck (Result(..), assertEquals, quickCheck')
-import Test.QuickCheck.Gen (Gen, chooseInt, elements, vectorOf)
+import Test.QuickCheck (Result(..), assertEquals)
+
 
 -- ══════════════════════════════════════════════════════════════════
 -- Test Runner
@@ -969,30 +969,17 @@ test_wire_roundtrip value_to_transmit = do
 -- Property-Based Tests (QuickCheck)
 -- ══════════════════════════════════════════════════════════════════
 
--- Run a QuickCheck property and convert to our test format
-run_property :: String -> Int -> (Unit -> Result) -> Effect Result
-run_property _name count prop = do
-  -- Use quickCheck' to run the property `count` times
-  -- quickCheck' returns Effect Unit and logs failures
-  -- We wrap it to capture the result
-  let gen_result = prop unit
-  -- For pure properties, we just evaluate once here and use
-  -- the parametric tests to cover the property space
-  pure gen_result
-
--- | Generators for game-domain values
-gen_player_count :: Gen Int
-gen_player_count = chooseInt 1 6
-
-gen_card :: Gen Card
-gen_card = case NEA.fromArray Cards.cardMap of
-  Just nea -> elements nea
-  Nothing -> pure (Card._card Cards.copper) -- fallback
-
-gen_phase :: Gen Phase
-gen_phase = case NEA.fromArray [ActionPhase, BuyPhase, CleanupPhase] of
-  Just nea -> elements nea
-  Nothing -> pure ActionPhase
+-- | Generators for game-domain values (for future QuickCheck integration)
+-- gen_player_count :: Gen Int
+-- gen_player_count = chooseInt 1 6
+-- gen_card :: Gen Card
+-- gen_card = case NEA.fromArray Cards.cardMap of
+--   Just nea -> elements nea
+--   Nothing -> pure (Card._card Cards.copper)
+-- gen_phase :: Gen Phase
+-- gen_phase = case NEA.fromArray [ActionPhase, BuyPhase, CleanupPhase] of
+--   Just nea -> elements nea
+--   Nothing -> pure ActionPhase
 
 -- | Property: Phase.next cycles with period 3
 -- ∀ p : Phase. next(next(next(p))) = p
@@ -1312,7 +1299,7 @@ simulate_and_check_conservation playerCount longGame nTurns = do
           trash_cards = Array.length game.trash
       in player_cards + supply_cards + trash_cards
 
-    check_turns :: Int -> Game -> Int -> _ Result
+    check_turns :: Int -> Game -> Int -> RandomM Result
     check_turns 0 game initial_total = pure $
       let current_total = count_all_cards game
       in if current_total == initial_total
