@@ -23,7 +23,7 @@ import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Traversal (Traversal', traverseOf)
 import Data.Maybe (Maybe)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Choice (Choice)
 import Domination.Data.Reaction (Reaction)
@@ -41,7 +41,7 @@ data Play
   | React { playerIndex :: Int, reaction :: Maybe Reaction }
 
 _playerIndex' :: forall r. Lens' { playerIndex :: Int | r } Int
-_playerIndex' = prop (SProxy :: SProxy "playerIndex")
+_playerIndex' = prop (Proxy :: Proxy "playerIndex")
 
 _playerIndex :: Traversal' Play Int
 _playerIndex = wander \f s -> case s of

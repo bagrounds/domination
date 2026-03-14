@@ -93,7 +93,7 @@ main = launchAff_ $ do
   audioContext <- liftEffect $ runAudioM newAudioContext
   HA.awaitLoad
   body <- HA.awaitBody
-  runUI (root audioContext) unit body
+  void $ runUI (root audioContext) unit body
 
 root :: forall s query o. AudioContext -> Component query o s Aff
 root audioContext = H.hoist (runAppM env) (component audioContext)

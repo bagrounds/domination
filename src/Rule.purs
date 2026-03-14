@@ -19,7 +19,7 @@ import Data.Show.Generic (genericShow)
 import Data.Lens.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Relationship (Relationship, is)
 
 type Predicate a = a -> Boolean
@@ -35,10 +35,10 @@ type Ruled =
   }
 
 _error :: forall a. Lens' (Rule a) (a -> Logic String)
-_error = prop (SProxy :: SProxy "error")
+_error = prop (Proxy :: Proxy "error")
 
 _predicate :: forall a. Lens' (Rule a) (Predicate a)
-_predicate = prop (SProxy :: SProxy "predicate")
+_predicate = prop (Proxy :: Proxy "predicate")
 
 check
   :: forall m

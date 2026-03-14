@@ -20,7 +20,7 @@ import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens, Lens', lens')
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card (Card)
 import Domination.Data.Cards as Cards
@@ -48,12 +48,12 @@ _toCards card = iso toCards (fromPotentiallyEmptyCards card)
 _card
   :: forall a b r
   . Lens { card :: a | r } { card :: b | r } a b
-_card = prop (SProxy :: SProxy "card")
+_card = prop (Proxy :: Proxy "card")
 
 _count
   :: forall a b r
   . Lens { count :: a | r } { count :: b | r } a b
-_count = prop (SProxy :: SProxy "count")
+_count = prop (Proxy :: Proxy "count")
 
 take :: Stack -> Stack
 take = decOver _count

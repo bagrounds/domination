@@ -27,8 +27,8 @@
   "devDependencies": {
     "hash-function": "^0.1.5",
     "parcel": "^2.0.0-beta.2",
-    "purescript": "^0.14.1",
-    "spago": "^0.15.3",
+    "purescript": "^0.15.15",
+    "spago": "^0.21.0",
     "stylelint": "^13.10.0",
     "stylelint-config-standard": "^20.0.0"
   }
