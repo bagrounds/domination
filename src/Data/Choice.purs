@@ -128,6 +128,23 @@ isAttack = case _ of
   GainBonus { attack } -> attack
   StackChoice { attack } -> attack
 
+clearAttack :: Choice -> Choice
+clearAttack = case _ of
+  If x -> If x { attack = false }
+  And x -> And x { attack = false }
+  Or x -> Or x { attack = false }
+  PickN x -> PickN x { attack = false }
+  Option x -> Option x { attack = false }
+  MoveFromTo x -> MoveFromTo x { attack = false }
+  GainCards x -> GainCards x { attack = false }
+  GainCard x -> GainCard x { attack = false }
+  GainActions x -> GainActions x { attack = false }
+  GainBuys x -> GainBuys x { attack = false }
+  Discard x -> Discard x { attack = false }
+  Draw x -> Draw x { attack = false }
+  GainBonus x -> GainBonus x { attack = false }
+  StackChoice x -> StackChoice x { attack = false }
+
 derive instance genericChoice :: Generic Choice _
 
 derive instance eqChoice :: Eq Choice
