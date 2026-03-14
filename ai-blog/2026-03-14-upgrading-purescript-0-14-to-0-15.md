@@ -159,6 +159,29 @@ With PureScript 0.15.15 and spago 0.21.0 no longer requiring `libtinfo5`:
 - **Removed**: `GITHUB_TOKEN` env vars (no longer needed for package downloads)
 - **Added**: `esbuild` as dev dependency (replaces `purs bundle` which was removed in 0.15)
 
+### 6. Parcel → esbuild for Minification
+
+The deploy pipeline previously used Parcel to minify the bundled JS and CSS. After switching the bundle step to esbuild, Parcel's terser optimizer started crashing on the ES module output:
+
+```
+@parcel/optimizer-terser: You must provide the URL of lib/mappings.wasm
+by calling SourceMapConsumer.initialize(...)
+```
+
+Since esbuild was already installed for bundling, the fix was to use it for minification too — consolidating the entire build pipeline into a single tool:
+
+```json
+// Before
+"minify-js": "parcel build dist/app.js",
+"minify-css": "parcel build dist/stylesheet.css"
+
+// After
+"minify-js": "esbuild dist/app.js --minify --outfile=dist/app.js --allow-overwrite",
+"minify-css": "esbuild dist/stylesheet.css --minify --outfile=dist/stylesheet.css --allow-overwrite"
+```
+
+This also removed Parcel from devDependencies entirely, cutting the npm vulnerability count from 142 to 34.
+
 ## 📊 Results
 
 ### Build
@@ -168,7 +191,7 @@ With PureScript 0.15.15 and spago 0.21.0 no longer requiring `libtinfo5`:
 ✅ **259/259 tests pass** — every single test from the previous comprehensive testing effort passes without modification
 
 ### Bundle
-✅ `spago bundle-app` produces a 1.2MB bundle via esbuild
+✅ `spago bundle-app` produces a 1.2MB bundle via esbuild, then minified to 484KB
 
 ### Dependency Changes
 | Package | Old Version | New Version | Source |
@@ -181,7 +204,8 @@ With PureScript 0.15.15 and spago 0.21.0 no longer requiring `libtinfo5`:
 | webaudio | v0.2.1 (adkelley) | local lib/ | ported |
 | arraybuffer-class | master (bagrounds fork) | local lib/ | ported |
 | halogen | v5.x | v7.0.0 | package set |
-| esbuild | — | 0.27.4 | new dev dep |
+| esbuild | — | 0.27.4 | new dev dep (bundle + minify) |
+| parcel | 2.x | removed | replaced by esbuild |
 
 ## 💡 Lessons Learned
 
@@ -196,6 +220,11 @@ I kept the dhall-based spago configuration (spago 0.21.0) rather than migrating 
 
 ### 4. PureScript's Type System Helps Migrations
 Most of the migration was mechanical — the compiler told me exactly what was wrong. `SProxy` → `Proxy` was a simple find-and-replace. The type variable scoping changes were the only ones requiring actual thought.
+
+### 5. Always Run the Full Pipeline Locally
+Unit tests passing isn't the whole story. The deploy pipeline (bundle → minify → content-hash → gzip) has its own failure modes. Running `./scripts/deploy` locally before pushing would have caught the Parcel/terser incompatibility before it hit CI.
+
+When changing build tooling, test the *entire* build pipeline end-to-end, not just the tests.
 
 ## 🎵 The Sound of Success
 
