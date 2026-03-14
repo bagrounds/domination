@@ -62,7 +62,21 @@ component
   , player
   , pile
   , constraint
-  } = H.mkComponent { initialState, render, eval }
+  } = H.mkComponent { initialState, render, eval: H.mkEval H.defaultEval
+      { handleAction = case _ of
+        Toggle i -> do
+          xs <- H.get
+          let total = length $ snd `filter` xs
+          H.modify_
+            $ mapWithIndex
+              \j (Tuple c selected) -> Tuple c
+                $ if i == j
+                  && canToggle { selected, total }
+                  then not selected
+                  else selected
+        Done -> (resolution <$> H.get) >>= H.raise
+      }
+  }
   where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
     initialState _ = (\x -> Tuple x false) <$> cards
@@ -78,34 +92,19 @@ component
       ]
       <> renderCard `mapWithIndex` xs
 
-    eval = H.mkEval H.defaultEval
-      { handleAction = case _ of
-        Toggle i -> do
-          xs <- H.get
-          let total = length $ snd `filter` xs
-          H.modify_
-            $ mapWithIndex
-              \j (Tuple c selected) -> Tuple c
-                $ if i == j
-                  && canToggle { selected, total }
-                  then not selected
-                  else selected
-        Done -> (resolution <$> H.get) >>= H.raise
-      }
-      where
-        canToggle { selected, total } =
-          selected || total < maxSelected
+    canToggle { selected, total } =
+      selected || total < maxSelected
 
-        maxSelected = case constraint of
-          UpTo n -> n
-          Exactly n -> n
-          DownTo n -> length cards - n
-          Unlimited -> length cards
+    maxSelected = case constraint of
+      UpTo n -> n
+      Exactly n -> n
+      DownTo n -> length cards - n
+      Unlimited -> length cards
 
-        resolution :: State -> Array Int
-        resolution xs = map snd
-          $ filter fst
-          $ (\i (Tuple _ b) -> (Tuple b i)) `mapWithIndex` xs
+    resolution :: State -> Array Int
+    resolution xs = map snd
+      $ filter fst
+      $ (\i (Tuple _ b) -> (Tuple b i)) `mapWithIndex` xs
 
     renderCard cardIndex (Tuple card selected) =
       Card.render onClick extraClasses card (baseSlotNumber cardIndex)

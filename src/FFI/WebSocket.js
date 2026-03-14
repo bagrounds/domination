@@ -1,5 +1,3 @@
-'use strict'
-
 // Add singleton management at the top
 const getWebSocket = () => window._singletonWebSocket
 const setWebSocket = (ws) => { window._singletonWebSocket = ws }
@@ -32,18 +30,18 @@ const broadcastEvent = messageTarget => event => {
     eventTarget.dispatchEvent(customEvent(event))
   }
   else {
-    logError(`${domQuery} undefined, cannot dispatch event: `, event)
+    logError(`${messageTarget} undefined, cannot dispatch event: `, event)
   }
 }
 
 const customEvent = detail =>
   new CustomEvent('purescript', { detail })
 
-exports.detail = ({ detail }) => detail
+export const detail = ({ detail }) => detail
 
-exports.showWebSocket = ws => `WebSocket(${ws.url})`
+export const showWebSocket = ws => `WebSocket(${ws.url})`
 
-exports.makeWebSocketFFI = left =>
+export const makeWebSocketFFI = left =>
   right =>
   roomCode =>
   remoteMessageTarget =>
@@ -89,7 +87,7 @@ exports.makeWebSocketFFI = left =>
           logInfo('Attempting to reconnect in 5 seconds...')
           setTimeout(() => {
             clearWebSocket()
-            exports.makeWebSocketFFI(left)(right)(roomCode)
+            makeWebSocketFFI(left)(right)(roomCode)
               (remoteMessageTarget)(serverUrl)(callback)()
           }, 5000)
         }
@@ -119,9 +117,9 @@ exports.makeWebSocketFFI = left =>
     }
 }
 
-exports.send = ws => message => () => {
+export const send = ws => message => () => {
   logInfo("sent message: ", message)
   ws.send(message)
 }
 
-exports.address = ws => () => ws.address
+export const address = ws => () => ws.address

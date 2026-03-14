@@ -28,7 +28,7 @@ import Data.List (List(..))
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Data.Actions (Actions)
 import Domination.Data.Buys (Buys)
@@ -100,27 +100,27 @@ cardWithRequirements c specs = CardWithRequirements
         l2 = transitiveRequirements css
 
 _types :: Lens' Card (Array CardType)
-_types = prop (SProxy :: SProxy "types")
+_types = prop (Proxy :: Proxy "types")
 _name :: Lens' Card String
-_name = prop (SProxy :: SProxy "name")
+_name = prop (Proxy :: Proxy "name")
 _cost :: Lens' Card Int
-_cost = prop (SProxy :: SProxy "cost")
+_cost = prop (Proxy :: Proxy "cost")
 _victoryPoints :: Lens' Card Points
-_victoryPoints = prop (SProxy :: SProxy "victoryPoints")
+_victoryPoints = prop (Proxy :: Proxy "victoryPoints")
 _treasure :: Lens' Card Int
-_treasure = prop (SProxy :: SProxy "treasure")
+_treasure = prop (Proxy :: Proxy "treasure")
 _buys :: Lens' Card Buys
-_buys = prop (SProxy :: SProxy "buys")
+_buys = prop (Proxy :: Proxy "buys")
 _cards :: Lens' Card Int
-_cards = prop (SProxy :: SProxy "cards")
+_cards = prop (Proxy :: Proxy "cards")
 _actions :: Lens' Card Actions
-_actions = prop (SProxy :: SProxy "actions")
+_actions = prop (Proxy :: Proxy "actions")
 _maybeSpecial :: Lens' Card (Maybe Special)
-_maybeSpecial = prop (SProxy :: SProxy "special")
+_maybeSpecial = prop (Proxy :: Proxy "special")
 _reaction :: Traversal' Card Reaction
-_reaction = prop (SProxy :: SProxy "reaction") <<< _Just
+_reaction = prop (Proxy :: Proxy "reaction") <<< _Just
 _special :: Traversal' Card Special
-_special = prop (SProxy :: SProxy "special") <<< _Just
+_special = prop (Proxy :: Proxy "special") <<< _Just
 
 _ofType :: CardType -> Prism' Card Card
 _ofType cardType = prism' identity $ justIf $ elem cardType <<< _.types
@@ -188,11 +188,11 @@ type Special =
   }
 
 _target :: Lens' Special Target
-_target = prop (SProxy :: SProxy "target")
+_target = prop (Proxy :: Proxy "target")
 _command :: Lens' Special Command
-_command = prop (SProxy :: SProxy "command")
+_command = prop (Proxy :: Proxy "command")
 _description :: Lens' Special String
-_description = prop (SProxy :: SProxy "description")
+_description = prop (Proxy :: Proxy "description")
 
 data Command
   = Choose Choice

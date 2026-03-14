@@ -1,5 +1,3 @@
-'use strict'
-
 // helpers
 
 const broadcastEvent = messageTarget => event => {
@@ -8,7 +6,7 @@ const broadcastEvent = messageTarget => event => {
     eventTarget.dispatchEvent(customEvent(event))
   }
   else {
-    logError(`${domQuery} undefined, cannot dispatch event: `, event)
+    logError(`${messageTarget} undefined, cannot dispatch event: `, event)
   }
 }
 
@@ -23,7 +21,7 @@ const logError = (...args) => log('error')(...args)
 
 // exports
 
-exports.registerServiceWorker = () => {
+export const registerServiceWorker = () => {
   if ('serviceWorker' in navigator) {
     const onLoad = () =>
       navigator.serviceWorker
@@ -43,7 +41,7 @@ exports.registerServiceWorker = () => {
   }
 }
 
-exports.copyToClipboard = id => () => {
+export const copyToClipboard = id => () => {
   const element = document.getElementById(id)
 
   element.select()
@@ -53,7 +51,7 @@ exports.copyToClipboard = id => () => {
   document.execCommand('copy')
 }
 
-exports.detail = ({ detail }) => detail
+export const detail = ({ detail }) => detail
 
 const MESSAGE_BUFFER_LENGTH = 4
 const messageBuffer = []
@@ -69,16 +67,15 @@ const newMessage = (message) => {
   return true
 }
 
-exports.showBugout = bugout => bugout.ek
+export const showBugout = bugout => bugout.ek
 
 const getBugout = () => {
-  // TODO: check if bugout is in a good state, or if it needs to be destroyed
   if (window.bugout instanceof Bugout) {
     return window.bugout
   }
 }
 
-exports.makeBugoutFFI = left =>
+export const makeBugoutFFI = left =>
   right =>
   roomCode =>
   remoteMessageTarget =>
@@ -181,15 +178,15 @@ const reloadOnNetworkChange = () => {
   connection.addEventListener('change', updateConnectionStatus);
 }
 
-exports.address = bugout => () => bugout.address()
+export const address = bugout => () => bugout.address()
 
-exports.send = bugout => message => () => {
+export const send = bugout => message => () => {
   logInfo("sent message length: ", message.length)
   bugout.send(message)
 }
 
 // https://stackoverflow.com/a/8809472
-exports.genUuid = () => { // Public Domain/MIT
+export const genUuid = () => { // Public Domain/MIT
   var d = new Date().getTime()
 
   // Time in microseconds since page-load or 0 if unsupported
@@ -213,10 +210,10 @@ exports.genUuid = () => { // Public Domain/MIT
     })
 }
 
-exports.arrayBufferAsString = buffer =>
+export const arrayBufferAsString = buffer =>
   String.fromCharCode.apply(null, new Uint8Array(buffer))
 
-exports.stringAsArrayBuffer = string => {
+export const stringAsArrayBuffer = string => {
   const stringLength = string.length
   const buffer = new ArrayBuffer(stringLength * 2)
   const bufferView = new Uint8Array(buffer)
@@ -230,9 +227,9 @@ exports.stringAsArrayBuffer = string => {
 // exist in our test suite - we currently import the library
 // in an HTML script tag
 // https://github.com/pieroxy/lz-string/issues/167#issuecomment-1319644753
-exports.compressString = s => LZString.compressToUTF16(s)
+export const compressString = s => LZString.compressToUTF16(s)
 
-exports.decompressStringFFI = just => nothing => s => {
+export const decompressStringFFI = just => nothing => s => {
 // https://github.com/pieroxy/lz-string/issues/167#issuecomment-1319644753
   const result = LZString.decompressFromUTF16(s)
   return result == null
@@ -240,7 +237,7 @@ exports.decompressStringFFI = just => nothing => s => {
     : just(result)
 }
 
-exports.setItem = left => right => unit => key => value => storage => () => {
+export const setItem = left => right => unit => key => value => storage => () => {
   try {
     storage.setItem(key, value)
     return right(unit)
@@ -249,4 +246,4 @@ exports.setItem = left => right => unit => key => value => storage => () => {
   }
 }
 
-exports.now = () => performance.now()
+export const now = () => performance.now()

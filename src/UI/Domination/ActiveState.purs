@@ -12,7 +12,7 @@ module Domination.UI.Domination.ActiveState where
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
 
@@ -27,19 +27,19 @@ type ActiveState =
 _i
   :: forall a b r
   . Lens { i :: a | r } { i :: b | r } a b
-_i = prop (SProxy :: SProxy "i")
+_i = prop (Proxy :: Proxy "i")
 _playerCount :: Lens' ActiveState Int
-_playerCount = prop (SProxy :: SProxy "playerCount")
+_playerCount = prop (Proxy :: Proxy "playerCount")
 _playerIndex :: Lens' ActiveState Int
-_playerIndex = prop (SProxy :: SProxy "playerIndex")
+_playerIndex = prop (Proxy :: Proxy "playerIndex")
 _showSupply
   :: forall a b r
   . Lens { showSupply :: a | r } { showSupply :: b | r } a b
-_showSupply = prop (SProxy :: SProxy "showSupply")
+_showSupply = prop (Proxy :: Proxy "showSupply")
 _state
   :: forall a b r
   . Lens { state :: a | r } { state :: b | r } a b
-_state = prop (SProxy :: SProxy "state")
+_state = prop (Proxy :: Proxy "state")
 
 upgrade :: ActiveState -> ActiveState
 upgrade = _state %~ Game.upgrade

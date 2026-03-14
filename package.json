@@ -2,12 +2,8 @@
   "name": "purescript-wip",
   "version": "0.1.0",
   "description": "purescript work in progress",
-  "source": [
-    "dist/app.js",
-    "assets/stylesheet.css"
-  ],
   "scripts": {
-    "clean": "rm -rf node_modules .cache dist public .parcel-cache",
+    "clean": "rm -rf node_modules .cache dist public",
     "prebuild": "stylelint assets/*.css",
     "build": "spago build",
     "build-watch": "spago build --watch",
@@ -19,16 +15,16 @@
     "docs": "spago docs",
     "run": "spago run",
     "test": "spago test",
-    "minify-js": "parcel build dist/app.js",
-    "minify-css": "parcel build dist/stylesheet.css"
+    "minify-js": "esbuild dist/app.js --minify --outfile=dist/app.js --allow-overwrite",
+    "minify-css": "esbuild dist/stylesheet.css --minify --outfile=dist/stylesheet.css --allow-overwrite"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "esbuild": "^0.27.4",
     "hash-function": "^0.1.5",
-    "parcel": "^2.0.0-beta.2",
-    "purescript": "^0.14.1",
-    "spago": "^0.15.3",
+    "purescript": "^0.15.15",
+    "spago": "^0.21.0",
     "stylelint": "^13.10.0",
     "stylelint-config-standard": "^20.0.0"
   }

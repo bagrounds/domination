@@ -85,7 +85,22 @@ component
   , state
   , player
   , pile
-  } = H.mkComponent { initialState, render, eval }
+  } = H.mkComponent { initialState, render, eval: H.mkEval H.defaultEval
+    { handleAction = case _ of
+      Toggle i -> do
+        xs <- H.get
+        let total = length $ snd `filter` xs
+        H.modify_
+          $ mapWithIndex
+            \j (Tuple c selected) -> Tuple c
+              $ if i == j
+                && canToggle { selected, total }
+                then not selected
+                else selected
+
+      Done -> ((resolve <<< resolution) <$> H.get) >>= H.raise
+    }
+  }
   where
   initialState :: forall a. a -> Array (Tuple Card Boolean)
   initialState _ = (\x -> Tuple x false) <$> cards
@@ -116,28 +131,11 @@ component
 
       Nothing -> h2__ "Something has gone terribly wrong!"
 
-  eval = H.mkEval H.defaultEval
-    { handleAction = case _ of
-      Toggle i -> do
-        xs <- H.get
-        let total = length $ snd `filter` xs
-        H.modify_
-          $ mapWithIndex
-            \j (Tuple c selected) -> Tuple c
-              $ if i == j
-                && canToggle { selected, total }
-                then not selected
-                else selected
-
-      Done -> ((resolve <<< resolution) <$> H.get) >>= H.raise
-    }
-
-    where
-      resolution :: State -> Maybe (Array Int)
-      resolution xs =
-        Just $ map snd
-        $ filter fst
-        $ (\i (Tuple _ b) -> (Tuple b i)) `mapWithIndex` xs
+  resolution :: State -> Maybe (Array Int)
+  resolution xs =
+    Just $ map snd
+    $ filter fst
+    $ (\i (Tuple _ b) -> (Tuple b i)) `mapWithIndex` xs
 
   renderCardToTrash cardIndex (Tuple card selected) =
     Card.render onClick extraClasses card (baseSlotNumber cardIndex)

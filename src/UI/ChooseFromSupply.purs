@@ -45,7 +45,20 @@ component
   => ComponentSpec
   -> Component query Unit (Maybe String) m
 component { cards, baseSlotNumber } =
-  H.mkComponent { initialState, render, eval }
+  H.mkComponent { initialState, render, eval: H.mkEval H.defaultEval
+      { handleAction = case _ of
+        Toggle i -> do
+          xs <- H.get
+          let total = length $ snd `filter` xs
+          H.modify_
+            $ mapWithIndex
+              \j (Tuple c selected) -> Tuple c
+                $ if i == j && (selected || total == 0)
+                  then not selected
+                  else selected
+        Done -> (resolution <$> H.get) >>= H.raise
+      }
+  }
     where
     initialState :: forall a. a -> Array (Tuple Card Boolean)
     initialState _ = (\x -> Tuple x false) <$> cards
@@ -61,22 +74,8 @@ component { cards, baseSlotNumber } =
           ]
           <> renderCard `mapWithIndex` xs
 
-    eval = H.mkEval H.defaultEval
-      { handleAction = case _ of
-        Toggle i -> do
-          xs <- H.get
-          let total = length $ snd `filter` xs
-          H.modify_
-            $ mapWithIndex
-              \j (Tuple c selected) -> Tuple c
-                $ if i == j && (selected || total == 0)
-                  then not selected
-                  else selected
-        Done -> (resolution <$> H.get) >>= H.raise
-      }
-      where
-        resolution :: State -> Maybe String
-        resolution xs = (_.name <<< fst) <$> find snd xs
+    resolution :: State -> Maybe String
+    resolution xs = (_.name <<< fst) <$> find snd xs
 
     renderCard cardIndex (Tuple card selected) =
       Card.render onClick extraClasses card (baseSlotNumber cardIndex)

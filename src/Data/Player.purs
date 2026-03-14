@@ -25,7 +25,7 @@ import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Actions (Actions)
@@ -145,45 +145,45 @@ _toWire = iso to from where
 _deck
   :: forall a b r
   . Lens { deck :: a | r } { deck :: b | r } a b
-_deck = prop (SProxy :: SProxy "deck")
+_deck = prop (Proxy :: Proxy "deck")
 _hand
   :: forall a b r
   . Lens { hand :: a | r } { hand :: b | r } a b
-_hand = prop (SProxy :: SProxy "hand")
+_hand = prop (Proxy :: Proxy "hand")
 _discard
   :: forall a b r
   . Lens { discard :: a | r } { discard :: b | r } a b
-_discard = prop (SProxy :: SProxy "discard")
+_discard = prop (Proxy :: Proxy "discard")
 _toDiscard
   :: forall a b r
   . Lens { toDiscard :: a | r } { toDiscard :: b | r } a b
-_toDiscard = prop (SProxy :: SProxy "toDiscard")
+_toDiscard = prop (Proxy :: Proxy "toDiscard")
 _atPlay
   :: forall a b r
   . Lens { atPlay :: a | r } { atPlay :: b | r } a b
-_atPlay = prop (SProxy :: SProxy "atPlay")
+_atPlay = prop (Proxy :: Proxy "atPlay")
 _buying
   :: forall a b r
   . Lens { buying :: a | r } { buying :: b | r } a b
-_buying = prop (SProxy :: SProxy "buying")
+_buying = prop (Proxy :: Proxy "buying")
 _actions
   :: forall a b r
   . Lens { actions :: a | r } { actions :: b | r } a b
-_actions = prop (SProxy :: SProxy "actions")
+_actions = prop (Proxy :: Proxy "actions")
 _buys
   :: forall a b r
   . Lens { buys :: a | r } { buys :: b | r } a b
-_buys = prop (SProxy :: SProxy "buys")
+_buys = prop (Proxy :: Proxy "buys")
 _choices
   :: forall a b r
   . Lens { choices :: a | r } { choices :: b | r } a b
-_choices = prop (SProxy :: SProxy "choices")
+_choices = prop (Proxy :: Proxy "choices")
 _reaction :: Traversal' Player Reaction
-_reaction = prop (SProxy :: SProxy "reaction") <<< _Just
+_reaction = prop (Proxy :: Proxy "reaction") <<< _Just
 _bonuses
   :: forall a b r
   . Lens { bonuses :: a | r } { bonuses :: b | r } a b
-_bonuses = prop (SProxy :: SProxy "bonuses")
+_bonuses = prop (Proxy :: Proxy "bonuses")
 
 _cardInHand :: Int -> Traversal' Player Card
 _cardInHand i = _hand <<< ix i

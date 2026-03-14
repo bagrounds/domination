@@ -19,7 +19,7 @@ import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.Card (Card, CardSpec(..))
@@ -61,51 +61,51 @@ _card = lens' f
 
 
 _cardSpec :: Lens' CardSpecSelection CardSpec
-_cardSpec = (prop (SProxy :: SProxy "cardSpec"))
+_cardSpec = (prop (Proxy :: Proxy "cardSpec"))
 
 _cardSpecCard :: Lens' CardSpecSelection Card
 _cardSpecCard = _cardSpec <<< _card
 
 _id :: Lens' AppState String
-_id = prop (SProxy :: SProxy "id")
+_id = prop (Proxy :: Proxy "id")
 _messages :: Lens' AppState (Array RemoteMessage)
-_messages = prop (SProxy :: SProxy "messages")
+_messages = prop (Proxy :: Proxy "messages")
 _message :: Lens' AppState String
-_message = prop (SProxy :: SProxy "message")
+_message = prop (Proxy :: Proxy "message")
 _chatNumber :: Lens' AppState Int
-_chatNumber = prop (SProxy :: SProxy "chatNumber")
+_chatNumber = prop (Proxy :: Proxy "chatNumber")
 _connectionCount :: Lens' AppState Int
-_connectionCount = prop (SProxy :: SProxy "connectionCount")
+_connectionCount = prop (Proxy :: Proxy "connectionCount")
 _usernames :: Lens' AppState (HashMap String String)
-_usernames = prop (SProxy :: SProxy "usernames")
+_usernames = prop (Proxy :: Proxy "usernames")
 _username :: Lens' AppState String
-_username = prop (SProxy :: SProxy "username")
+_username = prop (Proxy :: Proxy "username")
 _serverUrl :: Lens' AppState String
-_serverUrl = prop (SProxy :: SProxy "serverUrl")
+_serverUrl = prop (Proxy :: Proxy "serverUrl")
 _maybeBroadcaster :: Lens' AppState (Maybe WebSocketBroadcaster)
-_maybeBroadcaster = prop (SProxy :: SProxy "maybeBroadcaster")
+_maybeBroadcaster = prop (Proxy :: Proxy "maybeBroadcaster")
 _dominationConfig :: Lens' AppState Config
-_dominationConfig = prop (SProxy :: SProxy "dominationConfig")
+_dominationConfig = prop (Proxy :: Proxy "dominationConfig")
 _showMenu
   :: forall a b r
   . Lens { showMenu :: a | r } { showMenu :: b | r } a b
-_showMenu = prop (SProxy :: SProxy "showMenu")
+_showMenu = prop (Proxy :: Proxy "showMenu")
 _maybeAudioContext
   :: forall a b r
   . Lens
     { maybeAudioContext :: a | r }
     { maybeAudioContext :: b | r }
     a b
-_maybeAudioContext = prop (SProxy :: SProxy "maybeAudioContext")
+_maybeAudioContext = prop (Proxy :: Proxy "maybeAudioContext")
 
 _connectedClients :: Lens' AppState (HashMap String ClientInfo)
-_connectedClients = prop (SProxy :: SProxy "connectedClients")
+_connectedClients = prop (Proxy :: Proxy "connectedClients")
 
 _heartbeatInterval :: Lens' AppState Int
-_heartbeatInterval = prop (SProxy :: SProxy "heartbeatInterval")
+_heartbeatInterval = prop (Proxy :: Proxy "heartbeatInterval")
 
 _heartbeatTimeout :: Lens' AppState Int
-_heartbeatTimeout = prop (SProxy :: SProxy "heartbeatTimeout")
+_heartbeatTimeout = prop (Proxy :: Proxy "heartbeatTimeout")
 
 globalRoomCode :: String
 globalRoomCode = "global-dev"
@@ -159,7 +159,7 @@ type Selection = { card :: Card, selected :: Boolean }
 _selected
   :: forall a b r
   . Lens { selected :: a | r } { selected :: b | r } a b
-_selected = prop (SProxy :: SProxy "selected")
+_selected = prop (Proxy :: Proxy "selected")
 
 type Config =
   { nextPlayerIndex :: Int
@@ -175,14 +175,14 @@ upgradeConfig :: Config -> Config
 upgradeConfig = _kingdom %~ map upgradeSelection
 
 _nextPlayerIndex :: Lens' Config Int
-_nextPlayerIndex = prop (SProxy :: SProxy "nextPlayerIndex")
+_nextPlayerIndex = prop (Proxy :: Proxy "nextPlayerIndex")
 _nextPlayerCount :: Lens' Config Int
-_nextPlayerCount = prop (SProxy :: SProxy "nextPlayerCount")
+_nextPlayerCount = prop (Proxy :: Proxy "nextPlayerCount")
 _longGame
   :: forall a b r
   . Lens { longGame :: a | r } { longGame :: b | r } a b
-_longGame = prop (SProxy :: SProxy "longGame")
+_longGame = prop (Proxy :: Proxy "longGame")
 _kingdom
   :: forall a b r
   . Lens { kingdom :: a | r } { kingdom :: b | r } a b
-_kingdom = prop (SProxy :: SProxy "kingdom")
+_kingdom = prop (Proxy :: Proxy "kingdom")
