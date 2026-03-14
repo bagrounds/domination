@@ -5,16 +5,18 @@ import Prelude
 import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Buys (Buys)
-import Domination.Data.Player (Player, _atPlay, _bonuses, _buying, _choices, _deck, _discard, _hand, _toDiscard)
+import Domination.Data.Player (Player, _atPlay, _bonuses, _buying, _choices, _deck, _discard, _hand, _pendingReactions, _toDiscard)
 import Domination.Data.Wire.Bonus (WireBonus)
 import Domination.Data.Wire.Bonus (_toWire) as Bonus
 import Domination.Data.Wire.Card (_toWire) as Card
 import Domination.Data.Wire.Choice (WireChoice)
 import Domination.Data.Wire.Choice (_toWire) as Choice
 import Domination.Data.Wire.Int (WireInt)
+import Domination.Data.Wire.Reaction (WireReaction)
+import Domination.Data.Wire.Reaction (_toWire) as Reaction
 import Util ((<$>~))
 
 type WirePlayer =
@@ -27,7 +29,8 @@ type WirePlayer =
   (Tuple (Array WireInt) -- deck
   (Tuple (Array WireInt) -- discard
   (Tuple (Array WireInt) -- hand
-  (Array WireInt))))))))))
+  (Tuple (Array (Tuple WireReaction String)) -- pendingReactions
+  (Array WireInt)))))))))))
 
 _toWire :: Iso' Player WirePlayer
 _toWire = iso to from where
@@ -39,6 +42,7 @@ _toWire = iso to from where
     >>> (_toDiscard <$>~ view Card._toWire)
     >>> (_atPlay <$>~ view Card._toWire)
     >>> (_buying <$>~ view Card._toWire)
+    >>> (_pendingReactions <$>~ \(Tuple r s) -> Tuple (view Reaction._toWire r) s)
     >>> toTuple
   from = fromTuple
     >>> (_choices <$>~ review Choice._toWire)
@@ -49,6 +53,7 @@ _toWire = iso to from where
     >>> (_toDiscard <$>~ review Card._toWire)
     >>> (_atPlay <$>~ review Card._toWire)
     >>> (_buying <$>~ review Card._toWire)
+    >>> (_pendingReactions <$>~ \(Tuple r s) -> Tuple (review Reaction._toWire r) s)
   toTuple
     { actions
     , atPlay
@@ -59,6 +64,7 @@ _toWire = iso to from where
     , deck
     , discard
     , hand
+    , pendingReactions
     , toDiscard
     } = Tuple actions
       $ Tuple atPlay
@@ -68,7 +74,8 @@ _toWire = iso to from where
       $ Tuple choices
       $ Tuple deck
       $ Tuple discard
-      $ Tuple hand toDiscard
+      $ Tuple hand
+      $ Tuple pendingReactions toDiscard
   fromTuple
     (Tuple actions
     (Tuple atPlay
@@ -78,7 +85,8 @@ _toWire = iso to from where
     (Tuple choices
     (Tuple deck
     (Tuple discard
-    (Tuple hand toDiscard))))))))) =
+    (Tuple hand
+    (Tuple pendingReactions toDiscard)))))))))) =
     { actions
     , atPlay
     , bonuses
@@ -88,5 +96,6 @@ _toWire = iso to from where
     , deck
     , discard
     , hand
+    , pendingReactions
     , toDiscard
     }

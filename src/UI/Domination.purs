@@ -422,7 +422,7 @@ renderPlayer cs@{ state, playerIndex } player =
     where
       renderReactions :: HTML (ChildComponents query r m) Action
       renderReactions =
-        let reactions = Player.reactionsInHand player
+        let reactions = player.pendingReactions
         in chooseOne (HH.text "Choose a reaction")
           $ { clickEvent: MakePlay $ DoneReacting { playerIndex }
             , text: HH.text "Done reacting"

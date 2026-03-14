@@ -52,6 +52,7 @@ type Player =
   , deck :: Array Card
   , discard :: Array Card
   , hand :: Array Card
+  , pendingReactions :: Array (Tuple Reaction String)
   , toDiscard :: Array Card
   }
 
@@ -91,6 +92,11 @@ _choices
   :: forall a b r
   . Lens { choices :: a | r } { choices :: b | r } a b
 _choices = prop (Proxy :: Proxy "choices")
+
+_pendingReactions
+  :: forall a b r
+  . Lens { pendingReactions :: a | r } { pendingReactions :: b | r } a b
+_pendingReactions = prop (Proxy :: Proxy "pendingReactions")
 
 _bonuses
   :: forall a b r
@@ -160,10 +166,19 @@ reactionsInHand player = catMaybes
   <#> _.reaction
 
 gainChoice :: Choice -> Player -> Player
-gainChoice choice = _choices %~ (_ <> [ choice ])
+gainChoice choice player =
+  let
+    player' = (_choices %~ (_ <> [ choice ])) player
+  in
+    if Choice.isAttack choice
+    then player' { pendingReactions = reactionsInHand player' }
+    else player'
+
+dropReactions :: Player -> Player
+dropReactions = _ { pendingReactions = [] }
 
 hasReaction :: Player -> Boolean
-hasReaction = any (_ == true) <<< map (hasType CardType.Reaction) <<< _.hand
+hasReaction = not null <<< _.pendingReactions
 
 purchase :: Card -> Player -> Player
 purchase card = decOver _buys >>> prependOver _buying card
@@ -290,5 +305,6 @@ newPlayer =
   , actions: one
   , buys: one
   , choices: []
+  , pendingReactions: []
   , bonuses : []
   }

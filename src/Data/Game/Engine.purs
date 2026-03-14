@@ -20,7 +20,6 @@ import Data.Array as Array
 import Data.Array.NonEmpty (mapWithIndex, span, toArray)
 import Data.Either (Either(..))
 import Data.Foldable (foldM, length, maximum)
-import Data.Lens.Index (ix)
 import Data.Lens.Setter (over, set)
 import Data.Lens.Traversal (traverseOf)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -31,7 +30,6 @@ import Domination.Capability.Random (class Random)
 import Domination.Data.Card (Card, Command(..), Special)
 import Domination.Data.Card as Card
 import Domination.Data.Cards as Cards
-import Domination.Data.Choice as Choice
 import Domination.Data.Game (Game, assertChoicesResolved, assertPhase, assertPlayerCanAfford, assertTurn, currentPlayer, getPlayer, modifyPlayer, modifyPlayerM, modifyStack, modifyStackM)
 import Domination.Data.Game as Game
 import Domination.Data.Game.Mode (Mode(..), mode)
@@ -78,9 +76,7 @@ makePlay play' = maybeGameOver <=< case play' of
   ResolveChoice x -> resolveChoice x
   React x -> react x
   DoneReacting { playerIndex } ->
-    traverseOf
-      (Game._player playerIndex <<< Player._choices <<< ix 0)
-      (pure <<< Choice.clearAttack)
+    modifyPlayer playerIndex Player.dropReactions
   where
     maybeGameOver :: Game -> m Game
     maybeGameOver state =
@@ -177,6 +173,7 @@ react
   -> Game
   -> m Game
 react { playerIndex, reaction: maybeReaction } =
+  modifyPlayer playerIndex Player.dropReactions >=>
   case maybeReaction of
     Nothing -> pure
     Just reaction -> case reaction of
