@@ -14,6 +14,7 @@ import Prelude
 import Data.Foldable (find)
 import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (Tuple(..))
 import Domination.Data.Actions (actions)
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Buys (buys)
@@ -60,6 +61,7 @@ cardSpecMap =
   , courtyard
   , lurker
   , cellar
+  , secretChamber
   , greatHall
   , village
   , woodCutter
@@ -414,7 +416,9 @@ moat =
   { name = "Moat"
   , cost = 2
   , cards = 2
-  , reaction = Just BlockAttack
+  , reaction = Just $ Tuple
+    BlockAttack
+    "You may reveal this card from your hand to block attacks."
   }
 
 nobles :: CardSpec
@@ -1562,6 +1566,56 @@ mill = let
       }
     , description
     }
+  }
+
+secretChamber :: CardSpec
+secretChamber = let
+  attack = false
+  description = "Discard N cards, +$N."
+  in independentCard $ Card.actionReaction
+  { name = "Secret Chamber"
+  , cost = 2
+  , special = Just
+    { target: Self
+    , command: Choose $ StackChoice
+      { expression:
+        [ StackChooseCards
+          { cards: Unbound
+          , filter: Bound Filter.Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Unlimited
+          }
+        , StackDuplicate
+        , StackMoveCards { from: Pile.Hand, to: Pile.Discarding }
+        , StackLength
+        , StackGainBonusCash
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+    , description
+    }
+  , reaction = Just $ Tuple
+    ( ReactWithChoice $ StackChoice
+      { expression:
+        [ StackPush $ StackInt 2
+        , StackDraw
+        , StackChooseCards
+          { cards: Unbound
+          , filter: Bound Filter.Any
+          , from: Bound Pile.Hand
+          , n: Bound $ Exactly 2
+          }
+        , StackMoveCards { from: Pile.Hand, to: Pile.Deck }
+        ]
+      , stack: []
+      , attack
+      , description
+      }
+   ) $ "When another player plays an Attack card, you may reveal"
+    <> " this from your hand. If you do, +2 Cards, then put 2"
+    <> " cards from your hand on top of your deck."
   }
 
 resolution :: forall a. Maybe a

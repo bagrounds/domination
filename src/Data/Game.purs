@@ -196,8 +196,8 @@ currentPlayer state = getPlayer state.turn state
 
 hasReaction :: Int -> Game -> Boolean
 hasReaction playerIndex state =
-  case state ^? _player playerIndex <<< Player._reaction of
-    Just _ -> true
+  case state ^? _player playerIndex of
+    Just player -> Player.hasReaction player
     Nothing -> false
 
 isAttacked :: Int -> Game -> Boolean

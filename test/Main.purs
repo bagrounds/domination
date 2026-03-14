@@ -297,8 +297,8 @@ player_operation_tests =
   , { name: "newPlayer: no choices"
     , test: assert_eq p.choices []
     }
-  , { name: "newPlayer: no reaction"
-    , test: assert_eq p.reaction Nothing
+  , { name: "newPlayer: hasReaction is false"
+    , test: assert_false "should have no reaction" (Player.hasReaction p)
     }
   , { name: "newPlayer: no bonuses"
     , test: assert_eq p.bonuses []
@@ -338,9 +338,14 @@ player_operation_tests =
   , { name: "gainBuys: adds to existing"
     , test: assert_eq (Player.gainBuys one p).buys (one + one)
     }
-  -- dropReaction
-  , { name: "dropReaction: clears reaction"
-    , test: assert_eq (Player.dropReaction p).reaction Nothing
+  -- hasReaction with moat in hand
+  , { name: "hasReaction: true with moat in hand"
+    , test: assert_true "should have reaction"
+        (Player.hasReaction $ p { hand = [Card._card Cards.moat] })
+    }
+  , { name: "hasReaction: false with no reaction cards"
+    , test: assert_false "should not have reaction"
+        (Player.hasReaction $ p { hand = [Card._card Cards.copper] })
     }
   -- hasActionCardsInHand with no hand
   , { name: "newPlayer: no action cards in hand"

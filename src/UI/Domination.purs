@@ -25,6 +25,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Setter ((%~), (.~))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (fst)
 import Domination.Capability.Audio (class Audio, beep)
 import Domination.Capability.Audio as Sound
 import Domination.Capability.Dom (class Dom)
@@ -35,14 +36,13 @@ import Domination.Data.Card (Card, _card, passFilter)
 import Domination.Data.Card (isAction) as Card
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
-import Domination.Data.Game (choicesOutstanding, hasReaction, isAttacked, isBenefitted, new) as Game
+import Domination.Data.Game (choicesOutstanding, isAttacked, isBenefitted, new) as Game
 import Domination.Data.Game.Engine (choiceTurn, makeAutoPlay) as Game
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Play (Play(..))
 import Domination.Data.Play as Play
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
-import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
 import Domination.Data.StackEvaluation (StackExpression(..))
@@ -380,12 +380,11 @@ renderPlayer cs@{ state, playerIndex } player =
     then HH.div [ HP.class_ Css.dialogue ] $ fromMaybe [] $
       let
         choice = Player.firstChoice player
-        hasReaction = Game.hasReaction playerIndex state
         isAttacked = Game.isAttacked playerIndex state
       in
-      if isAttacked && hasReaction
-      then pure <$> renderReaction
-      else pure <$> renderChoice (CardSlot ChoiceArea) choice
+      pure <$> if isAttacked && Player.hasReaction player
+      then Just renderReactions
+      else renderChoice (CardSlot ChoiceArea) choice
     else HH.div_ []
   , case state.players !! state.turn of
       Nothing -> h1__ $ "No player (" <> show state.turn <> ") in "
@@ -421,20 +420,20 @@ renderPlayer cs@{ state, playerIndex } player =
         ]
   ]
     where
-      renderReaction
-        :: forall widget
-        . Maybe (HTML widget Action)
-      renderReaction =
-        Just $ chooseOne (HH.text "Block attack?")
-          [ { clickEvent: MakePlay $
-              React { playerIndex, reaction: Just BlockAttack }
-            , text: HH.text "Yes"
+      renderReactions :: HTML (ChildComponents query r m) Action
+      renderReactions =
+        let reactions = Player.reactionsInHand player
+        in chooseOne (HH.text "Choose a reaction")
+          $ { clickEvent: MakePlay $ DoneReacting { playerIndex }
+            , text: HH.text "Done reacting"
             }
-          , { clickEvent: MakePlay $
-              React { playerIndex, reaction: Nothing }
-            , text: HH.text "No"
-            }
-          ]
+          : ( ( \reaction ->
+                { clickEvent: MakePlay $
+                  React { playerIndex, reaction: Just $ fst reaction }
+                , text: renderText reaction
+                }
+              ) <$> reactions
+            )
 
       renderChoice
         :: (Int -> DomSlot)

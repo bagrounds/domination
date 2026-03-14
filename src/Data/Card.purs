@@ -51,7 +51,7 @@ type Card =
   , cards :: Int
   , actions :: Actions
   , special :: Maybe Special
-  , reaction :: Maybe Reaction
+  , reaction :: Maybe (Tuple Reaction String)
   }
 
 data CardSpec
@@ -117,7 +117,7 @@ _actions :: Lens' Card Actions
 _actions = prop (Proxy :: Proxy "actions")
 _maybeSpecial :: Lens' Card (Maybe Special)
 _maybeSpecial = prop (Proxy :: Proxy "special")
-_reaction :: Traversal' Card Reaction
+_reaction :: Traversal' Card (Tuple Reaction String)
 _reaction = prop (Proxy :: Proxy "reaction") <<< _Just
 _special :: Traversal' Card Special
 _special = prop (Proxy :: Proxy "special") <<< _Just
