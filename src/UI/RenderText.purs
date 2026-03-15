@@ -16,6 +16,7 @@ import Data.Array (intercalate)
 import Data.Lens ((^?), (^.))
 import Data.Lens.Index (ix)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (Tuple(..), snd)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
@@ -77,6 +78,10 @@ instance reactionRenderText :: RenderText Reaction where
     BlockAttack -> HH.text
       $ "When another player plays an Attack card"
       <> ", you may first reveal this from your hand, to be unaffected by it."
+    ReactWithChoice _ -> HH.text "React with a choice"
+
+instance tupleReactionStringRenderText :: RenderText (Tuple Reaction String) where
+  renderText = HH.text <<< snd
 
 instance bonusRenderText :: RenderText Bonus where
   renderText bonus = HH.span_ case bonus of

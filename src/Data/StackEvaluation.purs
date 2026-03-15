@@ -31,31 +31,33 @@ data StackExpression
     , from :: Var Pile
     , n :: Var Constraint
     }
-  | StackDuplicate
-  | StackDiscard
-  | StackLength
-  | StackAddN Int
-  | StackDraw
-  | StackTrash
-  | StackNth Int
-  | StackCostOf
-  | StackMakeFilterCostUpTo
-  | StackMakeFilterAnd
-  | StackBind String
-  | StackGainTo Pile
   | StackChooseCardFromSupply
     { cardName :: Var String
     , filter :: Var Filter
     }
-  | StackEquals StackValue
+  | StackOption (Var Boolean)
+  | StackMoveCards { from :: Pile, to :: Pile }
+  | StackDiscard
+  | StackTrash
+  | StackDraw
+  | StackGainTo Pile
+  | StackGainBonusCash
+  | StackDuplicate
   | StackPush StackValue
+  | StackLength
+  | StackAddN Int
+  | StackNth Int
+  | StackCostOf
+  | StackMakeFilterCostUpTo
+  | StackMakeFilterAnd
+  | StackEquals StackValue
+  | StackBind String
   | StackIf
     { condition :: Array StackExpression
     , following :: Array StackExpression
     , otherwise :: Array StackExpression
     }
   | StackGainBonus Bonus
-  | StackOption (Var Boolean)
 
 derive instance genericStackExpression :: Generic StackExpression _
 derive instance eqStackExpression :: Eq StackExpression

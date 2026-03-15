@@ -43,7 +43,7 @@ import Domination.Data.Result (Result(..))
 import Domination.Data.Stack as Stack
 import Domination.Data.Supply (emptyStackCount, getStack, highestVictoryCardStackIsEmpty, negativePoints, nonEmptyStacks, positivePoints)
 import Domination.Data.Target (Target(..))
-import Util (indices, withIndices)
+import Util (indices, withIndices, (:~))
 
 makeAutoPlay
   :: forall m
@@ -75,6 +75,8 @@ makePlay play' = maybeGameOver <=< case play' of
   Purchase x -> purchase x
   ResolveChoice x -> resolveChoice x
   React x -> react x
+  DoneReacting { playerIndex } ->
+    modifyPlayer playerIndex Player.dropReactions
   where
     maybeGameOver :: Game -> m Game
     maybeGameOver state =
@@ -166,16 +168,19 @@ purchase { playerIndex, stackIndex } =
 react
   :: forall m
   . MonadError String m
+  => Log m
   => { playerIndex :: Int, reaction :: Maybe Reaction }
   -> Game
   -> m Game
-react { playerIndex, reaction } =
-  modifyPlayer playerIndex Player.dropReaction >=>
-  case reaction of
-    Nothing ->
-      pure
-    Just BlockAttack ->
-      traverseOf (Game._player playerIndex) Player.dropChoice
+react { playerIndex, reaction: maybeReaction } =
+  case maybeReaction of
+    Nothing -> pure
+    Just reaction ->
+      modifyPlayer playerIndex (Player.dropReaction reaction) >=> case reaction of
+        BlockAttack ->
+          traverseOf (Game._player playerIndex) Player.dropChoice
+        ReactWithChoice choice ->
+          modifyPlayer playerIndex (Player._choices :~ choice)
 
 play
   :: forall m

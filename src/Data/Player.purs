@@ -12,40 +12,32 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (catMaybes, deleteAt, filter, head, length, replicate, reverse)
+import Data.Array (any, catMaybes, cons, deleteAt, filter, length, replicate, reverse, uncons)
 import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
-import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Lens (Lens)
-import Data.Lens.Prism (review)
-import Data.Lens.Prism.Maybe (_Just)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Type.Proxy (Proxy(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
 import Domination.Data.Bonus (cashValue) as Bonus
 import Domination.Data.Buys (Buys)
-import Domination.Data.Card (Card, _card)
+import Domination.Data.Card (Card, _card, hasType)
 import Domination.Data.Card (cost, isAction, isTreasure, negativePoints, positivePoints, value) as Card
+import Domination.Data.CardType as CardType
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice)
 import Domination.Data.Choice (isAttack) as Choice
 import Domination.Data.Points (Points)
 import Domination.Data.Reaction (Reaction)
 import Domination.Data.Stack (sortByStacks)
-import Domination.Data.Wire.Bonus (WireBonus)
-import Domination.Data.Wire.Bonus (_toWire) as Bonus
-import Domination.Data.Wire.Card (_toWire) as Card
-import Domination.Data.Wire.Choice (WireChoice)
-import Domination.Data.Wire.Choice (_toWire) as Choice
-import Domination.Data.Wire.Int (WireInt)
 import Relationship (Relationship, is)
 import Rule (Rule, check, (!>), (<@!))
 import Util (assert, decOver, dropIndices, fromJust, moveOne, prependOver, (:~), (<$>~))
@@ -60,87 +52,9 @@ type Player =
   , deck :: Array Card
   , discard :: Array Card
   , hand :: Array Card
-  , reaction :: Maybe Reaction
+  , pendingReactions :: Array (Tuple Reaction String)
   , toDiscard :: Array Card
   }
-
-type WirePlayer =
-  (Tuple Actions
-  (Tuple (Array WireInt) -- atPlay
-  (Tuple (Array WireBonus) -- bonuses
-  (Tuple (Array WireInt) -- buying
-  (Tuple Buys
-  (Tuple (Array WireChoice) -- choices
-  (Tuple (Array WireInt) -- deck
-  (Tuple (Array WireInt) -- discard
-  (Tuple (Array WireInt) -- hand
-  (Tuple (Maybe Reaction) (Array WireInt)))))))))))
-
-_toWire :: Iso' Player WirePlayer
-_toWire = iso to from where
-  to = (_choices <$>~ view Choice._toWire)
-    >>> (_bonuses <$>~ view Bonus._toWire)
-    >>> (_deck <$>~ view Card._toWire)
-    >>> (_hand <$>~ view Card._toWire)
-    >>> (_discard <$>~ view Card._toWire)
-    >>> (_toDiscard <$>~ view Card._toWire)
-    >>> (_atPlay <$>~ view Card._toWire)
-    >>> (_buying <$>~ view Card._toWire)
-    >>> toTuple
-  from = fromTuple
-    >>> (_choices <$>~ review Choice._toWire)
-    >>> (_bonuses <$>~ review Bonus._toWire)
-    >>> (_deck <$>~ review Card._toWire)
-    >>> (_hand <$>~ review Card._toWire)
-    >>> (_discard <$>~ review Card._toWire)
-    >>> (_toDiscard <$>~ review Card._toWire)
-    >>> (_atPlay <$>~ review Card._toWire)
-    >>> (_buying <$>~ review Card._toWire)
-  toTuple
-    { actions
-    , atPlay
-    , bonuses
-    , buying
-    , buys
-    , choices
-    , deck
-    , discard
-    , hand
-    , reaction
-    , toDiscard
-    } = Tuple actions
-      $ Tuple atPlay
-      $ Tuple bonuses
-      $ Tuple buying
-      $ Tuple buys
-      $ Tuple choices
-      $ Tuple deck
-      $ Tuple discard
-      $ Tuple hand
-      $ Tuple reaction toDiscard
-  fromTuple
-    (Tuple actions
-    (Tuple atPlay
-    (Tuple bonuses
-    (Tuple buying
-    (Tuple buys
-    (Tuple choices
-    (Tuple deck
-    (Tuple discard
-    (Tuple hand
-    (Tuple reaction toDiscard)))))))))) =
-    { actions
-    , atPlay
-    , bonuses
-    , buying
-    , buys
-    , choices
-    , deck
-    , discard
-    , hand
-    , reaction
-    , toDiscard
-    }
 
 _deck
   :: forall a b r
@@ -178,8 +92,12 @@ _choices
   :: forall a b r
   . Lens { choices :: a | r } { choices :: b | r } a b
 _choices = prop (Proxy :: Proxy "choices")
-_reaction :: Traversal' Player Reaction
-_reaction = prop (Proxy :: Proxy "reaction") <<< _Just
+
+_pendingReactions
+  :: forall a b r
+  . Lens { pendingReactions :: a | r } { pendingReactions :: b | r } a b
+_pendingReactions = prop (Proxy :: Proxy "pendingReactions")
+
 _bonuses
   :: forall a b r
   . Lens { bonuses :: a | r } { bonuses :: b | r } a b
@@ -242,32 +160,51 @@ gainBuys n = over _buys (_ + n)
 gainChoices :: Array Choice -> Player -> Player
 gainChoices = flip (foldr gainChoice) <<< reverse
 
+-- | Add a sub-choice without triggering a reaction window.
+-- | Used by ResolveChoice when decomposing compound choices
+-- | (If, And, Or, PickN, Option) into their sub-choices.
+addChoice :: Choice -> Player -> Player
+addChoice choice = _choices %~ (_ <> [ choice ])
+
+-- | Add multiple sub-choices without triggering reaction windows.
+addChoices :: Array Choice -> Player -> Player
+addChoices = flip (foldr addChoice) <<< reverse
+
+reactionsInHand :: Player -> Array (Tuple Reaction String)
+reactionsInHand player = catMaybes
+  $ hasType CardType.Reaction `filter` player.hand
+  <#> _.reaction
+
+-- | Add a choice and open a reaction window if it's an attack.
+-- | Only used for fresh attacks arriving from opponent card plays.
 gainChoice :: Choice -> Player -> Player
 gainChoice choice player =
   let
-    player' = (over _choices $ (_ <> [ choice ])) player
+    player' = (_choices %~ (_ <> [ choice ])) player
   in
     if Choice.isAttack choice
-    then case reactionInHand player of
-      Just r -> gainReaction r player'
-      Nothing -> player'
+    then player' { pendingReactions = reactionsInHand player' }
     else player'
 
-gainReaction :: Reaction -> Player -> Player
-gainReaction reaction = _ { reaction = Just reaction }
+-- | Drop a single reaction from pendingReactions (used when player reacts).
+-- | Keeps remaining reactions available for multi-reaction sequences
+-- | (e.g., react with Secret Chamber, then still block with Moat).
+dropReaction :: Reaction -> Player -> Player
+dropReaction reaction player =
+  player { pendingReactions = removeFirst player.pendingReactions }
+  where
+    removeFirst rs = case uncons rs of
+      Nothing -> []
+      Just { head: r, tail } ->
+        if fst r == reaction then tail
+        else cons r (removeFirst tail)
 
-dropReaction :: Player -> Player
-dropReaction = _ { reaction = Nothing }
-
-reactionInHand :: Player -> Maybe Reaction
-reactionInHand =
-  _.hand >>> map _.reaction >>> catMaybes >>> head
+-- | Drop ALL pending reactions (used when player clicks DoneReacting).
+dropReactions :: Player -> Player
+dropReactions = _ { pendingReactions = [] }
 
 hasReaction :: Player -> Boolean
-hasReaction { reaction } =
-  case reaction of
-    Just _ -> true
-    Nothing -> false
+hasReaction = not null <<< _.pendingReactions
 
 purchase :: Card -> Player -> Player
 purchase card = decOver _buys >>> prependOver _buying card
@@ -394,6 +331,6 @@ newPlayer =
   , actions: one
   , buys: one
   , choices: []
-  , reaction : Nothing
+  , pendingReactions: []
   , bonuses : []
   }

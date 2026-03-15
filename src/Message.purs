@@ -26,6 +26,7 @@ import Data.Lens.Prism (review)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Domination.Data.Card as Card
+import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
 import Domination.Data.Game (_player, _stack) as Game
 import Domination.Data.Play (Play(..))
@@ -229,6 +230,11 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
           HH.text $ case reaction of
             Nothing -> "did not react"
             Just BlockAttack -> "blocked an attack"
+            Just (ReactWithChoice (StackChoice { description })) ->
+              "reacted: " <> description
+            Just (ReactWithChoice _) -> "reacted with a choice"
+        DoneReacting _ -> Just $
+          HH.text "finished reacting"
 
 getPlayerCardName :: Int -> Game -> Int -> String
 getPlayerCardName playerIndex state cardIndex = fromMaybe "???"
