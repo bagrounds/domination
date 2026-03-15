@@ -406,11 +406,150 @@ DoneReacting { playerIndex } ->
 
 🎯 This is the same architecture as the original system, extended to support multiple reactions instead of just one.
 
+## 🐛 The Double-Reaction Bug — Compound Choices Strike Back
+
+### 🔍 Discovery
+
+🎮 After the `pendingReactions` fix eliminated the infinite loop, Bryan found a subtler bug. When attacked by Catpurse while holding a Moat:
+
+1. 📜 UI shows reaction buttons ("Block with Moat" / "Done reacting")
+2. 🖱️ Player clicks "Done reacting" (declines to block)
+3. 📜 UI shows the `If` choice: "If hand contains Copper, discard a Copper" → "Okay"
+4. 🖱️ Player clicks "Okay"
+5. 🔁 **UI shows reaction buttons AGAIN!** (same choice as step 1)
+6. 😤 Player has to decline to react a second time before they can actually discard the copper
+
+### 🧠 Root Cause: `gainChoice` vs. `addChoice`
+
+🕵️ The bug is in how compound choices decompose. Catpurse's attack is:
+
+```purescript
+If { condition: HasCard "Copper"
+   , choice: discardCopper  -- MoveFromTo { attack: true, ... }
+   , attack: true
+   , resolution: Nothing
+   }
+```
+
+📋 Here's what happens step by step:
+
+1. ⚔️ Catpurse attack arrives → `gainChoice(If { attack: true })` → `pendingReactions` populated from hand ✅
+2. 🛑 Player clicks "Done reacting" → `dropReactions` → `pendingReactions = []` ✅
+3. 📜 UI shows the `If` choice → player clicks "Okay" → `resolveChoice` handles it
+4. 🔍 Condition check: player has Copper → yes
+5. ⚠️ **`resolveChoice` calls `Player.gainChoice discardCopper`** — but `discardCopper` has `attack: true`!
+6. 💥 `gainChoice` sees `attack: true` → **repopulates `pendingReactions`** from hand!
+7. 🔁 UI sees `isAttacked && hasReaction` → shows reaction buttons again!
+
+🔑 The fundamental issue: `resolveChoice` was using `gainChoice` (which opens a reaction window) to add sub-choices that come from decomposing an existing choice. But sub-choices aren't new attacks — they're continuations of an attack the player already had the chance to react to.
+
+### ✅ The Fix: `addChoice` / `addChoices`
+
+💡 The solution: separate "adding a choice from a new attack" from "adding a sub-choice from choice decomposition":
+
+```purescript
+-- Used ONLY by Engine.applySpecialToTarget when an opponent's card lands an attack
+gainChoice :: Choice -> Player -> Player
+gainChoice choice player =
+  let player' = (_choices %~ (_ <> [ choice ])) player
+  in if Choice.isAttack choice
+     then player' { pendingReactions = reactionsInHand player' }
+     else player'
+
+-- Used by ResolveChoice when compound choices decompose into sub-choices
+addChoice :: Choice -> Player -> Player
+addChoice choice = _choices %~ (_ <> [ choice ])
+
+-- Same, for multiple sub-choices (used by And, PickN)
+addChoices :: Array Choice -> Player -> Player
+addChoices = flip (foldr addChoice) <<< reverse
+```
+
+📐 `resolveChoice` now uses `addChoice`/`addChoices` everywhere:
+
+```purescript
+If { condition, choice: choice', resolution: Just _ } ->
+  modifyPlayer playerIndex (playerUpdate ok) state
+  where playerUpdate ok = if ok then Player.addChoice choice' else ...
+
+And { choices, resolution: Just _ } ->
+  modifyPlayer playerIndex (Player.addChoices choices) state
+
+Or { resolution: Just chosen } ->
+  modifyPlayer playerIndex (Player.addChoice chosen) state
+
+Option { choice: choice', resolution: Just true } ->
+  modifyPlayer playerIndex (Player.addChoice choice') state
+```
+
+🎯 This respects a clean boundary: `gainChoice` = "new attack from opponent, open reaction window." `addChoice` = "decompose existing choice, no new reaction window."
+
+## 🃏 Example Scenario: Catpurse vs. Moat (The Double-Reaction Fix)
+
+🎬 This scenario directly demonstrates the fix. Without `addChoice`, the player would see reaction buttons twice.
+
+### 📋 Initial State
+
+```
+Player 0: hand = [Catpurse, ...]
+Player 1: hand = [Moat, Copper, Copper, Copper, Copper]
+         choices = []
+         pendingReactions = []
+```
+
+### ▶️ Step 1: Player 0 plays Catpurse
+
+🃏 Catpurse's special: `EveryoneElse → Choose If { condition: HasCard "Copper", choice: discardCopper, attack: true }`.
+
+⚙️ `gainChoice(If { attack: true, ... })` on Player 1:
+1. 📥 `choices = [If { attack: true }]`
+2. 🔍 `isAttack = true` → scans hand → finds Moat
+3. 🛡️ `pendingReactions = [(BlockAttack, "reveal Moat to block")]`
+
+### ▶️ Step 2: Player 1 clicks "Done reacting"
+
+⚙️ `DoneReacting { playerIndex: 1 }` → `dropReactions`:
+
+```
+Player 1: choices = [If { attack: true }]
+         pendingReactions = []
+```
+
+### ▶️ Step 3: UI shows the If choice
+
+🖥️ `isAttacked = true` but `hasReaction = false` → shows choice resolution.
+📋 Renders: "If (hand contains Copper) then (Discard 1 Copper)" with "Okay" button.
+
+### ▶️ Step 4: Player 1 clicks "Okay"
+
+⚙️ `resolveChoice` handles `If { condition: HasCard "Copper", choice: discardCopper, resolution: Just unit }`:
+1. 🔍 Checks condition: player has Copper → `true`
+2. ➕ **`Player.addChoice discardCopper`** — uses `addChoice`, NOT `gainChoice`!
+3. 🗑️ Drops the `If` choice
+
+```
+Player 1: choices = [MoveFromTo { attack: true, filter: HasName "Copper" }]
+         pendingReactions = []  ← STILL EMPTY! No double reaction!
+```
+
+### ▶️ Step 5: Player 1 resolves the MoveFromTo
+
+🖥️ `isAttacked = true` but `hasReaction = false` → shows choice resolution (not reaction buttons!).
+📋 Player selects a Copper to discard → MoveFromTo resolves → choice dropped.
+
+```
+Player 1: choices = []
+         pendingReactions = []
+         hand = [Moat, Copper, Copper, Copper]  (one Copper discarded)
+```
+
+✅ **Done.** The attack resolved with exactly one reaction prompt, not two.
+
 ## 🧪 Testing the Reaction System
 
 ### 📐 Scenario-Based Property Tests
 
-🔬 We wrote 30 tests organized around concrete game scenarios. Each scenario mirrors the state transition diagrams above:
+🔬 We wrote 49 tests organized around concrete game scenarios. Each scenario mirrors the state transition diagrams above:
 
 ```
 ── Reaction System ──
@@ -444,26 +583,49 @@ DoneReacting { playerIndex } ->
   ✓ SecretChamber scenario: card conservation through ReactWithChoice
   ✓ SecretChamber scenario: no infinite loop - reactions not shown after SC resolves
   ✓ ∀ hands: gainChoice(attack) → hasReaction ↔ reactionsInHand non-empty
-  30/30 passed
+  ✓ addChoice: does not populate pendingReactions even with attack=true
+  ✓ addChoice: preserves existing empty pendingReactions
+  ✓ addChoices: does not populate pendingReactions even with attack sub-choices
+  ✓ Catpurse scenario: setup — player has pending reactions
+  ✓ Catpurse scenario: DoneReacting → pendingReactions cleared
+  ✓ Catpurse scenario: DoneReacting then resolve If → no second reaction prompt
+  ✓ Catpurse scenario: DoneReacting then resolve If → sub-choice present
+  ✓ Catpurse scenario: card conservation through full DoneReacting + resolve flow
+  ✓ Catpurse scenario: BlockAttack → no choices remain
+  ✓ Militia scenario: DoneReacting → no re-reaction, choice remains
+  ✓ Margrave scenario: DoneReacting then resolve And → no second reaction prompt
+  ✓ Margrave scenario: DoneReacting then resolve And → sub-choices present
+  ✓ Catpurse full flow: DoneReacting → If resolves → MoveFromTo resolves → no choices left
+  ✓ Catpurse full flow: card conservation through entire attack sequence
+  ✓ Catpurse full flow: copper moved from hand to discard
+  ✓ ∀ compound attacks: If resolution does not re-trigger reactions
+  ✓ ∀ compound attacks: And resolution does not re-trigger reactions
+  ✓ ∀ compound attacks: Or resolution does not re-trigger reactions
+  ✓ ∀ compound attacks: Option(yes) resolution does not re-trigger reactions
+  49/49 passed
 ```
 
 ### 🎯 Key Property Invariants
 
-🛡️ **Card conservation**: Every reaction path (BlockAttack, ReactWithChoice, DoneReacting) preserves the total card count. No cards are created or destroyed by the reaction system.
+🛡️ **Card conservation**: Every reaction path (BlockAttack, ReactWithChoice, DoneReacting) and every compound choice decomposition (If, And, Or, Option) preserves the total card count. No cards are created or destroyed.
 
 🔗 **pendingReactions ↔ reactionsInHand consistency**: After `gainChoice(attackChoice)`, the player's `hasReaction` status matches whether their hand contains reaction cards. This universal property guarantees the `gainChoice` populator works correctly for any hand composition.
 
-🚫 **No infinite loop**: After `ReactWithChoice`, `hasReaction` is false. When the SC choice resolves and gets dropped, the attack choice resurfaces but the UI won't show reaction buttons because `pendingReactions` is empty. This is the test that catches the exact bug Bryan reported.
+🚫 **No infinite loop**: After `ReactWithChoice`, `hasReaction` is false. When the SC choice resolves and gets dropped, the attack choice resurfaces but the UI won't show reaction buttons because `pendingReactions` is empty.
+
+🚫 **No double reaction**: After compound choice decomposition (`If` → sub-choice, `And` → sub-choices, `Or` → chosen, `Option` → sub-choice), `hasReaction` remains false because `addChoice` never touches `pendingReactions`. This is verified across all four compound choice types.
 
 🔒 **Immutability**: The "DoneReacting: first choice still has attack=true" test explicitly verifies that we never mutate the attack flag. The choice is preserved exactly as the card defined it.
+
+🔄 **Full flow**: The Catpurse full-flow test chains 3 engine operations (DoneReacting → resolve If → resolve MoveFromTo) and verifies the player ends with no choices, no reactions, one fewer copper in hand, and one more copper in discard.
 
 ## 📊 Impact
 
 - 📁 **22 files changed**: Surgical changes across data types, wire protocol, engine, UI, and tests
-- ✅ **290 tests passing**: 30 scenario-based reaction tests, plus all existing tests
+- ✅ **309 tests passing**: 49 scenario-based reaction tests, plus all existing tests
 - 🃏 **1 new card**: Secret Chamber, the first card with a non-trivial reaction effect
-- 🐛 **1 bug fixed**: Secret Chamber infinite loop resolved via `pendingReactions` tracking
-- 🔒 **0 invariants violated**: Cards are immutable; only the reaction opportunity window is stateful
+- 🐛 **2 bugs fixed**: Secret Chamber infinite loop (via `pendingReactions`), double-reaction on compound choices (via `addChoice`)
+- 🔒 **0 invariants violated**: Cards are immutable; `gainChoice` only for new attacks, `addChoice` for decomposition
 
 ## 💡 Lessons Learned
 
@@ -477,7 +639,9 @@ DoneReacting { playerIndex } ->
 
 5. 🔒 **Respect the system's invariants.** My first fix (`clearAttack`) worked mechanically but violated the immutability principle. Bryan's feedback — "cards are immutable, we just move them between piles" — pointed me to the right architectural pattern. The `pendingReactions` field tracks the reaction opportunity window without mutating any choice or card.
 
-6. 🧪 **Test the scenarios, not just the functions.** The infinite loop only appeared when state transitions were chained: React → resolve SC → attack resurfaces → check reactions. Individual function tests wouldn't have caught it. Scenario-based tests that model realistic game flows are essential.
+6. 🔀 **Distinguish creation from decomposition.** The double-reaction bug came from using the same function (`gainChoice`) for two semantically different operations: "opponent plays attack card → new reaction window" and "compound choice decomposes → continuation of existing attack." The fix was simple: `addChoice` for decomposition, `gainChoice` for new attacks. This kind of API boundary is easy to miss when the underlying mechanics look the same (both add a choice to the queue), but the side effects are fundamentally different.
+
+7. 🧪 **Test the scenarios, not just the functions.** The infinite loop only appeared when state transitions were chained: React → resolve SC → attack resurfaces → check reactions. The double-reaction bug only appeared when compound choices decomposed: DoneReacting → resolve If → discardCopper re-triggers. Individual function tests wouldn't catch either bug. Scenario-based tests that model realistic game flows — chaining multiple engine operations — are essential.
 
 ## 🗑️ Branch Cleanup Note
 
