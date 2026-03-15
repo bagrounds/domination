@@ -160,11 +160,23 @@ gainBuys n = over _buys (_ + n)
 gainChoices :: Array Choice -> Player -> Player
 gainChoices = flip (foldr gainChoice) <<< reverse
 
+-- | Add a sub-choice without triggering a reaction window.
+-- | Used by ResolveChoice when decomposing compound choices
+-- | (If, And, Or, PickN, Option) into their sub-choices.
+addChoice :: Choice -> Player -> Player
+addChoice choice = _choices %~ (_ <> [ choice ])
+
+-- | Add multiple sub-choices without triggering reaction windows.
+addChoices :: Array Choice -> Player -> Player
+addChoices = flip (foldr addChoice) <<< reverse
+
 reactionsInHand :: Player -> Array (Tuple Reaction String)
 reactionsInHand player = catMaybes
   $ hasType CardType.Reaction `filter` player.hand
   <#> _.reaction
 
+-- | Add a choice and open a reaction window if it's an attack.
+-- | Only used for fresh attacks arriving from opponent card plays.
 gainChoice :: Choice -> Player -> Player
 gainChoice choice player =
   let

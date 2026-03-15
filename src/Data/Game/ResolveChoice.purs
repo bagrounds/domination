@@ -117,29 +117,29 @@ resolveChoice z@{ playerIndex, choice } state = do
       where
         playerUpdate ok player =
           if ok
-          then Player.gainChoice choice' player
+          then Player.addChoice choice' player
           else case otherwise of
             Nothing -> player
-            Just c -> Player.gainChoice c player
+            Just c -> Player.addChoice c player
 
     And { choices, resolution: Just _ } ->
-      modifyPlayer playerIndex (Player.gainChoices choices) state
+      modifyPlayer playerIndex (Player.addChoices choices) state
         >>= traverseOf (Game._player playerIndex) Player.dropChoice
 
     Or { resolution: Just chosen } ->
-      modifyPlayer playerIndex (Player.gainChoice chosen) state
+      modifyPlayer playerIndex (Player.addChoice chosen) state
         >>= traverseOf (Game._player playerIndex) Player.dropChoice
 
     PickN { n, resolution: Just choices } -> do
       check $ choices <@! lengthIs EQ n !<> "choices"
-      modifyPlayer playerIndex (Player.gainChoices choices) state
+      modifyPlayer playerIndex (Player.addChoices choices) state
         >>= traverseOf (Game._player playerIndex) Player.dropChoice
 
     Option { choice: choice', resolution: Just agree } ->
       let
         playerUpdate =
           if agree
-          then Player.gainChoice choice'
+          then Player.addChoice choice'
           else identity
       in modifyPlayer playerIndex playerUpdate state
         >>= traverseOf (Game._player playerIndex) Player.dropChoice

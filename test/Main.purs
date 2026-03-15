@@ -25,11 +25,15 @@ import Domination.Data.CardType (CardType(..))
 import Domination.Data.Cards as Cards
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Choice as Choice
+import Domination.Data.Condition (Condition(..))
+import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Filter as Filter
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
 import Domination.Data.Game.Engine as Engine
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Phase as Phase
+import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
@@ -1364,7 +1368,480 @@ reaction_tests =
         in assert_true "hasReaction should match reactionsInHand after attack"
           (all check testHands)
     }
+  --
+  -- ══ addChoice: sub-choice insertion without reaction re-trigger ══
+  --
+  , { name: "addChoice: does not populate pendingReactions even with attack=true"
+    , test: pure $
+        let p = Player.newPlayer
+              { hand = [Card._card Cards.moat, Card._card Cards.copper] }
+            p' = Player.addChoice Cards.discardDownTo3 p
+        in assert_false "addChoice should not trigger reactions"
+          (Player.hasReaction p')
+    }
+  , { name: "addChoice: preserves existing empty pendingReactions"
+    , test: pure $
+        let p = Player.newPlayer
+              { hand = [Card._card Cards.moat] }
+            p' = Player.addChoice Cards.gainCurse p
+        in assert_eq (Array.length p'.pendingReactions) 0
+    }
+  , { name: "addChoices: does not populate pendingReactions even with attack sub-choices"
+    , test: pure $
+        let p = Player.newPlayer
+              { hand = [Card._card Cards.moat, Card._card Cards.copper] }
+            p' = Player.addChoices [Cards.draw1Card, Cards.discardDownTo3] p
+        in assert_false "addChoices should not trigger reactions"
+          (Player.hasReaction p')
+    }
+  --
+  -- ══ Scenario: Catpurse attack with Moat — DoneReacting then resolve If ══
+  --
+  -- The bug: Catpurse's choice is If { condition: HasCard "Copper", choice: discardCopper }.
+  -- When the If resolves and its sub-choice discardCopper (attack=true) is added,
+  -- it should NOT re-trigger the reaction window.
+  -- Before the fix, `resolveChoice` used `gainChoice` which re-populated pendingReactions.
+  -- After the fix, `resolveChoice` uses `addChoice` which just appends.
+  --
+  , { name: "Catpurse scenario: setup — player has pending reactions"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+        pure $ case NEA.index game.players 1 of
+          Nothing -> Failed "no player at index 1"
+          Just p1 ->
+            assert_true "should have pending reactions after Catpurse attack"
+              (Player.hasReaction p1)
+    }
+  , { name: "Catpurse scenario: DoneReacting → pendingReactions cleared"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+        result <- runRandomM $ runExceptT $
+          Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+        pure case result of
+          Left err -> Failed $ "DoneReacting failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                assert_false "pendingReactions should be cleared"
+                  (Player.hasReaction p1)
+    }
+  , { name: "Catpurse scenario: DoneReacting then resolve If → no second reaction prompt"
+    , test: do
+        -- This is the exact bug Bryan reported.
+        -- Step 1: DoneReacting to decline reaction
+        -- Step 2: Resolve the If choice (click Okay)
+        -- Step 3: Sub-choice (discardCopper) should be added WITHOUT re-triggering reactions
+        let game = setup_catpurse_game_with_moat
+        result <- runRandomM $ runExceptT $ do
+          -- Step 1: DoneReacting
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          -- Step 2: Resolve the If choice (with resolution = Just unit)
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: catpurseIfResolved })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- KEY ASSERTION: After resolving the If, the sub-choice
+                -- discardCopper should be at index 0, but pendingReactions
+                -- should still be empty (no double reaction prompt)
+                assert_false "pendingReactions should still be empty — no double prompt!"
+                  (Player.hasReaction p1)
+    }
+  , { name: "Catpurse scenario: DoneReacting then resolve If → sub-choice present"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: catpurseIfResolved })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- The sub-choice (discardCopper MoveFromTo) should now be in the queue
+                assert_true "player should have the discardCopper sub-choice"
+                  (Player.hasChoices p1)
+    }
+  , { name: "Catpurse scenario: card conservation through full DoneReacting + resolve flow"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+            totalBefore = count_all game
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: catpurseIfResolved })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            assert_eq (count_all game') totalBefore
+    }
+  , { name: "Catpurse scenario: BlockAttack → no choices remain (no If resolution needed)"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+        result <- runRandomM $ runExceptT $
+          Engine.makePlay
+            (React { playerIndex: 1, reaction: Just BlockAttack })
+            game
+        pure case result of
+          Left err -> Failed $ "react failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                assert_false "choices should be cleared after BlockAttack"
+                  (Player.hasChoices p1)
+    }
+  --
+  -- ══ Scenario: Militia attack with Moat — DoneReacting (simple, no compound choice) ══
+  --
+  , { name: "Militia scenario: DoneReacting → no re-reaction, choice remains"
+    , test: do
+        let game = setup_militia_game_with_moat
+        result <- runRandomM $ runExceptT $
+          Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+        pure case result of
+          Left err -> Failed $ "DoneReacting failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                if not (Player.hasChoices p1) then Failed "player should still have MoveFromTo choice"
+                else if Player.hasReaction p1 then Failed "pendingReactions should be empty"
+                else Success
+    }
+  --
+  -- ══ Scenario: Margrave (And) with Moat — DoneReacting then resolve And ══
+  --
+  -- Margrave's choice is And { choices: [draw1Card, discardDownTo3], attack: true }.
+  -- After DoneReacting and resolving the And, both sub-choices should be added
+  -- without re-triggering reactions.
+  --
+  , { name: "Margrave scenario: DoneReacting then resolve And → no second reaction prompt"
+    , test: do
+        let game = setup_margrave_game_with_moat
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          -- Resolve the And choice (resolution = Just unit)
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: margraveAndResolved })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- After And resolves, sub-choices [draw1Card, discardDownTo3] are added
+                -- pendingReactions should still be empty
+                assert_false "pendingReactions should be empty — no double prompt!"
+                  (Player.hasReaction p1)
+    }
+  , { name: "Margrave scenario: DoneReacting then resolve And → sub-choices present"
+    , test: do
+        let game = setup_margrave_game_with_moat
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: margraveAndResolved })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- Should have 2 sub-choices after And decomposes
+                assert_eq (Array.length p1.choices) 2
+    }
+  --
+  -- ══ Multi-step simulation: Catpurse attack, DoneReacting, resolve If,
+  --    then resolve the MoveFromTo sub-choice to completion ══
+  --
+  , { name: "Catpurse full flow: DoneReacting → If resolves → MoveFromTo resolves → no choices left"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+        result <- runRandomM $ runExceptT $ do
+          -- Step 1: DoneReacting (decline to block)
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          -- Step 2: Resolve If (has Copper → true → adds discardCopper)
+          game2 <- Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: catpurseIfResolved })
+            game1
+          -- Step 3: Resolve the MoveFromTo sub-choice (select copper to discard)
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: discardCopperResolved })
+            game2
+        pure case result of
+          Left err -> Failed $ "full flow failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- After full resolution, player should have no choices left
+                if Player.hasChoices p1 then Failed "all choices should be resolved"
+                else if Player.hasReaction p1 then Failed "no pending reactions"
+                else Success
+    }
+  , { name: "Catpurse full flow: card conservation through entire attack sequence"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+            totalBefore = count_all game
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          game2 <- Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: catpurseIfResolved })
+            game1
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: discardCopperResolved })
+            game2
+        pure case result of
+          Left err -> Failed $ "full flow failed: " <> err
+          Right game' ->
+            assert_eq (count_all game') totalBefore
+    }
+  , { name: "Catpurse full flow: copper moved from hand to discard"
+    , test: do
+        let game = setup_catpurse_game_with_moat
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          game2 <- Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: catpurseIfResolved })
+            game1
+          Engine.makePlay
+            (ResolveChoice { playerIndex: 1, choice: discardCopperResolved })
+            game2
+        pure case result of
+          Left err -> Failed $ "full flow failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- Player started with [Moat, Copper], should now have [Moat] in hand
+                -- and [Copper] moved to discard pile
+                if Array.length p1.hand /= 1 then Failed $ "expected 1 card in hand, got " <> show (Array.length p1.hand)
+                else if Array.length p1.discard /= 11 then Failed $ "expected 11 cards in discard (10 starting + 1 discarded copper), got " <> show (Array.length p1.discard)
+                else Success
+    }
+  --
+  -- ══ Property: resolveChoice(compound) → addChoice, not gainChoice ══
+  --
+  -- For ANY compound attack choice that decomposes into sub-choices,
+  -- the sub-choices should NOT re-trigger pendingReactions.
+  --
+  , { name: "∀ compound attacks: If resolution does not re-trigger reactions"
+    , test: do
+        -- Generalized test: create an If attack choice wrapping any attack sub-choice.
+        -- After DoneReacting + resolving If, pendingReactions should stay empty.
+        let ifChoice = If
+              { condition: HasCard "Copper"
+              , choice: Cards.discardDownTo3  -- attack=true sub-choice
+              , otherwise: Nothing
+              , attack: true
+              , resolution: Nothing
+              }
+            game = setup_compound_attack_game ifChoice
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice
+              { playerIndex: 1
+              , choice: If
+                { condition: HasCard "Copper"
+                , choice: Cards.discardDownTo3
+                , otherwise: Nothing
+                , attack: true
+                , resolution: Just unit
+                }
+              })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            assert_false "If decomposition should not re-trigger reactions"
+              (Game.hasReaction 1 game')
+    }
+  , { name: "∀ compound attacks: And resolution does not re-trigger reactions"
+    , test: do
+        let andChoice = And
+              { choices: [Cards.draw1Card, Cards.discardDownTo3]
+              , attack: true
+              , resolution: Nothing
+              }
+            game = setup_compound_attack_game andChoice
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice
+              { playerIndex: 1
+              , choice: And
+                { choices: [Cards.draw1Card, Cards.discardDownTo3]
+                , attack: true
+                , resolution: Just unit
+                }
+              })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            assert_false "And decomposition should not re-trigger reactions"
+              (Game.hasReaction 1 game')
+    }
+  , { name: "∀ compound attacks: Or resolution does not re-trigger reactions"
+    , test: do
+        let orChoice = Or
+              { choices: [Cards.discardDownTo3, Cards.gainCurse]
+              , attack: true
+              , resolution: Nothing
+              }
+            game = setup_compound_attack_game orChoice
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice
+              { playerIndex: 1
+              , choice: Or
+                { choices: [Cards.discardDownTo3, Cards.gainCurse]
+                , attack: true
+                , resolution: Just Cards.discardDownTo3
+                }
+              })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            assert_false "Or decomposition should not re-trigger reactions"
+              (Game.hasReaction 1 game')
+    }
+  , { name: "∀ compound attacks: Option(yes) resolution does not re-trigger reactions"
+    , test: do
+        let optionChoice = Option
+              { choice: Cards.discardDownTo3
+              , attack: true
+              , resolution: Nothing
+              }
+            game = setup_compound_attack_game optionChoice
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game
+          Engine.makePlay
+            (ResolveChoice
+              { playerIndex: 1
+              , choice: Option
+                { choice: Cards.discardDownTo3
+                , attack: true
+                , resolution: Just true
+                }
+              })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            assert_false "Option(yes) decomposition should not re-trigger reactions"
+              (Game.hasReaction 1 game')
+    }
   ]
+
+-- ══════════════════════════════════════════════════════════════════
+-- Test Setup Helpers
+-- ══════════════════════════════════════════════════════════════════
+
+-- Catpurse If choice (unresolved)
+catpurseIfChoice :: Choice
+catpurseIfChoice = If
+  { condition: HasCard "Copper"
+  , choice: MoveFromTo
+    { n: Exactly 1
+    , filter: Filter.HasName "Copper"
+    , source: Pile.Hand
+    , destination: Pile.Discard
+    , resolution: Nothing
+    , attack: true
+    }
+  , otherwise: Nothing
+  , attack: true
+  , resolution: Nothing
+  }
+
+-- Catpurse If choice (resolved = Just unit)
+catpurseIfResolved :: Choice
+catpurseIfResolved = If
+  { condition: HasCard "Copper"
+  , choice: MoveFromTo
+    { n: Exactly 1
+    , filter: Filter.HasName "Copper"
+    , source: Pile.Hand
+    , destination: Pile.Discard
+    , resolution: Nothing
+    , attack: true
+    }
+  , otherwise: Nothing
+  , attack: true
+  , resolution: Just unit
+  }
+
+-- discardCopper MoveFromTo choice (resolved with card index 0 selected — the copper)
+-- Player 1 hand after DoneReacting: [Moat, Copper] → index 1 is Copper
+discardCopperResolved :: Choice
+discardCopperResolved = MoveFromTo
+  { n: Exactly 1
+  , filter: Filter.HasName "Copper"
+  , source: Pile.Hand
+  , destination: Pile.Discard
+  , resolution: Just [1]  -- index 1 = Copper in [Moat, Copper] hand
+  , attack: true
+  }
+
+-- Margrave And choice (unresolved)
+margraveAndChoice :: Choice
+margraveAndChoice = And
+  { choices: [Cards.draw1Card, Cards.discardDownTo3]
+  , attack: true
+  , resolution: Nothing
+  }
+
+-- Margrave And choice (resolved)
+margraveAndResolved :: Choice
+margraveAndResolved = And
+  { choices: [Cards.draw1Card, Cards.discardDownTo3]
+  , attack: true
+  , resolution: Just unit
+  }
 
 -- Set up a 2-player game where player 1 has Moat and is being attacked
 setup_attack_game_with_moat :: Game
@@ -1378,11 +1855,61 @@ setup_attack_game_with_secretchamber =
   setup_attack_game_with_hand
     [Card._card Cards.secretChamber, Card._card Cards.copper]
 
--- Set up a 2-player game where player 1 has a pending attack choice
+-- Set up a 2-player game for Catpurse: player 1 has Moat + Copper, attacked with catpurse If
+setup_catpurse_game_with_moat :: Game
+setup_catpurse_game_with_moat =
+  setup_attack_game_with_hand_and_choice
+    [Card._card Cards.moat, Card._card Cards.copper]
+    catpurseIfChoice
+
+-- Set up a 2-player game for Militia: player 1 has Moat + enough cards, attacked with discardDownTo3
+setup_militia_game_with_moat :: Game
+setup_militia_game_with_moat =
+  setup_attack_game_with_hand_and_choice
+    [ Card._card Cards.moat
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    ]
+    Cards.discardDownTo3
+
+-- Set up a 2-player game for Margrave: player 1 has Moat + cards, attacked with And choice
+setup_margrave_game_with_moat :: Game
+setup_margrave_game_with_moat =
+  setup_attack_game_with_hand_and_choice
+    [ Card._card Cards.moat
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    ]
+    margraveAndChoice
+
+-- Set up a game where player 1 has Moat + Copper and is attacked with any compound choice
+setup_compound_attack_game :: Choice -> Game
+setup_compound_attack_game choice =
+  setup_attack_game_with_hand_and_choice
+    [ Card._card Cards.moat
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    , Card._card Cards.copper
+    ]
+    choice
+
+-- Set up a 2-player game where player 1 has a pending attack choice (Witch's GainCurse)
 -- and the specified hand. Uses Player.gainChoice to properly populate
 -- pendingReactions from the hand's reaction cards.
 setup_attack_game_with_hand :: Array Card -> Game
 setup_attack_game_with_hand hand =
+  setup_attack_game_with_hand_and_choice hand Cards.gainCurse
+
+-- Set up a 2-player game where player 1 has a pending attack choice
+-- and the specified hand. Uses Player.gainChoice to properly populate
+-- pendingReactions from the hand's reaction cards.
+setup_attack_game_with_hand_and_choice :: Array Card -> Choice -> Game
+setup_attack_game_with_hand_and_choice hand choice =
   let
     game = Game.new 2 Cards.cardMap true
     player0 = Player.newPlayer
@@ -1390,7 +1917,7 @@ setup_attack_game_with_hand hand =
       , deck = Array.replicate 5 (Card._card Cards.copper)
       }
     -- Use gainChoice to properly populate pendingReactions
-    player1 = Player.gainChoice Cards.gainCurse $ Player.newPlayer
+    player1 = Player.gainChoice choice $ Player.newPlayer
       { hand = hand
       , deck = Array.replicate 5 (Card._card Cards.copper)
       }
