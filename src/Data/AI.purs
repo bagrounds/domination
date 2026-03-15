@@ -272,8 +272,6 @@ assignBotIndices humanIndex strategies =
   let
     totalPlayers = length strategies + 1
     nonHumanIndices = filter (_ /= humanIndex) $ 0 .. (totalPlayers - 1)
-  in mapWithIndex
-    (\i strategy -> { playerIndex: fromMaybe i (nonHumanIndices !! i)
-                    , strategy
-                    })
+  in Array.zipWith (\idx strategy -> { playerIndex: idx, strategy })
+    nonHumanIndices
     strategies

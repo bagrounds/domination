@@ -94,7 +94,7 @@ render cs@{ showMenu, dominationConfig } = let
   , Util.incrementer
     { label: "Player #: "
     , mbMin: Just one
-    , mbMax: Nothing
+    , mbMax: Just nextPlayerCount
     , value: nextPlayerIndex + one
     , setValue: (_ - one) >>> WritePlayerIndex
     }
