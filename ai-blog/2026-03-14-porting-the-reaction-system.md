@@ -803,9 +803,9 @@ check_invariants game initial_total =
 
 7. 🎲 **Stateful property-based testing catches what scenarios miss.** Hand-crafted scenario tests are valuable but limited to cases we can imagine. Random play generation explores combinations we wouldn't think to test — and the invariant checks catch violations at any state transition.
 
-6. 🔀 **Distinguish creation from decomposition.** The double-reaction bug came from using the same function (`gainChoice`) for two semantically different operations: "opponent plays attack card → new reaction window" and "compound choice decomposes → continuation of existing attack." The fix was simple: `addChoice` for decomposition, `gainChoice` for new attacks. This kind of API boundary is easy to miss when the underlying mechanics look the same (both add a choice to the queue), but the side effects are fundamentally different.
+8. 🔀 **Distinguish creation from decomposition.** The double-reaction bug came from using the same function (`gainChoice`) for two semantically different operations: "opponent plays attack card → new reaction window" and "compound choice decomposes → continuation of existing attack." The fix was simple: `addChoice` for decomposition, `gainChoice` for new attacks. This kind of API boundary is easy to miss when the underlying mechanics look the same (both add a choice to the queue), but the side effects are fundamentally different.
 
-7. 🧪 **Test the scenarios, not just the functions.** The infinite loop only appeared when state transitions were chained: React → resolve SC → attack resurfaces → check reactions. The double-reaction bug only appeared when compound choices decomposed: DoneReacting → resolve If → discardCopper re-triggers. Individual function tests wouldn't catch either bug. Scenario-based tests that model realistic game flows — chaining multiple engine operations — are essential.
+9. 🧪 **Test the scenarios, not just the functions.** The infinite loop only appeared when state transitions were chained: React → resolve SC → attack resurfaces → check reactions. The double-reaction bug only appeared when compound choices decomposed: DoneReacting → resolve If → discardCopper re-triggers. Individual function tests wouldn't catch either bug. Scenario-based tests that model realistic game flows — chaining multiple engine operations — are essential.
 
 ## 🗑️ Branch Cleanup Note
 
