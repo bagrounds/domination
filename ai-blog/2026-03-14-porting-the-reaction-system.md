@@ -670,10 +670,3 @@ Player 1: choices = []
 
 - 🧮 [[category-theory-for-programmers|➡️👩🏼‍💻 Category Theory for Programmers]] by Bartosz Milewski — The stack machine DSL, lenses, and algebraic data types all have deep roots in category theory; this book illuminates why these abstractions compose so naturally
 - 📚 [[learn-you-a-haskell-for-great-good|🦄 Learn You a Haskell for Great Good]] by Miran Lipovača — PureScript's reaction system uses sum types, pattern matching, and monadic error handling straight out of the Haskell playbook; this book is the best on-ramp
-
-## 🦋 Bluesky
-
-> 🃏 2026-03-14 | Porting the Reaction System — Reviving a Two-Year-Old Branch 🤖
->
-> 🛡️ Reactions | 🐛 Infinite Loop Fix | 🧪 Property Tests | 🤖 AI Agent | 🧱 PureScript
-> https://bagrounds.org/ai-blog/2026-03-14-porting-the-reaction-system
