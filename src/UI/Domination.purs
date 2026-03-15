@@ -55,7 +55,9 @@ import Domination.UI.ChooseFromSupply as ChooseFromSupply
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination.Action (Action(..))
-import Domination.UI.Domination.ActiveState (ActiveState, _i, _playerIndex, _showSupply, _state)
+import Domination.Data.AI as AI
+import Domination.Data.AI (Bot)
+import Domination.UI.Domination.ActiveState (ActiveState, _bots, _i, _playerIndex, _showSupply, _state)
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
@@ -111,6 +113,7 @@ component config audioContext =
     , playerCount: config.nextPlayerCount
     , state: Game.new one kingdom config.longGame
     , showSupply: true
+    , bots: AI.assignBotIndices config.nextPlayerIndex config.botStrategies
     }
   kingdom = (_.cardSpec >>> _card) <$> _.selected `filter` config.kingdom
   render = renderPlayerN
@@ -167,28 +170,35 @@ handleQuery audioContext = case _ of
         , state
         , i
         , showSupply: newShowSupply
+        , bots: activeGame.bots
         }
     H.put newActiveState
     H.raise $ SaveGame newActiveState
+    playBotTurns audioContext
     pure $ Just a
 
   LoadActiveState activeState@{ state } a -> do
     activeGame <- H.get
     let
       newShowSupply = updateShowSupply activeGame state
+      preservedBots = activeGame.bots
 
-    H.put $ (_showSupply .~ newShowSupply) activeState
+    H.put $ (_showSupply .~ newShowSupply)
+      >>> (_bots .~ preservedBots) $ activeState
+    playBotTurns audioContext
     pure $ Just a
 
-  StartNewGameRequest config a -> do
+  StartNewGameRequest config' a -> do
     let
       { kingdom
       , nextPlayerIndex: playerIndex
       , nextPlayerCount: playerCount
       , longGame
-      } = config
+      , botStrategies
+      } = config'
+      bots = AI.assignBotIndices playerIndex botStrategies
 
-    H.modify_ $ _playerIndex .~ playerIndex
+    H.modify_ $ (_playerIndex .~ playerIndex) >>> (_bots .~ bots)
     let (selecteds :: Array CardSpecSelection) = _.selected `filter` kingdom
     let (f :: CardSpecSelection -> Card) = (_.cardSpec >>> _card)
     let (supply :: Array Card) = f <$> selecteds
@@ -196,6 +206,7 @@ handleQuery audioContext = case _ of
       playerIndex
       (NewGame { playerCount, supply, longGame })
       audioContext
+    playBotTurns audioContext
     pure $ Just a
 
 type ChildComponents query r m =
@@ -803,9 +814,10 @@ handleAction
   -> Action
   -> HalogenM ActiveState p s GameEvent m Unit
 handleAction audioContext = case _ of
-  MakePlay play ->
+  MakePlay play -> do
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
-    in playAndReport playerIndex play audioContext
+    playAndReport playerIndex play audioContext
+    playBotTurns audioContext
   UndoRequest as -> H.raise $ Undo as
   ToggleSupply -> H.modify_ $ _showSupply %~ not
   DoNothing -> pure unit
@@ -861,3 +873,24 @@ playAndReport playerIndex play audioContext = do
       H.raise $ NewState
         (((_i .~ newI) >>> (_state .~ gameState)) activeState)
         playMade
+
+playBotTurns
+  :: forall s p m
+  . Log m
+  => Random m
+  => Audio m
+  => AudioContext
+  -> HalogenM ActiveState p s GameEvent m Unit
+playBotTurns audioContext = do
+  activeState <- H.get
+  let game = activeState.state
+  case AI.findBotToAct activeState.bots game of
+    Nothing -> pure unit
+    Just bot -> do
+      ePlay <- AI.generateBotPlay bot game
+      case ePlay of
+        Left e -> do
+          error $ "Bot error: " <> e
+        Right play -> do
+          playAndReport bot.playerIndex play audioContext
+          playBotTurns audioContext

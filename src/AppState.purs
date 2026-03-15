@@ -22,6 +22,7 @@ import Data.Maybe (Maybe(..))
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
+import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
@@ -147,6 +148,7 @@ newConfig =
   , nextPlayerIndex: zero
   , kingdom: defaultKingdom
   , longGame: false
+  , botStrategies: []
   }
 
 type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
@@ -166,6 +168,7 @@ type Config =
   , nextPlayerCount :: Int
   , kingdom :: Array CardSpecSelection
   , longGame :: Boolean
+  , botStrategies :: Array Strategy
   }
 
 upgradeSelection :: CardSpecSelection -> CardSpecSelection
@@ -186,3 +189,8 @@ _kingdom
   :: forall a b r
   . Lens { kingdom :: a | r } { kingdom :: b | r } a b
 _kingdom = prop (Proxy :: Proxy "kingdom")
+
+_botStrategies
+  :: forall a b r
+  . Lens { botStrategies :: a | r } { botStrategies :: b | r } a b
+_botStrategies = prop (Proxy :: Proxy "botStrategies")

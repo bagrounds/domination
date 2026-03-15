@@ -11,6 +11,7 @@ module AppAction where
 
 import AppState (AppState)
 import Data.Lens.Lens (Lens')
+import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (CardSpec)
 import Domination.UI.Domination.GameEvent (GameEvent)
 import Web.Event.Event (Event)
@@ -35,4 +36,6 @@ data AppAction
   | SendMessage
   | ReceiveRemoteMessage Event
   | HandleGameEvent GameEvent
+  | AddBot Strategy
+  | RemoveBot Int
   | DoNothing

@@ -13,11 +13,11 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _botStrategies, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
-import Data.Array (elem, length, take)
+import Data.Array (deleteAt, elem, length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
@@ -369,6 +369,28 @@ handleAction audioContext = case _ of
 
   ToggleLongGame ->
     H.modify_ $ _dominationConfig <<< _longGame %~ not
+
+  AddBot strategy -> do
+    { dominationConfig: { botStrategies } } <- H.get
+    let
+      newBotStrategies = botStrategies <> [ strategy ]
+      newPlayerCount = length newBotStrategies + one
+    H.modify_
+      $ (_dominationConfig <<< _botStrategies .~ newBotStrategies)
+      >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
+    save "player_count" newPlayerCount >>= logErrorToChat
+
+  RemoveBot idx -> do
+    { dominationConfig: { botStrategies, nextPlayerIndex } } <- H.get
+    case deleteAt idx botStrategies of
+      Nothing -> pure unit
+      Just newBotStrategies -> do
+        let newPlayerCount = max one $ length newBotStrategies + one
+        H.modify_
+          $ (_dominationConfig <<< _botStrategies .~ newBotStrategies)
+          >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
+          >>> (_dominationConfig <<< _nextPlayerIndex .~ min nextPlayerIndex (newPlayerCount - one))
+        save "player_count" newPlayerCount >>= logErrorToChat
 
   DoNothing -> pure unit
 

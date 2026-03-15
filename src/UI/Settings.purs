@@ -14,13 +14,14 @@ import Prelude
 
 import AppAction (AppAction(..), CardSpecSelection)
 import AppState (AppState, defaultKingdom)
-import Data.Array (elem, mapWithIndex)
+import Data.Array (elem, length, mapWithIndex)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
+import Domination.Data.AI.Strategy (Strategy(..), allStrategies, botName)
 import Domination.Data.Card (Card, CardSpec, _card, _requirements)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
@@ -69,6 +70,7 @@ render cs@{ showMenu, dominationConfig } = let
   , nextPlayerCount
   , longGame
   , kingdom
+  , botStrategies
   } = dominationConfig
   in HH.div
   [ HP.classes
@@ -90,19 +92,13 @@ render cs@{ showMenu, dominationConfig } = let
   , ServerUrlInput.render { onInput: WriteServerUrl, state: cs }
   , UsernameInput.render { onInput: WriteUsername, state: cs }
   , Util.incrementer
-    { label: "Players: "
-    , mbMin: Just one
-    , mbMax: Nothing
-    , value: nextPlayerCount
-    , setValue: WritePlayerCount
-    }
-  , Util.incrementer
     { label: "Player #: "
     , mbMin: Just one
     , mbMax: Nothing
     , value: nextPlayerIndex + one
     , setValue: (_ - one) >>> WritePlayerIndex
     }
+  , renderBotControls botStrategies
   , HH.div_
     [ HH.button
       [ HE.onClick \_ -> StartNewGame
@@ -142,6 +138,37 @@ render cs@{ showMenu, dominationConfig } = let
     [ HH.text "Select All" ]
   , renderKingdom kingdom
   ]
+
+renderBotControls
+  :: forall w
+  . Array Strategy
+  -> HTML w AppAction
+renderBotControls botStrategies = HH.div
+  [ HP.class_ Css.botControls ]
+  [ HH.label_ [ HH.text "AI Players" ]
+  , HH.div_ $ mapWithIndex renderBot botStrategies
+  , HH.div
+    [ HP.class_ Css.addBot ]
+    $ addBotButton <$> allStrategies
+  ]
+  where
+    renderBot :: Int -> Strategy -> HTML w AppAction
+    renderBot i strategy = HH.div
+      [ HP.class_ Css.botEntry ]
+      [ HH.span_ [ HH.text $ botName strategy ]
+      , HH.button
+        [ HE.onClick \_ -> RemoveBot i
+        , HP.class_ Css.removeBot
+        ]
+        [ HH.text "✕" ]
+      ]
+
+    addBotButton :: Strategy -> HTML w AppAction
+    addBotButton strategy = HH.button
+      [ HE.onClick \_ -> AddBot strategy
+      , HP.class_ Css.addBotButton
+      ]
+      [ HH.text $ "+ " <> botName strategy ]
 
 type RenderedKingdom a b r m = HTML
     ( ComponentSlot

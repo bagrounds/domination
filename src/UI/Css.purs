@@ -172,3 +172,14 @@ points :: ClassName
 points = ClassName "points"
 cards :: ClassName
 cards = ClassName "cards"
+
+botControls :: ClassName
+botControls = ClassName "bot-controls"
+botEntry :: ClassName
+botEntry = ClassName "bot-entry"
+addBot :: ClassName
+addBot = ClassName "add-bot"
+addBotButton :: ClassName
+addBotButton = ClassName "add-bot-button"
+removeBot :: ClassName
+removeBot = ClassName "remove-bot"

@@ -13,6 +13,7 @@ import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Type.Proxy (Proxy(..))
+import Domination.Data.AI (Bot)
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
 
@@ -22,6 +23,7 @@ type ActiveState =
   , playerIndex :: Int
   , showSupply :: Boolean
   , state :: Game
+  , bots :: Array Bot
   }
 
 _i
@@ -40,6 +42,8 @@ _state
   :: forall a b r
   . Lens { state :: a | r } { state :: b | r } a b
 _state = prop (Proxy :: Proxy "state")
+_bots :: Lens' ActiveState (Array Bot)
+_bots = prop (Proxy :: Proxy "bots")
 
 upgrade :: ActiveState -> ActiveState
 upgrade = _state %~ Game.upgrade

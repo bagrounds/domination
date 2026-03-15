@@ -16,25 +16,17 @@ import Data.Array.NonEmpty (mapWithIndex, toArray, (!!))
 import Data.Foldable (length)
 import Data.Maybe (Maybe(..))
 import Domination.Data.Card as Card
-import Domination.Data.Game (Game)
 import Domination.Data.Phase (Phase(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.UI.Css as Css
 import Domination.UI.Domination.Action (Action)
+import Domination.UI.Domination.ActiveState (ActiveState)
 import Domination.UI.Icons as Icons
 import Domination.UI.RenderText (renderText)
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-
-type ActiveState =
-  { i :: Int
-  , playerIndex :: Int
-  , playerCount :: Int
-  , state :: Game
-  , showSupply :: Boolean
-  }
 
 render :: forall w. ActiveState -> HTML w Action
 render cs@{ i, playerIndex, state } =
