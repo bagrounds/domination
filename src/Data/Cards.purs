@@ -1571,7 +1571,7 @@ mill = let
 secretChamber :: CardSpec
 secretChamber = let
   attack = false
-  description = "Discard N cards, +$N."
+  description = "Move 2 cards from your hand to the top of your deck."
   in independentCard $ Card.actionReaction
   { name = "Secret Chamber"
   , cost = 2
