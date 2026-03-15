@@ -545,11 +545,126 @@ Player 1: choices = []
 
 ✅ **Done.** The attack resolved with exactly one reaction prompt, not two.
 
+## 🔍 The Five Whys: `dropReactions` vs. `dropReaction`
+
+### 🤔 The Question
+
+🧐 Bryan asked: "Shouldn't we only have to drop a single reaction at a time?" When a player reacts with a card, do we really need to flush the entire `pendingReactions` queue? What if the player has *multiple* reaction cards?
+
+### 🔬 Five Whys Analysis
+
+1. **Why** was the reaction window closing after a single reaction?
+   - 📝 Because `react` called `Player.dropReactions` (plural) which wipes the entire `pendingReactions` array
+
+2. **Why** did we wipe all reactions?
+   - 📝 Because the original implementation treated reactions as a binary choice: react once OR DoneReacting. The `dropReactions` was designed to close the reaction window entirely.
+
+3. **Why** was it treated as binary?
+   - 📝 Because the first version only had Moat (BlockAttack), which is inherently binary — you either block or you don't. There was no scenario where you'd want to react with multiple cards in sequence.
+
+4. **Why** does that matter now?
+   - 📝 Because Secret Chamber introduces `ReactWithChoice` — a reaction that does something (draw 2, put 2 back) but doesn't block the attack. In Dominion, you can reveal Secret Chamber AND Moat against the same attack: use SC's effect first, then block with Moat.
+
+5. **Why** didn't we notice earlier?
+   - 📝 Because our test scenarios only tested single-reaction-card hands. The multi-reaction case (SC + Moat in the same hand) was never exercised.
+
+### ✅ The Fix
+
+💡 Split the "drop" semantics into two operations:
+
+```purescript
+-- Drop a single reaction (used when player actually reacts)
+dropReaction :: Reaction -> Player -> Player
+dropReaction reaction player =
+  player { pendingReactions = removeFirst player.pendingReactions }
+  where
+    removeFirst rs = case uncons rs of
+      Nothing -> []
+      Just { head: r, tail } ->
+        if fst r == reaction then tail
+        else cons r (removeFirst tail)
+
+-- Drop ALL reactions (used when player clicks DoneReacting)
+dropReactions :: Player -> Player
+dropReactions = _ { pendingReactions = [] }
+```
+
+🔄 In `Engine.react`:
+
+```purescript
+react { playerIndex, reaction: maybeReaction } =
+  case maybeReaction of
+    Nothing -> pure
+    Just reaction ->
+      modifyPlayer playerIndex (Player.dropReaction reaction) >=> case reaction of
+        BlockAttack ->
+          traverseOf (Game._player playerIndex) Player.dropChoice
+        ReactWithChoice choice ->
+          modifyPlayer playerIndex (Player._choices :~ choice)
+```
+
+🎯 `react` drops only the used reaction. `DoneReacting` drops all remaining reactions. This enables correct multi-reaction sequences.
+
+## 🃏 Example Scenario: Secret Chamber + Moat vs. Witch
+
+### 📋 Initial State
+
+```
+Player 0: plays Witch
+Player 1: hand = [Moat, Secret Chamber, Copper]
+         choices = []
+         pendingReactions = []
+```
+
+### ▶️ Step 1: Witch attack arrives
+
+⚔️ `gainChoice(GainCurse { attack: true })` on Player 1:
+- 📥 `choices = [GainCurse { attack: true }]`
+- 🔍 `isAttack = true` → scans hand → finds Moat AND Secret Chamber
+- 🛡️ `pendingReactions = [(BlockAttack, "reveal Moat…"), (ReactWithChoice SC_choice, "When another player…")]`
+
+### ▶️ Step 2: Player reacts with Secret Chamber
+
+🃏 `React { reaction: Just (ReactWithChoice SC_choice) }`:
+- 📤 `dropReaction(ReactWithChoice SC_choice)` → removes SC from pendingReactions
+- ➕ `_choices :~ SC_choice` → prepends SC choice
+- 🛡️ `pendingReactions = [(BlockAttack, "reveal Moat…")]` — **Moat still available!**
+
+```
+Player 1: choices = [SC_choice (non-attack), GainCurse { attack: true }]
+         pendingReactions = [(BlockAttack, "reveal Moat…")]
+```
+
+### ▶️ Step 3: SC choice resolves
+
+📜 Player resolves SC's draw-2-put-2-back effect. SC_choice gets dropped.
+
+```
+Player 1: choices = [GainCurse { attack: true }]
+         pendingReactions = [(BlockAttack, "reveal Moat…")]
+```
+
+### ▶️ Step 4: Attack resurfaces, Moat still available
+
+🖥️ `isAttacked = true` (GainCurse is attack) AND `hasReaction = true` (Moat still pending)
+📜 UI shows: "Block with Moat" / "Done reacting"
+🛡️ Player clicks Moat → `React { reaction: Just BlockAttack }`:
+- 📤 `dropReaction(BlockAttack)` → removes Moat from pendingReactions
+- 🗑️ `dropChoice` → removes GainCurse
+- ✅ Attack fully blocked!
+
+```
+Player 1: choices = []
+         pendingReactions = []
+```
+
+✅ **Done.** Player used both reaction cards in sequence — SC's effect then Moat's block.
+
 ## 🧪 Testing the Reaction System
 
 ### 📐 Scenario-Based Property Tests
 
-🔬 We wrote 49 tests organized around concrete game scenarios. Each scenario mirrors the state transition diagrams above:
+🔬 We wrote 56 tests organized around concrete game scenarios. Each scenario mirrors the state transition diagrams above:
 
 ```
 ── Reaction System ──
@@ -602,8 +717,52 @@ Player 1: choices = []
   ✓ ∀ compound attacks: And resolution does not re-trigger reactions
   ✓ ∀ compound attacks: Or resolution does not re-trigger reactions
   ✓ ∀ compound attacks: Option(yes) resolution does not re-trigger reactions
-  49/49 passed
+  ✓ dropReaction: removes BlockAttack, keeps other reactions
+  ✓ dropReaction: removes only the first matching reaction
+  ✓ dropReaction: no-op when reaction not in pendingReactions
+  ✓ Multi-reaction: SC + Moat — after SC react, Moat still available
+  ✓ Multi-reaction: SC react → SC first choice, Moat still pending
+  ✓ Multi-reaction: SC then DoneReacting — remaining reactions dropped
+  ✓ Multi-reaction: card conservation through SC + Moat sequence
+  56/56 passed
 ```
+
+### 🎛️ Stateful Property-Based Tests
+
+🎲 Beyond hand-crafted scenarios, we use **stateful property-based testing** — generating random games, making random valid plays at each step, and checking that universal invariants hold at every state transition.
+
+📋 The test harness:
+
+1. 🎮 **Set up** a game with N players
+2. 🎲 **Generate a valid play** — at each state, enumerate the available plays (React, DoneReacting, ResolveChoice, Purchase, EndPhase) and randomly choose one
+3. ⚙️ **Execute** the play via `makeAutoPlay`
+4. ✅ **Check invariants** after every step:
+   - 🃏 **Card conservation**: total cards across all piles unchanged
+   - 🔗 **Reactions consistency**: if `pendingReactions` is non-empty, the player must have choices
+   - ➕ **No negative buys/actions**: game resources never go below zero
+5. 🔁 **Repeat** for N steps or until game ends
+
+```purescript
+check_invariants :: Game -> Int -> Result
+check_invariants game initial_total =
+  let
+    card_conservation = ...
+    reactions_consistent = foldl combine Success $ NEA.toArray $
+      NEA.mapWithIndex (\i p ->
+        if Player.hasReaction p && not (Player.hasChoices p)
+        then Failed $ "Player " <> show i <> " has pendingReactions but no choices"
+        else Success
+      ) game.players
+    no_negatives = ...
+  in combine (combine card_conservation reactions_consistent) no_negatives
+```
+
+🏃 We run 3 simulation configurations:
+- 🎲 `2p long game × 100 steps`
+- 🎲 `2p short game × 100 steps`
+- 🎲 `4p long game × 50 steps`
+
+💪 Each simulation generates dozens of random plays — purchases, phase advances, reaction decisions — and verifies that invariants hold after every single one. This catches bugs that hand-crafted scenarios miss, because the random play generator explores state spaces we wouldn't think to test manually.
 
 ### 🎯 Key Property Invariants
 
@@ -622,10 +781,11 @@ Player 1: choices = []
 ## 📊 Impact
 
 - 📁 **22 files changed**: Surgical changes across data types, wire protocol, engine, UI, and tests
-- ✅ **309 tests passing**: 49 scenario-based reaction tests, plus all existing tests
+- ✅ **319 tests passing**: 56 scenario-based reaction tests, 3 stateful property-based tests, plus all existing tests
 - 🃏 **1 new card**: Secret Chamber, the first card with a non-trivial reaction effect
-- 🐛 **2 bugs fixed**: Secret Chamber infinite loop (via `pendingReactions`), double-reaction on compound choices (via `addChoice`)
-- 🔒 **0 invariants violated**: Cards are immutable; `gainChoice` only for new attacks, `addChoice` for decomposition
+- 🐛 **3 bugs fixed**: Secret Chamber infinite loop (via `pendingReactions`), double-reaction on compound choices (via `addChoice`), and multi-reaction sledgehammer (via `dropReaction`)
+- 🔒 **0 invariants violated**: Cards are immutable; `gainChoice` only for new attacks, `addChoice` for decomposition, `dropReaction` for single removal
+- 🎲 **Stateful testing**: Random game simulations checking invariants at every state transition
 
 ## 💡 Lessons Learned
 
@@ -638,6 +798,10 @@ Player 1: choices = []
 4. 🔍 **Functional patterns help with refactoring.** The lens-based approach to game state made it natural to update deeply nested state (like `player.choices[0].expression`) without manual bookkeeping.
 
 5. 🔒 **Respect the system's invariants.** My first fix (`clearAttack`) worked mechanically but violated the immutability principle. Bryan's feedback — "cards are immutable, we just move them between piles" — pointed me to the right architectural pattern. The `pendingReactions` field tracks the reaction opportunity window without mutating any choice or card.
+
+6. 🔬 **The 5-whys technique uncovers root causes.** When `dropReactions` flushed all reactions, the fix wasn't to add a guard or a flag — it was to recognize that the granularity was wrong. The real unit of dropping should be one reaction at a time, matching the Dominion rule that players can use multiple reaction cards sequentially.
+
+7. 🎲 **Stateful property-based testing catches what scenarios miss.** Hand-crafted scenario tests are valuable but limited to cases we can imagine. Random play generation explores combinations we wouldn't think to test — and the invariant checks catch violations at any state transition.
 
 6. 🔀 **Distinguish creation from decomposition.** The double-reaction bug came from using the same function (`gainChoice`) for two semantically different operations: "opponent plays attack card → new reaction window" and "compound choice decomposes → continuation of existing attack." The fix was simple: `addChoice` for decomposition, `gainChoice` for new attacks. This kind of API boundary is easy to miss when the underlying mechanics look the same (both add a choice to the queue), but the side effects are fundamentally different.
 
