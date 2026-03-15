@@ -12,7 +12,7 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (any, catMaybes, deleteAt, filter, length, replicate, reverse)
+import Data.Array (any, catMaybes, cons, deleteAt, filter, length, replicate, reverse, uncons)
 import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
@@ -23,7 +23,7 @@ import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Type.Proxy (Proxy(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Domination.Capability.Random (class Random, shuffle)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Bonus (Bonus)
@@ -186,6 +186,20 @@ gainChoice choice player =
     then player' { pendingReactions = reactionsInHand player' }
     else player'
 
+-- | Drop a single reaction from pendingReactions (used when player reacts).
+-- | Keeps remaining reactions available for multi-reaction sequences
+-- | (e.g., react with Secret Chamber, then still block with Moat).
+dropReaction :: Reaction -> Player -> Player
+dropReaction reaction player =
+  player { pendingReactions = removeFirst player.pendingReactions }
+  where
+    removeFirst rs = case uncons rs of
+      Nothing -> []
+      Just { head: r, tail } ->
+        if fst r == reaction then tail
+        else cons r (removeFirst tail)
+
+-- | Drop ALL pending reactions (used when player clicks DoneReacting).
 dropReactions :: Player -> Player
 dropReactions = _ { pendingReactions = [] }
 

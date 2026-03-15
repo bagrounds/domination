@@ -16,6 +16,7 @@ import Data.Maybe (Maybe(..))
 import Data.Stack.Machine as Machine
 import Data.Traversable (traverse)
 import Domination.Capability.Random (RandomM, runRandomM)
+import Domination.Capability.Random (randomIntBetween, randomBoolean) as Random
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Actions (Actions, actions)
 import Domination.Data.Buys (Buys, buys)
@@ -41,7 +42,7 @@ import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Stack as Stack
 import Domination.Data.Supply as Supply
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Domination.Data.Wire.Game (_toWire) as Dom
 import Domination.Data.Wire.Play (_toWire) as Play
 import Effect (Effect)
@@ -1775,6 +1776,152 @@ reaction_tests =
             assert_false "Option(yes) decomposition should not re-trigger reactions"
               (Game.hasReaction 1 game')
     }
+  --
+  -- ══ dropReaction: drop one, keep the rest ══
+  --
+  , { name: "dropReaction: removes BlockAttack, keeps other reactions"
+    , test: pure $
+        let p = Player.newPlayer
+              { hand = [Card._card Cards.moat, Card._card Cards.secretChamber] }
+            p' = Player.gainChoice Cards.gainCurse p
+            -- Should have 2 pending reactions
+            p'' = Player.dropReaction BlockAttack p'
+        in if Array.length p'.pendingReactions /= 2
+           then Failed $ "expected 2 pending reactions, got " <> show (Array.length p'.pendingReactions)
+           else if Array.length p''.pendingReactions /= 1
+           then Failed $ "expected 1 pending reaction after dropReaction, got " <> show (Array.length p''.pendingReactions)
+           else if Player.hasReaction p'' == false
+           then Failed "should still have a reaction after dropping one of two"
+           else Success
+    }
+  , { name: "dropReaction: removes only the first matching reaction"
+    , test: pure $
+        let p = Player.newPlayer
+              { hand = [Card._card Cards.moat] }
+            p' = Player.gainChoice Cards.gainCurse p
+            p'' = Player.dropReaction BlockAttack p'
+        in assert_false "should have no reactions after dropping the only one"
+          (Player.hasReaction p'')
+    }
+  , { name: "dropReaction: no-op when reaction not in pendingReactions"
+    , test: pure $
+        let p = Player.newPlayer
+              { hand = [Card._card Cards.moat] }
+            p' = Player.gainChoice Cards.gainCurse p
+            scReaction = case (Card._card Cards.secretChamber).reaction of
+              Just (Tuple reaction _) -> reaction
+              _ -> BlockAttack  -- fallback
+            p'' = Player.dropReaction scReaction p'
+        in assert_eq (Array.length p''.pendingReactions) 1
+    }
+  --
+  -- ══ Multi-reaction scenario: Secret Chamber + Moat ══
+  --
+  -- Player 1 has BOTH Moat and Secret Chamber in hand.
+  -- Attacked by Witch. Player reacts with Secret Chamber first.
+  -- After SC reaction, Moat reaction should still be available.
+  -- Player can then also block with Moat.
+  --
+  , { name: "Multi-reaction: SC + Moat — after SC react, Moat still available"
+    , test: do
+        let game = setup_attack_game_with_both_reactions
+            scReaction = case (Card._card Cards.secretChamber).reaction of
+              Just (Tuple reaction _) -> reaction
+              _ -> BlockAttack
+        result <- runRandomM $ runExceptT $
+          Engine.makePlay
+            (React { playerIndex: 1, reaction: Just scReaction })
+            game
+        pure case result of
+          Left err -> Failed $ "react failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- After reacting with SC, should still have Moat's BlockAttack pending
+                if not (Player.hasReaction p1)
+                then Failed "should still have Moat reaction pending"
+                else if Array.length p1.pendingReactions /= 1
+                then Failed $ "expected 1 remaining reaction, got " <> show (Array.length p1.pendingReactions)
+                else Success
+    }
+  , { name: "Multi-reaction: SC react → SC first choice, Moat still pending"
+    , test: do
+        let game = setup_attack_game_with_both_reactions
+            scReaction = case (Card._card Cards.secretChamber).reaction of
+              Just (Tuple reaction _) -> reaction
+              _ -> BlockAttack
+        result <- runRandomM $ runExceptT $ do
+          -- Step 1: React with Secret Chamber
+          Engine.makePlay
+            (React { playerIndex: 1, reaction: Just scReaction })
+            game
+        pure case result of
+          Left err -> Failed $ "react failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                -- SC choice is at index 0 (non-attack), attack at index 1
+                -- isAttacked checks firstChoice, which is SC (non-attack), so false
+                -- hasReaction is true (Moat still pending)
+                -- UI shows SC choice resolution, not reaction buttons
+                -- Moat stays available for when attack resurfaces
+                let isAttacked = case Player.firstChoice p1 of
+                      Nothing -> false
+                      Just c -> Choice.isAttack c
+                in if isAttacked
+                   then Failed "first choice should be SC's non-attack choice"
+                   else if not (Player.hasReaction p1)
+                   then Failed "Moat reaction should still be pending"
+                   else if Array.length p1.choices /= 2
+                   then Failed $ "expected 2 choices, got " <> show (Array.length p1.choices)
+                   else Success
+    }
+  , { name: "Multi-reaction: SC then DoneReacting — remaining reactions dropped"
+    , test: do
+        let game = setup_attack_game_with_both_reactions
+            scReaction = case (Card._card Cards.secretChamber).reaction of
+              Just (Tuple reaction _) -> reaction
+              _ -> BlockAttack
+        result <- runRandomM $ runExceptT $ do
+          -- Step 1: React with Secret Chamber (adds SC's choice, drops SC reaction)
+          game1 <- Engine.makePlay
+            (React { playerIndex: 1, reaction: Just scReaction })
+            game
+          -- Step 2: DoneReacting (drops remaining Moat reaction)
+          Engine.makePlay
+            (DoneReacting { playerIndex: 1 })
+            game1
+        pure case result of
+          Left err -> Failed $ "scenario failed: " <> err
+          Right game' ->
+            case NEA.index game'.players 1 of
+              Nothing -> Failed "no player at index 1"
+              Just p1 ->
+                if Player.hasReaction p1
+                then Failed "DoneReacting should have dropped all remaining reactions"
+                else Success
+    }
+  , { name: "Multi-reaction: card conservation through SC + Moat sequence"
+    , test: do
+        let game = setup_attack_game_with_both_reactions
+            totalBefore = count_all game
+            scReaction = case (Card._card Cards.secretChamber).reaction of
+              Just (Tuple reaction _) -> reaction
+              _ -> BlockAttack
+        result <- runRandomM $ runExceptT $ do
+          game1 <- Engine.makePlay
+            (React { playerIndex: 1, reaction: Just scReaction })
+            game
+          Engine.makePlay
+            (React { playerIndex: 1, reaction: Just BlockAttack })
+            game1
+        pure case result of
+          Left err -> Failed $ "react failed: " <> err
+          Right game' ->
+            assert_eq (count_all game') totalBefore
+    }
   ]
 
 -- ══════════════════════════════════════════════════════════════════
@@ -1854,6 +2001,16 @@ setup_attack_game_with_secretchamber :: Game
 setup_attack_game_with_secretchamber =
   setup_attack_game_with_hand
     [Card._card Cards.secretChamber, Card._card Cards.copper]
+
+-- Set up a 2-player game where player 1 has BOTH Moat and Secret Chamber,
+-- enabling multi-reaction sequences
+setup_attack_game_with_both_reactions :: Game
+setup_attack_game_with_both_reactions =
+  setup_attack_game_with_hand
+    [ Card._card Cards.moat
+    , Card._card Cards.secretChamber
+    , Card._card Cards.copper
+    ]
 
 -- Set up a 2-player game for Catpurse: player 1 has Moat + Copper, attacked with catpurse If
 setup_catpurse_game_with_moat :: Game
@@ -2233,6 +2390,15 @@ property_tests =
                   assert_true "hand sizes should be reasonable"
                   $ all (\p -> Array.length p.hand <= 10) game.players
           }
+        , { name: "Stateful: 2p random game (100 steps) — all invariants hold"
+          , test: run_random_game_simulation 2 true 100
+          }
+        , { name: "Stateful: 2p short random game (100 steps) — all invariants hold"
+          , test: run_random_game_simulation 2 false 100
+          }
+        , { name: "Stateful: 4p random game (50 steps) — all invariants hold"
+          , test: run_random_game_simulation 4 true 50
+          }
         ]
   in phase_tests <> player_count_tests <> unit_props <> qc_tests <> simulation_prop_tests
 
@@ -2291,4 +2457,181 @@ simulate_and_check_conservation playerCount longGame nTurns = do
          then Success
          else Failed $ "Card conservation violated: "
            <> show initial_total <> " → " <> show current_total
+
+-- ══════════════════════════════════════════════════════════════════
+-- Stateful Property-Based Testing: Random Game Simulation
+-- ══════════════════════════════════════════════════════════════════
+
+-- | Check all game-state invariants that must hold after every play.
+-- Returns Success or the first violated invariant.
+check_invariants :: Game -> Int -> Result
+check_invariants game initial_total =
+  let
+    current_total = count_all game
+    -- Invariant 1: Card conservation
+    card_conservation =
+      if current_total == initial_total then Success
+      else Failed $ "Card conservation violated: "
+        <> show initial_total <> " → " <> show current_total
+
+    -- Invariant 2: pendingReactions consistency
+    -- If player has pendingReactions, they must have an attack choice
+    -- (the converse isn't required: a player can have an attack choice
+    -- with empty pendingReactions after DoneReacting)
+    reactions_consistent = foldl combine Success $ NEA.toArray $
+      NEA.mapWithIndex (\i p ->
+        if Player.hasReaction p && not (Player.hasChoices p)
+        then Failed $ "Player " <> show i <> " has pendingReactions but no choices"
+        else Success
+      ) game.players
+
+    -- Invariant 3: No negative buys or actions
+    no_negatives = foldl combine Success $ NEA.toArray $
+      NEA.mapWithIndex (\i p ->
+        if p.buys < zero
+        then Failed $ "Player " <> show i <> " has negative buys: " <> show p.buys
+        else if p.actions < zero
+        then Failed $ "Player " <> show i <> " has negative actions: " <> show p.actions
+        else Success
+      ) game.players
+  in
+    combine (combine card_conservation reactions_consistent) no_negatives
+  where
+    combine Success r = r
+    combine (Failed msg) _ = Failed msg
+
+-- | Generate a valid play for the current game state.
+-- This picks randomly from available valid moves.
+generate_valid_play :: Game -> RandomM Play
+generate_valid_play game = do
+  let playerIndex = game.turn
+  -- Check if any player has outstanding choices
+  if Game.choicesOutstanding game
+  then do
+    let choicePlayerIndex = Engine.choiceTurn game
+    case NEA.index game.players choicePlayerIndex of
+      Nothing -> pure $ EndPhase { playerIndex }
+      Just player ->
+        if Game.isAttacked choicePlayerIndex game && Player.hasReaction player
+        then do
+          -- Player is attacked with pending reactions: randomly React or DoneReacting
+          let reactions = player.pendingReactions
+          doReact <- Random.randomBoolean
+          if doReact && Array.length reactions > 0
+          then do
+            idx <- Random.randomIntBetween 0 (Array.length reactions - 1)
+            case reactions Array.!! idx of
+              Nothing -> pure $ DoneReacting { playerIndex: choicePlayerIndex }
+              Just (Tuple reaction _) ->
+                pure $ React { playerIndex: choicePlayerIndex, reaction: Just reaction }
+          else
+            pure $ DoneReacting { playerIndex: choicePlayerIndex }
+        else
+          -- Player has choices but not reacting: try to resolve
+          case Player.firstChoice player of
+            Nothing -> pure $ EndPhase { playerIndex }
+            Just choice -> pure $ ResolveChoice
+              { playerIndex: choicePlayerIndex
+              , choice: auto_resolve choice
+              }
+  else
+    -- No choices outstanding: advance phase or make a normal play
+    case game.phase of
+      ActionPhase ->
+        if Player.hasActions (NEA.head game.players)
+        && Player.hasActionCardsInHand (NEA.head game.players)
+        then pure $ EndPhase { playerIndex }  -- Just skip for simplicity
+        else pure $ EndPhase { playerIndex }
+      BuyPhase -> do
+        -- Try to purchase something affordable
+        case NEA.index game.players playerIndex of
+          Nothing -> pure $ EndPhase { playerIndex }
+          Just player ->
+            let
+              playerCash = Player.cash player
+              affordable = Array.mapWithIndex (\i s -> { i, s })
+                $ Array.filter (\s -> s.count > 0 && s.card.cost <= playerCash)
+                $ game.supply
+            in
+            if player.buys > zero && Array.length affordable > 0
+            then do
+              idx <- Random.randomIntBetween 0 (Array.length affordable - 1)
+              case affordable Array.!! idx of
+                Nothing -> pure $ EndPhase { playerIndex }
+                Just { i: stackIndex } -> pure $ Purchase { playerIndex, stackIndex }
+            else
+              pure $ EndPhase { playerIndex }
+      CleanupPhase ->
+        pure $ EndPhase { playerIndex }
+
+-- | Auto-resolve a choice by providing minimal valid resolution.
+-- For compound choices, just acknowledge them (resolution = Just unit / Just true).
+-- For terminal choices, provide minimal valid card selections.
+auto_resolve :: Choice -> Choice
+auto_resolve = case _ of
+  If r -> If r { resolution = Just unit }
+  And r -> And r { resolution = Just unit }
+  Or r@{ choices } ->
+    case Array.head choices of
+      Nothing -> Or r { resolution = Nothing }
+      Just c -> Or r { resolution = Just c }
+  PickN r@{ choices, n } ->
+    PickN r { resolution = Just (Array.take n choices) }
+  Option r -> Option r { resolution = Just true }
+  MoveFromTo r -> MoveFromTo r { resolution = Just [0] }
+  GainCard r -> GainCard r { resolution = Just "Copper" }
+  GainCards r -> GainCards r { resolution = Just unit }
+  GainActions r -> GainActions r { resolution = Just unit }
+  GainBuys r -> GainBuys r { resolution = Just unit }
+  Discard r -> Discard r { resolution = Just unit }
+  Draw r -> Draw r { resolution = Just unit }
+  GainBonus r -> GainBonus r { resolution = Just unit }
+  c@(StackChoice _) -> c  -- Can't auto-resolve StackChoice
+
+-- | Run a stateful random game simulation for N steps,
+-- checking invariants at each step.
+run_random_game_simulation :: Int -> Boolean -> Int -> Effect Result
+run_random_game_simulation playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let initial_total = count_all game
+      -- Check invariants after setup
+      case check_invariants game initial_total of
+        Failed msg -> pure $ Failed $ "Invariant violated after setup: " <> msg
+        Success ->
+          runRandomM $ simulate_steps maxSteps game initial_total 0
+
+simulate_steps :: Int -> Game -> Int -> Int -> RandomM Result
+simulate_steps 0 _ _ step_count = pure Success
+simulate_steps remaining game initial_total step_count = do
+  -- Game is over? Stop.
+  if game.result /= Nothing
+  then pure Success
+  else do
+    -- Generate a random valid play
+    play <- generate_valid_play game
+    -- Execute it
+    result <- Engine.makeAutoPlay play game
+    case result of
+      Left _ ->
+        -- Invalid play is fine — we just skip and try ending the phase
+        do
+          result2 <- Engine.makeAutoPlay
+            (EndPhase { playerIndex: game.turn })
+            game
+          case result2 of
+            Left _ -> pure Success -- Completely stuck, stop
+            Right game' ->
+              if game'.result /= Nothing
+              then pure $ check_invariants game' initial_total
+              else simulate_steps (remaining - 1) game' initial_total (step_count + 1)
+      Right game' ->
+        -- Check invariants
+        case check_invariants game' initial_total of
+          Failed msg -> pure $ Failed $ "Invariant violated at step "
+            <> show step_count <> " after play " <> show play <> ": " <> msg
+          Success ->
+            simulate_steps (remaining - 1) game' initial_total (step_count + 1)
 

@@ -173,14 +173,14 @@ react
   -> Game
   -> m Game
 react { playerIndex, reaction: maybeReaction } =
-  modifyPlayer playerIndex Player.dropReactions >=>
   case maybeReaction of
     Nothing -> pure
-    Just reaction -> case reaction of
-      BlockAttack ->
-        traverseOf (Game._player playerIndex) Player.dropChoice
-      ReactWithChoice choice ->
-        modifyPlayer playerIndex (Player._choices :~ choice)
+    Just reaction ->
+      modifyPlayer playerIndex (Player.dropReaction reaction) >=> case reaction of
+        BlockAttack ->
+          traverseOf (Game._player playerIndex) Player.dropChoice
+        ReactWithChoice choice ->
+          modifyPlayer playerIndex (Player._choices :~ choice)
 
 play
   :: forall m
