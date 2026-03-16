@@ -24,8 +24,9 @@ import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Setter ((%~), (.~))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Tuple (fst)
+import Data.Int (toNumber)
 import Domination.Capability.Audio (class Audio, beep)
 import Domination.Capability.Audio as Sound
 import Domination.Capability.Dom (class Dom)
@@ -57,7 +58,8 @@ import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination.Action (Action(..))
 import Domination.Data.AI as AI
 import Domination.Data.AI (Bot)
-import Domination.UI.Domination.ActiveState (ActiveState, ComponentState, mkComponentState, _active, _pendingBotMessage, _botTimerSub, _bots, _i, _playerIndex, _showSupply, _state)
+import Domination.Data.AI.Strategy (botName)
+import Domination.UI.Domination.ActiveState (ActiveState, ComponentState, PendingBotPlay, mkComponentState, _active, _pendingBotPlay, _botTimerSub, _botDelay, _bots, _i, _playerIndex, _showSupply, _state)
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
@@ -72,6 +74,11 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
+import Halogen.Subscription as HS
+import Effect.Aff as Effect.Aff
+import Effect.Aff (Milliseconds(..), delay)
+import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Class (liftEffect)
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -101,13 +108,14 @@ component
   => Dom m
   => Random m
   => Audio m
+  => MonadAff m
   => Config
   -> AudioContext
   -> H.Component GameQuery input GameEvent m
 component config audioContext =
   H.mkComponent { initialState, render, eval }
   where
-  initialState _ = mkComponentState
+  initialState _ = mkComponentState config.botDelay
     { i: zero
     , playerIndex: config.nextPlayerIndex
     , playerCount: config.nextPlayerCount
@@ -134,16 +142,18 @@ updateShowSupply activeState { turn: nextTurn, phase } =
 
 
 handleQuery
-  :: forall action slots m a
+  :: forall slots m a
   . Log m
   => Storage m
   => Audio m
   => Random m
+  => MonadAff m
   => AudioContext
   -> GameQuery a
-  -> H.HalogenM ComponentState action slots GameEvent m (Maybe a)
+  -> H.HalogenM ComponentState Action slots GameEvent m (Maybe a)
 handleQuery audioContext = case _ of
   ReceiveGame { state, i } a -> do
+    cancelPendingBotPlay
     cs <- H.get
     let activeGame = cs.active
 
@@ -179,6 +189,7 @@ handleQuery audioContext = case _ of
     pure $ Just a
 
   LoadActiveState activeState@{ state } a -> do
+    cancelPendingBotPlay
     cs <- H.get
     let
       newShowSupply = updateShowSupply cs.active state
@@ -234,17 +245,23 @@ renderPlayerN cs = HH.div
       [ Hud.render activeState
       , renderText result
       ]
-  ) <> renderBotOverlay cs.pendingBotMessage
+  ) <> renderBotOverlay cs.pendingBotPlay
   where
   activeState = cs.active
 
-renderBotOverlay :: forall w. Maybe String -> Array (HTML w Action)
+renderBotOverlay :: forall w. Maybe PendingBotPlay -> Array (HTML w Action)
 renderBotOverlay = case _ of
   Nothing -> []
-  Just msg ->
+  Just { message } ->
     [ HH.div
       [ HP.class_ $ HH.ClassName "bot-play-overlay" ]
-      [ HH.text msg ]
+      [ HH.div
+        [ HP.class_ $ HH.ClassName "bot-play-spinner" ]
+        []
+      , HH.div
+        [ HP.class_ $ HH.ClassName "bot-play-message" ]
+        [ HH.text message ]
+      ]
     ]
 
 renderSupply'
@@ -817,32 +834,43 @@ renderHand player { playerIndex, state } = HH.ul
           $ findIndex ((_ == stack.card.name) <<< _.name) hand
 
 handleAction
-  :: forall s p m
+  :: forall s m
   . Log m
   => Random m
   => Audio m
+  => MonadAff m
   => AudioContext
   -> Action
-  -> HalogenM ComponentState p s GameEvent m Unit
+  -> HalogenM ComponentState Action s GameEvent m Unit
 handleAction audioContext = case _ of
   MakePlay play -> do
+    cancelPendingBotPlay
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
     playAndReport playerIndex play audioContext
     playBotTurns audioContext
-  UndoRequest as -> H.raise $ Undo as
+  UndoRequest as -> do
+    cancelPendingBotPlay
+    H.raise $ Undo as
   ToggleSupply -> H.modify_ $ _active <<< _showSupply %~ not
-  ExecutePendingBotPlay -> pure unit
+  ExecutePendingBotPlay -> do
+    cs <- H.get
+    case cs.pendingBotPlay of
+      Nothing -> pure unit
+      Just { bot, play } -> do
+        H.modify_ $ (_pendingBotPlay .~ Nothing) >>> (_botTimerSub .~ Nothing)
+        playAndReport bot.playerIndex play audioContext
+        playBotTurns audioContext
   DoNothing -> pure unit
 
 playAndReport
-  :: forall s p m
+  :: forall s m
   . Log m
   => Random m
   => Audio m
   => Int
   -> Play
   -> AudioContext
-  -> HalogenM ComponentState p s GameEvent m Unit
+  -> HalogenM ComponentState Action s GameEvent m Unit
 playAndReport playerIndex play audioContext = do
   cs <- H.get
   let activeState = cs.active
@@ -891,12 +919,13 @@ playAndReport playerIndex play audioContext = do
         playMade
 
 playBotTurns
-  :: forall s p m
+  :: forall s m
   . Log m
   => Random m
   => Audio m
+  => MonadAff m
   => AudioContext
-  -> HalogenM ComponentState p s GameEvent m Unit
+  -> HalogenM ComponentState Action s GameEvent m Unit
 playBotTurns audioContext = do
   cs <- H.get
   let activeState = cs.active
@@ -909,5 +938,37 @@ playBotTurns audioContext = do
         Left e -> do
           error $ "Bot error: " <> e
         Right play -> do
-          playAndReport bot.playerIndex play audioContext
-          playBotTurns audioContext
+          let message = botName bot.strategy <> " plays: " <> show play
+          if cs.botDelay <= 0
+          then do
+            playAndReport bot.playerIndex play audioContext
+            playBotTurns audioContext
+          else do
+            cancelPendingBotPlay
+            H.modify_ $ (_pendingBotPlay .~ Just { bot, play, message })
+            scheduleBotPlay audioContext
+
+cancelPendingBotPlay
+  :: forall s m
+  . HalogenM ComponentState Action s GameEvent m Unit
+cancelPendingBotPlay = do
+  cs <- H.get
+  case cs.botTimerSub of
+    Just subId -> H.unsubscribe subId
+    Nothing -> pure unit
+  H.modify_ $ (_pendingBotPlay .~ Nothing) >>> (_botTimerSub .~ Nothing)
+
+scheduleBotPlay
+  :: forall s m
+  . MonadAff m
+  => AudioContext
+  -> HalogenM ComponentState Action s GameEvent m Unit
+scheduleBotPlay _audioContext = do
+  cs <- H.get
+  let ms = toNumber cs.botDelay
+  { emitter, listener } <- liftEffect HS.create
+  _ <- liftAff $ Effect.Aff.forkAff do
+    delay (Milliseconds ms)
+    liftEffect $ HS.notify listener ExecutePendingBotPlay
+  subId <- H.subscribe emitter
+  H.modify_ $ _botTimerSub .~ Just subId

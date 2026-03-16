@@ -20,6 +20,7 @@ import Domination.Data.AI (Bot)
 import Domination.Data.AI.Strategy (botName)
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
+import Domination.Data.Play (Play)
 import Halogen (SubscriptionId)
 
 type ActiveState =
@@ -31,17 +32,25 @@ type ActiveState =
   , bots :: Array Bot
   }
 
-type ComponentState =
-  { active :: ActiveState
-  , pendingBotMessage :: Maybe String
-  , botTimerSub :: Maybe SubscriptionId
+type PendingBotPlay =
+  { bot :: Bot
+  , play :: Play
+  , message :: String
   }
 
-mkComponentState :: ActiveState -> ComponentState
-mkComponentState active =
+type ComponentState =
+  { active :: ActiveState
+  , pendingBotPlay :: Maybe PendingBotPlay
+  , botTimerSub :: Maybe SubscriptionId
+  , botDelay :: Int
+  }
+
+mkComponentState :: Int -> ActiveState -> ComponentState
+mkComponentState botDelay active =
   { active
-  , pendingBotMessage: Nothing
+  , pendingBotPlay: Nothing
   , botTimerSub: Nothing
+  , botDelay
   }
 
 _active
@@ -49,15 +58,20 @@ _active
   . Lens { active :: a | r } { active :: b | r } a b
 _active = prop (Proxy :: Proxy "active")
 
-_pendingBotMessage
+_pendingBotPlay
   :: forall a b r
-  . Lens { pendingBotMessage :: a | r } { pendingBotMessage :: b | r } a b
-_pendingBotMessage = prop (Proxy :: Proxy "pendingBotMessage")
+  . Lens { pendingBotPlay :: a | r } { pendingBotPlay :: b | r } a b
+_pendingBotPlay = prop (Proxy :: Proxy "pendingBotPlay")
 
 _botTimerSub
   :: forall a b r
   . Lens { botTimerSub :: a | r } { botTimerSub :: b | r } a b
 _botTimerSub = prop (Proxy :: Proxy "botTimerSub")
+
+_botDelay
+  :: forall a b r
+  . Lens { botDelay :: a | r } { botDelay :: b | r } a b
+_botDelay = prop (Proxy :: Proxy "botDelay")
 
 _i
   :: forall a b r

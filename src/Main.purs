@@ -13,14 +13,15 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _botDelay, _botStrategies, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _settingsTab, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _botStrategies, _chatNumber, _connectedClients, _connectionCount, _debugLog, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _settingsTab, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
-import Data.Array (deleteAt, elem, length, take)
+import Data.Array (deleteAt, elem, length, snoc, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
+import Effect.Aff.Class (class MonadAff)
 import Data.Lens.Getter (view)
 import Data.Lens.Prism (review)
 import Data.Lens.Setter (over, set, (%~), (.~))
@@ -111,6 +112,7 @@ component
   => WireCodec m
   => Audio m
   => Timer m
+  => MonadAff m
   => AudioContext
   -> Component query o s m
 component audioContext =
@@ -130,6 +132,7 @@ render
   => Storage m
   => Dom m
   => Random m
+  => MonadAff m
   => AudioContext
   -> AppState
   -> HTML (Domination.Component GameQuery c m AppAction) AppAction
