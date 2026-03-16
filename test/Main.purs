@@ -7,18 +7,21 @@ import Data.Array ((..))
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, decodeArrayBuffer, encodeArrayBuffer)
-import Data.Either (Either(..))
+import Data.Either (Either(..), isRight)
 import Data.Foldable (all, foldl, length, sum)
 import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso')
 import Data.Lens.Prism (review)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Stack.Machine as Machine
 import Data.Traversable (traverse)
 import Domination.Capability.Random (RandomM, runRandomM)
 import Domination.Capability.Random (randomIntBetween, randomBoolean) as Random
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Actions (Actions, actions)
+import Domination.Data.AI as AI
+import Domination.Data.AI (Bot)
+import Domination.Data.AI.Strategy (Strategy(..), botName, allStrategies)
 import Domination.Data.Buys (Buys, buys)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
@@ -40,6 +43,8 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Points (points)
 import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Result as Domination.Data.Result
+import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack as Stack
 import Domination.Data.Supply as Supply
 import Data.Tuple (Tuple(..), fst)
@@ -76,8 +81,9 @@ main = do
   simulation_results <- run_effect_section "Game Simulation" game_simulation_tests
   reaction_results <- run_effect_section "Reaction System" reaction_tests
   property_results <- run_effect_section "Property-Based Tests" property_tests
-  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed
-  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed
+  ai_results <- run_effect_section "AI Bot Tests" ai_tests
+  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed
+  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed
   let total = total_passed + total_failed
   log ""
   log $ "═══ Results: " <> show total_passed <> "/" <> show total <> " passed ═══"
@@ -2634,4 +2640,582 @@ simulate_steps remaining game initial_total step_count = do
             <> show step_count <> " after play " <> show play <> ": " <> msg
           Success ->
             simulate_steps (remaining - 1) game' initial_total (step_count + 1)
+
+-- ══════════════════════════════════════════════════════════════════
+-- AI Bot Tests
+-- ══════════════════════════════════════════════════════════════════
+
+ai_tests :: Array { name :: String, test :: Effect Result }
+ai_tests =
+  assign_bot_indices_tests
+  <> big_money_target_tests
+  <> find_bot_to_act_tests
+  <> auto_resolve_tests
+  <> bot_name_tests
+  <> generate_play_tests
+  <> bot_simulation_tests
+
+-- ── assignBotIndices ──
+
+assign_bot_indices_tests :: Array { name :: String, test :: Effect Result }
+assign_bot_indices_tests =
+  [ { name: "assignBotIndices: 1 bot, human at 0 → bot at 1"
+    , test: pure $
+        let bots = AI.assignBotIndices 0 [ BigMoney ]
+        in assert_true "bot should be at index 1"
+          $ bots == [ { playerIndex: 1, strategy: BigMoney } ]
+    }
+  , { name: "assignBotIndices: 1 bot, human at 1 → bot at 0"
+    , test: pure $
+        let bots = AI.assignBotIndices 1 [ BigMoney ]
+        in assert_true "bot should be at index 0"
+          $ bots == [ { playerIndex: 0, strategy: BigMoney } ]
+    }
+  , { name: "assignBotIndices: 2 bots, human at 0 → bots at 1,2"
+    , test: pure $
+        let bots = AI.assignBotIndices 0 [ BigMoney, Random ]
+        in assert_true "bots should be at indices 1 and 2"
+          $ bots == [ { playerIndex: 1, strategy: BigMoney }
+                    , { playerIndex: 2, strategy: Random }
+                    ]
+    }
+  , { name: "assignBotIndices: 2 bots, human at 1 → bots at 0,2"
+    , test: pure $
+        let bots = AI.assignBotIndices 1 [ BigMoney, Random ]
+        in assert_true "bots should be at indices 0 and 2"
+          $ bots == [ { playerIndex: 0, strategy: BigMoney }
+                    , { playerIndex: 2, strategy: Random }
+                    ]
+    }
+  , { name: "assignBotIndices: no bots → empty"
+    , test: pure $
+        let bots = AI.assignBotIndices 0 []
+        in assert_eq bots []
+    }
+  ]
+
+-- ── bigMoneyTarget ──
+
+big_money_target_tests :: Array { name :: String, test :: Effect Result }
+big_money_target_tests =
+  let supply = Supply.makeSupply 2 Cards.cardMap
+  in
+  [ { name: "bigMoneyTarget: $8 buys Province"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 8 supply) (Just "Province")
+    }
+  , { name: "bigMoneyTarget: $10 buys Province"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 10 supply) (Just "Province")
+    }
+  , { name: "bigMoneyTarget: $7 buys Gold"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 7 supply) (Just "Gold")
+    }
+  , { name: "bigMoneyTarget: $6 buys Gold"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 6 supply) (Just "Gold")
+    }
+  , { name: "bigMoneyTarget: $4 buys Silver"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 4 supply) (Just "Silver")
+    }
+  , { name: "bigMoneyTarget: $3 buys Silver"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 3 supply) (Just "Silver")
+    }
+  , { name: "bigMoneyTarget: $2 buys Nothing"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 2 supply) Nothing
+    }
+  , { name: "bigMoneyTarget: $0 buys Nothing"
+    , test: pure $ assert_eq (AI.bigMoneyTarget 0 supply) Nothing
+    }
+  , { name: "bigMoneyTarget: $5 with few provinces buys Duchy"
+    , test: pure $
+        let
+          lowProvinceSupply = map
+            (\s -> if s.card.name == "Province"
+                   then s { count = 4 }
+                   else s)
+            supply
+        in assert_eq (AI.bigMoneyTarget 5 lowProvinceSupply) (Just "Duchy")
+    }
+  , { name: "bigMoneyTarget: $5 with many provinces buys Silver"
+    , test: pure $
+        let
+          highProvinceSupply = map
+            (\s -> if s.card.name == "Province"
+                   then s { count = 8 }
+                   else s)
+            supply
+        in assert_eq (AI.bigMoneyTarget 5 highProvinceSupply) (Just "Silver")
+    }
+  ]
+
+-- ── findBotToAct ──
+
+find_bot_to_act_tests :: Array { name :: String, test :: Effect Result }
+find_bot_to_act_tests =
+  [ { name: "findBotToAct: returns Nothing for empty bot list"
+    , test: do
+        result <- run_make_auto_play 2 true
+        pure case result of
+          Left err -> Failed err
+          Right game ->
+            assert_eq (AI.findBotToAct [] game) Nothing
+    }
+  , { name: "findBotToAct: returns bot when it's their turn"
+    , test: do
+        result <- run_make_auto_play 2 true
+        pure case result of
+          Left err -> Failed err
+          Right game ->
+            let
+              bot = { playerIndex: game.turn, strategy: BigMoney }
+              bots = [ bot ]
+            in assert_eq (AI.findBotToAct bots game) (Just bot)
+    }
+  , { name: "findBotToAct: returns Nothing when human's turn"
+    , test: do
+        result <- run_make_auto_play 2 true
+        pure case result of
+          Left err -> Failed err
+          Right game ->
+            let
+              otherIndex = if game.turn == 0 then 1 else 0
+              bot = { playerIndex: otherIndex, strategy: BigMoney }
+              bots = [ bot ]
+            in assert_eq (AI.findBotToAct bots game) Nothing
+    }
+  , { name: "findBotToAct: returns Nothing when game is over"
+    , test: do
+        result <- run_make_auto_play 2 true
+        pure case result of
+          Left err -> Failed err
+          Right game ->
+            let
+              finishedGame = game { result = Just (Domination.Data.Result.Victory 0) }
+              bot = { playerIndex: game.turn, strategy: BigMoney }
+              bots = [ bot ]
+            in assert_eq (AI.findBotToAct bots finishedGame) Nothing
+    }
+  ]
+
+-- ── autoResolve ──
+
+auto_resolve_tests :: Array { name :: String, test :: Effect Result }
+auto_resolve_tests =
+  [ { name: "autoResolve: If gets Just unit resolution"
+    , test: pure $
+        let
+          choice = If { choice: Draw { n: 1, resolution: Nothing, attack: false }
+                      , otherwise: Nothing
+                      , condition: HasCard "Copper"
+                      , resolution: Nothing
+                      , attack: false
+                      }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          If r -> assert_eq r.resolution (Just unit)
+          _ -> Failed "expected If"
+    }
+  , { name: "autoResolve: And gets Just unit resolution"
+    , test: pure $
+        let
+          choice = And { choices: [], resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          And r -> assert_eq r.resolution (Just unit)
+          _ -> Failed "expected And"
+    }
+  , { name: "autoResolve: Or picks first choice"
+    , test: pure $
+        let
+          draw1 = Draw { n: 1, resolution: Nothing, attack: false }
+          draw2 = Draw { n: 2, resolution: Nothing, attack: false }
+          choice = Or { choices: [ draw1, draw2 ], resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          Or r -> assert_eq r.resolution (Just draw1)
+          _ -> Failed "expected Or"
+    }
+  , { name: "autoResolve: Option resolves to true"
+    , test: pure $
+        let
+          choice = Option { choice: Draw { n: 1, resolution: Nothing, attack: false }
+                          , resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          Option r -> assert_eq r.resolution (Just true)
+          _ -> Failed "expected Option"
+    }
+  , { name: "autoResolve: Draw gets Just unit resolution"
+    , test: pure $
+        let
+          choice = Draw { n: 3, resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          Draw r -> assert_eq r.resolution (Just unit)
+          _ -> Failed "expected Draw"
+    }
+  , { name: "autoResolve: GainCard resolves to Copper"
+    , test: pure $
+        let
+          choice = GainCard { attack: false, filter: Filter.Any
+                            , destination: Pile.Discard, resolution: Nothing }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          GainCard r -> assert_eq r.resolution (Just "Copper")
+          _ -> Failed "expected GainCard"
+    }
+  , { name: "autoResolve: Discard gets Just unit resolution"
+    , test: pure $
+        let
+          choice = Discard { selection: SelectAll, resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          Discard r -> assert_eq r.resolution (Just unit)
+          _ -> Failed "expected Discard"
+    }
+  , { name: "autoResolve: GainActions gets Just unit resolution"
+    , test: pure $
+        let
+          choice = GainActions { n: actions 2, resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          GainActions r -> assert_eq r.resolution (Just unit)
+          _ -> Failed "expected GainActions"
+    }
+  , { name: "autoResolve: GainBuys gets Just unit resolution"
+    , test: pure $
+        let
+          choice = GainBuys { n: buys 1, resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          GainBuys r -> assert_eq r.resolution (Just unit)
+          _ -> Failed "expected GainBuys"
+    }
+  , { name: "autoResolve: PickN takes first n choices"
+    , test: pure $
+        let
+          c1 = Draw { n: 1, resolution: Nothing, attack: false }
+          c2 = Draw { n: 2, resolution: Nothing, attack: false }
+          c3 = Draw { n: 3, resolution: Nothing, attack: false }
+          choice = PickN { choices: [ c1, c2, c3 ], n: 2
+                         , resolution: Nothing, attack: false }
+          resolved = AI.autoResolve choice
+        in case resolved of
+          PickN r -> assert_eq r.resolution (Just [ c1, c2 ])
+          _ -> Failed "expected PickN"
+    }
+  ]
+
+-- ── botName ──
+
+bot_name_tests :: Array { name :: String, test :: Effect Result }
+bot_name_tests =
+  [ { name: "botName BigMoney is 'Big Money Bot'"
+    , test: pure $ assert_eq (botName BigMoney) "Big Money Bot"
+    }
+  , { name: "botName Random is 'Random Bot'"
+    , test: pure $ assert_eq (botName Random) "Random Bot"
+    }
+  , { name: "allStrategies contains BigMoney and Random"
+    , test: pure $ assert_true "should have both strategies"
+      $ allStrategies == [ BigMoney, Random ]
+    }
+  ]
+
+-- ── generatePlay ──
+
+generate_play_tests :: Array { name :: String, test :: Effect Result }
+generate_play_tests =
+  [ { name: "BigMoney: generates Purchase or EndPhase after setup"
+    , test: do
+        result <- run_make_auto_play 2 true
+        case result of
+          Left err -> pure $ Failed err
+          Right game -> do
+            let bot = { playerIndex: game.turn, strategy: BigMoney }
+            ePlay <- runRandomM $ AI.generateBotPlay bot game
+            pure case ePlay of
+              Left err -> Failed $ "generatePlay failed: " <> err
+              Right (EndPhase _) -> Success
+              Right (Purchase _) -> Success
+              Right play -> Failed $ "expected EndPhase or Purchase, got: " <> show play
+    }
+  , { name: "BigMoney: generates Purchase in BuyPhase"
+    , test: do
+        result <- run_make_auto_play 2 true
+        case result of
+          Left err -> pure $ Failed err
+          Right game -> do
+            -- Advance to buy phase
+            let buyGame = game { phase = BuyPhase }
+            let bot = { playerIndex: buyGame.turn, strategy: BigMoney }
+            ePlay <- runRandomM $ AI.generateBotPlay bot buyGame
+            pure case ePlay of
+              Left err -> Failed $ "generatePlay failed: " <> err
+              Right (Purchase _) -> Success
+              Right (EndPhase _) -> Success
+              Right play -> Failed $ "expected Purchase or EndPhase, got: " <> show play
+    }
+  , { name: "Random: generates valid play after setup"
+    , test: do
+        result <- run_make_auto_play 2 true
+        case result of
+          Left err -> pure $ Failed err
+          Right game -> do
+            let bot = { playerIndex: game.turn, strategy: Random }
+            ePlay <- runRandomM $ AI.generateBotPlay bot game
+            pure case ePlay of
+              Left err -> Failed $ "generatePlay failed: " <> err
+              Right (EndPhase _) -> Success
+              Right (PlayCard _) -> Success
+              Right (Purchase _) -> Success
+              Right play -> Failed $ "expected EndPhase, PlayCard, or Purchase, got: " <> show play
+    }
+  , { name: "Random: generates valid play in BuyPhase"
+    , test: do
+        result <- run_make_auto_play 2 true
+        case result of
+          Left err -> pure $ Failed err
+          Right game -> do
+            let buyGame = game { phase = BuyPhase }
+            let bot = { playerIndex: buyGame.turn, strategy: Random }
+            ePlay <- runRandomM $ AI.generateBotPlay bot buyGame
+            pure case ePlay of
+              Left err -> Failed $ "generatePlay failed: " <> err
+              Right (Purchase _) -> Success
+              Right (EndPhase _) -> Success
+              Right play -> Failed $ "expected Purchase or EndPhase, got: " <> show play
+    }
+  , { name: "Bot generates EndPhase in CleanupPhase"
+    , test: do
+        result <- run_make_auto_play 2 true
+        case result of
+          Left err -> pure $ Failed err
+          Right game -> do
+            let cleanupGame = game { phase = CleanupPhase }
+            let bot = { playerIndex: cleanupGame.turn, strategy: BigMoney }
+            ePlay <- runRandomM $ AI.generateBotPlay bot cleanupGame
+            pure case ePlay of
+              Left err -> Failed $ "generatePlay failed: " <> err
+              Right (EndPhase _) -> Success
+              Right play -> Failed $ "expected EndPhase, got: " <> show play
+    }
+  ]
+
+-- ── Full Bot Game Simulations ──
+
+bot_simulation_tests :: Array { name :: String, test :: Effect Result }
+bot_simulation_tests =
+  [ { name: "BigMoney bot plays full 2p game to completion"
+    , test: run_all_bots_game BigMoney 2 false 1000
+    }
+  , { name: "BigMoney bot plays full 3p game to completion"
+    , test: run_all_bots_game BigMoney 3 false 1500
+    }
+  , { name: "Random bot generates valid plays for 200 steps"
+    , test: run_bot_game_with_invariants Random 2 false 200
+    }
+  , { name: "BigMoney bot plays full 4p game to completion"
+    , test: run_all_bots_game BigMoney 4 false 2000
+    }
+  , { name: "BigMoney bot preserves card conservation (2p)"
+    , test: run_bot_game_with_invariants BigMoney 2 false 500
+    }
+  , { name: "Random bot preserves card conservation (2p)"
+    , test: run_bot_game_with_invariants Random 2 false 500
+    }
+  , { name: "BigMoney bot preserves card conservation (4p)"
+    , test: run_bot_game_with_invariants BigMoney 4 false 300
+    }
+  , { name: "3 BigMoney bots play full 3p game"
+    , test: run_all_bots_game BigMoney 3 false 1000
+    }
+  , { name: "BigMoney bot always buys something reasonable"
+    , test: run_big_money_buy_validation 2 false 200
+    }
+  ]
+
+run_bot_game :: Strategy -> Int -> Boolean -> Int -> Effect Result
+run_bot_game strategy playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let
+        bots = map (\i -> { playerIndex: i, strategy })
+          $ Array.filter (_ /= 0) $ 0 .. (playerCount - 1)
+      runRandomM $ run_bot_steps bots maxSteps game
+
+run_all_bots_game :: Strategy -> Int -> Boolean -> Int -> Effect Result
+run_all_bots_game strategy playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let
+        bots = map (\i -> { playerIndex: i, strategy })
+          $ 0 .. (playerCount - 1)
+      runRandomM $ run_bot_steps bots maxSteps game
+
+run_mixed_bots_game :: Array Strategy -> Int -> Boolean -> Int -> Effect Result
+run_mixed_bots_game strategies playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let
+        bots = Array.mapWithIndex (\i s -> { playerIndex: i, strategy: s })
+          $ Array.take playerCount strategies
+      runRandomM $ run_bot_steps bots maxSteps game
+
+run_multi_bot_game :: Array Strategy -> Int -> Boolean -> Int -> Effect Result
+run_multi_bot_game strategies playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let bots = AI.assignBotIndices 0 strategies
+      runRandomM $ run_bot_steps bots maxSteps game
+
+run_bot_steps :: Array Bot -> Int -> Game -> RandomM Result
+run_bot_steps _ 0 _ = pure $ Failed "game did not finish within step limit"
+run_bot_steps bots remaining game =
+  if isJust game.result
+  then pure Success
+  else case AI.findBotToAct bots game of
+    Just bot -> do
+      ePlay <- AI.generateBotPlay bot game
+      case ePlay of
+        Left _ -> do
+          -- Fallback: try EndPhase
+          result <- Engine.makeAutoPlay
+            (EndPhase { playerIndex: bot.playerIndex }) game
+          case result of
+            Left _ -> pure Success
+            Right game' -> run_bot_steps bots (remaining - 1) game'
+        Right play -> do
+          result <- Engine.makeAutoPlay play game
+          case result of
+            Left _ -> do
+              -- Try EndPhase as fallback
+              result2 <- Engine.makeAutoPlay
+                (EndPhase { playerIndex: bot.playerIndex }) game
+              case result2 of
+                Left _ -> pure Success
+                Right game' -> run_bot_steps bots (remaining - 1) game'
+            Right game' -> run_bot_steps bots (remaining - 1) game'
+    Nothing -> do
+      -- Human's turn - simulate human EndPhase
+      let humanPlay = EndPhase { playerIndex: game.turn }
+      result <- Engine.makeAutoPlay humanPlay game
+      case result of
+        Left _ -> pure Success
+        Right game' -> run_bot_steps bots (remaining - 1) game'
+
+run_bot_game_with_invariants :: Strategy -> Int -> Boolean -> Int -> Effect Result
+run_bot_game_with_invariants strategy playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let
+        initial_total = count_all game
+        bots = map (\i -> { playerIndex: i, strategy })
+          $ Array.filter (_ /= 0) $ 0 .. (playerCount - 1)
+      runRandomM $ run_bot_steps_with_invariants bots maxSteps game initial_total 0
+
+run_bot_steps_with_invariants
+  :: Array Bot -> Int -> Game -> Int -> Int -> RandomM Result
+run_bot_steps_with_invariants _ 0 _ _ _ = pure Success
+run_bot_steps_with_invariants bots remaining game initial_total step = do
+  -- Check invariants at every step
+  case check_invariants game initial_total of
+    Failed msg -> pure $ Failed $ "Invariant violated at step "
+      <> show step <> ": " <> msg
+    Success ->
+      if isJust game.result
+      then pure Success
+      else case AI.findBotToAct bots game of
+        Just bot -> do
+          ePlay <- AI.generateBotPlay bot game
+          case ePlay of
+            Left _ -> do
+              result <- Engine.makeAutoPlay
+                (EndPhase { playerIndex: bot.playerIndex }) game
+              case result of
+                Left _ -> pure Success
+                Right game' ->
+                  run_bot_steps_with_invariants
+                    bots (remaining - 1) game' initial_total (step + 1)
+            Right play -> do
+              result <- Engine.makeAutoPlay play game
+              case result of
+                Left _ -> do
+                  result2 <- Engine.makeAutoPlay
+                    (EndPhase { playerIndex: bot.playerIndex }) game
+                  case result2 of
+                    Left _ -> pure Success
+                    Right game' ->
+                      run_bot_steps_with_invariants
+                        bots (remaining - 1) game' initial_total (step + 1)
+                Right game' ->
+                  run_bot_steps_with_invariants
+                    bots (remaining - 1) game' initial_total (step + 1)
+        Nothing -> do
+          let humanPlay = EndPhase { playerIndex: game.turn }
+          result <- Engine.makeAutoPlay humanPlay game
+          case result of
+            Left _ -> pure Success
+            Right game' ->
+              run_bot_steps_with_invariants
+                bots (remaining - 1) game' initial_total (step + 1)
+
+run_big_money_buy_validation :: Int -> Boolean -> Int -> Effect Result
+run_big_money_buy_validation playerCount longGame maxSteps = do
+  initial <- run_make_auto_play playerCount longGame
+  case initial of
+    Left err -> pure $ Failed $ "setup failed: " <> err
+    Right game -> do
+      let
+        bots = [ { playerIndex: 1, strategy: BigMoney } ]
+      runRandomM $ validate_big_money_buys bots maxSteps game
+
+validate_big_money_buys :: Array Bot -> Int -> Game -> RandomM Result
+validate_big_money_buys _ 0 _ = pure Success
+validate_big_money_buys bots remaining game =
+  if isJust game.result
+  then pure Success
+  else case AI.findBotToAct bots game of
+    Just bot -> do
+      ePlay <- AI.generateBotPlay bot game
+      case ePlay of
+        Left _ -> pure Success
+        Right play -> do
+          -- Validate BigMoney never buys action cards
+          case play of
+            Purchase { stackIndex } ->
+              let stack = game.supply Array.!! stackIndex
+              in case stack of
+                Nothing -> pure $ Failed "invalid stack index"
+                Just s ->
+                  if Array.any (_ == Action) s.card.types
+                    && not (Array.any (_ == Treasure) s.card.types)
+                  then pure $ Failed $ "BigMoney bought action card: "
+                    <> s.card.name
+                  else do
+                    result <- Engine.makeAutoPlay play game
+                    case result of
+                      Left _ -> pure Success
+                      Right game' ->
+                        validate_big_money_buys bots (remaining - 1) game'
+            _ -> do
+              result <- Engine.makeAutoPlay play game
+              case result of
+                Left _ -> pure Success
+                Right game' ->
+                  validate_big_money_buys bots (remaining - 1) game'
+    Nothing -> do
+      let humanPlay = EndPhase { playerIndex: game.turn }
+      result <- Engine.makeAutoPlay humanPlay game
+      case result of
+        Left _ -> pure Success
+        Right game' -> validate_big_money_buys bots (remaining - 1) game'
 

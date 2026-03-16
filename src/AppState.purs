@@ -22,6 +22,7 @@ import Data.Maybe (Maybe(..))
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
+import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
@@ -30,6 +31,11 @@ type ClientInfo =
   { timestamp :: Int
   , clientId :: String
   }
+
+data SettingsTab
+  = ConnectionTab
+  | GameSetupTab
+  | KingdomTab
 
 type AppState =
   { connectionCount :: Int
@@ -50,6 +56,8 @@ type AppState =
   , connectedClients :: HashMap String ClientInfo
   , heartbeatInterval :: Int
   , heartbeatTimeout :: Int
+  , settingsTab :: SettingsTab
+  , debugLog :: Array String
   }
 
 _card :: Lens' CardSpec Card
@@ -107,6 +115,12 @@ _heartbeatInterval = prop (Proxy :: Proxy "heartbeatInterval")
 _heartbeatTimeout :: Lens' AppState Int
 _heartbeatTimeout = prop (Proxy :: Proxy "heartbeatTimeout")
 
+_settingsTab :: Lens' AppState SettingsTab
+_settingsTab = prop (Proxy :: Proxy "settingsTab")
+
+_debugLog :: Lens' AppState (Array String)
+_debugLog = prop (Proxy :: Proxy "debugLog")
+
 globalRoomCode :: String
 globalRoomCode = "global-dev"
 
@@ -139,6 +153,8 @@ newApp =
   , connectedClients: HashMap.empty
   , heartbeatInterval: defaultHeartbeatInterval
   , heartbeatTimeout: defaultHeartbeatTimeout
+  , settingsTab: GameSetupTab
+  , debugLog: []
   }
 
 newConfig :: Config
@@ -147,6 +163,8 @@ newConfig =
   , nextPlayerIndex: zero
   , kingdom: defaultKingdom
   , longGame: false
+  , botStrategies: []
+  , botDelay: 2000
   }
 
 type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
@@ -166,6 +184,8 @@ type Config =
   , nextPlayerCount :: Int
   , kingdom :: Array CardSpecSelection
   , longGame :: Boolean
+  , botStrategies :: Array Strategy
+  , botDelay :: Int
   }
 
 upgradeSelection :: CardSpecSelection -> CardSpecSelection
@@ -186,3 +206,13 @@ _kingdom
   :: forall a b r
   . Lens { kingdom :: a | r } { kingdom :: b | r } a b
 _kingdom = prop (Proxy :: Proxy "kingdom")
+
+_botStrategies
+  :: forall a b r
+  . Lens { botStrategies :: a | r } { botStrategies :: b | r } a b
+_botStrategies = prop (Proxy :: Proxy "botStrategies")
+
+_botDelay
+  :: forall a b r
+  . Lens { botDelay :: a | r } { botDelay :: b | r } a b
+_botDelay = prop (Proxy :: Proxy "botDelay")
