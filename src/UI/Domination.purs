@@ -57,7 +57,7 @@ import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination.Action (Action(..))
 import Domination.Data.AI as AI
 import Domination.Data.AI (Bot)
-import Domination.UI.Domination.ActiveState (ActiveState, _bots, _i, _playerIndex, _showSupply, _state)
+import Domination.UI.Domination.ActiveState (ActiveState, ComponentState, mkComponentState, _active, _pendingBotMessage, _botTimerSub, _bots, _i, _playerIndex, _showSupply, _state)
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
@@ -107,7 +107,7 @@ component
 component config audioContext =
   H.mkComponent { initialState, render, eval }
   where
-  initialState _ =
+  initialState _ = mkComponentState
     { i: zero
     , playerIndex: config.nextPlayerIndex
     , playerCount: config.nextPlayerCount
@@ -141,10 +141,11 @@ handleQuery
   => Random m
   => AudioContext
   -> GameQuery a
-  -> H.HalogenM ActiveState action slots GameEvent m (Maybe a)
+  -> H.HalogenM ComponentState action slots GameEvent m (Maybe a)
 handleQuery audioContext = case _ of
   ReceiveGame { state, i } a -> do
-    activeGame <- H.get
+    cs <- H.get
+    let activeGame = cs.active
 
     if Game.isAttacked activeGame.playerIndex state
     then beep audioContext Sound.Attacked
@@ -172,19 +173,17 @@ handleQuery audioContext = case _ of
         , showSupply: newShowSupply
         , bots: activeGame.bots
         }
-    H.put newActiveState
+    H.modify_ $ _active .~ newActiveState
     H.raise $ SaveGame newActiveState
     playBotTurns audioContext
     pure $ Just a
 
   LoadActiveState activeState@{ state } a -> do
-    activeGame <- H.get
+    cs <- H.get
     let
-      newShowSupply = updateShowSupply activeGame state
-      preservedBots = activeGame.bots
+      newShowSupply = updateShowSupply cs.active state
 
-    H.put $ (_showSupply .~ newShowSupply)
-      >>> (_bots .~ preservedBots) $ activeState
+    H.modify_ $ _active .~ ((_showSupply .~ newShowSupply) activeState)
     playBotTurns audioContext
     pure $ Just a
 
@@ -198,7 +197,7 @@ handleQuery audioContext = case _ of
       } = config'
       bots = AI.assignBotIndices playerIndex botStrategies
 
-    H.modify_ $ (_playerIndex .~ playerIndex) >>> (_bots .~ bots)
+    H.modify_ $ _active %~ ((_playerIndex .~ playerIndex) >>> (_bots .~ bots))
     let (selecteds :: Array CardSpecSelection) = _.selected `filter` kingdom
     let (f :: CardSpecSelection -> Card) = (_.cardSpec >>> _card)
     let (supply :: Array Card) = f <$> selecteds
@@ -225,16 +224,28 @@ renderPlayerN
   :: forall query r m
   . Dom m
   => Log m
-  => ActiveState
+  => ComponentState
   -> HTML (ChildComponents query r m) Action
-renderPlayerN activeState = HH.div
+renderPlayerN cs = HH.div
   [ HP.class_ Css.domination ] $
-  case activeState.state.result of
+  ( case activeState.state.result of
     Nothing -> renderPlayers activeState
     Just result ->
       [ Hud.render activeState
       , renderText result
       ]
+  ) <> renderBotOverlay cs.pendingBotMessage
+  where
+  activeState = cs.active
+
+renderBotOverlay :: forall w. Maybe String -> Array (HTML w Action)
+renderBotOverlay = case _ of
+  Nothing -> []
+  Just msg ->
+    [ HH.div
+      [ HP.class_ $ HH.ClassName "bot-play-overlay" ]
+      [ HH.text msg ]
+    ]
 
 renderSupply'
   :: forall query r m
@@ -812,14 +823,15 @@ handleAction
   => Audio m
   => AudioContext
   -> Action
-  -> HalogenM ActiveState p s GameEvent m Unit
+  -> HalogenM ComponentState p s GameEvent m Unit
 handleAction audioContext = case _ of
   MakePlay play -> do
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
     playAndReport playerIndex play audioContext
     playBotTurns audioContext
   UndoRequest as -> H.raise $ Undo as
-  ToggleSupply -> H.modify_ $ _showSupply %~ not
+  ToggleSupply -> H.modify_ $ _active <<< _showSupply %~ not
+  ExecutePendingBotPlay -> pure unit
   DoNothing -> pure unit
 
 playAndReport
@@ -830,9 +842,11 @@ playAndReport
   => Int
   -> Play
   -> AudioContext
-  -> HalogenM ActiveState p s GameEvent m Unit
+  -> HalogenM ComponentState p s GameEvent m Unit
 playAndReport playerIndex play audioContext = do
-  activeState@{ state, showSupply } <- H.get
+  cs <- H.get
+  let activeState = cs.active
+  let { state, showSupply } = activeState
   let
     lastPhase = state.phase
     lastTurn = state.turn
@@ -867,9 +881,11 @@ playAndReport playerIndex play audioContext = do
         newI = case play of
           NewGame _ -> zero
           _ -> activeState.i + one
-      H.modify_ $ (_playerIndex .~ activeState.playerIndex)
+      H.modify_ $ _active %~
+        ( (_playerIndex .~ activeState.playerIndex)
         >>> (_i .~ newI)
         >>> (_showSupply .~ newShowSupply)
+        )
       H.raise $ NewState
         (((_i .~ newI) >>> (_state .~ gameState)) activeState)
         playMade
@@ -880,9 +896,10 @@ playBotTurns
   => Random m
   => Audio m
   => AudioContext
-  -> HalogenM ActiveState p s GameEvent m Unit
+  -> HalogenM ComponentState p s GameEvent m Unit
 playBotTurns audioContext = do
-  activeState <- H.get
+  cs <- H.get
+  let activeState = cs.active
   let game = activeState.state
   case AI.findBotToAct activeState.bots game of
     Nothing -> pure unit

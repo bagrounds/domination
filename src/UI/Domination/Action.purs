@@ -16,4 +16,5 @@ data Action
   = MakePlay Play
   | UndoRequest ActiveState
   | ToggleSupply
+  | ExecutePendingBotPlay
   | DoNothing

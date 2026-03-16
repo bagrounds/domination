@@ -9,7 +9,7 @@
 --| * **Event Handling**: The process of responding to incoming events and messages.
 module AppAction where
 
-import AppState (AppState)
+import AppState (AppState, SettingsTab(..))
 import Data.Lens.Lens (Lens')
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (CardSpec)
@@ -38,4 +38,7 @@ data AppAction
   | HandleGameEvent GameEvent
   | AddBot Strategy
   | RemoveBot Int
+  | WriteBotDelay Int
+  | SwitchSettingsTab SettingsTab
+  | CopyLogs
   | DoNothing

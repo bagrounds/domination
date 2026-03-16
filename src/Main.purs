@@ -13,7 +13,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _botStrategies, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _botDelay, _botStrategies, _chatNumber, _connectedClients, _connectionCount, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _settingsTab, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
@@ -45,7 +45,8 @@ import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination (GameQuery(..))
 import Domination.UI.Domination as Domination
-import Domination.UI.Domination.ActiveState (_playerIndex)
+import Domination.Data.AI as AI
+import Domination.UI.Domination.ActiveState (_bots, _playerIndex)
 import Domination.UI.Domination.ActiveState as ActiveState
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Icons as Icons
@@ -255,6 +256,14 @@ handleAction audioContext = case _ of
         pure 1
       Right i -> pure i
 
+    eBotStrategies <- load "bot_strategies"
+    botStrategies <- case eBotStrategies of
+      Left e -> do
+        log $ "Initialize: Failed to load botStrategies. Falling back to default."
+          <> "Error: " <> e
+        pure []
+      Right s -> pure s
+
     eMessages <- load chatKey
     messages <- case eMessages of
       Left e -> do
@@ -269,6 +278,7 @@ handleAction audioContext = case _ of
       >>> (_dominationConfig <<< _kingdom .~ kingdom)
       >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
       >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
+      >>> (_dominationConfig <<< _botStrategies .~ botStrategies)
       >>> (_maybeAudioContext .~ Just audioContext)
       >>> (_messages .~ messages)
     log "Initialize: done modifying a bunch of stuff..."
@@ -379,6 +389,7 @@ handleAction audioContext = case _ of
       $ (_dominationConfig <<< _botStrategies .~ newBotStrategies)
       >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
     save "player_count" newPlayerCount >>= logErrorToChat
+    save "bot_strategies" newBotStrategies >>= logErrorToChat
 
   RemoveBot idx -> do
     { dominationConfig: { botStrategies, nextPlayerIndex } } <- H.get
@@ -391,8 +402,17 @@ handleAction audioContext = case _ of
           >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
           >>> (_dominationConfig <<< _nextPlayerIndex .~ min nextPlayerIndex (newPlayerCount - one))
         save "player_count" newPlayerCount >>= logErrorToChat
+        save "bot_strategies" newBotStrategies >>= logErrorToChat
 
   DoNothing -> pure unit
+
+  WriteBotDelay delay ->
+    H.modify_ $ _dominationConfig <<< _botDelay .~ delay
+
+  SwitchSettingsTab tab ->
+    H.modify_ $ _settingsTab .~ tab
+
+  CopyLogs -> pure unit
 
   StartNewGame -> do
     config <- H.gets _.dominationConfig
@@ -525,14 +545,17 @@ handleAction audioContext = case _ of
     sendMessage $ HeartbeatMessage { clientId, timestamp }
   where
     loadGame key = do
-      { nextPlayerIndex } <- H.gets _.dominationConfig
+      { nextPlayerIndex, botStrategies } <- H.gets _.dominationConfig
       mbGame <- load key
       case mbGame of
         Left e -> error e
         Right activeState -> do
           let
-            newActiveState = ActiveState.upgrade $
-              (_playerIndex .~ nextPlayerIndex) activeState
+            bots = AI.assignBotIndices nextPlayerIndex botStrategies
+            newActiveState = ActiveState.upgrade
+              $ (_playerIndex .~ nextPlayerIndex)
+              >>> (_bots .~ bots)
+              $ activeState
           queryGame $ LoadActiveState newActiveState
           sendMessage $ GameMessage
             { state: activeState.state

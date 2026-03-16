@@ -32,6 +32,11 @@ type ClientInfo =
   , clientId :: String
   }
 
+data SettingsTab
+  = ConnectionTab
+  | GameSetupTab
+  | KingdomTab
+
 type AppState =
   { connectionCount :: Int
   , id :: String
@@ -51,6 +56,8 @@ type AppState =
   , connectedClients :: HashMap String ClientInfo
   , heartbeatInterval :: Int
   , heartbeatTimeout :: Int
+  , settingsTab :: SettingsTab
+  , debugLog :: Array String
   }
 
 _card :: Lens' CardSpec Card
@@ -108,6 +115,12 @@ _heartbeatInterval = prop (Proxy :: Proxy "heartbeatInterval")
 _heartbeatTimeout :: Lens' AppState Int
 _heartbeatTimeout = prop (Proxy :: Proxy "heartbeatTimeout")
 
+_settingsTab :: Lens' AppState SettingsTab
+_settingsTab = prop (Proxy :: Proxy "settingsTab")
+
+_debugLog :: Lens' AppState (Array String)
+_debugLog = prop (Proxy :: Proxy "debugLog")
+
 globalRoomCode :: String
 globalRoomCode = "global-dev"
 
@@ -140,6 +153,8 @@ newApp =
   , connectedClients: HashMap.empty
   , heartbeatInterval: defaultHeartbeatInterval
   , heartbeatTimeout: defaultHeartbeatTimeout
+  , settingsTab: GameSetupTab
+  , debugLog: []
   }
 
 newConfig :: Config
@@ -149,6 +164,7 @@ newConfig =
   , kingdom: defaultKingdom
   , longGame: false
   , botStrategies: []
+  , botDelay: 2000
   }
 
 type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
@@ -169,6 +185,7 @@ type Config =
   , kingdom :: Array CardSpecSelection
   , longGame :: Boolean
   , botStrategies :: Array Strategy
+  , botDelay :: Int
   }
 
 upgradeSelection :: CardSpecSelection -> CardSpecSelection
@@ -194,3 +211,8 @@ _botStrategies
   :: forall a b r
   . Lens { botStrategies :: a | r } { botStrategies :: b | r } a b
 _botStrategies = prop (Proxy :: Proxy "botStrategies")
+
+_botDelay
+  :: forall a b r
+  . Lens { botDelay :: a | r } { botDelay :: b | r } a b
+_botDelay = prop (Proxy :: Proxy "botDelay")
