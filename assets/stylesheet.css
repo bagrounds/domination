@@ -808,3 +808,35 @@ button span,
     transform: translate(0, 0) rotate(0);
   }
 }
+/* Settings Tabs */
+.settings-tabs { display: flex; gap: 0; margin: 0.5em 0; }
+.settings-tab { flex: 1; padding: 0.5em; border: 1px solid #444; background: #222; color: #aaa; cursor: pointer; text-align: center; }
+.settings-tab-active { background: #333; color: white; border-bottom-color: #333; }
+
+/* Bot Play Overlay */
+.bot-play-overlay {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.85); color: white; padding: 1.5em 2em;
+  border-radius: 8px; z-index: 1000; text-align: center;
+  border: 2px solid #484; font-size: 1.2em;
+  animation: fadeIn 0.3s ease-in;
+}
+.bot-play-spinner {
+  width: 40px; height: 40px; margin: 0 auto 1em;
+  border: 4px solid #333; border-top: 4px solid #4a4;
+  border-radius: 50%; animation: spin 1s linear infinite;
+}
+.bot-play-message { font-weight: bold; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Debug Log Section */
+.debug-log { margin: 1em 0; padding: 0.5em; border: 1px solid #444; border-radius: 4px; }
+.debug-log-header { display: flex; justify-content: space-between; align-items: center; }
+.debug-log-content { max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8em; background: #111; padding: 0.5em; margin-top: 0.5em; }
+.copy-log-button { background: #252; color: white; border: 1px solid #484; padding: 0.3em 0.8em; cursor: pointer; border-radius: 3px; }
+
+/* Bot Delay Slider */
+.bot-delay { padding: 0.5em 0; }
+.bot-delay label { display: block; margin-bottom: 0.3em; }
+.bot-delay input[type="range"] { width: 100%; }

@@ -183,3 +183,36 @@ addBotButton :: ClassName
 addBotButton = ClassName "add-bot-button"
 removeBot :: ClassName
 removeBot = ClassName "remove-bot"
+
+settingsTabs :: ClassName
+settingsTabs = ClassName "settings-tabs"
+
+settingsTab :: ClassName
+settingsTab = ClassName "settings-tab"
+
+settingsTabActive :: ClassName
+settingsTabActive = ClassName "settings-tab-active"
+
+botPlayOverlay :: ClassName
+botPlayOverlay = ClassName "bot-play-overlay"
+
+botPlaySpinner :: ClassName
+botPlaySpinner = ClassName "bot-play-spinner"
+
+botPlayMessage :: ClassName
+botPlayMessage = ClassName "bot-play-message"
+
+debugLog :: ClassName
+debugLog = ClassName "debug-log"
+
+debugLogHeader :: ClassName
+debugLogHeader = ClassName "debug-log-header"
+
+debugLogContent :: ClassName
+debugLogContent = ClassName "debug-log-content"
+
+copyLogButton :: ClassName
+copyLogButton = ClassName "copy-log-button"
+
+botDelay :: ClassName
+botDelay = ClassName "bot-delay"
