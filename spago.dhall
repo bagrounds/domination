@@ -48,6 +48,7 @@ You can edit this file as you like.
   , "unfoldable"
   , "unordered-collections"
   , "unsafe-coerce"
+  , "web-dom"
   , "web-events"
   , "web-html"
   , "web-storage"

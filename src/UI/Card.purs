@@ -14,8 +14,11 @@ module Domination.UI.Card
 
 import Prelude
 
-import Data.Maybe (Maybe(..), isJust, fromMaybe)
-import Domination.Capability.Dom (class Dom, stopPropagation)
+import Control.Monad.State.Class (class MonadState)
+import Data.Foldable (sequence_)
+import Data.Int (round)
+import Data.Maybe (Maybe(..), isJust, fromMaybe, maybe)
+import Domination.Capability.Dom (class Dom, boundingClientRect, stopPropagation, viewportSize)
 import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
@@ -23,6 +26,7 @@ import Domination.Data.CardType as CardType
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
 import Domination.UI.Icons as Icons
+import Domination.UI.Placement (Position, placeTooltip, viewportMargin)
 import Domination.UI.RenderText (renderText)
 import Halogen as H
 import Halogen.Component (ComponentSlot)
@@ -31,8 +35,9 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HP
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties (class_, classes) as HP
+import Halogen.HTML.Properties (class_, classes, ref, style) as HP
 import Type.Proxy (Proxy(..))
+import Web.DOM.Element (Element)
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
 render
@@ -142,8 +147,8 @@ descriptionComponent
 descriptionComponent card' =
   H.mkComponent { initialState, render: render', eval }
   where
-    initialState _ = { card: card', visible: false }
-    render' { visible, card } =
+    initialState _ = { card: card', visible: false, position: Nothing }
+    render' { visible, card, position } =
       if not (isJust card.special || isJust card.reaction)
       then HH.li
         [ HP.classes [ Css.cardText, Css.cardName ] ]
@@ -152,6 +157,7 @@ descriptionComponent card' =
         [ HP.classes [ Css.description ] ] $
         [ HH.button
           [ HP.classes [ Css.cardText, Css.cardName, Css.toggle ]
+          , HP.ref tooltipAnchor
           , HP.onClick \event ->
             { card, event: Just event, reset: false }
           ]
@@ -161,6 +167,8 @@ descriptionComponent card' =
         then
           [ HH.button
             [ HP.class_ Css.toolTip
+            , HP.ref tooltip
+            , HP.style $ maybe "" positionStyle position
             , HP.onClick \event ->
               { card, event: Just event, reset: false }
             ] $
@@ -180,8 +188,46 @@ descriptionComponent card' =
           Nothing -> pure unit
           Just e -> stopPropagation $ toEvent e
         if reset
-          then H.put { card, visible: false }
-          else
-            H.modify_ \{ visible } -> { visible: not visible, card: card }
+          then H.put { card, visible: false, position: Nothing }
+          else do
+            H.modify_ \{ visible } ->
+              { visible: not visible, card: card, position: Nothing }
+            { visible } <- H.get
+            when visible do
+              anchorElement <- H.getRef tooltipAnchor
+              tooltipElement <- H.getRef tooltip
+              sequence_ $ positionTooltip <$> anchorElement <*> tooltipElement
       , receive = \card -> Just { event: Nothing, reset: true, card }
       }
+
+tooltipAnchor :: H.RefLabel
+tooltipAnchor = H.RefLabel "tooltip-anchor"
+
+tooltip :: H.RefLabel
+tooltip = H.RefLabel "tooltip"
+
+positionTooltip
+  :: forall state m
+  . Dom m
+  => MonadState { position :: Maybe Position | state } m
+  => Element
+  -> Element
+  -> m Unit
+positionTooltip anchorElement tooltipElement = do
+  viewport <- viewportSize
+  anchor <- boundingClientRect anchorElement
+  { width, height } <- boundingClientRect tooltipElement
+  H.modify_ _
+    { position = Just $ placeTooltip
+      { viewport
+      , anchor
+      , tooltip: { width, height }
+      , margin: viewportMargin
+      }
+    }
+
+positionStyle :: Position -> String
+positionStyle { left, top } =
+  "left: " <> pixels left <> "; top: " <> pixels top <> ";"
+  where
+  pixels n = show (round n) <> "px"
