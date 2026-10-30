@@ -23,6 +23,13 @@ Running many full bot games under strict invariants found engine bugs that affec
 - **Moat**: after a block, the reaction window stayed open even when no attack remained.
 - **Lurker deleted empty supply piles.** The supply was edited by flattening it into cards and regrouping them, and any pile with zero cards disappeared. A later Witch then failed with "card not in supply!", and the end-of-game checks for empty piles could no longer see them. The supply now goes through a `_restocked` lens: reads are unchanged, and writes restore counts onto the original piles, so empty piles keep their place at zero. A QuickCheck property and an end-to-end Lurker → Witch test lock this in.
 
+## Bugs only a browser could find
+
+Clicking through the built app turned up two problems the unit tests couldn't see:
+
+- **The delay slider showed 0 s while its label said 2 s.** Halogen sets the input's `value` before `min`, `max` and `step`. The browser clamped 2000 to the default maximum of 100, and the 250 ms step then snapped it to 0. Setting `value` last fixes it.
+- **The countdown ring wasn't styled.** `HP.class_` sets the DOM `className` property, which is read-only on SVG elements, so the class was silently dropped. The SVG now sets `class` as an attribute.
+
 ## Takeaways
 
 Property-based and full-game simulations paid for themselves: each of the bugs above was found by bots playing thousands of turns, not by hand testing.

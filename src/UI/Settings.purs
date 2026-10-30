@@ -210,10 +210,10 @@ renderBotDelay delay = HH.div
     [ HH.text $ "Bot play delay: " <> showSeconds delay
     , HH.input
       [ HP.type_ HP.InputRange
-      , HP.value $ show delay
       , HP.min 0.0
       , HP.max $ toNumber maxBotDelay
       , HP.step $ HP.Step 250.0
+      , HP.value $ show delay
       , HE.onValueInput \s -> WriteBotDelay (round (readNumber s))
       ]
     ]

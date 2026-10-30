@@ -287,12 +287,12 @@ phaseName = case _ of
 
 renderCountdown :: forall w i. Int -> HTML w i
 renderCountdown botDelay = HH.elementNS svgNamespace (HH.ElemName "svg")
-  [ HP.class_ $ HH.ClassName "bot-play-countdown"
+  [ svgClass "bot-play-countdown"
   , HP.attr (HH.AttrName "viewBox") "0 0 36 36"
   , HP.attr (HH.AttrName "aria-hidden") "true"
   ]
   [ HH.elementNS svgNamespace (HH.ElemName "circle")
-    [ HP.class_ $ HH.ClassName "bot-play-countdown-ring"
+    [ svgClass "bot-play-countdown-ring"
     , HP.attr (HH.AttrName "cx") "18"
     , HP.attr (HH.AttrName "cy") "18"
     , HP.attr (HH.AttrName "r") "15"
@@ -303,6 +303,7 @@ renderCountdown botDelay = HH.elementNS svgNamespace (HH.ElemName "svg")
   ]
   where
     svgNamespace = HH.Namespace "http://www.w3.org/2000/svg"
+    svgClass = HP.attr (HH.AttrName "class")
 
 renderSupply'
   :: forall query r m
