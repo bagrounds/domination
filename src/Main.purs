@@ -13,15 +13,15 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _botStrategies, _chatNumber, _connectedClients, _connectionCount, _debugLog, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _nextPlayerCount, _nextPlayerIndex, _serverUrl, _settingsTab, _showMenu, _username, _usernames, defaultKingdom, defaultServerUrl, newApp, upgradeSelection)
+import AppState (AppState, CardSpecSelection, _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
+import DebugLog as DebugLog
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
-import Data.Array (deleteAt, elem, length, snoc, take)
+import Data.Array (elem, length, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
-import Data.String (joinWith)
 import Effect.Aff.Class (class MonadAff)
 import Data.Lens.Getter (view)
 import Data.Lens.Prism (review)
@@ -44,12 +44,10 @@ import Domination.Data.Card (CardSpec)
 import Domination.Env (env)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
-import Domination.UI.DebugLog as DebugLog
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination (GameQuery(..))
 import Domination.UI.Domination as Domination
-import Domination.Data.AI as AI
-import Domination.UI.Domination.ActiveState (_bots, _playerIndex)
+import Domination.UI.Domination.ActiveState (_playerIndex)
 import Domination.UI.Domination.ActiveState as ActiveState
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Icons as Icons
@@ -93,6 +91,7 @@ chatKey = "chat"
 
 main :: Effect Unit
 main = launchAff_ $ do
+  liftEffect DebugLog.install
   liftEffect $ FFI.registerServiceWorker
   audioContext <- liftEffect $ runAudioM newAudioContext
   HA.awaitLoad
@@ -163,7 +162,6 @@ render audioContext state = HH.main_ $
   , HH.i
     [ HP.class_ Css.connections ]
     [ HH.text $ show state.connectionCount ]
-  , DebugLog.render state.debugLog
   ]
 
 renderSettingsButton :: forall w. HTML w AppAction
@@ -215,7 +213,6 @@ handleAction
 handleAction audioContext = case _ of
   Initialize -> do
     log "Initialize"
-    appendLog "Initialize started"
     eUuid <- load uuidKey
     uuid <- case eUuid of
       Left e -> do
@@ -278,7 +275,7 @@ handleAction audioContext = case _ of
         log $ "Initialize: Failed to load botDelay. Falling back to default."
           <> "Error: " <> e
         pure 2000
-      Right d -> pure d
+      Right d -> pure $ clampBotDelay d
 
     eMessages <- load chatKey
     messages <- case eMessages of
@@ -292,9 +289,11 @@ handleAction audioContext = case _ of
       >>> (_username .~ username)
       >>> (_usernames %~ HashMap.insert uuid username)
       >>> (_dominationConfig <<< _kingdom .~ kingdom)
-      >>> (_dominationConfig <<< _nextPlayerIndex .~ nextPlayerIndex)
-      >>> (_dominationConfig <<< _nextPlayerCount .~ nextPlayerCount)
-      >>> (_dominationConfig <<< _botStrategies .~ botStrategies)
+      >>> (_dominationConfig %~ \config -> normalizeRoster config
+        { nextPlayerIndex = nextPlayerIndex
+        , nextPlayerCount = nextPlayerCount
+        , botStrategies = botStrategies
+        })
       >>> (_dominationConfig <<< _botDelay .~ botDelay)
       >>> (_maybeAudioContext .~ Just audioContext)
       >>> (_messages .~ messages)
@@ -302,6 +301,7 @@ handleAction audioContext = case _ of
 
     log "Initialize: load game..."
     loadGame "game_state"
+    configureBots
     log "Initialize: done loading game..."
 
     eServerUrl <- load serverUrlKey
@@ -346,8 +346,7 @@ handleAction audioContext = case _ of
         (toEventTarget w)
         \_ -> Just Finalize
 
-    appendLog "Initialize completed"
-    pure unit
+    log "Initialize completed"
 
   Finalize -> do
     clientId <- H.gets _.id
@@ -355,28 +354,13 @@ handleAction audioContext = case _ of
     sendMessage $ LeaveMessage { clientId, timestamp }
     pure unit
 
-  ToggleMenu -> H.modify_ $ _showMenu %~ not
+  ToggleMenu -> do
+    H.modify_ $ _showMenu %~ not
+    void refreshDebugReport
 
-  WritePlayerIndex index -> do
-    { dominationConfig: { nextPlayerCount } } <- H.get
-    let
-      newPlayerIndex = max index zero
-      newPlayerCount = max (index + one) nextPlayerCount
-    H.modify_ $ (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
-      >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
-    save "player_index" newPlayerIndex >>= logErrorToChat
-    save "player_count" newPlayerCount >>= logErrorToChat
+  WritePlayerIndex index -> updateRoster $ setPlayerIndex index
 
-  WritePlayerCount count -> do
-    { nextPlayerIndex } <- H.gets _.dominationConfig
-    let
-      newPlayerIndex = min (count - one) nextPlayerIndex
-      newPlayerCount = max count one
-    H.modify_
-      $ (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
-      >>> (_dominationConfig <<< _nextPlayerIndex .~ newPlayerIndex)
-    save "player_index" newPlayerIndex >>= logErrorToChat
-    save "player_count" newPlayerCount >>= logErrorToChat
+  WritePlayerCount count -> updateRoster $ setPlayerCount count
 
   RandomizeKingdom -> do
     { kingdom } <- H.gets _.dominationConfig
@@ -399,41 +383,32 @@ handleAction audioContext = case _ of
     H.modify_ $ _dominationConfig <<< _longGame %~ not
 
   AddBot strategy -> do
-    { dominationConfig: { botStrategies } } <- H.get
-    let
-      newBotStrategies = botStrategies <> [ strategy ]
-      newPlayerCount = length newBotStrategies + one
-    H.modify_
-      $ (_dominationConfig <<< _botStrategies .~ newBotStrategies)
-      >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
-    save "player_count" newPlayerCount >>= logErrorToChat
-    save "bot_strategies" newBotStrategies >>= logErrorToChat
+    updateRoster $ addBot strategy
+    configureBots
 
-  RemoveBot idx -> do
-    { dominationConfig: { botStrategies, nextPlayerIndex } } <- H.get
-    case deleteAt idx botStrategies of
-      Nothing -> pure unit
-      Just newBotStrategies -> do
-        let newPlayerCount = max one $ length newBotStrategies + one
-        H.modify_
-          $ (_dominationConfig <<< _botStrategies .~ newBotStrategies)
-          >>> (_dominationConfig <<< _nextPlayerCount .~ newPlayerCount)
-          >>> (_dominationConfig <<< _nextPlayerIndex .~ min nextPlayerIndex (newPlayerCount - one))
-        save "player_count" newPlayerCount >>= logErrorToChat
-        save "bot_strategies" newBotStrategies >>= logErrorToChat
+  RemoveBot botIndex -> do
+    updateRoster $ removeBot botIndex
+    configureBots
 
   DoNothing -> pure unit
 
   WriteBotDelay delay -> do
-    H.modify_ $ _dominationConfig <<< _botDelay .~ delay
-    save "bot_delay" delay >>= logErrorToChat
+    let botDelay = clampBotDelay delay
+    H.modify_ $ _dominationConfig <<< _botDelay .~ botDelay
+    save "bot_delay" botDelay >>= logErrorToChat
+    configureBots
 
-  SwitchSettingsTab tab ->
+  SwitchSettingsTab tab -> do
     H.modify_ $ _settingsTab .~ tab
+    void refreshDebugReport
 
-  CopyLogs -> do
-    entries <- H.gets _.debugLog
-    liftEffect $ FFI.copyToClipboard (joinWith "\n" entries)
+  CopyBugReport -> do
+    report <- refreshDebugReport
+    liftEffect $ FFI.copyToClipboard report
+
+  ClearDebugLog -> do
+    liftEffect DebugLog.clear
+    void refreshDebugReport
 
   StartNewGame -> do
     config <- H.gets _.dominationConfig
@@ -543,11 +518,8 @@ handleAction audioContext = case _ of
               <> "; Clients after new heartbeat: " <> show updatedClientCount
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
-      appendLog $ "Game state updated: iteration " <> show activeState.i
       case playMade of
-        Just x -> do
-          H.modify_ $ _messages :~ (PlayMadeMessage x)
-          appendLog "Play made"
+        Just x -> H.modify_ $ _messages :~ (PlayMadeMessage x)
         Nothing -> pure unit
       queryGame $ LoadActiveState activeState
       sendMessage $ GameMessage
@@ -568,16 +540,14 @@ handleAction audioContext = case _ of
     sendMessage $ HeartbeatMessage { clientId, timestamp }
   where
     loadGame key = do
-      { nextPlayerIndex, botStrategies } <- H.gets _.dominationConfig
+      { nextPlayerIndex } <- H.gets _.dominationConfig
       mbGame <- load key
       case mbGame of
         Left e -> error e
         Right activeState -> do
           let
-            bots = AI.assignBotIndices nextPlayerIndex botStrategies
             newActiveState = ActiveState.upgrade
               $ (_playerIndex .~ nextPlayerIndex)
-              >>> (_bots .~ bots)
               $ activeState
           queryGame $ LoadActiveState newActiveState
           sendMessage $ GameMessage
@@ -613,14 +583,21 @@ handleAction audioContext = case _ of
     logErrorToChat result = case result of
       Left err -> do
         H.modify_ $ _message .~ ("ERROR: " <> err)
-        appendLog $ "Error: " <> err
         sendChatMessage
       Right _ -> pure unit
-    appendLog entry = do
-      timestamp <- now
-      let
-        prefixed = "[" <> show timestamp <> "] " <> entry
-      H.modify_ $ _debugLog %~ \entries -> take 500 (snoc entries prefixed)
+    updateRoster changeRoster = do
+      H.modify_ $ _dominationConfig %~ changeRoster
+      { nextPlayerIndex, nextPlayerCount, botStrategies } <- H.gets _.dominationConfig
+      save "player_index" nextPlayerIndex >>= logErrorToChat
+      save "player_count" nextPlayerCount >>= logErrorToChat
+      save "bot_strategies" botStrategies >>= logErrorToChat
+    configureBots = do
+      { botStrategies, botDelay } <- H.gets _.dominationConfig
+      queryGame $ ConfigureBots { botStrategies, botDelay }
+    refreshDebugReport = do
+      report <- liftEffect $ DebugLog.renderReport <$> DebugLog.currentReport
+      H.modify_ $ _debugReport .~ report
+      pure report
 
 sendMessage
   :: forall t1 r o1 q1 output m

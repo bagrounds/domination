@@ -58,6 +58,7 @@ data StackExpression
     , otherwise :: Array StackExpression
     }
   | StackGainBonus Bonus
+  | StackSwap
 
 derive instance genericStackExpression :: Generic StackExpression _
 derive instance eqStackExpression :: Eq StackExpression

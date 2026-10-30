@@ -15,13 +15,13 @@ import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
-import Type.Proxy (Proxy(..))
 import Domination.Data.AI (Bot)
-import Domination.Data.AI.Strategy (botName)
+import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
 import Domination.Data.Play (Play)
-import Halogen (SubscriptionId)
+import Halogen (ForkId)
+import Type.Proxy (Proxy(..))
 
 type ActiveState =
   { i :: Int
@@ -29,49 +29,42 @@ type ActiveState =
   , playerIndex :: Int
   , showSupply :: Boolean
   , state :: Game
-  , bots :: Array Bot
+  }
+
+type BotConfig =
+  { botStrategies :: Array Strategy
+  , botDelay :: Int
   }
 
 type PendingBotPlay =
   { bot :: Bot
   , play :: Play
-  , message :: String
+  , i :: Int
+  , state :: Game
   }
 
 type ComponentState =
   { active :: ActiveState
+  , botConfig :: BotConfig
   , pendingBotPlay :: Maybe PendingBotPlay
-  , botTimerSub :: Maybe SubscriptionId
-  , botDelay :: Int
+  , botTimer :: Maybe ForkId
   }
 
-mkComponentState :: Int -> ActiveState -> ComponentState
-mkComponentState botDelay active =
+mkComponentState :: BotConfig -> ActiveState -> ComponentState
+mkComponentState botConfig active =
   { active
+  , botConfig
   , pendingBotPlay: Nothing
-  , botTimerSub: Nothing
-  , botDelay
+  , botTimer: Nothing
   }
+
+isPendingFor :: ActiveState -> PendingBotPlay -> Boolean
+isPendingFor { i, state } pending = pending.i == i && pending.state == state
 
 _active
   :: forall a b r
   . Lens { active :: a | r } { active :: b | r } a b
 _active = prop (Proxy :: Proxy "active")
-
-_pendingBotPlay
-  :: forall a b r
-  . Lens { pendingBotPlay :: a | r } { pendingBotPlay :: b | r } a b
-_pendingBotPlay = prop (Proxy :: Proxy "pendingBotPlay")
-
-_botTimerSub
-  :: forall a b r
-  . Lens { botTimerSub :: a | r } { botTimerSub :: b | r } a b
-_botTimerSub = prop (Proxy :: Proxy "botTimerSub")
-
-_botDelay
-  :: forall a b r
-  . Lens { botDelay :: a | r } { botDelay :: b | r } a b
-_botDelay = prop (Proxy :: Proxy "botDelay")
 
 _i
   :: forall a b r
@@ -89,8 +82,6 @@ _state
   :: forall a b r
   . Lens { state :: a | r } { state :: b | r } a b
 _state = prop (Proxy :: Proxy "state")
-_bots :: Lens' ActiveState (Array Bot)
-_bots = prop (Proxy :: Proxy "bots")
 
 upgrade :: ActiveState -> ActiveState
 upgrade = _state %~ Game.upgrade

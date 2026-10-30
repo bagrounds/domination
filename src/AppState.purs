@@ -18,7 +18,8 @@ import Data.Lens (lens')
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
-import Data.Maybe (Maybe(..))
+import Data.Array (deleteAt, length, snoc)
+import Data.Maybe (Maybe(..), maybe)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
@@ -33,9 +34,24 @@ type ClientInfo =
   }
 
 data SettingsTab
-  = ConnectionTab
-  | GameSetupTab
+  = GameSetupTab
+  | BotsTab
   | KingdomTab
+  | ConnectionTab
+  | DebugTab
+
+derive instance eqSettingsTab :: Eq SettingsTab
+
+settingsTabs :: Array SettingsTab
+settingsTabs = [ GameSetupTab, BotsTab, KingdomTab, ConnectionTab, DebugTab ]
+
+settingsTabLabel :: SettingsTab -> String
+settingsTabLabel = case _ of
+  GameSetupTab -> "Game"
+  BotsTab -> "Bots"
+  KingdomTab -> "Kingdom"
+  ConnectionTab -> "Connection"
+  DebugTab -> "Debug"
 
 type AppState =
   { connectionCount :: Int
@@ -57,7 +73,7 @@ type AppState =
   , heartbeatInterval :: Int
   , heartbeatTimeout :: Int
   , settingsTab :: SettingsTab
-  , debugLog :: Array String
+  , debugReport :: String
   }
 
 _card :: Lens' CardSpec Card
@@ -118,8 +134,8 @@ _heartbeatTimeout = prop (Proxy :: Proxy "heartbeatTimeout")
 _settingsTab :: Lens' AppState SettingsTab
 _settingsTab = prop (Proxy :: Proxy "settingsTab")
 
-_debugLog :: Lens' AppState (Array String)
-_debugLog = prop (Proxy :: Proxy "debugLog")
+_debugReport :: Lens' AppState String
+_debugReport = prop (Proxy :: Proxy "debugReport")
 
 globalRoomCode :: String
 globalRoomCode = "global-dev"
@@ -154,7 +170,7 @@ newApp =
   , heartbeatInterval: defaultHeartbeatInterval
   , heartbeatTimeout: defaultHeartbeatTimeout
   , settingsTab: GameSetupTab
-  , debugLog: []
+  , debugReport: ""
   }
 
 newConfig :: Config
@@ -186,6 +202,54 @@ type Config =
   , longGame :: Boolean
   , botStrategies :: Array Strategy
   , botDelay :: Int
+  }
+
+maxBotDelay :: Int
+maxBotDelay = 5000
+
+clampBotDelay :: Int -> Int
+clampBotDelay = clamp zero maxBotDelay
+
+type Roster r =
+  { nextPlayerIndex :: Int
+  , nextPlayerCount :: Int
+  , botStrategies :: Array Strategy
+  | r
+  }
+
+-- | Every roster keeps a seat for the local human and one for each bot,
+-- | with the human seated inside the table.
+normalizeRoster :: forall r. Roster r -> Roster r
+normalizeRoster roster = roster
+  { nextPlayerCount = playerCount
+  , nextPlayerIndex = clamp zero (playerCount - one) roster.nextPlayerIndex
+  }
+  where
+    playerCount = max (length roster.botStrategies + one) roster.nextPlayerCount
+
+addBot :: forall r. Strategy -> Roster r -> Roster r
+addBot strategy roster = normalizeRoster roster
+  { botStrategies = snoc roster.botStrategies strategy
+  , nextPlayerCount = roster.nextPlayerCount + one
+  }
+
+removeBot :: forall r. Int -> Roster r -> Roster r
+removeBot botIndex roster = maybe roster
+  ( \botStrategies -> normalizeRoster roster
+    { botStrategies = botStrategies
+    , nextPlayerCount = roster.nextPlayerCount - one
+    }
+  )
+  (deleteAt botIndex roster.botStrategies)
+
+setPlayerCount :: forall r. Int -> Roster r -> Roster r
+setPlayerCount playerCount roster =
+  normalizeRoster roster { nextPlayerCount = playerCount }
+
+setPlayerIndex :: forall r. Int -> Roster r -> Roster r
+setPlayerIndex playerIndex roster = normalizeRoster roster
+  { nextPlayerIndex = max zero playerIndex
+  , nextPlayerCount = max (playerIndex + one) roster.nextPlayerCount
   }
 
 upgradeSelection :: CardSpecSelection -> CardSpecSelection

@@ -13,7 +13,7 @@ module Domination.UI.Settings where
 import Prelude
 
 import AppAction (AppAction(..), CardSpecSelection)
-import AppState (AppState, SettingsTab(..), defaultKingdom)
+import AppState (AppState, SettingsTab(..), defaultKingdom, maxBotDelay, settingsTabLabel, settingsTabs)
 import Data.Array (elem, length, mapWithIndex)
 import Data.Int (toNumber, round)
 import Data.Lens.Index (ix)
@@ -26,6 +26,7 @@ import Domination.Data.AI.Strategy (Strategy(..), allStrategies, botName)
 import Domination.Data.Card (Card, CardSpec, _card, _requirements)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
+import Domination.UI.DebugLog as DebugLog
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.RenderText (renderText)
 import Domination.UI.ServerUrlInput as ServerUrlInput
@@ -104,30 +105,19 @@ render cs@{ showMenu, dominationConfig, settingsTab } = let
 
 renderTabs :: forall w. SettingsTab -> HTML w AppAction
 renderTabs activeTab = HH.div
-  [ HP.class_ Css.settingsTabs ]
-  [ tabButton ConnectionTab "Connection"
-  , tabButton GameSetupTab "Game Setup"
-  , tabButton KingdomTab "Kingdom"
+  [ HP.class_ Css.settingsTabs
+  , HP.attr (HH.AttrName "role") "tablist"
   ]
+  $ tabButton <$> settingsTabs
   where
-    tabButton tab label = HH.button
-      [ HP.classes $ [ Css.settingsTab ] <> activeClasses tab
+    tabButton tab = HH.button
+      [ HP.classes $ [ Css.settingsTab ]
+        <> if tab == activeTab then [ Css.settingsTabActive ] else []
+      , HP.attr (HH.AttrName "role") "tab"
+      , HP.attr (HH.AttrName "aria-selected") $ show (tab == activeTab)
       , HE.onClick \_ -> SwitchSettingsTab tab
       ]
-      [ HH.text label ]
-    activeClasses tab =
-      if isActive tab
-      then [ Css.settingsTabActive ]
-      else []
-    isActive ConnectionTab = case activeTab of
-      ConnectionTab -> true
-      _ -> false
-    isActive GameSetupTab = case activeTab of
-      GameSetupTab -> true
-      _ -> false
-    isActive KingdomTab = case activeTab of
-      KingdomTab -> true
-      _ -> false
+      [ HH.text $ settingsTabLabel tab ]
 
 renderTabContent
   :: forall a b r m
@@ -150,15 +140,22 @@ renderTabContent ConnectionTab cs _ = HH.div_
   [ ServerUrlInput.render { onInput: WriteServerUrl, state: cs }
   , UsernameInput.render { onInput: WriteUsername, state: cs }
   ]
-renderTabContent GameSetupTab _ { nextPlayerIndex, nextPlayerCount, longGame, botStrategies, botDelay } = HH.div_
+renderTabContent GameSetupTab _ { nextPlayerIndex, nextPlayerCount, longGame, botStrategies } = HH.div_
   [ Util.incrementer
+    { label: "Players: "
+    , mbMin: Just $ length botStrategies + one
+    , mbMax: Nothing
+    , value: nextPlayerCount
+    , setValue: WritePlayerCount
+    }
+  , Util.incrementer
     { label: "Player #: "
     , mbMin: Just one
     , mbMax: Just nextPlayerCount
     , value: nextPlayerIndex + one
     , setValue: (_ - one) >>> WritePlayerIndex
     }
-  , renderBotControls botStrategies
+  , HH.p_ [ HH.text $ seatingSummary nextPlayerCount (length botStrategies) ]
   , HH.div_
     [ HH.button
       [ HE.onClick \_ -> StartNewGame
@@ -187,8 +184,12 @@ renderTabContent GameSetupTab _ { nextPlayerIndex, nextPlayerCount, longGame, bo
       , HH.text "Don't end the game until the leader can't be beaten"
       ]
     ]
+  ]
+renderTabContent BotsTab _ { botStrategies, botDelay } = HH.div_
+  [ renderBotControls botStrategies
   , renderBotDelay botDelay
   ]
+renderTabContent DebugTab cs _ = DebugLog.render cs.debugReport
 renderTabContent KingdomTab _ { kingdom } = HH.div_
   [ HH.button
     [ HE.onClick \_ -> ChooseKingdom ((prop (Proxy :: Proxy "selected") %~ not) <$> defaultKingdom) ]
@@ -205,16 +206,27 @@ renderTabContent KingdomTab _ { kingdom } = HH.div_
 renderBotDelay :: forall w. Int -> HTML w AppAction
 renderBotDelay delay = HH.div
   [ HP.class_ Css.botDelay ]
-  [ HH.label_ [ HH.text $ "Bot Delay: " <> showSeconds delay ]
-  , HH.input
-    [ HP.type_ HP.InputRange
-    , HP.value $ show delay
-    , HP.min 0.0
-    , HP.max 3000.0
-    , HP.step $ HP.Step $ toNumber 500
-    , HE.onValueInput \s -> WriteBotDelay (round (readNumber s))
+  [ HH.label_
+    [ HH.text $ "Bot play delay: " <> showSeconds delay
+    , HH.input
+      [ HP.type_ HP.InputRange
+      , HP.value $ show delay
+      , HP.min 0.0
+      , HP.max $ toNumber maxBotDelay
+      , HP.step $ HP.Step 250.0
+      , HE.onValueInput \s -> WriteBotDelay (round (readNumber s))
+      ]
+    ]
+  , HH.p_
+    [ HH.text $ "Each bot play is announced for this long before it happens,"
+      <> " so you can undo past bot turns. At 0s bots play instantly."
     ]
   ]
+
+seatingSummary :: Int -> Int -> String
+seatingSummary playerCount botCount =
+  "You + " <> show botCount <> " bot(s) + "
+    <> show (playerCount - botCount - one) <> " remote seat(s)"
 
 showSeconds :: Int -> String
 showSeconds ms = let

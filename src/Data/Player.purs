@@ -21,7 +21,7 @@ import Data.Lens.Lens (Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Domination.Capability.Random (class Random, shuffle)
@@ -202,6 +202,13 @@ dropReaction reaction player =
 -- | Drop ALL pending reactions (used when player clicks DoneReacting).
 dropReactions :: Player -> Player
 dropReactions = _ { pendingReactions = [] }
+
+-- | A reaction window only stays open while an attack is awaiting resolution.
+closeReactionWindowWhenUnattacked :: Player -> Player
+closeReactionWindowWhenUnattacked player =
+  if maybe false Choice.isAttack (firstChoice player)
+  then player
+  else dropReactions player
 
 hasReaction :: Player -> Boolean
 hasReaction = not null <<< _.pendingReactions

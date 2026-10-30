@@ -197,7 +197,7 @@ renderHtml (UsernameMessage { username, id }) =
     , HH.text ")"
     ]
 renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
-  case play' of
+  case describePlay state play of
     Nothing -> HH.span [] []
     Just text -> HH.div
       [ HH.class_ $ ClassName "play-made-message" ]
@@ -206,35 +206,35 @@ renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
         [ HH.class_ $ ClassName "play-made" ]
         [ text ]
       ]
-  where
-      play' :: Maybe (HTML w i)
-      play' = case play of
-        NewGame { playerCount } -> Just $
-          HH.span_
-            [ HH.text $ "created a new "
-              <> show playerCount <> " player game"
-            ]
-        EndPhase _ -> Nothing
-        PlayCard { playerIndex, cardIndex } -> Just $
-          HH.text $ "played: "
-            <> getPlayerCardName playerIndex state cardIndex
-        Purchase { stackIndex } -> Just $
-          HH.text $ "purchased: " <> text
-          where
-            text = case preview (Game._stack stackIndex) state of
-              Nothing -> "???"
-              Just { card } -> card.name
-        ResolveChoice { playerIndex, choice } ->
-          Just $ renderTextInContext playerIndex state choice
-        React { reaction } -> Just $
-          HH.text $ case reaction of
-            Nothing -> "did not react"
-            Just BlockAttack -> "blocked an attack"
-            Just (ReactWithChoice (StackChoice { description })) ->
-              "reacted: " <> description
-            Just (ReactWithChoice _) -> "reacted with a choice"
-        DoneReacting _ -> Just $
-          HH.text "finished reacting"
+
+describePlay :: forall w i. Game -> Play -> Maybe (HTML w i)
+describePlay state = case _ of
+  NewGame { playerCount } -> Just $
+    HH.span_
+      [ HH.text $ "created a new "
+        <> show playerCount <> " player game"
+      ]
+  EndPhase _ -> Nothing
+  PlayCard { playerIndex, cardIndex } -> Just $
+    HH.text $ "played: "
+      <> getPlayerCardName playerIndex state cardIndex
+  Purchase { stackIndex } -> Just $
+    HH.text $ "purchased: " <> text
+    where
+      text = case preview (Game._stack stackIndex) state of
+        Nothing -> "???"
+        Just { card } -> card.name
+  ResolveChoice { playerIndex, choice } ->
+    Just $ renderTextInContext playerIndex state choice
+  React { reaction } -> Just $
+    HH.text $ case reaction of
+      Nothing -> "did not react"
+      Just BlockAttack -> "blocked an attack"
+      Just (ReactWithChoice (StackChoice { description })) ->
+        "reacted: " <> description
+      Just (ReactWithChoice _) -> "reacted with a choice"
+  DoneReacting _ -> Just $
+    HH.text "finished reacting"
 
 getPlayerCardName :: Int -> Game -> Int -> String
 getPlayerCardName playerIndex state cardIndex = fromMaybe "???"

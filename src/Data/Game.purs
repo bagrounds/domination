@@ -101,7 +101,7 @@ _pile pile playerIndex = case pile of
   Pile.Discard -> _player playerIndex <<< Player._discard <<< _stacksFromCards
   Pile.Discarding -> _player playerIndex <<< Player._toDiscard <<< _stacksFromCards
   Pile.Hand -> _player playerIndex <<< Player._hand <<< _stacksFromCards
-  Pile.Supply -> _supply
+  Pile.Supply -> _supply <<< Supply._restocked
   Pile.Trash -> _trash <<< _stacksFromCards
 
 new :: Int -> Array Card -> Boolean -> Game

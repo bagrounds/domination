@@ -178,7 +178,8 @@ react { playerIndex, reaction: maybeReaction } =
     Just reaction ->
       modifyPlayer playerIndex (Player.dropReaction reaction) >=> case reaction of
         BlockAttack ->
-          traverseOf (Game._player playerIndex) Player.dropChoice
+          traverseOf (Game._player playerIndex)
+            (map Player.closeReactionWindowWhenUnattacked <<< Player.dropChoice)
         ReactWithChoice choice ->
           modifyPlayer playerIndex (Player._choices :~ choice)
 

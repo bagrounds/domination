@@ -5,6 +5,7 @@ import Prim hiding (Constraint)
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (all, filter, head, intercalate, length, replicate, uncons, (!!), (:))
+import Data.Array (drop, take) as Array
 import Data.Array.NonEmpty as NonEmpty
 import Data.Lens.Fold ((^?))
 import Data.Lens.Index (ix)
@@ -347,6 +348,14 @@ evalStackChoice' playerIndex attack description expression stack state' = do
                     <> ", label: " <> show label
                     <> ", nextExpr: " <> show nextExpr
 
+      StackSwap ->
+        case Array.take 2 stack of
+          [ top, second ] -> evalStackChoice
+            expressionTail
+            ([ second, top ] <> Array.drop 2 stack)
+            state'
+          _ -> throwError "StackSwap needs two values on the stack"
+
       StackDuplicate ->
         case head stack of
           Nothing -> throwError
@@ -358,8 +367,10 @@ evalStackChoice' playerIndex attack description expression stack state' = do
         case uncons stack of
           Nothing -> throwError "StackCostOf with empty Stack"
           Just { head: StackInt cardIndex, tail: stackTail } -> do
-            player <- getPlayer playerIndex state'
-            { cost } <- Player.getCard cardIndex player
+            { cost } <- fromJust ("no card at hand index " <> show cardIndex)
+              $ state' ^? Game._pile Pile.Hand playerIndex
+                <<< _stacksToCardsIso
+                <<< ix cardIndex
             let
               top = StackInt cost
               stack' = top : stackTail
