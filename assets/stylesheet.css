@@ -122,9 +122,8 @@ button span,
     position-area: bottom;
     position-try-fallbacks: flip-block;
     inset: auto;
-    margin: 0 8px;
-    max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 16px);
+    max-width: 100vw;
+    max-height: 100vh;
     overflow-y: auto;
     z-index: 450;
   }

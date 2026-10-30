@@ -39,9 +39,8 @@ It kept tooltips on screen, but the review pointed out two problems:
     position-area: bottom;
     position-try-fallbacks: flip-block;
     inset: auto;
-    margin: 0 8px;
-    max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 16px);
+    max-width: 100vw;
+    max-height: 100vh;
     overflow-y: auto;
     z-index: 450;
   }
@@ -53,7 +52,7 @@ Each declaration covers one requirement:
 - **`anchor-name` / `anchor-scope`.** Every card's name button is an anchor called `--card-name`. `anchor-scope` on the card's `.description` makes each tooltip find *its own* card's name rather than the last one on the page.
 - **`position: fixed`.** The tooltip is laid out against the viewport, so a scrolling container can no longer clip it. Anchor positioning keeps it attached: when the supply or hand scrolls, the tooltip moves with its card.
 - **`position-area: bottom`.** It sits directly below the card name, horizontally centered on it.
-- **Default overflow alignment.** If the centered tooltip would cross the viewport edge, the browser shifts it back inside. `margin: 0 8px` makes that keep an 8px gap.
+- **Default overflow alignment.** If the centered tooltip would cross the viewport edge, the browser shifts it back inside, flush with the edge like the rest of the UI.
 - **`position-try-fallbacks: flip-block`.** If there is no room below, it flips above the card name.
 - **`position-visibility: anchors-visible`** (the default). If the card scrolls out of view inside its container, its tooltip is hidden instead of floating over the HUD.
 
@@ -65,8 +64,8 @@ I checked it in Chromium at a 360×740 phone size:
 
 | Case | Card name (left, top, right, bottom) | Tooltip |
 | --- | --- | --- |
-| Pawn, at the right edge | 229, 475, 323, 510 | 192, 510, **352**, 587: ends 8px from the right edge |
-| Chapel, at the left edge | 37, 141, 131, 176 | **8**, 176, 168, 253: starts 8px from the left edge |
+| Pawn, pushed against the right edge | 266, 312, 360, 347 | 200, 347, **360**, 424: flush with the right edge |
+| Chapel, pushed against the left edge | 0, 312, 94, 347 | **0**, 347, 160, 424: flush with the left edge |
 | Moat, in the middle | 133, 312, 227, 347 | 100, 347, 260, 444: centered below |
 | Moat, supply scrolled 60px | 133, 252, 227, 287 | 100, **287**, 260, 384: moved with the card |
 | Card name near the bottom | 133, 685, 227, 720 | 100, 588, 260, **685**: flipped above |
@@ -75,5 +74,9 @@ I checked it in Chromium at a 360×740 phone size:
 ## Takeaway
 
 Before writing positioning code, check what the platform already does. Here, six CSS declarations replaced a geometry module, two new DOM capability methods and a dependency, and the CSS version also behaves better: the browser re-anchors the tooltip on every frame, which the measure-once code could not.
+
+## Follow-up: flush with the edge
+
+The first CSS version kept an 8px gap between a shifted tooltip and the screen edge. The rest of the UI (the HUD, the supply, the controls) runs right to the edge, so the gap looked out of place. Dropping `margin: 0 8px` and the matching `- 16px` from the size caps lets the browser's overflow alignment put the tooltip flush against the edge.
 
 Version bumped to **v0.37.1**.
