@@ -21,7 +21,6 @@ import Data.Array (deleteAt, elem, length, snoc, take)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..))
 import Data.HashMap as HashMap
-import Data.Int (round)
 import Data.String (joinWith)
 import Effect.Aff.Class (class MonadAff)
 import Data.Lens.Getter (view)
@@ -209,6 +208,7 @@ handleAction
   => WireCodec m
   => Timer m
   => Dom m
+  => MonadAff m
   => AudioContext
   -> AppAction
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
@@ -619,7 +619,7 @@ handleAction audioContext = case _ of
     appendLog entry = do
       timestamp <- now
       let
-        prefixed = "[" <> show (round timestamp) <> "] " <> entry
+        prefixed = "[" <> show timestamp <> "] " <> entry
       H.modify_ $ _debugLog %~ \entries -> take 500 (snoc entries prefixed)
 
 sendMessage
