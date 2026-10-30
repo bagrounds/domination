@@ -37,7 +37,7 @@ import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player, newPlayer)
 import Domination.Data.Player as Player
 import Domination.Data.Result (Result)
-import Domination.Data.Stack (Stack, _stacksFromCards)
+import Domination.Data.Stack (Stack, _stacksFromCards, _stacksToCardsIso)
 import Domination.Data.Supply (Supply, getStack, makeSupply)
 import Domination.Data.Supply as Supply
 import Domination.Data.Wire.Int as Int
@@ -103,6 +103,12 @@ _pile pile playerIndex = case pile of
   Pile.Hand -> _player playerIndex <<< Player._hand <<< _stacksFromCards
   Pile.Supply -> _supply <<< Supply._restocked
   Pile.Trash -> _trash <<< _stacksFromCards
+
+-- | The cards of a pile in the order the engine indexes them when resolving
+-- | card choices. Card choosers must offer cards in this order.
+pileCards :: Pile -> Int -> Game -> Array Card
+pileCards pile playerIndex game = fromMaybe []
+  $ game ^? _pile pile playerIndex <<< _stacksToCardsIso
 
 new :: Int -> Array Card -> Boolean -> Game
 new playerCount cards longGame =

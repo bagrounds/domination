@@ -21,11 +21,10 @@ import Domination.Capability.Log (class Log)
 import Domination.Data.Card (Card)
 import Domination.Data.Choice (Choice)
 import Domination.Data.Game (Game)
+import Domination.Data.Game as Game
 import Domination.Data.Pile (Pile)
-import Domination.Data.Pile as Pile
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
-import Domination.Data.Stack (stacksToCards)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
@@ -65,6 +64,7 @@ type ComponentSpec t26 t25 t29 m =
   , choice :: Choice
   , pile :: Pile
   , player :: Player
+  , playerIndex :: Int
   , renderChoice :: RenderChoice t26 t25 t29 m
   , resolve :: Maybe (Array Int) -> Choice
   , state :: Game
@@ -84,6 +84,7 @@ component
   , resolve
   , state
   , player
+  , playerIndex
   , pile
   } = H.mkComponent { initialState, render, eval: H.mkEval H.defaultEval
     { handleAction = case _ of
@@ -105,15 +106,7 @@ component
   initialState :: forall a. a -> Array (Tuple Card Boolean)
   initialState _ = (\x -> Tuple x false) <$> cards
     where
-      cards = case pile of
-        Pile.AtPlay -> player.atPlay
-        Pile.Hand -> player.hand
-        Pile.Discard -> player.discard
-        Pile.Buying -> player.buying
-        Pile.Discarding -> player.toDiscard
-        Pile.Deck -> player.deck
-        Pile.Trash -> state.trash
-        Pile.Supply -> stacksToCards state.supply
+      cards = Game.pileCards pile playerIndex state
 
   render xs =
     case Player.firstChoice player >>= renderChoice of

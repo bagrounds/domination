@@ -33,3 +33,21 @@ Clicking through the built app turned up two problems the unit tests couldn't se
 ## Takeaways
 
 Property-based and full-game simulations paid for themselves: each of the bugs above was found by bots playing thousands of turns, not by hand testing.
+
+## Follow-up: a test command that can fail, and two choice bugs
+
+### The test command now fails when tests fail
+
+The test runner printed `Results: N/M passed` but always exited 0, so `npm test` (and CI) passed even when tests failed. The runner now throws after printing the summary whenever anything failed, so the process exits non-zero.
+
+### Card choosers now show cards in the order the engine counts them
+
+When the engine resolves a choice like "pick a card from your discard pile", it reads each pile *grouped by card name*. The choosers, though, showed the raw pile. Picking the second card of `[Copper, Estate, Copper]` displayed an Estate but moved a Copper. Hands happened to stay grouped, which hid the bug; discard, deck, trash and in-play piles did not.
+
+There is now a single source of truth, `Game.pileCards`, for "the cards of this pile, in the order the engine indexes them". The bots and all three chooser components use it. A randomized test plays 200 random discard piles and checks that choosing index *i* moves exactly the card `pileCards` shows at position *i*.
+
+### Moat blocks the attack, not whatever choice comes first
+
+Reacting with Secret Chamber puts its own choice *in front of* the attack. Blocking with Moat used to remove the first pending choice. If the block arrived before the Secret Chamber choice was resolved, Moat discarded the Secret Chamber choice and left the attack in place. The standard UI resolves the Secret Chamber choice first, so this mostly affected plays sent straight to the engine, such as bots or remote clients. `BlockAttack` now removes the first *attack* choice and is rejected when no attack is pending. Both cases have regression tests, and both fail against the old code.
+
+Version bumped to **v0.37.0**.

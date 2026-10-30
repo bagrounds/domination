@@ -539,7 +539,7 @@ renderPlayer cs@{ state, playerIndex } player =
                   (AreaSlot ChoiceArea)
                   ( ChooseCards.component
                     { state
-                    , player
+                    , playerIndex
                     , baseSlotNumber
                     , pile
                     , constraint
@@ -691,6 +691,7 @@ renderPlayer cs@{ state, playerIndex } player =
               ( MoveFromTo.component
                 state
                 player
+                playerIndex
                 choice
                 baseSlotNumber
               )

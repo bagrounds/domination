@@ -25,8 +25,7 @@ import Data.Array (filter, findIndex, length, mapWithIndex, sortBy, (..))
 import Data.Array as Array
 import Data.Array.NonEmpty (index) as NEA
 import Data.Either (Either(..), either)
-import Data.Lens.Fold ((^?))
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Ord (abs, comparing)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
@@ -42,12 +41,10 @@ import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
 import Domination.Data.Game.Engine as Engine
 import Domination.Data.Phase (Phase(..))
-import Domination.Data.Pile (Pile)
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
-import Domination.Data.Stack (_stacksToCardsIso)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Var (Var(..))
 
@@ -294,7 +291,7 @@ choiceResolutions strategy playerIndex game = case _ of
   MoveFromTo r ->
     map (\selection -> MoveFromTo r { resolution = Just selection })
       <$> cardSelections strategy r.n r.filter
-        (pileCards r.source playerIndex game)
+        (Game.pileCards r.source playerIndex game)
   GainCard r ->
     map (\name -> GainCard r { resolution = Just name })
       <$> gainableCardNames strategy r.filter game
@@ -327,7 +324,7 @@ bindStackExpression strategy playerIndex game = case _ of
     } ->
     map (\selection -> StackChooseCards e { cards = Bound selection })
       <$> cardSelections strategy constraint cardFilter
-        (pileCards source playerIndex game)
+        (Game.pileCards source playerIndex game)
   StackChooseCardFromSupply e@{ cardName: Unbound, filter: Bound cardFilter } ->
     map (\name -> StackChooseCardFromSupply e { cardName = Bound name })
       <$> gainableCardNames strategy cardFilter game
@@ -339,10 +336,6 @@ arrange :: forall m a. Random m => Eq a => Strategy -> Array a -> m (Array a)
 arrange = case _ of
   BigMoney -> pure
   Random -> shuffle
-
-pileCards :: Pile -> Int -> Game -> Array Card
-pileCards pile playerIndex game = fromMaybe []
-  $ game ^? Game._pile pile playerIndex <<< _stacksToCardsIso
 
 gainableCardNames
   :: forall m

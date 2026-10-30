@@ -22,10 +22,8 @@ import Domination.Data.Card (Card)
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Filter (Filter)
 import Domination.Data.Game (Game)
+import Domination.Data.Game as Game
 import Domination.Data.Pile (Pile)
-import Domination.Data.Pile as Pile
-import Domination.Data.Player (Player)
-import Domination.Data.Stack (stacksToCards)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DomSlot (DomSlot)
@@ -42,7 +40,7 @@ data Action
   | Done
 
 type ComponentSpec =
-  { player :: Player
+  { playerIndex :: Int
   , pile :: Pile
   , baseSlotNumber :: Int -> DomSlot
   , state :: Game
@@ -59,7 +57,7 @@ component
 component
   { baseSlotNumber
   , state
-  , player
+  , playerIndex
   , pile
   , constraint
   } = H.mkComponent { initialState, render, eval: H.mkEval H.defaultEval
@@ -116,12 +114,4 @@ component
             else Css.toKeep
           ]
 
-    cards = case pile of
-      Pile.AtPlay -> player.atPlay
-      Pile.Hand -> player.hand
-      Pile.Discard -> player.discard
-      Pile.Buying -> player.buying
-      Pile.Discarding -> player.toDiscard
-      Pile.Deck -> player.deck
-      Pile.Trash -> state.trash
-      Pile.Supply -> stacksToCards state.supply
+    cards = Game.pileCards pile playerIndex state

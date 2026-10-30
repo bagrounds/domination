@@ -58,10 +58,11 @@ import Domination.Data.Wire.Game (_toWire) as Dom
 import Domination.Data.Wire.Play (_toWire) as Play
 import Effect (Effect)
 import Effect.Console (log)
+import Effect.Exception (throw)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Var (Var(..))
 import Test.QuickCheck (class Testable, Result(..), assertEquals, checkResults, quickCheckPure', randomSeed)
-import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements)
+import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, randomSample')
 import AppState (Config, newConfig)
 import AppState as AppState
 
@@ -100,6 +101,7 @@ main = do
   log $ "═══ Results: " <> show total_passed <> "/" <> show total <> " passed ═══"
   when (total_failed > 0) do
     log $ "FAILURES: " <> show total_failed
+    throw $ show total_failed <> " test(s) failed"
 
 type TestCase = { name :: String, test :: Result }
 
@@ -1952,6 +1954,40 @@ reaction_tests =
           Right game' ->
             assert_eq (count_all game') totalBefore
     }
+  , { name: "Multi-reaction: SC then Moat blocks the attack and keeps the SC choice"
+    , test: do
+        let game = setup_attack_game_with_both_reactions
+            scReaction = case (Card._card Cards.secretChamber).reaction of
+              Just (Tuple reaction _) -> reaction
+              _ -> BlockAttack
+        result <- runRandomM $ runExceptT $
+          Engine.makePlay (React { playerIndex: 1, reaction: Just scReaction }) game
+            >>= Engine.makePlay (React { playerIndex: 1, reaction: Just BlockAttack })
+        pure case result <#> \game' -> NEA.index game'.players 1 of
+          Left err -> Failed $ "react failed: " <> err
+          Right Nothing -> Failed "no player at index 1"
+          Right (Just p1) -> assert_true
+            ("expected only the Secret Chamber choice, got " <> show p1.choices <> " / " <> show p1.pendingReactions)
+            $ case p1.choices of
+                [ StackChoice _ ] -> not (Player.hasReaction p1)
+                _ -> false
+    }
+  , { name: "BlockAttack with no attack pending is rejected"
+    , test: do
+        let game = setup_attack_game_with_hand_and_choice
+              [ Card._card Cards.moat ]
+              (Draw { n: 1, attack: false, resolution: Nothing })
+            moatPending = game
+              { players = fromMaybe game.players
+                  $ NEA.modifyAt 1 (_ { pendingReactions = Player.reactionsInHand (Player.newPlayer { hand = [ Card._card Cards.moat ] }) }) game.players
+              }
+        result <- runRandomM $ runExceptT $
+          Engine.makePlay (React { playerIndex: 1, reaction: Just BlockAttack }) moatPending
+        pure case result of
+          Left _ -> Success
+          Right game' -> Failed $ "expected rejection, got choices "
+            <> show (map _.choices (NEA.index game'.players 1))
+    }
   ]
 
 -- ══════════════════════════════════════════════════════════════════
@@ -2678,6 +2714,7 @@ ai_tests =
   <> choice_resolution_tests
   <> trash_to_upgrade_tests
   <> supply_pile_tests
+  <> pile_order_tests
   <> bot_name_tests
   <> generate_play_tests
   <> bot_simulation_tests
@@ -3288,6 +3325,67 @@ pile_counts game = map (\pile -> pile.card.name <> "=" <> show pile.count) game.
 
 supply_count :: String -> Game -> Maybe Int
 supply_count name game = _.count <$> Array.find (_.card.name >>> eq name) game.supply
+
+-- ── Card chooser order ──
+
+pile_order_tests :: Array { name :: String, test :: Effect Result }
+pile_order_tests =
+  [ { name: "pileCards groups a pile the way the engine indexes it"
+    , test: pure $ assert_eq
+        (map _.name $ Game.pileCards Pile.Discard 0 (with_discard [ copper, estate, copper ]))
+        [ "Copper", "Copper", "Estate" ]
+    }
+  , { name: "Choosing index i of pileCards moves exactly that card (200 random discards)"
+    , test: do
+        samples <- randomSample' 200 do
+          cards <- arrayOf (elements $ NEA.cons' copper [ estate, silver, curse ])
+          i <- chooseInt 0 (max 0 (Array.length cards - 1))
+          pure { discard: cards, i }
+        all_succeed <$> traverse moves_shown_card (Array.filter (not <<< Array.null <<< _.discard) samples)
+    }
+  ]
+  where
+    copper = Card._card Cards.copper
+    estate = Card._card Cards.estate
+    silver = Card._card Cards.silver
+    curse = Card._card Cards.curse
+
+with_discard :: Array Card -> Game
+with_discard discard = game
+  { players = fromMaybe game.players
+      $ NEA.modifyAt 0 (_ { discard = discard, choices = [ move_one_from_discard Nothing ] }) game.players
+  }
+  where
+    game = Game.new 2 Cards.cardMap false
+
+move_one_from_discard :: Maybe (Array Int) -> Choice
+move_one_from_discard resolution = MoveFromTo
+  { n: Exactly 1
+  , filter: Filter.Any
+  , source: Pile.Discard
+  , destination: Pile.Deck
+  , resolution
+  , attack: false
+  }
+
+moves_shown_card :: { discard :: Array Card, i :: Int } -> Effect Result
+moves_shown_card { discard, i } = do
+  let
+    game = with_discard discard
+    shown = Game.pileCards Pile.Discard 0 game
+  result <- runRandomM $ runExceptT $ move_from_discard i game
+  pure case result of
+    Left err -> Failed $ "engine error: " <> err
+    Right game' -> assert_eq
+      (map _.name $ Array.difference discard (player_discard game'))
+      (map _.name $ Array.fromFoldable (Array.index shown i))
+
+move_from_discard :: Int -> Game -> ExceptT String RandomM Game
+move_from_discard i = Engine.makePlay
+  $ ResolveChoice { playerIndex: 0, choice: move_one_from_discard (Just [ i ]) }
+
+player_discard :: Game -> Array Card
+player_discard game = maybe [] _.discard $ NEA.index game.players 0
 
 -- ── botName ──
 

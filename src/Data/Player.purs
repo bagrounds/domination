@@ -12,7 +12,7 @@ module Domination.Data.Player where
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
-import Data.Array (any, catMaybes, cons, deleteAt, filter, length, replicate, reverse, uncons)
+import Data.Array (any, catMaybes, cons, deleteAt, filter, findIndex, length, replicate, reverse, uncons)
 import Data.Foldable (foldr, null, sum)
 import Data.Lens.Fold (firstOf, preview)
 import Data.Lens.Getter (view)
@@ -21,7 +21,7 @@ import Data.Lens.Lens (Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter (over, (%~), (+~), (.~))
 import Data.Lens.Traversal (Traversal', traverseOf, traversed)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Domination.Capability.Random (class Random, shuffle)
@@ -206,9 +206,25 @@ dropReactions = _ { pendingReactions = [] }
 -- | A reaction window only stays open while an attack is awaiting resolution.
 closeReactionWindowWhenUnattacked :: Player -> Player
 closeReactionWindowWhenUnattacked player =
-  if maybe false Choice.isAttack (firstChoice player)
+  if hasPendingAttack player
   then player
   else dropReactions player
+
+hasPendingAttack :: Player -> Boolean
+hasPendingAttack = any Choice.isAttack <<< _.choices
+
+-- | Blocking an attack removes the attack itself, leaving any choices a
+-- | reaction (e.g. Secret Chamber) added ahead of it.
+dropFirstAttack
+  :: forall m
+  . MonadError String m
+  => Player
+  -> m Player
+dropFirstAttack player = do
+  attackIndex <- fromJust "no attack to block"
+    $ findIndex Choice.isAttack player.choices
+  fromJust "failed to drop attack"
+    $ traverseOf _choices (deleteAt attackIndex) player
 
 hasReaction :: Player -> Boolean
 hasReaction = not null <<< _.pendingReactions
