@@ -51,3 +51,12 @@ There is now a single source of truth, `Game.pileCards`, for "the cards of this 
 Reacting with Secret Chamber puts its own choice *in front of* the attack. Blocking with Moat used to remove the first pending choice. If the block arrived before the Secret Chamber choice was resolved, Moat discarded the Secret Chamber choice and left the attack in place. The standard UI resolves the Secret Chamber choice first, so this mostly affected plays sent straight to the engine, such as bots or remote clients. `BlockAttack` now removes the first *attack* choice and is rejected when no attack is pending. Both cases have regression tests, and both fail against the old code.
 
 Version bumped to **v0.37.0**.
+
+### Where does a push actually go?
+
+I reported that these fixes were "live", but they never reached [domination.fun](https://domination.fun/). The repository has two deployment pipelines:
+
+- `.github/workflows/deploy.yml` publishes **every push to every branch** to [bagrounds.github.io/domination](https://bagrounds.github.io/domination/). That makes it a shared preview: it serves whichever branch was pushed last.
+- [domination.fun](https://domination.fun/) is served by the `pages` job in `.gitlab-ci.yml`. That job runs only for `master` in the GitLab project.
+
+The README now has a Deployments section that spells this out, so "deployed" can't be mistaken for "released" again.
