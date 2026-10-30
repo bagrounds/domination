@@ -61,9 +61,6 @@ import Effect.Console (log)
 import Effect.Exception (throw)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Var (Var(..))
-import Domination.UI.Placement (Placement, Position, placeTooltip)
-import Data.Int (toNumber)
-import Data.Int as Int
 import Test.QuickCheck (class Testable, Result(..), assertEquals, checkResults, quickCheckPure', randomSeed)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, randomSample')
 import AppState (Config, newConfig)
@@ -97,9 +94,8 @@ main = do
   reaction_results <- run_effect_section "Reaction System" reaction_tests
   property_results <- run_effect_section "Property-Based Tests" property_tests
   ai_results <- run_effect_section "AI Bot Tests" ai_tests
-  placement_results <- run_effect_section "Tooltip Placement" placement_tests
-  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed + placement_results.passed
-  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed + placement_results.failed
+  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed
+  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed
   let total = total_passed + total_failed
   log ""
   log $ "═══ Results: " <> show total_passed <> "/" <> show total <> " passed ═══"
@@ -3614,136 +3610,3 @@ validate_big_money_buys bots remaining game =
         Left _ -> pure Success
         Right game' -> validate_big_money_buys bots (remaining - 1) game'
 
-
--- ══════════════════════════════════════════════════════════════════
--- Tooltip Placement
--- ══════════════════════════════════════════════════════════════════
-
-placement_tests :: Array { name :: String, test :: Effect Result }
-placement_tests =
-  [ { name: "QC: a tooltip that fits the viewport is placed entirely inside it"
-    , test: quick_check 1000 prop_fitting_tooltip_stays_inside_viewport
-    }
-  , { name: "QC: any tooltip keeps its top-left corner inside the margin"
-    , test: quick_check 1000 prop_tooltip_respects_top_left_margin
-    }
-  , { name: "QC: a tooltip goes just below its anchor when there is room"
-    , test: quick_check 1000 prop_tooltip_prefers_below_anchor
-    }
-  , { name: "QC: a tooltip flips just above its anchor when there is no room below"
-    , test: quick_check 1000 prop_tooltip_flips_above_anchor
-    }
-  , { name: "QC: a tooltip is centered on its anchor when there is room"
-    , test: quick_check 1000 prop_tooltip_centers_on_anchor
-    }
-  , { name: "a tooltip on a card at the right edge of a phone screen stays on screen"
-    , test: pure $ assert_eq { left: 212.0, top: 640.0 } $ placeTooltip
-      { viewport: { width: 360.0, height: 740.0 }
-      , anchor: { left: 300.0, top: 600.0, width: 90.0, height: 40.0 }
-      , tooltip: { width: 140.0, height: 80.0 }
-      , margin: 8.0
-      }
-    }
-  ]
-
-type Extent = { length :: Int, margin :: Int }
-
-gen_viewport_and_margin :: Gen { width :: Int, height :: Int, margin :: Int }
-gen_viewport_and_margin =
-  { width: _, height: _, margin: _ }
-    <$> chooseInt 200 2000
-    <*> chooseInt 200 2000
-    <*> chooseInt 0 20
-
-gen_fitting_length :: Extent -> Gen Int
-gen_fitting_length { length, margin } = chooseInt 1 (length - 2 * margin)
-
-gen_any_length :: Extent -> Gen Int
-gen_any_length { length } = chooseInt 1 (2 * length)
-
-gen_placement :: (Extent -> Gen Int) -> Gen Placement
-gen_placement gen_tooltip_length = do
-  { width, height, margin } <- gen_viewport_and_margin
-  tooltip_width <- gen_tooltip_length { length: width, margin }
-  tooltip_height <- gen_tooltip_length { length: height, margin }
-  anchor_width <- chooseInt 1 400
-  anchor_height <- chooseInt 1 400
-  anchor_left <- chooseInt (-anchor_width - 100) (width + 100)
-  anchor_top <- chooseInt (-anchor_height - 100) (height + 100)
-  pure
-    { viewport: { width: toNumber width, height: toNumber height }
-    , anchor:
-      { left: toNumber anchor_left
-      , top: toNumber anchor_top
-      , width: toNumber anchor_width
-      , height: toNumber anchor_height
-      }
-    , tooltip: { width: toNumber tooltip_width, height: toNumber tooltip_height }
-    , margin: toNumber margin
-    }
-
-show_placement :: Placement -> Position -> String
-show_placement placement position =
-  "viewport=" <> show placement.viewport
-    <> " anchor=" <> show placement.anchor
-    <> " tooltip=" <> show placement.tooltip
-    <> " margin=" <> show placement.margin
-    <> " placed at " <> show position
-
-prop_fitting_tooltip_stays_inside_viewport :: Gen Result
-prop_fitting_tooltip_stays_inside_viewport = do
-  placement@{ viewport, tooltip, margin } <- gen_placement gen_fitting_length
-  let position = placeTooltip placement
-  pure $ assert_true (show_placement placement position)
-    $ position.left >= margin
-    && position.left + tooltip.width <= viewport.width - margin
-    && position.top >= margin
-    && position.top + tooltip.height <= viewport.height - margin
-
-prop_tooltip_respects_top_left_margin :: Gen Result
-prop_tooltip_respects_top_left_margin = do
-  placement@{ margin } <- gen_placement gen_any_length
-  let position = placeTooltip placement
-  pure $ assert_true (show_placement placement position)
-    $ position.left >= margin && position.top >= margin
-
-prop_tooltip_prefers_below_anchor :: Gen Result
-prop_tooltip_prefers_below_anchor = do
-  placement@{ viewport, tooltip, margin } <- gen_placement gen_fitting_length
-  anchor_bottom <- toNumber <$> chooseInt
-    (Int.ceil margin)
-    (Int.floor (viewport.height - margin - tooltip.height))
-  let anchor = placement.anchor { top = anchor_bottom - placement.anchor.height }
-      below_anchor = placement { anchor = anchor }
-      position = placeTooltip below_anchor
-  pure $ assert_true (show_placement below_anchor position)
-    $ position.top == anchor_bottom
-
-prop_tooltip_flips_above_anchor :: Gen Result
-prop_tooltip_flips_above_anchor = do
-  placement@{ viewport, tooltip, margin } <- gen_placement gen_fitting_length
-  anchor_top <- chooseInt
-    (Int.ceil (margin + tooltip.height))
-    (Int.floor (viewport.height - margin))
-  let lowest_fitting_bottom = Int.floor (viewport.height - margin - tooltip.height)
-      shortest_overflowing_height = max 1 (lowest_fitting_bottom - anchor_top + 1)
-  anchor_height <- chooseInt shortest_overflowing_height (shortest_overflowing_height + 400)
-  let anchor = placement.anchor
-        { top = toNumber anchor_top, height = toNumber anchor_height }
-      above_anchor = placement { anchor = anchor }
-      position = placeTooltip above_anchor
-  pure $ assert_true (show_placement above_anchor position)
-    $ position.top == anchor.top - tooltip.height
-
-prop_tooltip_centers_on_anchor :: Gen Result
-prop_tooltip_centers_on_anchor = do
-  placement@{ viewport, tooltip, margin } <- gen_placement gen_fitting_length
-  centered_left <- toNumber <$> chooseInt
-    (Int.ceil margin)
-    (Int.floor (viewport.width - margin - tooltip.width))
-  let anchor = placement.anchor
-        { left = centered_left - (placement.anchor.width - tooltip.width) / 2.0 }
-      centered = placement { anchor = anchor }
-      position = placeTooltip centered
-  pure $ assert_true (show_placement centered position)
-    $ position.left == centered_left

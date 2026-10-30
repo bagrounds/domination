@@ -97,14 +97,37 @@ button span,
 }
 
 .tool-tip {
-  box-sizing: border-box;
   white-space: normal;
-  position: fixed;
-  z-index: 450;
+  position: absolute;
+  z-index: 110;
   width: 10em;
-  max-width: calc(100vw - 16px);
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
+  left: -2em;
+}
+
+/* Anchor the tooltip to its card name, but lay it out against the viewport,
+   so scrolling containers can't clip it and it never runs off screen. */
+@supports (anchor-scope: --card-name) {
+  .description {
+    anchor-scope: --card-name;
+  }
+
+  .description .toggle {
+    anchor-name: --card-name;
+  }
+
+  .tool-tip {
+    box-sizing: border-box;
+    position: fixed;
+    position-anchor: --card-name;
+    position-area: bottom;
+    position-try-fallbacks: flip-block;
+    inset: auto;
+    margin: 0 8px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    z-index: 450;
+  }
 }
 
 .container {

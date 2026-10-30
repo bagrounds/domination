@@ -1,73 +1,79 @@
-# Tooltips That Stay on Screen
+# Tooltips That Stay on Screen (and on Their Card)
 
-Issue [#6](https://github.com/bagrounds/domination/issues/6) was short: card tooltips get cut off near the edge of the screen. Tap the name of a card like *Moat* at the far right of your hand and half the description disappears.
+Issue [#6](https://github.com/bagrounds/domination/issues/6) was short: card tooltips get cut off near the edge of the screen. Tap the name of a card like *Pawn* at the far right of the supply and half the description disappears.
 
 ## Why the tooltip was cut off
 
 The tooltip was a `position: absolute` box, `10em` wide, shifted `-2em` to the left of its card. Two things went wrong:
 
-1. **No knowledge of the viewport.** The offset was fixed, so a card near the right edge pushed its tooltip past the right edge. A card near the left edge only stayed visible because of the small `-2em` overhang.
-2. **Scrolling containers clip.** The hand, the play area, the buying area and the supply all scroll (`overflow-x: scroll` or `overflow-y: scroll`). An absolutely positioned child cannot leave the box of a scrolling ancestor, so the tooltip was clipped at the container's edge too, not only the screen's.
+1. **No knowledge of the viewport.** The offset was fixed, so a card near the right edge pushed its tooltip past the right edge.
+2. **Scrolling containers clip.** The hand, the play area, the buying area and the supply all scroll. An absolutely positioned child cannot leave the box of a scrolling ancestor, so the tooltip was also clipped at the container's edge.
 
-CSS alone can't solve both. A `position: fixed` tooltip escapes the scrolling containers, but then it needs coordinates. Those depend on where the card is, how big the tooltip turned out to be and how big the screen is.
+## First attempt: measure with JavaScript
 
-## The fix: measure, then place with a pure function
+The first version of this fix made the tooltip `position: fixed` and positioned it from PureScript. A pure `placeTooltip` function, covered by property tests, computed coordinates from the card's bounding rectangle and the viewport size, and the component wrote them as inline `left`/`top`.
 
-### A pure placement function
+It kept tooltips on screen, but the review pointed out two problems:
 
-`Domination.UI.Placement` is plain geometry with no DOM:
+- **The tooltip stayed put.** The coordinates were measured once, when the tooltip opened. Scrolling the supply or hand moved the card but not the tooltip, so it was no longer attached to its card.
+- **JavaScript was doing a stylesheet's job.** Positioning is a style concern. The fix had grown a new DOM capability, a geometry module and a dependency to do something CSS can express directly.
 
-```purescript
-placeTooltip :: Placement -> Position
-placeTooltip { viewport, anchor, tooltip, margin } =
-  { left: clampInto horizontal centered
-  , top: fromMaybe (clampInto vertical below)
-    $ find (fitsInto vertical) [ below, above ]
+## The fix: CSS anchor positioning
+
+[CSS anchor positioning](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Anchor_positioning) lets an element be laid out relative to another element, the *anchor*, wherever that anchor is. It is Baseline in Chrome, Firefox (147+) and Safari (26+). The fix is CSS only, and the PureScript is back to exactly what it was:
+
+```css
+@supports (anchor-scope: --card-name) {
+  .description {
+    anchor-scope: --card-name;
   }
+
+  .description .toggle {
+    anchor-name: --card-name;
+  }
+
+  .tool-tip {
+    box-sizing: border-box;
+    position: fixed;
+    position-anchor: --card-name;
+    position-area: bottom;
+    position-try-fallbacks: flip-block;
+    inset: auto;
+    margin: 0 8px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    z-index: 450;
+  }
+}
 ```
 
-The rules read straight from the code:
+Each declaration covers one requirement:
 
-- **Horizontally**, the tooltip is centered on its anchor and then clamped into the span of valid left edges, `[margin, viewport − margin − width]`.
-- **Vertically**, it tries a list of candidates in order of preference, *below* the anchor and then *above* it, and takes the first that fits. If neither fits, it clamps the "below" position into the viewport.
+- **`anchor-name` / `anchor-scope`.** Every card's name button is an anchor called `--card-name`. `anchor-scope` on the card's `.description` makes each tooltip find *its own* card's name rather than the last one on the page.
+- **`position: fixed`.** The tooltip is laid out against the viewport, so a scrolling container can no longer clip it. Anchor positioning keeps it attached: when the supply or hand scrolls, the tooltip moves with its card.
+- **`position-area: bottom`.** It sits directly below the card name, horizontally centered on it.
+- **Default overflow alignment.** If the centered tooltip would cross the viewport edge, the browser shifts it back inside. `margin: 0 8px` makes that keep an 8px gap.
+- **`position-try-fallbacks: flip-block`.** If there is no room below, it flips above the card name.
+- **`position-visibility: anchors-visible`** (the default). If the card scrolls out of view inside its container, its tooltip is hidden instead of floating over the HUD.
 
-`clampInto` applies the lower bound last (`max lower <<< min upper`). If a tooltip is larger than the screen, its top-left corner still stays on screen, and CSS `max-width`/`max-height` with `overflow-y: auto` keep the content readable.
+Browsers without anchor positioning skip the `@supports` block and get the old tooltip unchanged.
 
-### Measuring in the component
+## Verification
 
-The `Dom` capability gains two methods:
+I checked it in Chromium at a 360×740 phone size:
 
-```purescript
-boundingClientRect :: Element -> m Rect
-viewportSize :: m Size
-```
-
-They are implemented for `AppM`, `DomM` and lifted through `HalogenM`, just like `stopPropagation`. The description component tags the card-name toggle and the tooltip with Halogen refs. When the tooltip opens:
-
-1. The state flips to `visible`. Halogen re-renders synchronously, so the tooltip is now in the DOM at its natural size.
-2. The component measures the anchor, the tooltip and the viewport, then stores `placeTooltip`'s result in state.
-3. The tooltip is re-rendered with inline `left`/`top`.
-
-All of this happens in one JavaScript task, so the browser never paints the tooltip in its unplaced spot.
-
-### CSS
-
-`.tool-tip` is now `position: fixed`, so scrolling containers can no longer clip it. Its width is capped at `calc(100vw - 16px)` and its height at `calc(100vh - 16px)`, matching the 8px `viewportMargin` on each side. Its `z-index` is raised above choice dialogues, because a flipped tooltip can now overlap them.
-
-## Tests
-
-The placement rules are checked with QuickCheck over random viewports, anchors (including anchors partly off screen), tooltip sizes and margins:
-
-- a tooltip that fits the viewport is always placed entirely inside it, margin included;
-- any tooltip, even one larger than the screen, keeps its top-left corner inside the margin;
-- with room below the anchor, the tooltip sits exactly below it;
-- with no room below but room above, it flips to exactly above;
-- with room to center horizontally, it is exactly centered.
-
-A concrete regression case covers the original report: a card at the right edge of a 360px phone screen.
+| Case | Card name (left, top, right, bottom) | Tooltip |
+| --- | --- | --- |
+| Pawn, at the right edge | 229, 475, 323, 510 | 192, 510, **352**, 587: ends 8px from the right edge |
+| Chapel, at the left edge | 37, 141, 131, 176 | **8**, 176, 168, 253: starts 8px from the left edge |
+| Moat, in the middle | 133, 312, 227, 347 | 100, 347, 260, 444: centered below |
+| Moat, supply scrolled 60px | 133, 252, 227, 287 | 100, **287**, 260, 384: moved with the card |
+| Card name near the bottom | 133, 685, 227, 720 | 100, 588, 260, **685**: flipped above |
+| Card scrolled out of the supply | 133, 103, 227, 138 | hidden |
 
 ## Takeaway
 
-Generic "keep it on screen" logic is easy to get subtly wrong in event-handler code. It's easy to test once it's a total function from rectangles to a point. The DOM part shrinks to "measure three things, call a function, write two numbers".
+Before writing positioning code, check what the platform already does. Here, six CSS declarations replaced a geometry module, two new DOM capability methods and a dependency, and the CSS version also behaves better: the browser re-anchors the tooltip on every frame, which the measure-once code could not.
 
 Version bumped to **v0.37.1**.
