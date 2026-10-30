@@ -1316,26 +1316,13 @@ remodel = let
   , special = Just
     { target: Self
     , command: Choose $ StackChoice
-      { expression:
-        [ StackChooseCards
-          { cards: Unbound
-          , filter: Bound Filter.Any
-          , from: Bound Pile.Hand
-          , n: Bound $ Exactly one
-          }
-        , StackDuplicate
-        , StackTrash
-        , StackNth zero
-        , StackCostOf
-        , StackAddN 2
-        , StackMakeFilterCostUpTo
-        , StackBind "filter"
-        , StackChooseCardFromSupply
-          { cardName: Unbound
-          , filter: Unbound
-          }
-        , StackGainTo Pile.Discarding
-        ]
+      { expression: trashFromHandToGainUpgrade
+        { selectable: Filter.Any
+        , n: Exactly one
+        , extraCost: 2
+        , refineFilter: []
+        , destination: Pile.Discarding
+        }
       , stack: []
       , attack
       , description
@@ -1355,26 +1342,13 @@ expand = let
   , special = Just
     { target: Self
     , command: Choose $ StackChoice
-      { expression:
-        [ StackChooseCards
-          { cards: Unbound
-          , filter: Bound Filter.Any
-          , from: Bound Pile.Hand
-          , n: Bound $ Exactly one
-          }
-        , StackDuplicate
-        , StackTrash
-        , StackNth zero
-        , StackCostOf
-        , StackAddN 3
-        , StackMakeFilterCostUpTo
-        , StackBind "filter"
-        , StackChooseCardFromSupply
-          { cardName: Unbound
-          , filter: Unbound
-          }
-        , StackGainTo Pile.Discarding
-        ]
+      { expression: trashFromHandToGainUpgrade
+        { selectable: Filter.Any
+        , n: Exactly one
+        , extraCost: 3
+        , refineFilter: []
+        , destination: Pile.Discarding
+        }
       , stack: []
       , attack
       , description
@@ -1503,28 +1477,16 @@ mine = let
   , special = Just
     { target: Self
     , command: Choose $ StackChoice
-      { expression:
-        [ StackChooseCards
-          { cards: Unbound
-          , filter: Bound $ Filter.HasType Treasure
-          , from: Bound Pile.Hand
-          , n: Bound $ Exactly one
-          }
-        , StackDuplicate
-        , StackTrash
-        , StackNth zero
-        , StackCostOf
-        , StackAddN 3
-        , StackMakeFilterCostUpTo
-        , StackPush (StackFilter (Filter.HasType Treasure))
-        , StackMakeFilterAnd
-        , StackBind "filter"
-        , StackChooseCardFromSupply
-          { cardName: Unbound
-          , filter: Unbound
-          }
-        , StackGainTo Pile.Hand
-        ]
+      { expression: trashFromHandToGainUpgrade
+        { selectable: Filter.HasType Treasure
+        , n: UpTo one
+        , extraCost: 3
+        , refineFilter:
+          [ StackPush (StackFilter (Filter.HasType Treasure))
+          , StackMakeFilterAnd
+          ]
+        , destination: Pile.Hand
+        }
       , stack: []
       , attack
       , description
@@ -1532,6 +1494,47 @@ mine = let
     , description
     }
   }
+
+trashFromHandToGainUpgrade
+  :: { selectable :: Filter.Filter
+     , n :: Constraint
+     , extraCost :: Int
+     , refineFilter :: Array StackExpression
+     , destination :: Pile.Pile
+     }
+  -> Array StackExpression
+trashFromHandToGainUpgrade { selectable, n, extraCost, refineFilter, destination } =
+  [ StackChooseCards
+    { cards: Unbound
+    , filter: Bound selectable
+    , from: Bound Pile.Hand
+    , n: Bound n
+    }
+  , StackDuplicate
+  , StackLength
+  , StackIf
+    { condition: [ StackEquals $ StackInt one ]
+    , following:
+      [ StackDuplicate
+      , StackNth zero
+      , StackCostOf
+      , StackSwap
+      , StackTrash
+      , StackAddN extraCost
+      , StackMakeFilterCostUpTo
+      ]
+      <> refineFilter
+      <>
+      [ StackBind "filter"
+      , StackChooseCardFromSupply
+        { cardName: Unbound
+        , filter: Unbound
+        }
+      , StackGainTo destination
+      ]
+    , otherwise: [ StackTrash ]
+    }
+  ]
 
 mill :: CardSpec
 mill = let

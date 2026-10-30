@@ -65,6 +65,7 @@ data WireStackExpression
   | WireStackOption (Var Boolean)
   | WireStackMoveCards Pile Pile
   | WireStackGainBonusCash
+  | WireStackSwap
 
 _toWire :: Iso' StackExpression WireStackExpression
 _toWire = iso to fro where
@@ -102,6 +103,7 @@ _toWire = iso to fro where
     StackOption var -> WireStackOption var
     StackMoveCards { from, to: destination } -> WireStackMoveCards from destination
     StackGainBonusCash -> WireStackGainBonusCash
+    StackSwap -> WireStackSwap
 
   fro = case _ of
     WireStackChooseCards cards filter from n ->
@@ -140,6 +142,7 @@ _toWire = iso to fro where
     WireStackOption var -> StackOption var
     WireStackMoveCards from destination -> StackMoveCards { from, to: destination }
     WireStackGainBonusCash -> StackGainBonusCash
+    WireStackSwap -> StackSwap
 
 derive instance genericWireStackExpression
   :: Generic WireStackExpression _

@@ -2,6 +2,8 @@
 
 A peer-to-peer deck building game.
 Try it at [domination.fun](https://domination.fun/)
+or preview the latest push at [bagrounds.github.io/domination](https://bagrounds.github.io/domination/)
+(see [Deployments](#deployments)).
 
 ## Technology
 * peer-to-peer encrypted networking via [Bugout](https://github.com/chr15m/bugout), [WebTorrent](https://webtorrent.io/), [WebRTC](https://webrtc.org/), and [NaCl](http://nacl.cr.yp.to/)
@@ -15,7 +17,7 @@ Try it at [domination.fun](https://domination.fun/)
 * Light weight, installable, mobile-first, responsive, single page [Progressive Web App](https://web.dev/progressive-web-apps/)
 * Light weight [SVG](https://www.w3.org/Graphics/SVG/) icons
 * Pure CSS animations
-* GitHub Actions CI/CD pipeline deploys to GitHub Pages on commits to master
+* GitHub Actions CI/CD pipeline deploys every push to GitHub Pages for preview
 
 ## Game features
 * Custom deck building game logic
@@ -102,6 +104,21 @@ npm run test
 # compiles, bundles, minifies, and gzips all assets in public directory
 npm run deploy
 ```
+
+### Deployments
+There are two independent deployments:
+
+| Site | Deployed by | Triggered by |
+| --- | --- | --- |
+| [bagrounds.github.io/domination](https://bagrounds.github.io/domination/) | `.github/workflows/deploy.yml` (GitHub Actions to GitHub Pages) | every push to **any branch** on GitHub |
+| [domination.fun](https://domination.fun/) | the `pages` job in `.gitlab-ci.yml` (GitLab CI to GitLab Pages) | pushes to `master` in the **GitLab** project only |
+
+- The GitHub Pages site is a single shared preview. Whichever branch was pushed most recently is what it serves,
+  so it can show unmerged pull request work. Check the version shown in the app to know which build you are on.
+- Pushing or merging on GitHub does **not** update domination.fun.
+  To release to production, push `master` to the GitLab project and let its `pages` job finish.
+- Both sites install a service worker that serves cached assets first.
+  After a deploy, reload (or clear site data on mobile) to pick up the new version.
 
 ### Start an HTTP server to host the public directory
 ```sh

@@ -293,6 +293,60 @@ button span,
   margin-right: 0.5em;
 }
 
+.bot-controls {
+  padding: 0.5em;
+  margin: 0.5em 0;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.bot-controls label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 0.3em;
+  font-size: 1.1em;
+}
+
+.bot-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3em 0.5em;
+  margin: 0.2em 0;
+  background-color: #222;
+  border-radius: 3px;
+}
+
+.bot-entry span {
+  flex: 1;
+}
+
+.remove-bot {
+  background-color: #600;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 0.2em 0.5em;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.add-bot {
+  display: flex;
+  gap: 0.5em;
+  margin-top: 0.3em;
+}
+
+.add-bot-button {
+  flex: 1;
+  padding: 0.4em;
+  background-color: #252;
+  color: white;
+  border: 1px solid #484;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
 .kingdom {
   overflow-y: scroll;
   height: 58vh;
@@ -753,4 +807,138 @@ button span,
   100% {
     transform: translate(0, 0) rotate(0);
   }
+}
+
+/* Settings Tabs */
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0.5em 0;
+}
+
+.settings-tab {
+  flex: 1;
+  padding: 0.5em;
+  border: 1px solid #444;
+  background: #222;
+  color: #aaa;
+  cursor: pointer;
+  text-align: center;
+}
+
+.settings-tab-active {
+  background: #333;
+  color: white;
+  border-bottom-color: #333;
+}
+
+/* Bot Play Overlay */
+.bot-play-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.bot-play-card {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  max-width: 80vw;
+  padding: 1em 1.5em;
+  border: 2px solid #484;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 85%);
+  color: white;
+  font-size: 1.2em;
+  animation: bot-play-fade-in 0.3s ease-in;
+}
+
+.bot-play-countdown {
+  flex: none;
+  width: 2.5em;
+  height: 2.5em;
+  transform: rotate(-90deg);
+}
+
+.bot-play-countdown-ring {
+  fill: none;
+  stroke: #4a4;
+  stroke-width: 4;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  animation-name: bot-play-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.bot-play-name {
+  font-weight: bold;
+}
+
+@keyframes bot-play-countdown {
+  to {
+    stroke-dashoffset: 100;
+  }
+}
+
+@keyframes bot-play-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Debug Log */
+.debug-log {
+  margin: 1em 0;
+  padding: 0.5em;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.debug-log-header {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+}
+
+.debug-log-content {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40vh;
+  margin-top: 0.5em;
+  padding: 0.5em;
+  background: #111;
+  color: #ddd;
+  font-family: monospace;
+  font-size: 0.8em;
+}
+
+.copy-log-button {
+  padding: 0.3em 0.8em;
+  border: 1px solid #484;
+  border-radius: 3px;
+  background: #252;
+  color: white;
+  cursor: pointer;
+}
+
+/* Bot Delay Slider */
+.bot-delay {
+  padding: 0.5em 0;
+}
+
+.bot-delay label {
+  display: block;
+  margin-bottom: 0.3em;
+}
+
+.bot-delay input[type="range"] {
+  width: 100%;
 }

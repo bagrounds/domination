@@ -13,12 +13,13 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError)
 import Data.Array (filter, findIndex, length, updateAt)
-import Data.Foldable (find, maximumBy, sum)
+import Data.Foldable (any, find, maximumBy, sum)
 import Data.Lens.Fold ((^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Index (ix)
+import Data.Lens.Lens (Lens', lens)
 import Data.Lens.Traversal (Traversal')
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Domination.Data.Card (Card)
 import Domination.Data.Card as Card
 import Domination.Data.CardType (CardType(..))
@@ -32,6 +33,18 @@ type Supply = Array Stack
 
 _stack :: Int -> Traversal' Supply Stack
 _stack i = ix i
+
+_restocked :: Lens' Supply Supply
+_restocked = lens identity restock
+
+restock :: Supply -> Supply -> Supply
+restock original regrouped =
+  map restockFrom original <> filter isNewPile regrouped
+  where
+    restockFrom pile = pile
+      { count = maybe zero _.count (find (samePile pile) regrouped) }
+    isNewPile pile = not (any (samePile pile) original)
+    samePile a b = a.card.name == b.card.name
 
 defaultSupply :: Int -> Supply
 defaultSupply i = makeSupply i Cards.cardMap

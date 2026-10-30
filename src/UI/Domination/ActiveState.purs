@@ -9,12 +9,19 @@
 --| * Data transformation using Setter (%~)
 module Domination.UI.Domination.ActiveState where
 
+import Prelude
+
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
-import Type.Proxy (Proxy(..))
+import Data.Maybe (Maybe(..))
+import Domination.Data.AI (Bot)
+import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
+import Domination.Data.Play (Play)
+import Halogen (ForkId)
+import Type.Proxy (Proxy(..))
 
 type ActiveState =
   { i :: Int
@@ -23,6 +30,41 @@ type ActiveState =
   , showSupply :: Boolean
   , state :: Game
   }
+
+type BotConfig =
+  { botStrategies :: Array Strategy
+  , botDelay :: Int
+  }
+
+type PendingBotPlay =
+  { bot :: Bot
+  , play :: Play
+  , i :: Int
+  , state :: Game
+  }
+
+type ComponentState =
+  { active :: ActiveState
+  , botConfig :: BotConfig
+  , pendingBotPlay :: Maybe PendingBotPlay
+  , botTimer :: Maybe ForkId
+  }
+
+mkComponentState :: BotConfig -> ActiveState -> ComponentState
+mkComponentState botConfig active =
+  { active
+  , botConfig
+  , pendingBotPlay: Nothing
+  , botTimer: Nothing
+  }
+
+isPendingFor :: ActiveState -> PendingBotPlay -> Boolean
+isPendingFor { i, state } pending = pending.i == i && pending.state == state
+
+_active
+  :: forall a b r
+  . Lens { active :: a | r } { active :: b | r } a b
+_active = prop (Proxy :: Proxy "active")
 
 _i
   :: forall a b r

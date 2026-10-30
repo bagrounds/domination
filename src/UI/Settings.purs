@@ -13,17 +13,20 @@ module Domination.UI.Settings where
 import Prelude
 
 import AppAction (AppAction(..), CardSpecSelection)
-import AppState (AppState, defaultKingdom)
-import Data.Array (elem, mapWithIndex)
+import AppState (AppState, SettingsTab(..), defaultKingdom, maxBotDelay, settingsTabLabel, settingsTabs)
+import Data.Array (elem, length, mapWithIndex)
+import Data.Int (toNumber, round)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
 import Data.Maybe (Maybe(..))
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
+import Domination.Data.AI.Strategy (Strategy(..), allStrategies, botName)
 import Domination.Data.Card (Card, CardSpec, _card, _requirements)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
+import Domination.UI.DebugLog as DebugLog
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.RenderText (renderText)
 import Domination.UI.ServerUrlInput as ServerUrlInput
@@ -64,11 +67,13 @@ render
     ( ComponentSlot
       (description :: Slot a b DomSlot | r) m AppAction
     ) AppAction
-render cs@{ showMenu, dominationConfig } = let
+render cs@{ showMenu, dominationConfig, settingsTab } = let
   { nextPlayerIndex
   , nextPlayerCount
   , longGame
   , kingdom
+  , botStrategies
+  , botDelay
   } = dominationConfig
   in HH.div
   [ HP.classes
@@ -87,11 +92,58 @@ render cs@{ showMenu, dominationConfig } = let
       [ HH.text "Back" ]
     ]
   , renderText version
-  , ServerUrlInput.render { onInput: WriteServerUrl, state: cs }
+  , renderTabs settingsTab
+  , renderTabContent settingsTab cs
+    { nextPlayerIndex
+    , nextPlayerCount
+    , longGame
+    , kingdom
+    , botStrategies
+    , botDelay
+    }
+  ]
+
+renderTabs :: forall w. SettingsTab -> HTML w AppAction
+renderTabs activeTab = HH.div
+  [ HP.class_ Css.settingsTabs
+  , HP.attr (HH.AttrName "role") "tablist"
+  ]
+  $ tabButton <$> settingsTabs
+  where
+    tabButton tab = HH.button
+      [ HP.classes $ [ Css.settingsTab ]
+        <> if tab == activeTab then [ Css.settingsTabActive ] else []
+      , HP.attr (HH.AttrName "role") "tab"
+      , HP.attr (HH.AttrName "aria-selected") $ show (tab == activeTab)
+      , HE.onClick \_ -> SwitchSettingsTab tab
+      ]
+      [ HH.text $ settingsTabLabel tab ]
+
+renderTabContent
+  :: forall a b r m
+  . Dom m
+  => Log m
+  => SettingsTab
+  -> AppState
+  -> { nextPlayerIndex :: Int
+     , nextPlayerCount :: Int
+     , longGame :: Boolean
+     , kingdom :: Array CardSpecSelection
+     , botStrategies :: Array Strategy
+     , botDelay :: Int
+     }
+  -> HTML
+    ( ComponentSlot
+      (description :: Slot a b DomSlot | r) m AppAction
+    ) AppAction
+renderTabContent ConnectionTab cs _ = HH.div_
+  [ ServerUrlInput.render { onInput: WriteServerUrl, state: cs }
   , UsernameInput.render { onInput: WriteUsername, state: cs }
-  , Util.incrementer
+  ]
+renderTabContent GameSetupTab _ { nextPlayerIndex, nextPlayerCount, longGame, botStrategies } = HH.div_
+  [ Util.incrementer
     { label: "Players: "
-    , mbMin: Just one
+    , mbMin: Just $ length botStrategies + one
     , mbMax: Nothing
     , value: nextPlayerCount
     , setValue: WritePlayerCount
@@ -99,10 +151,11 @@ render cs@{ showMenu, dominationConfig } = let
   , Util.incrementer
     { label: "Player #: "
     , mbMin: Just one
-    , mbMax: Nothing
+    , mbMax: Just nextPlayerCount
     , value: nextPlayerIndex + one
     , setValue: (_ - one) >>> WritePlayerIndex
     }
+  , HH.p_ [ HH.text $ seatingSummary nextPlayerCount (length botStrategies) ]
   , HH.div_
     [ HH.button
       [ HE.onClick \_ -> StartNewGame
@@ -131,7 +184,14 @@ render cs@{ showMenu, dominationConfig } = let
       , HH.text "Don't end the game until the leader can't be beaten"
       ]
     ]
-  , HH.button
+  ]
+renderTabContent BotsTab _ { botStrategies, botDelay } = HH.div_
+  [ renderBotControls botStrategies
+  , renderBotDelay botDelay
+  ]
+renderTabContent DebugTab cs _ = DebugLog.render cs.debugReport
+renderTabContent KingdomTab _ { kingdom } = HH.div_
+  [ HH.button
     [ HE.onClick \_ -> ChooseKingdom ((prop (Proxy :: Proxy "selected") %~ not) <$> defaultKingdom) ]
     [ HH.text "Select None" ]
   , HH.button
@@ -142,6 +202,69 @@ render cs@{ showMenu, dominationConfig } = let
     [ HH.text "Select All" ]
   , renderKingdom kingdom
   ]
+
+renderBotDelay :: forall w. Int -> HTML w AppAction
+renderBotDelay delay = HH.div
+  [ HP.class_ Css.botDelay ]
+  [ HH.label_
+    [ HH.text $ "Bot play delay: " <> showSeconds delay
+    , HH.input
+      [ HP.type_ HP.InputRange
+      , HP.min 0.0
+      , HP.max $ toNumber maxBotDelay
+      , HP.step $ HP.Step 250.0
+      , HP.value $ show delay
+      , HE.onValueInput \s -> WriteBotDelay (round (readNumber s))
+      ]
+    ]
+  , HH.p_
+    [ HH.text $ "Each bot play is announced for this long before it happens,"
+      <> " so you can undo past bot turns. At 0s bots play instantly."
+    ]
+  ]
+
+seatingSummary :: Int -> Int -> String
+seatingSummary playerCount botCount =
+  "You + " <> show botCount <> " bot(s) + "
+    <> show (playerCount - botCount - one) <> " remote seat(s)"
+
+showSeconds :: Int -> String
+showSeconds ms = let
+  s = toNumber ms / 1000.0
+  in show s <> "s"
+
+foreign import readNumber :: String -> Number
+
+renderBotControls
+  :: forall w
+  . Array Strategy
+  -> HTML w AppAction
+renderBotControls botStrategies = HH.div
+  [ HP.class_ Css.botControls ]
+  [ HH.label_ [ HH.text "AI Players" ]
+  , HH.div_ $ mapWithIndex renderBot botStrategies
+  , HH.div
+    [ HP.class_ Css.addBot ]
+    $ addBotButton <$> allStrategies
+  ]
+  where
+    renderBot :: Int -> Strategy -> HTML w AppAction
+    renderBot i strategy = HH.div
+      [ HP.class_ Css.botEntry ]
+      [ HH.span_ [ HH.text $ botName strategy ]
+      , HH.button
+        [ HE.onClick \_ -> RemoveBot i
+        , HP.class_ Css.removeBot
+        ]
+        [ HH.text "✕" ]
+      ]
+
+    addBotButton :: Strategy -> HTML w AppAction
+    addBotButton strategy = HH.button
+      [ HE.onClick \_ -> AddBot strategy
+      , HP.class_ Css.addBotButton
+      ]
+      [ HH.text $ "+ " <> botName strategy ]
 
 type RenderedKingdom a b r m = HTML
     ( ComponentSlot

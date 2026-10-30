@@ -18,10 +18,12 @@ import Data.Lens (lens')
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
-import Data.Maybe (Maybe(..))
+import Data.Array (deleteAt, length, snoc)
+import Data.Maybe (Maybe(..), maybe)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
+import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Message (RemoteMessage)
@@ -30,6 +32,26 @@ type ClientInfo =
   { timestamp :: Int
   , clientId :: String
   }
+
+data SettingsTab
+  = GameSetupTab
+  | BotsTab
+  | KingdomTab
+  | ConnectionTab
+  | DebugTab
+
+derive instance eqSettingsTab :: Eq SettingsTab
+
+settingsTabs :: Array SettingsTab
+settingsTabs = [ GameSetupTab, BotsTab, KingdomTab, ConnectionTab, DebugTab ]
+
+settingsTabLabel :: SettingsTab -> String
+settingsTabLabel = case _ of
+  GameSetupTab -> "Game"
+  BotsTab -> "Bots"
+  KingdomTab -> "Kingdom"
+  ConnectionTab -> "Connection"
+  DebugTab -> "Debug"
 
 type AppState =
   { connectionCount :: Int
@@ -50,6 +72,8 @@ type AppState =
   , connectedClients :: HashMap String ClientInfo
   , heartbeatInterval :: Int
   , heartbeatTimeout :: Int
+  , settingsTab :: SettingsTab
+  , debugReport :: String
   }
 
 _card :: Lens' CardSpec Card
@@ -107,6 +131,12 @@ _heartbeatInterval = prop (Proxy :: Proxy "heartbeatInterval")
 _heartbeatTimeout :: Lens' AppState Int
 _heartbeatTimeout = prop (Proxy :: Proxy "heartbeatTimeout")
 
+_settingsTab :: Lens' AppState SettingsTab
+_settingsTab = prop (Proxy :: Proxy "settingsTab")
+
+_debugReport :: Lens' AppState String
+_debugReport = prop (Proxy :: Proxy "debugReport")
+
 globalRoomCode :: String
 globalRoomCode = "global-dev"
 
@@ -139,6 +169,8 @@ newApp =
   , connectedClients: HashMap.empty
   , heartbeatInterval: defaultHeartbeatInterval
   , heartbeatTimeout: defaultHeartbeatTimeout
+  , settingsTab: GameSetupTab
+  , debugReport: ""
   }
 
 newConfig :: Config
@@ -147,6 +179,8 @@ newConfig =
   , nextPlayerIndex: zero
   , kingdom: defaultKingdom
   , longGame: false
+  , botStrategies: []
+  , botDelay: 2000
   }
 
 type CardSpecSelection = { cardSpec :: CardSpec, selected :: Boolean }
@@ -166,6 +200,56 @@ type Config =
   , nextPlayerCount :: Int
   , kingdom :: Array CardSpecSelection
   , longGame :: Boolean
+  , botStrategies :: Array Strategy
+  , botDelay :: Int
+  }
+
+maxBotDelay :: Int
+maxBotDelay = 5000
+
+clampBotDelay :: Int -> Int
+clampBotDelay = clamp zero maxBotDelay
+
+type Roster r =
+  { nextPlayerIndex :: Int
+  , nextPlayerCount :: Int
+  , botStrategies :: Array Strategy
+  | r
+  }
+
+-- | Every roster keeps a seat for the local human and one for each bot,
+-- | with the human seated inside the table.
+normalizeRoster :: forall r. Roster r -> Roster r
+normalizeRoster roster = roster
+  { nextPlayerCount = playerCount
+  , nextPlayerIndex = clamp zero (playerCount - one) roster.nextPlayerIndex
+  }
+  where
+    playerCount = max (length roster.botStrategies + one) roster.nextPlayerCount
+
+addBot :: forall r. Strategy -> Roster r -> Roster r
+addBot strategy roster = normalizeRoster roster
+  { botStrategies = snoc roster.botStrategies strategy
+  , nextPlayerCount = roster.nextPlayerCount + one
+  }
+
+removeBot :: forall r. Int -> Roster r -> Roster r
+removeBot botIndex roster = maybe roster
+  ( \botStrategies -> normalizeRoster roster
+    { botStrategies = botStrategies
+    , nextPlayerCount = roster.nextPlayerCount - one
+    }
+  )
+  (deleteAt botIndex roster.botStrategies)
+
+setPlayerCount :: forall r. Int -> Roster r -> Roster r
+setPlayerCount playerCount roster =
+  normalizeRoster roster { nextPlayerCount = playerCount }
+
+setPlayerIndex :: forall r. Int -> Roster r -> Roster r
+setPlayerIndex playerIndex roster = normalizeRoster roster
+  { nextPlayerIndex = max zero playerIndex
+  , nextPlayerCount = max (playerIndex + one) roster.nextPlayerCount
   }
 
 upgradeSelection :: CardSpecSelection -> CardSpecSelection
@@ -186,3 +270,13 @@ _kingdom
   :: forall a b r
   . Lens { kingdom :: a | r } { kingdom :: b | r } a b
 _kingdom = prop (Proxy :: Proxy "kingdom")
+
+_botStrategies
+  :: forall a b r
+  . Lens { botStrategies :: a | r } { botStrategies :: b | r } a b
+_botStrategies = prop (Proxy :: Proxy "botStrategies")
+
+_botDelay
+  :: forall a b r
+  . Lens { botDelay :: a | r } { botDelay :: b | r } a b
+_botDelay = prop (Proxy :: Proxy "botDelay")
