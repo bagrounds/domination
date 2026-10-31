@@ -13,3 +13,8 @@ Implement a matchmaking system so players can find each other without sharing ro
 - Lobby system with a signaling server
 - Random matchmaking queue
 - Public game rooms browser
+
+## Design
+
+See the proposal [`docs/2026-10-31-matchmaking-design.md`](../docs/2026-10-31-matchmaking-design.md):
+invite-link rooms filtered in the client (MVP), then discovery of unstarted games through room listings in the global room.
