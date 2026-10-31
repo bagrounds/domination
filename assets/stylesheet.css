@@ -967,3 +967,17 @@ button span,
 .bot-delay input[type="range"] {
   width: 100%;
 }
+
+.room-panel {
+  padding: 0.5em 0;
+}
+
+.room-panel .invite-link {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.room-panel .room-notice {
+  font-size: 0.9em;
+  opacity: 0.8;
+}

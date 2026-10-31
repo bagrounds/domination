@@ -19,11 +19,12 @@ import Data.Int (toNumber, round)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
 import Data.Lens.Setter ((%~))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.AI.Strategy (Strategy(..), allStrategies, botName)
 import Domination.Data.Card (Card, CardSpec, _card, _requirements)
+import Domination.Data.Room (Room(..), roomHash, unRoomCode)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DebugLog as DebugLog
@@ -140,8 +141,9 @@ renderTabContent ConnectionTab cs _ = HH.div_
   [ ServerUrlInput.render { onInput: WriteServerUrl, state: cs }
   , UsernameInput.render { onInput: WriteUsername, state: cs }
   ]
-renderTabContent GameSetupTab _ { nextPlayerIndex, nextPlayerCount, longGame, botStrategies } = HH.div_
-  [ Util.incrementer
+renderTabContent GameSetupTab cs { nextPlayerIndex, nextPlayerCount, longGame, botStrategies } = HH.div_
+  [ renderRoomPanel cs
+  , Util.incrementer
     { label: "Players: "
     , mbMin: Just $ length botStrategies + one
     , mbMax: Nothing
@@ -202,6 +204,58 @@ renderTabContent KingdomTab _ { kingdom } = HH.div_
     [ HH.text "Select All" ]
   , renderKingdom kingdom
   ]
+
+type RoomPanelState r =
+  { room :: Room
+  , roomNotice :: Maybe String
+  , inviteBaseUrl :: String
+  , connectionCount :: Int
+  | r
+  }
+
+renderRoomPanel :: forall w r. RoomPanelState r -> HTML w AppAction
+renderRoomPanel { room, roomNotice, inviteBaseUrl, connectionCount } = HH.div
+  [ HP.class_ Css.roomPanel ]
+  $ renderRoom room <> maybe [] (pure <<< renderInvalidRoomLink) roomNotice
+  where
+    renderRoom = case _ of
+      GlobalRoom ->
+        [ HH.p_ [ HH.text "Room: Global (everyone without an invite link)" ]
+        , HH.button
+          [ HE.onClick \_ -> CreateRoom ]
+          [ HH.text "Create private game" ]
+        ]
+      GameRoom code ->
+        [ HH.p_ [ HH.text $ "Room: " <> unRoomCode code <> " · " <> othersHere connectionCount ]
+        , HH.label_
+          [ HH.text "Invite link: "
+          , HH.input
+            [ HP.class_ Css.inviteLink
+            , HP.readOnly true
+            , HP.value $ inviteBaseUrl <> roomHash room
+            ]
+          ]
+        , HH.div_
+          [ HH.button
+            [ HE.onClick \_ -> CopyInviteLink ]
+            [ HH.text "Copy invite link" ]
+          , HH.button
+            [ HE.onClick \_ -> LeaveRoom ]
+            [ HH.text "Leave room" ]
+          ]
+        , HH.p
+          [ HP.class_ Css.roomNotice ]
+          [ HH.text "Anyone with this link can join and see the game." ]
+        ]
+
+    renderInvalidRoomLink fragment = HH.p
+      [ HP.class_ Css.roomNotice ]
+      [ HH.text $ "Ignored an invalid room link (#" <> fragment <> "). You are in the global room." ]
+
+othersHere :: Int -> String
+othersHere = case _ of
+  1 -> "1 other here"
+  n -> show n <> " others here"
 
 renderBotDelay :: forall w. Int -> HTML w AppAction
 renderBotDelay delay = HH.div

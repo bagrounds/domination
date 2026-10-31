@@ -65,6 +65,7 @@ import Test.QuickCheck (class Testable, Result(..), assertEquals, checkResults, 
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, randomSample')
 import AppState (Config, newConfig)
 import AppState as AppState
+import Test.Room (room_tests)
 
 
 -- ══════════════════════════════════════════════════════════════════
@@ -94,8 +95,9 @@ main = do
   reaction_results <- run_effect_section "Reaction System" reaction_tests
   property_results <- run_effect_section "Property-Based Tests" property_tests
   ai_results <- run_effect_section "AI Bot Tests" ai_tests
-  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed
-  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed
+  room_results <- run_effect_section "Rooms" room_tests
+  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed + room_results.passed
+  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed + room_results.failed
   let total = total_passed + total_failed
   log ""
   log $ "═══ Results: " <> show total_passed <> "/" <> show total <> " passed ═══"

@@ -216,3 +216,12 @@ copyLogButton = ClassName "copy-log-button"
 
 botDelay :: ClassName
 botDelay = ClassName "bot-delay"
+
+roomPanel :: ClassName
+roomPanel = ClassName "room-panel"
+
+inviteLink :: ClassName
+inviteLink = ClassName "invite-link"
+
+roomNotice :: ClassName
+roomNotice = ClassName "room-notice"
