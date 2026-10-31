@@ -74,6 +74,12 @@ dom/1/k7m2x9qp/3b2f…   room k7m2x9qp
 - 🖥️ I also ran the local relay with three browser tabs, two in one room and one in the global room. Chat, games and connection counts stayed apart. A reload in the room broadcast nothing larger than a heartbeat.
 - 🧓 Finally, I built the **previous** version of the app and connected it to the same relay. It decoded the new messages without errors, and chatted both ways with a new client in the global room, while clients in the room ignored it.
 
+🤖 These browser checks were manual. The repository has no end-to-end browser suite yet, so I filed [an issue](https://github.com/bagrounds/domination/blob/master/issues/TODO-e2e-browser-tests.md) to automate them as Playwright property tests over random sequences of players creating, joining, reloading and leaving rooms.
+
+## 📦 Release
+
+🏷️ This ships as **v0.38.0**, a minor bump for a new feature. The bump also renames the service worker's cache, which had fallen one patch behind the app version. A changed `sw.js` makes browsers install the new worker, cache the new build and switch to it once the old tabs close.
+
 ## 🗺️ What's Next
 
 📝 I filed follow-up issues in [`issues/`](https://github.com/bagrounds/domination/tree/master/issues):
@@ -82,7 +88,8 @@ dom/1/k7m2x9qp/3b2f…   room k7m2x9qp
 - ⏩ **Catch-up on join**: one member resends the current game when someone arrives
 - 💺 **Seat claiming**: show and resolve taken seats
 - 🏁 **Retire the shared global game** once old clients are rare
-- ⚡ **Faster service-worker updates**: `skipWaiting` and `clients.claim`, plus a version bump at release
+- ⚡ **Faster service-worker updates**: `skipWaiting` and `clients.claim`
+- 🤖 **End-to-end browser tests**: automate the multi-tab checks above as property tests
 - 🛰️ **Optional topic routing** on the relay, only if traffic ever needs it
 
 ## 💡 Takeaways
@@ -101,14 +108,14 @@ dom/1/k7m2x9qp/3b2f…   room k7m2x9qp
 
 ### ✨ Similar
 
-- 📊 [[designing-data-intensive-applications|📊🧱 Designing Data-Intensive Applications]] by Martin Kleppmann: forward and backward compatibility during rolling upgrades is exactly the problem the header solves
-- 🧩 [[domain-driven-design|🧩🧱⚙️❤️ Domain-Driven Design]] by Eric Evans: `Room`, `Header` and `Admission` are a small ubiquitous language with one home
+- 📊 *Designing Data-Intensive Applications* by Martin Kleppmann: forward and backward compatibility during rolling upgrades is exactly the problem the header solves
+- 🧩 *Domain-Driven Design* by Eric Evans: `Room`, `Header` and `Admission` are a small ubiquitous language with one home
 
 ### 🆚 Contrasting
 
-- 🎮 [[game-programming-patterns|🎮 Game Programming Patterns]] by Robert Nystrom: most networked games trust an authoritative server, while here the server knows nothing and every client enforces the rules
+- 🎮 *Game Programming Patterns* by Robert Nystrom: most networked games trust an authoritative server, while here the server knows nothing and every client enforces the rules
 
 ### 🧠 Deeper Exploration
 
-- 🦄 [[learn-you-a-haskell-for-great-good|🦄 Learn You a Haskell for Great Good]] by Miran Lipovača: sum types, smart constructors and `Either`-based parsing are the tools this change is built from
-- 🧪🚀✅ [[continuous-delivery|🧪🚀✅ Continuous Delivery]] by Jez Humble and David Farley: ship the expand step first, keep the old path working, and contract later
+- 🦄 *Learn You a Haskell for Great Good* by Miran Lipovača: sum types, smart constructors and `Either`-based parsing are the tools this change is built from
+- 🧪🚀✅ *Continuous Delivery* by Jez Humble and David Farley: ship the expand step first, keep the old path working, and contract later

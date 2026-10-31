@@ -16,7 +16,7 @@ Implement a matchmaking system so players can find each other without sharing ro
 
 ## Design
 
-See the proposal [`docs/2026-10-31-matchmaking-design.md`](../docs/2026-10-31-matchmaking-design.md):
+See the design [`docs/2026-10-31-matchmaking-design.md`](../docs/2026-10-31-matchmaking-design.md):
 invite-link rooms filtered in the client (MVP), then discovery of unstarted games through room listings in the global room.
 
 ## Progress
@@ -29,3 +29,4 @@ invite-link rooms filtered in the client (MVP), then discovery of unstarted game
 - [ ] [Retire the shared global game](TODO-matchmaking-retire-global-game.md)
 - [ ] [Service worker: deliver new builds faster](TODO-service-worker-fast-updates.md)
 - [ ] [Optional topic routing on the relay](TODO-matchmaking-server-topic-routing.md)
+- [ ] [End-to-end browser tests for private game links](TODO-e2e-browser-tests.md)

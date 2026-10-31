@@ -37,7 +37,7 @@ or preview the latest push at [bagrounds.github.io/domination](https://bagrounds
 * Pseudo-random numbers (for deterministic shuffling and undo, and light weight game state diff based messages)
 * More expressive card effect Domain Specific Language (DSL)
 * Game AI players
-* More thorough tests
+* More thorough tests, including end-to-end browser tests for private game links
 
 ## Principles
 1. Catch and prevent bugs as early as possible

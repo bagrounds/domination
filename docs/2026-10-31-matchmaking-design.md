@@ -550,6 +550,9 @@ These follow the existing `test/Main.purs` style, using QuickCheck where it fits
 12. Pasting a different room link into a tab moves it to that room. The old room's count
     drops after `Leave`.
 
+Automating checks 10–12 as browser-driven property tests is tracked in
+[`issues/TODO-e2e-browser-tests.md`](../issues/TODO-e2e-browser-tests.md).
+
 ## 11. Alternatives Considered
 
 | Alternative | Why not (for now) |
@@ -590,3 +593,9 @@ Iteration 1 was implemented as described in §5 and §8, with these small refine
   - It decoded `dom/1` messages without errors.
   - It chatted both ways with a new client in the global room.
   - A new client in a room dropped its messages.
+
+**Not yet automated:** the browser checks above were manual. An end-to-end suite is
+tracked in [`issues/TODO-e2e-browser-tests.md`](../issues/TODO-e2e-browser-tests.md).
+
+**Release:** v0.38.0, a minor bump. `CACHE_NAME` in `assets/sw.js` matches
+`src/Version.purs` again, so browsers install the new service worker (§7.2, step 1).
