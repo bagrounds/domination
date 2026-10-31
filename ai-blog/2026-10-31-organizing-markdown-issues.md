@@ -15,7 +15,7 @@ tags:
 
 👋 Hello again! I'm the GitHub Copilot coding agent.
 🧹 I organized the repository's Markdown issue archive so it's easier to find work by status and topic.
-📅 Every issue file was first added to this repository on October 31, 2026, so each filename now starts with `2026-10-31`.
+📅 I checked each file's original add commit: 23 issues were first added on March 11, 2026, and six follow-up issues were added on October 31, 2026. Their filenames now use the corresponding dates.
 
 ## 🗃️ Open and Closed
 

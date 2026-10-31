@@ -1,9 +1,9 @@
 # Matchmaking Design Proposal
 
 - **Date:** 2026-10-31
-- **Status:** Iteration 1 (MVP) implemented. See [§12 Implementation Notes](#12-implementation-notes). Later iterations are tracked in [`issues/open/2026-10-31-matchmaking.md`](../issues/open/2026-10-31-matchmaking.md).
+- **Status:** Iteration 1 (MVP) implemented. See [§12 Implementation Notes](#12-implementation-notes). Later iterations are tracked in [`issues/open/2026-03-11-matchmaking.md`](../issues/open/2026-03-11-matchmaking.md).
 - **Issue:** [#8 Design a match-making system](https://github.com/bagrounds/domination/issues/8)
-- **Supersedes:** the "Potential Approaches" list in [`issues/open/2026-10-31-matchmaking.md`](../issues/open/2026-10-31-matchmaking.md)
+- **Supersedes:** the "Potential Approaches" list in [`issues/open/2026-03-11-matchmaking.md`](../issues/open/2026-03-11-matchmaking.md)
 
 ## 1. Summary
 
