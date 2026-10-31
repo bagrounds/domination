@@ -13,27 +13,28 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
+import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _inviteBaseUrl, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _room, _roomNotice, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
 import DebugLog as DebugLog
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (elem, length, take)
+import Data.Foldable (traverse_)
 import Data.Bifunctor (rmap)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.HashMap as HashMap
 import Effect.Aff.Class (class MonadAff)
 import Data.Lens.Getter (view)
 import Data.Lens.Prism (review)
 import Data.Lens.Setter (over, set, (%~), (.~))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Capability.Clock (class Clock, now)
-import Domination.Capability.Dom (class Dom, window)
+import Domination.Capability.Dom (class Dom, locationHash, pageBaseUrl, reload, setLocationHash, window)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
 import Domination.Capability.Random (class Random, randomElement, shuffle)
@@ -41,6 +42,7 @@ import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.Timer (class Timer, createTimer)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Card (CardSpec)
+import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, channelName, generateRoomCode, isGameRoom, parseRoomHash, printHeader, roomFromHash, roomHash, scopedKey)
 import Domination.Env (env)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
@@ -88,6 +90,17 @@ usernameKey = "username"
 
 chatKey :: String
 chatKey = "chat"
+
+gameStateKey :: String
+gameStateKey = "game_state"
+
+undoKey :: Int -> String
+undoKey saveNumber = "game_state_" <> show saveNumber
+
+-- | A room member who reloads with a stale game must not roll the room back,
+-- | so only the global room keeps today's share-on-startup behaviour.
+sharesSavedGameOnStartup :: Room -> Boolean
+sharesSavedGameOnStartup = not <<< isGameRoom
 
 main :: Effect Unit
 main = launchAff_ $ do
@@ -181,15 +194,15 @@ type ChildComponents o r q1 o1 =
 saveChat
   :: forall m r messages
   . Monad m
-  => MonadState { messages :: messages | r } m
+  => MonadState { messages :: messages, room :: Room | r } m
   => Storage m
   => EncodeJson messages
   => DecodeJson messages
   => Log m
   => m (Either String Unit)
 saveChat = do
-  messages <- H.gets _.messages
-  result <- save chatKey messages
+  { messages, room } <- H.get
+  result <- save (scopedKey room chatKey) messages
   log "saved chat messages"
   pure result
 
@@ -232,7 +245,14 @@ handleAction audioContext = case _ of
         pure $ emoji <> "lurker" <> emoji
       Right u -> pure u
 
-    roomCode <- H.gets _.roomCode
+    eRoom <- parseRoomHash <$> locationHash
+    inviteBaseUrl <- pageBaseUrl
+    let room = either (const GlobalRoom) identity eRoom
+    either (log <<< append "Initialize: ignoring invalid room link: ") (const $ pure unit) eRoom
+    log $ "Initialize: room: " <> show room
+    H.modify_ $ (_room .~ room)
+      >>> (_roomNotice .~ either Just (const Nothing) eRoom)
+      >>> (_inviteBaseUrl .~ inviteBaseUrl)
 
     eKingdom <- load "kingdom"
     kingdom <- case eKingdom of
@@ -277,7 +297,7 @@ handleAction audioContext = case _ of
         pure 2000
       Right d -> pure $ clampBotDelay d
 
-    eMessages <- load chatKey
+    eMessages <- load (scopedKey room chatKey)
     messages <- case eMessages of
       Left e -> do
         log $ "Initialize: Failed to load messages. Error: " <> e
@@ -300,7 +320,10 @@ handleAction audioContext = case _ of
     log "Initialize: done modifying a bunch of stuff..."
 
     log "Initialize: load game..."
-    loadGame "game_state"
+    restored <- restoreGame gameStateKey
+    when (sharesSavedGameOnStartup room) $ traverse_ shareGame restored
+    when (isGameRoom room && isNothing restored) $ H.modify_
+      $ (_showMenu .~ true) >>> (_settingsTab .~ GameSetupTab)
     configureBots
     log "Initialize: done loading game..."
 
@@ -316,7 +339,7 @@ handleAction audioContext = case _ of
     H.modify_ (_serverUrl .~ serverUrl)
 
     maybeBroadcaster <- maybeCreateBroadcaster
-      roomCode remoteMessageTarget serverUrl
+      (channelName room) remoteMessageTarget serverUrl
 
     log $ "Initialize: broadcaster: " <> show maybeBroadcaster
 
@@ -345,6 +368,12 @@ handleAction audioContext = case _ of
         (EventType "unload")
         (toEventTarget w)
         \_ -> Just Finalize
+
+    H.subscribe' \_ ->
+      eventListener
+        (EventType "hashchange")
+        (toEventTarget w)
+        \_ -> Just RoomChanged
 
     log "Initialize completed"
 
@@ -410,13 +439,29 @@ handleAction audioContext = case _ of
     liftEffect DebugLog.clear
     void refreshDebugReport
 
+  CreateRoom -> generateRoomCode >>= maybe
+    (error "CreateRoom: failed to generate a room code")
+    (setLocationHash <<< roomHash <<< GameRoom)
+
+  LeaveRoom -> setLocationHash $ roomHash GlobalRoom
+
+  RoomChanged -> do
+    current <- H.gets _.room
+    next <- roomFromHash <$> locationHash
+    log $ "RoomChanged: " <> show current <> " -> " <> show next
+    when (next /= current) reload
+
+  CopyInviteLink -> do
+    { inviteBaseUrl, room } <- H.get
+    liftEffect $ FFI.copyToClipboard $ inviteBaseUrl <> roomHash room
+
   StartNewGame -> do
     config <- H.gets _.dominationConfig
     queryGame $ StartNewGameRequest config
     H.modify_ $ _showMenu .~ false
 
   LoadGameRequest -> do
-    loadGame "game_state"
+    loadGame gameStateKey
     H.modify_ $ _showMenu .~ false
 
   WriteServerUrl serverUrl -> do
@@ -436,86 +481,19 @@ handleAction audioContext = case _ of
 
   ReceiveRemoteMessage customEvent -> do
     let detail = FFI.detail customEvent
-    (eWireEnvelope :: Either String WireEnvelope) <- readWire detail
-    let
-      eMessage = (
-        rmap
-        (review Message._toWire))
-        <$> eWireEnvelope
-    case eMessage of
-      Left e -> error $ "problem receiving message: " <> e
-      Right (Tuple _ msg) -> do
-        case msg of
-          UsernameMessage { username, id } -> do
-            log $ "username incoming: " <> username
-            H.modify_ $ over _usernames
-              $ HashMap.insert id username
-          ChatMessage { message } -> do
-            H.modify_
-              $ (_messages :~ msg)
-              >>> (_messages %~ take 250)
-            saveChat >>= logErrorToChat
-            if message == "PING"
-              then do
-                H.modify_ $ _message .~ "PONG"
-                sendChatMessage
-              else pure unit
-          GameMessage { i, state, playMade } -> do
-            queryGame $ ReceiveGame
-              { i
-              , state
-              }
-            case playMade of
-              Just x -> do
-                H.modify_ $ _messages :~ PlayMadeMessage x
-              Nothing -> pure unit
-          PlayMadeMessage _ ->
-            error "PlayMadeMessage should not be called"
-          JoinMessage { clientId } -> do
-            timestamp <- now
-            let clientInfo = { timestamp, clientId }
-            H.modify_ $ _connectedClients %~ HashMap.insert clientId clientInfo
-            -- After updating connected clients, broadcast the new count
-            clients <- H.gets _.connectedClients
-            let count = HashMap.size clients
-            H.modify_ $ _connectionCount .~ count
-            log $ "Client joined: " <> clientId <> ", total clients: " <> show count
-          LeaveMessage { clientId } -> do
-            H.modify_ $ _connectedClients %~ HashMap.delete clientId
-            -- After removing client, broadcast the new count
-            clients <- H.gets _.connectedClients
-            let count = HashMap.size clients
-            H.modify_ $ _connectionCount .~ count
-            log $ "Client left: " <> clientId <> ", total clients: " <> show count
-          HeartbeatMessage { clientId } -> do
-            timestamp <- now
-            -- First get current state
-            clients <- H.gets _.connectedClients
-            let originalClientCount = HashMap.size clients
-            timeout <- H.gets _.heartbeatTimeout
-
-            -- Clean up stale clients first
-            let activeClients = HashMap.filter (\info -> not $ (timestamp - info.timestamp) > timeout) clients
-            let activeClientCount = HashMap.size activeClients
-
-            -- Update the current client's heartbeat
-            let updatedClients = HashMap.insert
-                  clientId
-                  { timestamp, clientId }
-                  activeClients
-            let updatedClientCount = HashMap.size updatedClients
-
-            -- Update state with clean list including current client
-            H.modify_ $ _connectedClients .~ updatedClients
-            H.modify_ $ _connectionCount .~ updatedClientCount
-
-            { username, id } <- H.get
-            sendMessage (UsernameMessage { username, id })
-
-            log $ "Heartbeat from clientId(" <> clientId <> ")"
-              <> "; Clients before cleanup: " <> show originalClientCount
-              <> "; Clients after cleanup: " <> show activeClientCount
-              <> "; Clients after new heartbeat: " <> show updatedClientCount
+    room <- H.gets _.room
+    (eHeader :: Either String String) <- readWire detail
+    case admission room <$> eHeader of
+      Left e -> error $ "problem receiving message header: " <> e
+      Right (ForeignRoom senderRoom) ->
+        log $ "dropped message for " <> show senderRoom
+      Right (Unsupported headerError) ->
+        log $ "dropped message with unsupported header: " <> show headerError
+      Right Admit -> do
+        (eWireEnvelope :: Either String WireEnvelope) <- readWire detail
+        case rmap (review Message._toWire) <$> eWireEnvelope of
+          Left e -> error $ "problem receiving message: " <> e
+          Right (Tuple _ msg) -> receiveMessage msg
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
@@ -529,38 +507,107 @@ handleAction audioContext = case _ of
         }
       saveGame activeState
     SaveGame activeState -> saveGame activeState
-    Undo { i } -> do
-      let
-        saveNumber = (i - 1) `mod` 10
-        key = "game_state_" <> show saveNumber
-      loadGame key
+    Undo { i } -> loadGame $ undoKey $ (i - 1) `mod` 10
   HeartbeatTick -> do
     clientId <- H.gets _.id
     timestamp <- now
     sendMessage $ HeartbeatMessage { clientId, timestamp }
   where
-    loadGame key = do
-      { nextPlayerIndex } <- H.gets _.dominationConfig
-      mbGame <- load key
+    receiveMessage msg = case msg of
+        UsernameMessage { username, id } -> do
+          log $ "username incoming: " <> username
+          H.modify_ $ over _usernames
+            $ HashMap.insert id username
+        ChatMessage { message } -> do
+          H.modify_
+            $ (_messages :~ msg)
+            >>> (_messages %~ take 250)
+          saveChat >>= logErrorToChat
+          if message == "PING"
+            then do
+              H.modify_ $ _message .~ "PONG"
+              sendChatMessage
+            else pure unit
+        GameMessage { i, state, playMade } -> do
+          queryGame $ ReceiveGame
+            { i
+            , state
+            }
+          case playMade of
+            Just x -> do
+              H.modify_ $ _messages :~ PlayMadeMessage x
+            Nothing -> pure unit
+        PlayMadeMessage _ ->
+          error "PlayMadeMessage should not be called"
+        JoinMessage { clientId } -> do
+          timestamp <- now
+          let clientInfo = { timestamp, clientId }
+          H.modify_ $ _connectedClients %~ HashMap.insert clientId clientInfo
+          -- After updating connected clients, broadcast the new count
+          clients <- H.gets _.connectedClients
+          let count = HashMap.size clients
+          H.modify_ $ _connectionCount .~ count
+          log $ "Client joined: " <> clientId <> ", total clients: " <> show count
+        LeaveMessage { clientId } -> do
+          H.modify_ $ _connectedClients %~ HashMap.delete clientId
+          -- After removing client, broadcast the new count
+          clients <- H.gets _.connectedClients
+          let count = HashMap.size clients
+          H.modify_ $ _connectionCount .~ count
+          log $ "Client left: " <> clientId <> ", total clients: " <> show count
+        HeartbeatMessage { clientId } -> do
+          timestamp <- now
+          -- First get current state
+          clients <- H.gets _.connectedClients
+          let originalClientCount = HashMap.size clients
+          timeout <- H.gets _.heartbeatTimeout
+
+          -- Clean up stale clients first
+          let activeClients = HashMap.filter (\info -> not $ (timestamp - info.timestamp) > timeout) clients
+          let activeClientCount = HashMap.size activeClients
+
+          -- Update the current client's heartbeat
+          let updatedClients = HashMap.insert
+                clientId
+                { timestamp, clientId }
+                activeClients
+          let updatedClientCount = HashMap.size updatedClients
+
+          -- Update state with clean list including current client
+          H.modify_ $ _connectedClients .~ updatedClients
+          H.modify_ $ _connectionCount .~ updatedClientCount
+
+          { username, id } <- H.get
+          sendMessage (UsernameMessage { username, id })
+
+          log $ "Heartbeat from clientId(" <> clientId <> ")"
+            <> "; Clients before cleanup: " <> show originalClientCount
+            <> "; Clients after cleanup: " <> show activeClientCount
+            <> "; Clients after new heartbeat: " <> show updatedClientCount
+    loadGame key = restoreGame key >>= traverse_ shareGame
+    restoreGame key = do
+      { dominationConfig: { nextPlayerIndex }, room } <- H.get
+      mbGame <- load $ scopedKey room key
       case mbGame of
-        Left e -> error e
+        Left e -> do
+          error e
+          pure Nothing
         Right activeState -> do
           let
             newActiveState = ActiveState.upgrade
               $ (_playerIndex .~ nextPlayerIndex)
               $ activeState
           queryGame $ LoadActiveState newActiveState
-          sendMessage $ GameMessage
-            { state: activeState.state
-            , i: activeState.i
-            , playMade: Nothing
-            }
+          pure $ Just activeState
+    shareGame activeState = sendMessage $ GameMessage
+      { state: activeState.state
+      , i: activeState.i
+      , playMade: Nothing
+      }
     saveGame activeState = do
-      let
-        saveNumber = activeState.i `mod` 10
-        key = "game_state_" <> show saveNumber
-      save key activeState >>= logErrorToChat
-      save "game_state" activeState >>= logErrorToChat
+      room <- H.gets _.room
+      save (scopedKey room $ undoKey $ activeState.i `mod` 10) activeState >>= logErrorToChat
+      save (scopedKey room gameStateKey) activeState >>= logErrorToChat
     queryGame state = do
       _ <- H.query
         Domination._component
@@ -608,16 +655,16 @@ sendMessage
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
 sendMessage message' = do
   let message = view Message._toWire message'
-  { roomCode, maybeBroadcaster, id } <- H.get
+  { room, maybeBroadcaster, id } <- H.get
   log $ "maybeBroadcaster: " <> show maybeBroadcaster
 
-  let wireEnvelope = Tuple id message
+  let wireEnvelope = Tuple (printHeader $ V1Header room id) message
 
   serverUrl <- H.gets _.serverUrl
 
   maybeBroadcaster' <- case maybeBroadcaster of
     Nothing -> maybeCreateBroadcaster
-      roomCode remoteMessageTarget serverUrl
+      (channelName room) remoteMessageTarget serverUrl
     Just b -> pure (Just b)
 
   case maybeBroadcaster' of

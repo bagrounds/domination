@@ -42,4 +42,8 @@ data AppAction
   | SwitchSettingsTab SettingsTab
   | CopyBugReport
   | ClearDebugLog
+  | CreateRoom
+  | LeaveRoom
+  | RoomChanged
+  | CopyInviteLink
   | DoNothing

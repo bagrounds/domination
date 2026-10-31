@@ -20,19 +20,34 @@ import Web.Event.Event (Event)
 import Web.Event.Event as Event
 import Web.HTML as HTML
 import Web.HTML (Window)
+import Web.HTML.Location as Location
+import Web.HTML.Window as Window
 
 class Monad m <= Dom m where
   stopPropagation :: Event -> m Unit
   window :: m Window
+  locationHash :: m String
+  setLocationHash :: String -> m Unit
+  reload :: m Unit
+  pageBaseUrl :: m String
 
 instance domHalogenM
   :: Dom m => Dom (HalogenM st act slots msg m) where
   stopPropagation  = lift <<< stopPropagation
   window = lift window
+  locationHash = lift locationHash
+  setLocationHash = lift <<< setLocationHash
+  reload = lift reload
+  pageBaseUrl = lift pageBaseUrl
 
 instance domAppM :: Dom AppM where
   stopPropagation = liftEffect <<< Event.stopPropagation
   window = liftEffect HTML.window
+  locationHash = liftEffect $ withLocation Location.hash
+  setLocationHash = liftEffect <<< withLocation <<< Location.setHash
+  reload = liftEffect $ withLocation Location.reload
+  pageBaseUrl = liftEffect $ withLocation \location ->
+    append <$> Location.origin location <*> Location.pathname location
 
 newtype DomM a = DomM (Effect a)
 
@@ -46,6 +61,14 @@ derive newtype instance monadEffectDomM :: MonadEffect DomM
 instance domDomM :: Dom DomM where
   stopPropagation = liftEffect <<< Event.stopPropagation
   window = liftEffect HTML.window
+  locationHash = liftEffect $ withLocation Location.hash
+  setLocationHash = liftEffect <<< withLocation <<< Location.setHash
+  reload = liftEffect $ withLocation Location.reload
+  pageBaseUrl = liftEffect $ withLocation \location ->
+    append <$> Location.origin location <*> Location.pathname location
+
+withLocation :: forall a. (Location.Location -> Effect a) -> Effect a
+withLocation f = HTML.window >>= Window.location >>= f
 
 runDomM :: DomM ~> Effect
 runDomM (DomM m) = liftEffect m
