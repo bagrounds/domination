@@ -26,6 +26,7 @@ import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
+import Domination.Data.Room (Room(..))
 import Message (RemoteMessage)
 
 type ClientInfo =
@@ -64,7 +65,9 @@ type AppState =
   , chatNumber :: Int
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe WebSocketBroadcaster
-  , roomCode :: String
+  , room :: Room
+  , roomNotice :: Maybe String
+  , inviteBaseUrl :: String
   , dominationConfig :: Config
   , showMenu :: Boolean
   , longGame :: Boolean
@@ -137,8 +140,14 @@ _settingsTab = prop (Proxy :: Proxy "settingsTab")
 _debugReport :: Lens' AppState String
 _debugReport = prop (Proxy :: Proxy "debugReport")
 
-globalRoomCode :: String
-globalRoomCode = "global-dev"
+_room :: Lens' AppState Room
+_room = prop (Proxy :: Proxy "room")
+
+_roomNotice :: Lens' AppState (Maybe String)
+_roomNotice = prop (Proxy :: Proxy "roomNotice")
+
+_inviteBaseUrl :: Lens' AppState String
+_inviteBaseUrl = prop (Proxy :: Proxy "inviteBaseUrl")
 
 defaultServerUrl :: String
 defaultServerUrl = "wss://purescript-wip.onrender.com"
@@ -161,7 +170,9 @@ newApp =
   , chatNumber: 0
   , gameOn: false
   , maybeBroadcaster: Nothing
-  , roomCode: globalRoomCode
+  , room: GlobalRoom
+  , roomNotice: Nothing
+  , inviteBaseUrl: ""
   , dominationConfig: newConfig
   , showMenu: false
   , longGame: false
