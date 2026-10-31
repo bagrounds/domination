@@ -14,3 +14,7 @@
 
 ## Scientific Engineering
 - Always test your work and iterate until your tests succeed and verify that the goal has been achieved.
+
+## Markdown Issues
+- Keep issue files in `issues/open/` or `issues/closed/` according to their status; prefix filenames with the date they were first added to this repository (`YYYY-MM-DD`).
+- Give related issues a shared topic prefix, such as `matchmaking-`.

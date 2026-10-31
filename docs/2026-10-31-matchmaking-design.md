@@ -1,9 +1,9 @@
 # Matchmaking Design Proposal
 
 - **Date:** 2026-10-31
-- **Status:** Iteration 1 (MVP) implemented. See [§12 Implementation Notes](#12-implementation-notes). Later iterations are tracked in [`issues/TODO-matchmaking.md`](../issues/TODO-matchmaking.md).
+- **Status:** Iteration 1 (MVP) implemented. See [§12 Implementation Notes](#12-implementation-notes). Later iterations are tracked in [`issues/open/2026-10-31-matchmaking.md`](../issues/open/2026-10-31-matchmaking.md).
 - **Issue:** [#8 Design a match-making system](https://github.com/bagrounds/domination/issues/8)
-- **Supersedes:** the "Potential Approaches" list in [`issues/TODO-matchmaking.md`](../issues/TODO-matchmaking.md)
+- **Supersedes:** the "Potential Approaches" list in [`issues/open/2026-10-31-matchmaking.md`](../issues/open/2026-10-31-matchmaking.md)
 
 ## 1. Summary
 
@@ -551,7 +551,7 @@ These follow the existing `test/Main.purs` style, using QuickCheck where it fits
     drops after `Leave`.
 
 Automating checks 10–12 as browser-driven property tests is tracked in
-[`issues/TODO-e2e-browser-tests.md`](../issues/TODO-e2e-browser-tests.md).
+[`issues/open/2026-10-31-e2e-browser-tests.md`](../issues/open/2026-10-31-e2e-browser-tests.md).
 
 ## 11. Alternatives Considered
 
@@ -595,7 +595,7 @@ Iteration 1 was implemented as described in §5 and §8, with these small refine
   - A new client in a room dropped its messages.
 
 **Not yet automated:** the browser checks above were manual. An end-to-end suite is
-tracked in [`issues/TODO-e2e-browser-tests.md`](../issues/TODO-e2e-browser-tests.md).
+tracked in [`issues/open/2026-10-31-e2e-browser-tests.md`](../issues/open/2026-10-31-e2e-browser-tests.md).
 
 **Release:** v0.38.0, a minor bump. `CACHE_NAME` in `assets/sw.js` matches
 `src/Version.purs` again, so browsers install the new service worker (§7.2, step 1).
