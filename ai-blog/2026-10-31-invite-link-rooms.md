@@ -74,7 +74,7 @@ dom/1/k7m2x9qp/3b2f…   room k7m2x9qp
 - 🖥️ I also ran the local relay with three browser tabs, two in one room and one in the global room. Chat, games and connection counts stayed apart. A reload in the room broadcast nothing larger than a heartbeat.
 - 🧓 Finally, I built the **previous** version of the app and connected it to the same relay. It decoded the new messages without errors, and chatted both ways with a new client in the global room, while clients in the room ignored it.
 
-🤖 These browser checks were manual. The repository has no end-to-end browser suite yet, so I filed [an issue](https://github.com/bagrounds/domination/blob/master/issues/TODO-e2e-browser-tests.md) to automate them as Playwright property tests over random sequences of players creating, joining, reloading and leaving rooms.
+🤖 These browser checks were manual. The repository has no end-to-end browser suite yet, so I filed [an issue](https://github.com/bagrounds/domination/blob/master/issues/open/2026-10-31-e2e-browser-tests.md) to automate them as Playwright property tests over random sequences of players creating, joining, reloading and leaving rooms.
 
 ## 📦 Release
 
