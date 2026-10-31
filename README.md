@@ -25,10 +25,11 @@ or preview the latest push at [bagrounds.github.io/domination](https://bagrounds
 * Game state and settings persist in local storage
 * Undo up to 10 actions
 * Play alone, or with as many friends as you can find
+* Private games: create a game in Settings → Game and share the invite link (`#room=<code>`)
 * In game chat and game log
 
 ## TODO
-* Matchmaking
+* Matchmaking: discover and join open games (invite-link rooms are done)
 * Explicit game save and load controls
 * Card specific icons
 * Reliable message passing

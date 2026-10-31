@@ -1,7 +1,7 @@
 # Matchmaking Design Proposal
 
 - **Date:** 2026-10-31
-- **Status:** Proposal for review. Nothing here is implemented yet.
+- **Status:** Iteration 1 (MVP) implemented. See [§12 Implementation Notes](#12-implementation-notes). Later iterations are tracked in [`issues/TODO-matchmaking.md`](../issues/TODO-matchmaking.md).
 - **Issue:** [#8 Design a match-making system](https://github.com/bagrounds/domination/issues/8)
 - **Supersedes:** the "Potential Approaches" list in [`issues/TODO-matchmaking.md`](../issues/TODO-matchmaking.md)
 
@@ -561,3 +561,32 @@ These follow the existing `test/Main.purs` style, using QuickCheck where it fits
 | **Query-string or path rooms** (`?room=`, `/r/<code>`) | Query strings miss the service-worker cache. Paths need server rewrites on two static hosts. The fragment needs neither (§5.3) |
 | **Automatic queue or skill-based matchmaking** | Needs an authority or agreement on who matches whom. Out of proportion for the player base. Quick join (§6.1) covers casual use |
 | **Rooms and discovery in one release** | Discovery needs a new message family, a timer-driven announcer and a lobby UI. Shipping invites first proves the room logic with much less code, and iteration 2 only adds to it |
+
+## 12. Implementation Notes
+
+Iteration 1 was implemented as described in §5 and §8, with these small refinements:
+
+| Design | Implementation | Why |
+|---|---|---|
+| `Header` as a record with a `protocol` field | `data Header = LegacyHeader String \| V1Header Room String` | A legacy header can only be in the global room. The sum type makes the invalid combination unrepresentable, and `parseHeader <<< printHeader` round-trips for every valid value |
+| `HeaderError = UnsupportedVersion \| InvalidRoomCode` | Adds `MalformedHeader String` | Covers `dom/1` with a missing room or an empty sender |
+| `ForeignRoom` | `ForeignRoom Room` | The debug log names the room a dropped message was for |
+| `maybeCreateBroadcaster` receives `roomHash room` | Receives `channelName room` | Keeps the Bugout swarm name `global-dev` for the global room |
+| `roomFromHash` only | Also `parseRoomHash :: String -> Either String Room` | Lets the Settings room panel name the invalid link it ignored |
+| Room state in `AppState` | `room`, plus `roomNotice` and `inviteBaseUrl` | The panel renders from state alone |
+
+**Verified:**
+
+- **Tests.** `test/Room.purs` runs 30 tests: the property tests 1–7 from §10, examples
+  from the grammar, and wire compatibility tests 8–9 for chat, join and game messages.
+- **Manual check, new clients.** The local relay ran with three tabs, two in one room and
+  one in the global room:
+  - Chat, game and presence stayed inside each room.
+  - A reload inside the room restored the game locally and sent no `GameMessage`.
+  - *Leave room* and pasting a link both moved the tab through `hashchange`, and upper-case
+    links were normalized.
+  - An invalid link showed the notice.
+- **Manual check, old client.** A build from before this change, on the same relay:
+  - It decoded `dom/1` messages without errors.
+  - It chatted both ways with a new client in the global room.
+  - A new client in a room dropped its messages.
