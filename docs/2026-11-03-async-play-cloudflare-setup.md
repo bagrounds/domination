@@ -84,22 +84,45 @@ belongs only in step 6.
 
 ## 6. Put Both Values in GitHub
 
-The mailbox will be deployed by a GitHub Action in this repository (it will run only on
-pushes to `master` that change `mailbox/`). GitHub keeps the values encrypted and hides
-them in logs.
+The mailbox is deployed by a GitHub Action in this repository
+(`.github/workflows/mailbox.yml`, on pushes to `master` that change `mailbox/`, or by
+hand from the Actions tab). GitHub keeps the values encrypted and hides them in logs.
+They are **secrets**, not **variables**: variables are shown in plain text.
 
-1. Open [the repository's Actions secrets](https://github.com/bagrounds/domination/settings/secrets/actions):
-   **Settings → Secrets and variables → Actions**.
-2. On the **Secrets** tab, click **New repository secret** and add:
+1. Open the repository on GitHub: <https://github.com/bagrounds/domination>.
+2. Click the **⚙️ Settings** tab in the row of tabs under the repository name (*Code,
+   Issues, Pull requests, Actions, …*). On a narrow window it may be hidden behind the
+   **⋯** overflow menu at the end of that row. You need to be an admin of the repository
+   to see it.
+3. In the left sidebar, find the **Security** section and click **Secrets and
+   variables**. It expands; click **Actions** underneath it.
+4. The page has two tabs, **Secrets** and **Variables**. Stay on **Secrets**.
+5. Under **Repository secrets** (not *Environment secrets*), click the green
+   **New repository secret** button.
 
-   | Name (exactly) | Value |
+   Shortcut: <https://github.com/bagrounds/domination/settings/secrets/actions/new> opens
+   this form directly.
+6. Fill in the form and click **Add secret**:
+
+   | Name (exactly) | Secret |
    |---|---|
    | `CLOUDFLARE_API_TOKEN` | the token from step 5 |
+
+7. Click **New repository secret** again and add the second one:
+
+   | Name (exactly) | Secret |
+   |---|---|
    | `CLOUDFLARE_ACCOUNT_ID` | the account ID from step 4 |
 
-3. That's all. You do not need to add anything to GitLab: production
-   (`domination.fun`, GitLab Pages) only serves the client, and the client only needs the
-   mailbox's public URL.
+8. Check: the **Repository secrets** list now shows both names. GitHub never shows a
+   secret's value again. To change one, click its ✏️ pencil and paste a new value; to
+   remove one, click its 🗑️ bin.
+
+The names must match exactly (upper case, underscores), because the workflow reads
+`secrets.CLOUDFLARE_API_TOKEN` and `secrets.CLOUDFLARE_ACCOUNT_ID`.
+
+You do not need to add anything to GitLab: production (`domination.fun`, GitLab Pages)
+only serves the client, and the client only needs the mailbox's public URL.
 
 Secrets are not given to workflows triggered by pull requests from forks, so nobody
 outside the repository can deploy with your token.

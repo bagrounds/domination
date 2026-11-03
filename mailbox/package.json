@@ -1,0 +1,15 @@
+{
+  "name": "domination-mailbox",
+  "private": true,
+  "description": "Room mailbox for asynchronous play: the latest game envelope per room, with compare-and-set revisions.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "fast-check": "4.10.2",
+    "wrangler": "4.157.0"
+  }
+}
