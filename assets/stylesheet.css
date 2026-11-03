@@ -981,3 +981,71 @@ button span,
   font-size: 0.9em;
   opacity: 0.8;
 }
+
+/* Rename Form */
+.rename-form p {
+  margin: 0.3em 0;
+}
+
+.rename-actions {
+  display: flex;
+  gap: 0.5em;
+}
+
+.rename-actions button {
+  flex: 1;
+}
+
+.rename-actions button:disabled {
+  opacity: 0.5;
+}
+
+.rename-entries {
+  overflow-y: scroll;
+  height: 58vh;
+  padding: 0 0.5em;
+}
+
+.rename-terms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14em, 1fr));
+  gap: 0.3em 1em;
+}
+
+.rename-card {
+  display: flex;
+  gap: 0.5em;
+  align-items: flex-start;
+  padding: 0.5em 0;
+  border-bottom: 1px solid #444;
+}
+
+.rename-fields {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.3em;
+}
+
+.rename-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.rename-label {
+  font-weight: bold;
+}
+
+.rename-current {
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+.rename-field input,
+.rename-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.3em;
+  font-size: 1em;
+  border-radius: 0.6em;
+}

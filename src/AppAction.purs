@@ -13,6 +13,7 @@ import AppState (AppState, SettingsTab)
 import Data.Lens.Lens (Lens')
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (CardSpec)
+import Domination.Data.Retheme (RenameTarget)
 import Domination.UI.Domination.GameEvent (GameEvent)
 import Web.Event.Event (Event)
 
@@ -46,4 +47,7 @@ data AppAction
   | LeaveRoom
   | RoomChanged
   | CopyInviteLink
+  | ProposeRename RenameTarget String
+  | CopyRenameMapping
+  | ClearRenameProposals
   | DoNothing

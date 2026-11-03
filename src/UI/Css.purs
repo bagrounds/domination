@@ -225,3 +225,30 @@ inviteLink = ClassName "invite-link"
 
 roomNotice :: ClassName
 roomNotice = ClassName "room-notice"
+
+renameForm :: ClassName
+renameForm = ClassName "rename-form"
+
+renameActions :: ClassName
+renameActions = ClassName "rename-actions"
+
+renameEntries :: ClassName
+renameEntries = ClassName "rename-entries"
+
+renameTerms :: ClassName
+renameTerms = ClassName "rename-terms"
+
+renameCard :: ClassName
+renameCard = ClassName "rename-card"
+
+renameFields :: ClassName
+renameFields = ClassName "rename-fields"
+
+renameField :: ClassName
+renameField = ClassName "rename-field"
+
+renameLabel :: ClassName
+renameLabel = ClassName "rename-label"
+
+renameCurrent :: ClassName
+renameCurrent = ClassName "rename-current"

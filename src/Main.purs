@@ -13,7 +13,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _inviteBaseUrl, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _room, _roomNotice, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
+import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _inviteBaseUrl, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _renameProposals, _room, _roomNotice, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
 import DebugLog as DebugLog
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
@@ -23,6 +23,7 @@ import Data.Foldable (traverse_)
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..), either)
 import Data.HashMap as HashMap
+import Data.Map as Map
 import Effect.Aff.Class (class MonadAff)
 import Data.Lens.Getter (view)
 import Data.Lens.Prism (review)
@@ -42,6 +43,7 @@ import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.Timer (class Timer, createTimer)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Card (CardSpec)
+import Domination.Data.Retheme (Proposals, proposeRename, renameMapping)
 import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, channelName, generateRoomCode, isGameRoom, parseRoomHash, printHeader, roomFromHash, roomHash, scopedKey)
 import Domination.Env (env)
 import Domination.UI.Chat as Chat
@@ -90,6 +92,9 @@ usernameKey = "username"
 
 chatKey :: String
 chatKey = "chat"
+
+renameProposalsKey :: String
+renameProposalsKey = "rename_proposals"
 
 gameStateKey :: String
 gameStateKey = "game_state"
@@ -297,6 +302,13 @@ handleAction audioContext = case _ of
         pure 2000
       Right d -> pure $ clampBotDelay d
 
+    eRenameProposals <- load renameProposalsKey
+    renameProposals <- case eRenameProposals of
+      Left e -> do
+        log $ "Initialize: no rename proposals found. Error: " <> e
+        pure Map.empty
+      Right p -> pure p
+
     eMessages <- load (scopedKey room chatKey)
     messages <- case eMessages of
       Left e -> do
@@ -317,6 +329,7 @@ handleAction audioContext = case _ of
       >>> (_dominationConfig <<< _botDelay .~ botDelay)
       >>> (_maybeAudioContext .~ Just audioContext)
       >>> (_messages .~ messages)
+      >>> (_renameProposals .~ renameProposals)
     log "Initialize: done modifying a bunch of stuff..."
 
     log "Initialize: load game..."
@@ -454,6 +467,18 @@ handleAction audioContext = case _ of
   CopyInviteLink -> do
     { inviteBaseUrl, room } <- H.get
     liftEffect $ FFI.copyToClipboard $ inviteBaseUrl <> roomHash room
+
+  ProposeRename target text -> do
+    { renameProposals } <- H.modify $ _renameProposals %~ proposeRename target text
+    save renameProposalsKey renameProposals >>= logErrorToChat
+
+  CopyRenameMapping -> do
+    proposals <- H.gets _.renameProposals
+    liftEffect $ FFI.copyToClipboard $ renameMapping proposals
+
+  ClearRenameProposals -> do
+    H.modify_ $ _renameProposals .~ Map.empty
+    save renameProposalsKey (Map.empty :: Proposals) >>= logErrorToChat
 
   StartNewGame -> do
     config <- H.gets _.dominationConfig

@@ -29,6 +29,7 @@ import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DebugLog as DebugLog
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
+import Domination.UI.Rename as Rename
 import Domination.UI.RenderText (renderText)
 import Domination.UI.ServerUrlInput as ServerUrlInput
 import Domination.UI.UsernameInput as UsernameInput
@@ -192,6 +193,7 @@ renderTabContent BotsTab _ { botStrategies, botDelay } = HH.div_
   , renderBotDelay botDelay
   ]
 renderTabContent DebugTab cs _ = DebugLog.render cs.debugReport
+renderTabContent RenameTab cs _ = Rename.render cs.renameProposals
 renderTabContent KingdomTab _ { kingdom } = HH.div_
   [ HH.button
     [ HE.onClick \_ -> ChooseKingdom ((prop (Proxy :: Proxy "selected") %~ not) <$> defaultKingdom) ]
