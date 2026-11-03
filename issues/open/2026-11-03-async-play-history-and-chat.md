@@ -1,6 +1,6 @@
 # Async Play: History and Chat While Away
 
-**Source:** [Async play design](../docs/2026-11-03-async-play-design.md) §6.5
+**Source:** [Async play design](../../docs/2026-11-03-async-play-design.md) §6.5
 
 **Status:** Open (after the room mailbox)
 

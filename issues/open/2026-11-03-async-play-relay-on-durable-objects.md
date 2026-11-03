@@ -1,6 +1,6 @@
 # Async Play: Relay on Durable Objects
 
-**Source:** [Async play design](../docs/2026-11-03-async-play-design.md) §6.7
+**Source:** [Async play design](../../docs/2026-11-03-async-play-design.md) §6.7
 
 **Status:** Open (later, optional)
 

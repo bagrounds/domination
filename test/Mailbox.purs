@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing, maybe)
 import Data.String (Pattern(..), indexOf)
 import Data.String.CodeUnits as CodeUnits
 import Domination.Data.Mailbox (Delivery(..), Dirty(..), PullOutcome(..), Pulled(..), Revision(..), Sent, Settlement(..), Stamp(..), Sync, deliveryStamp, initialSync, interpretDelivery, interpretPull, isClean, mailboxRoomUrl, nextRevision, ownChange, overtakes, parseRevisionTag, parseStamp, printRevisionTag, printStamp, pullCursor, receiveFrame, senderStamp, settleDelivery, settlePull, stampSender)
-import Domination.Data.Room (roomCode)
+import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, headerSender, parseHeader, printHeader, roomCode)
 import Effect (Effect)
 import Test.QuickCheck (Result(..), (<?>))
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, vectorOf)
@@ -43,6 +43,17 @@ mailbox_tests =
         (all (isNothing <<< senderStamp)
           [ "0b6e1f9a-6c2d-4f6e-9b1a-2d3c4e5f6a7b", "abc", "a/b", "a/@", "a/@x", "a/~-1" ])
         "an unstamped sender produced a stamp"
+    }
+  , { name: "stamped headers are admitted by the room parser old builds share"
+    , test: quick_check 200 do
+        stamp <- stampGen
+        pure $ case roomCode "abc" of
+          Nothing -> Failed "room code"
+          Just code ->
+            let header = printHeader (V1Header (GameRoom code) (stampSender stamp "0b6e1f9a"))
+            in (admission (GameRoom code) header == Admit
+              && (senderStamp <<< headerSender <$> parseHeader header) == Right (Just stamp))
+              <?> header
     }
   , { name: "a live frame never lowers confirmed"
     , test: quick_check 500 do

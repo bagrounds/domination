@@ -1,7 +1,9 @@
 # Asynchronous Play Design Proposal
 
 - **Date:** 2026-11-03
-- **Status:** Proposed. Not implemented. The iterations are tracked in
+- **Status:** Iterations 0 and 1 are implemented: reconnect (§6.3) and the room mailbox
+  (§6.4), live at `https://domination-mailbox.bagrounds.workers.dev`. Sections 6.5–6.7
+  are not started. The iterations are tracked in
   [`issues/open/2026-11-03-async-play.md`](../issues/open/2026-11-03-async-play.md).
 - **Issue:** [#22 Async Play](https://github.com/bagrounds/domination/issues/22)
 - **Builds on:** [Matchmaking design](./2026-10-31-matchmaking-design.md) (rooms, the `dom/1` header, room-scoped storage)
@@ -317,6 +319,11 @@ can fix that, which is iteration 1.
 
 ### 6.4 Iteration 1: the room mailbox
 
+**Status: implemented** (closed ticket
+[`2026-11-03-async-play-mailbox.md`](../issues/closed/2026-11-03-async-play-mailbox.md)).
+The client modules as built are listed in §6.4.7, and what changed during
+implementation is in §6.4.9.
+
 #### 6.4.1 HTTP API
 
 ```text
@@ -565,15 +572,15 @@ which are closed above:
 
 | Module | Contents |
 |---|---|
-| `src/Data/Mailbox.purs` (new, pure) | `Revision` (newtype over `Int`, ordered), `Stamp = Committed Revision \| Tentative Revision`, `printStamp` and `parseStamp`, `Dirty = Clean \| Moved \| Relaying`, `Sync = { confirmed :: Revision, dirty :: Dirty }`, `receiveFrame :: Sync -> Maybe Stamp -> Maybe Sync` (`Nothing` means ignore), `Delivery = Accepted Revision \| Rejected { revision :: Revision, envelope :: Maybe String } \| Unreachable String`, `resolve`, `mailboxUrl :: String -> RoomCode -> String` |
-| `src/Data/Room.purs` | `V1Header` gains an optional `Stamp` in the sender segment. `printHeader` and `parseHeader` round-trip it |
-| `src/Capability/Mailbox.purs` (new) | `class Monad m <= Mailbox m` with `pull :: String -> Revision -> m (Either String Pulled)` and `deliver :: String -> Revision -> String -> m Delivery`. Instances for `AppM` and `HalogenM`, using `fetch` through a small FFI, like `Dom`, `Storage` and `WireCodec` |
+| `src/Data/Mailbox.purs` (new, pure) | `Revision`, `Stamp = Committed Revision \| Tentative Revision` with `stampSender` and `senderStamp`, `Dirty = Clean \| Moved \| Relaying`, `Sync = { confirmed, dirty, uncertain }`, `receiveFrame` (`Nothing` means ignore), `interpretDelivery` and `interpretPull` (HTTP reply → `Delivery` and `Pulled`), `settleDelivery` and `settlePull` (what to do next), `Status`, `mailboxRoomUrl`, `mailboxBackoff` |
+| `src/FFI/Mailbox.js`, `src/FFI/Mailbox.purs` (new) | `request`: one `fetch` with `If-Match`/`If-None-Match`, a timeout that aborts it, and status 0 for no answer. `documentVisible` |
+| `src/Capability/Mailbox.purs` (new) | `class Monad m <= Mailbox m` with `requestMailbox` and `isDocumentVisible`. Instances for `AppM` and `HalogenM` |
 | `src/FFI/WebSocket.js` | Done in iteration 0 (§6.3) |
-| `src/Main.purs` | `Pull` and `Deliver` actions, a pull in `RelayRegained`; subscriptions to `online` and `visibilitychange`; stamping in `sendMessage`; `receiveFrame` in `ReceiveRemoteMessage` |
-| `src/AppState.purs` | `mailboxUrl :: String` (default constant, like `defaultServerUrl`), `mailboxStatus :: Synced \| Pending \| Offline` |
-| `src/UI/Settings.purs` | Connection tab: a *Mailbox URL* input next to *Server URL*. An empty value turns async play off |
-| `src/Main.purs` render | A small cloud mark next to the connection count: ✓ synced, … pending, ✗ offline |
-| `mailbox/` (new) | Worker, Durable Object, pure `decide.js`, tests, `wrangler.toml` |
+| `src/Main.purs` | `PullMailbox`, `DeliverMailbox`, `MailboxRetryDue` and `VisibilityChanged` actions; a pull on start, in `RelayRegained`, on `online` and when the page becomes visible; own games go through `publishGame` (mailbox first, then broadcast); `receiveGameFrame` applies `receiveFrame`; the sync state is saved per room (`mailbox_sync`) |
+| `src/AppState.purs` | `mailboxUrl` (default `defaultMailboxUrl`) and `mailbox :: MailboxSession` (sync, outbox, counters, in-flight and retry flags) |
+| `src/UI/Settings.purs`, `src/UI/MailboxUrlInput.purs` | Connection tab: a *Mailbox URL* input under *Server URL*. An empty value turns async play off |
+| `src/Main.purs` render | A cloud mark next to the connection count: ☁ ✓ synced, ☁ … pending, ☁ ✗ offline |
+| `mailbox/` (new) | Worker, Durable Object, pure `decide.js`, CORS, tests, `wrangler.toml`; deployed by `.github/workflows/mailbox.yml` |
 
 There are no changes to `Message.WireMessage`, `WireEnvelope` or the relay.
 
@@ -583,6 +590,28 @@ The API is two HTTP methods with standard headers, and the stored value is an op
 string. Any host that can do compare-and-set per key can serve it: a Durable Object
 today, or a Node process with a database, or a Deno or Bun server with SQLite tomorrow.
 The client only knows a URL, which the Connection tab can change, like the server URL.
+
+#### 6.4.9 As built: what changed during implementation
+
+- **The stamp lives in the sender string.** `stampSender` appends `/@r` or `/~b` to the
+  sender id, and `senderStamp` reads it back, so `V1Header` and `Room.purs` did not change.
+  Old builds read the whole segment as the sender id, which they ignore.
+- **Replies are interpreted, then settled.** Instead of one `resolve`, the client turns
+  an HTTP reply into a `Delivery` or `Pulled` value and then into a `Settlement` or
+  `PullOutcome`. Both steps are pure and tested; `Main` only performs them.
+- **Uncertain writes are remembered.** `Sync` keeps up to 8 envelopes that were sent
+  without an answer. A later `412` whose body is one of them, and which still matches our
+  game, counts as our own commit.
+- **Weak tags.** Cloudflare compresses responses for browsers and then weakens the ETag
+  to `W/"5"`, which the first browser test caught. The Worker now sends
+  `Cache-Control: no-store, no-transform`, compares `If-None-Match` weakly (RFC 9110), and
+  the client reads `W/"5"` as revision 5. `If-Match` stays strong.
+- **The first game takes your seat.** A player who opens an invite without a saved game
+  sees game setup, and the game view still has its default seat. The first game that
+  arrives, from the mailbox or live, now closes setup and loads with the seat chosen in
+  setup, as a restored game does.
+- **Subdomain.** The deploy workflow registers the account's `workers.dev` subdomain
+  when there is none.
 
 ### 6.5 Later: what happened while I was away (history and async chat)
 
@@ -742,6 +771,32 @@ using the local relay and `wrangler dev`:
     delivered by B.
 15. A committed frame is held back (for example by throttling one client) until a newer
     revision has arrived: it is ignored, and nobody's game goes backwards.
+
+### 10.1 Results
+
+- Server: 21 `node --test` tests in `mailbox/`, including a compare-and-set model
+  property (6–8).
+- Client: 19 tests in the "Room Mailbox" section (1–5), including a simulation of three
+  clients, a compare-and-set mailbox, and a relay that drops and reorders frames, with
+  lost requests and lost replies. Every run must end converged, with `confirmed` never
+  decreasing. Changing `settleDelivery` to forget a move made during a delivery makes
+  it fail.
+- Live Worker, with `curl`: `204`/`"0"` for a new room, `200` then `412` for a repeated
+  `If-Match`, `304`, `428`, `413`, `404`, CORS for the allowed origins, and exactly one
+  `200` out of 15 concurrent `PUT`s.
+- Browser: a Playwright script drove two Chrome profiles (separate storage) against the
+  live mailbox, with the local relay and then with the production relay. It checks:
+  - 10: Alice starts a game and plays while Bob has never been online. Bob opens the
+    room, catches up and plays; Alice comes back and catches up.
+  - Live play between them, with revisions taken from stamped frames.
+  - 14: the mailbox is blocked for Bob only. He plays, sees ☁ ✗, Alice delivers his move
+    as a courier, and Bob settles at the same revision when it is back, without a false
+    "not applied" notice.
+  - 11: the mailbox is blocked for Alice alone. She plays and closes the tab, the move is
+    delivered when she reopens, and Bob receives it later.
+
+  Scenarios 9, 12, 13 and 15 are covered by the unit and simulation tests, not in a
+  browser.
 
 ## 11. Open Questions
 

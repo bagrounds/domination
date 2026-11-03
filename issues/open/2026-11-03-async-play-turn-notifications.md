@@ -1,6 +1,6 @@
 # Async Play: Turn Notifications
 
-**Source:** [Async play design](../docs/2026-11-03-async-play-design.md) §6.6
+**Source:** [Async play design](../../docs/2026-11-03-async-play-design.md) §6.6
 
 **Status:** Open (after the room mailbox)
 

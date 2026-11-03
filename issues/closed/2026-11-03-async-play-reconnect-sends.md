@@ -1,6 +1,6 @@
 # Async Play: Reconnect Sends on the Live Socket
 
-**Source:** [Async play design](../docs/2026-11-03-async-play-design.md) §3.3 and §6.3
+**Source:** [Async play design](../../docs/2026-11-03-async-play-design.md) §3.3 and §6.3
 
 **Status:** Closed (fixed on 2026-11-03)
 
@@ -53,4 +53,4 @@ Also, the reconnect loop calls `alert()` every 5 s while the server is unreachab
 - Errors are logged instead of alerted.
 - Verified by hand with two tabs and a restarted local relay (design §6.3). A message that
   is flushed before the other peer has reconnected is still lost, because the relay keeps
-  nothing. The [room mailbox](../open/2026-11-03-async-play-mailbox.md) fixes that.
+  nothing. The [room mailbox](./2026-11-03-async-play-mailbox.md) fixes that.

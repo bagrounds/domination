@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - copilot/design-async-play-modification
     paths:
       - 'mailbox/**'
       - '.github/workflows/mailbox.yml'

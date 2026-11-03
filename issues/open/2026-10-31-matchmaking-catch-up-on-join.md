@@ -33,6 +33,6 @@ should resend its latest `GameMessage`.
 
 - [Async play design](../docs/2026-11-03-async-play-design.md) §5, option A. Catch-up only
   helps when a member with the game is online at the same time. The
-  [room mailbox](./2026-11-03-async-play-mailbox.md) covers the case where nobody is. The
+  [room mailbox](../closed/2026-11-03-async-play-mailbox.md) covers the case where nobody is. The
   same responder logic should also run after a reconnect
   ([reconnect sends](../closed/2026-11-03-async-play-reconnect-sends.md)).

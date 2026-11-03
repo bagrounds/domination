@@ -1,9 +1,9 @@
 # Async Play
 
 **Source:** [#22 Async Play](https://github.com/bagrounds/domination/issues/22),
-[Async play design](../docs/2026-11-03-async-play-design.md)
+[Async play design](../../docs/2026-11-03-async-play-design.md)
 
-**Status:** Open (designed, not implemented)
+**Status:** Open (core implemented; optional follow-ups remain)
 
 ## Description
 
@@ -22,7 +22,7 @@ conditional writes. The WebSocket relay does not change.
 
 1. [Reconnect sends](../closed/2026-11-03-async-play-reconnect-sends.md): a prerequisite bug fix,
    client only. **Done.**
-2. [Room mailbox](./2026-11-03-async-play-mailbox.md): async play itself.
+2. [Room mailbox](../closed/2026-11-03-async-play-mailbox.md): async play itself. **Done.**
 3. Later, optional:
    - [History and async chat](./2026-11-03-async-play-history-and-chat.md)
    - [Turn notifications](./2026-11-03-async-play-turn-notifications.md)
@@ -35,10 +35,10 @@ Related:
 
 ## Acceptance Criteria
 
-- [ ] With the relay restarted and the mover's tab closed, a player who opens a game room
+- [x] With the relay restarted and the mover's tab closed, a player who opens a game room
       sees the latest move.
-- [ ] A move made while offline is delivered when the player is back online, even after a
+- [x] A move made while offline is delivered when the player is back online, even after a
       reload.
-- [ ] A stale client cannot overwrite a newer move.
-- [ ] Live play between old and new builds keeps working.
-- [ ] Everything runs on free plans.
+- [x] A stale client cannot overwrite a newer move.
+- [x] Live play between old and new builds keeps working.
+- [x] Everything runs on free plans.

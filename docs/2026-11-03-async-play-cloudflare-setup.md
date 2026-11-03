@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-03
 - **For:** the room mailbox ([design](./2026-11-03-async-play-design.md) §6.4,
-  [ticket](../issues/open/2026-11-03-async-play-mailbox.md))
+  [ticket](../issues/closed/2026-11-03-async-play-mailbox.md))
 - **Cost:** free. Everything below uses the Cloudflare **Workers Free** plan.
 
 The mailbox is a Cloudflare Worker with one Durable Object per game room. To get it
@@ -18,7 +18,7 @@ credentials at all: it only needs the Worker's public URL.
 | `workers.dev` subdomain | Your free address, `<subdomain>.workers.dev` | No | Chosen once in the dashboard |
 | `CLOUDFLARE_ACCOUNT_ID` | A 32-character hex ID for your account | Not really, but keep it with the token | GitHub Actions secret |
 | `CLOUDFLARE_API_TOKEN` | A token that may deploy Workers to your account | **Yes** | GitHub Actions secret |
-| Mailbox URL | `https://domination-mailbox.<subdomain>.workers.dev`, known after the first deploy | No (public) | Sent to me, then compiled into the client |
+| Mailbox URL | `https://domination-mailbox.bagrounds.workers.dev` (deployed) | No (public) | Compiled into the client as the default |
 
 You do **not** need:
 - a domain name or DNS changes (`workers.dev` is enough),
@@ -36,8 +36,9 @@ You do **not** need:
 
 ## 3. Choose the `workers.dev` Subdomain
 
-The first deploy from GitHub Actions cannot answer questions, so pick the subdomain by hand
-first.
+The deploy workflow registers one for you if the account has none yet: `bagrounds`, or the
+name in the repository **variable** (not secret) `CLOUDFLARE_WORKERS_SUBDOMAIN` if you set
+one. This is what happened on the first deploy. To choose one by hand instead:
 
 1. In the dashboard, open **Workers & Pages** in the left sidebar.
 2. Find **Subdomain** (on the overview page, in the account details on the right) and
@@ -129,25 +130,26 @@ outside the repository can deploy with your token.
 
 ## 7. After the First Deploy
 
-When the mailbox is built and merged, the deploy workflow prints the Worker's URL. It will
-be:
+The workflow's *Deploy* step prints the Worker's URL. This repository's mailbox is live at:
 
 ```text
-https://domination-mailbox.<your-subdomain>.workers.dev
+https://domination-mailbox.bagrounds.workers.dev
 ```
 
 1. Check it is alive. A room that has never been written to answers `204` with revision 0:
 
    ```sh
-   curl -i https://domination-mailbox.<your-subdomain>.workers.dev/v1/rooms/test
+   curl -i https://domination-mailbox.bagrounds.workers.dev/v1/rooms/test
    # HTTP/2 204
    # etag: "0"
    ```
 
-2. Tell me the URL (or just the subdomain). I will make it the client's default mailbox,
+2. That URL is the client's default mailbox (`defaultMailboxUrl` in `src/AppState.purs`),
    next to the default relay URL. It is public, like the relay's address.
-3. Anyone can still point their own browser at a different mailbox, or turn async play
-   off by clearing the field, in **Settings → Connection → Mailbox URL**.
+3. Anyone can point their own browser at a different mailbox, or turn async play off by
+   clearing the field, in **Settings → Connection → Mailbox URL**.
+4. Later deploys run on pushes to `master` that change `mailbox/` or the workflow, and by
+   hand: **Actions → Deploy Mailbox → Run workflow**.
 
 ## 8. Deploying or Testing by Hand (Optional)
 
@@ -169,10 +171,10 @@ You never need the API token on your own machine:
 
 ## 10. Checklist
 
-- [ ] Cloudflare account created and email confirmed
-- [ ] `workers.dev` subdomain chosen
-- [ ] Account ID copied
-- [ ] API token created from the *Edit Cloudflare Workers* template, limited to your account
-- [ ] `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` added as GitHub Actions repository
+- [x] Cloudflare account created and email confirmed
+- [x] `workers.dev` subdomain chosen (registered by the workflow: `bagrounds`)
+- [x] Account ID copied
+- [x] API token created from the *Edit Cloudflare Workers* template, limited to your account
+- [x] `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` added as GitHub Actions repository
       secrets
-- [ ] (After the mailbox ships) the Worker URL answers `204` and has been sent to me
+- [x] The Worker URL answers `204` and is the client's default mailbox

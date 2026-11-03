@@ -27,6 +27,7 @@ or preview the latest push at [bagrounds.github.io/domination](https://bagrounds
 * Play alone, or with as many friends as you can find
 * Private games: create a game in Settings → Game and share the invite link (`#room=<code>`)
 * In game chat and game log
+* Asynchronous play in game rooms: moves are kept in a free room mailbox (a Cloudflare Worker, `mailbox/`), so players who were offline catch up when they come back ([design](docs/2026-11-03-async-play-design.md), [Cloudflare setup](docs/2026-11-03-async-play-cloudflare-setup.md))
 * Re-theming form: propose new names for cards, card text and game terms in Settings → Rename, then copy the mapping to share it
 
 ## TODO
@@ -34,7 +35,6 @@ or preview the latest push at [bagrounds.github.io/domination](https://bagrounds
 * Explicit game save and load controls
 * Card specific icons
 * Reliable message passing
-* Asynchronous play: moves reach players who were offline ([design](docs/2026-11-03-async-play-design.md), [Cloudflare setup](docs/2026-11-03-async-play-cloudflare-setup.md))
 * Custom card editor
 * Pseudo-random numbers (for deterministic shuffling and undo, and light weight game state diff based messages)
 * More expressive card effect Domain Specific Language (DSL)

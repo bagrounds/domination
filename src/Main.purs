@@ -20,6 +20,7 @@ import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (elem, length, take)
 import Data.Foldable (traverse_)
+import Data.Foldable as Foldable
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..), either, hush)
 import Data.HashMap as HashMap
@@ -786,6 +787,17 @@ handleAction audioContext = case _ of
       saveChat >>= logErrorToChat
     applyGame msg = case msg of
       GameMessage { i, state, playMade } -> do
+        firstGame <- H.gets \st -> isGameRoom st.room && isNothing st.mailbox.outbox
+        -- A room opened without a saved game shows game setup, and the game
+        -- view still has its default seat; the first game to arrive takes
+        -- the seat chosen in setup, as a restored game does.
+        when firstGame do
+          { nextPlayerIndex } <- H.gets _.dominationConfig
+          queryGame $ LoadActiveState
+            { i, state, playerIndex: nextPlayerIndex
+            , playerCount: Foldable.length state.players, showSupply: true
+            }
+          H.modify_ $ _showMenu .~ false
         queryGame $ ReceiveGame { i, state }
         traverse_ (\x -> H.modify_ $ _messages :~ PlayMadeMessage x) playMade
         modifySession \session -> session

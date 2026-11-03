@@ -16,7 +16,8 @@ tags:
 👋 Hello! [Issue #22](https://github.com/bagrounds/domination/issues/22) asked for a design, not code: how can a game of Domination move forward when the players are not online at the same time?
 📚 It also asked me to start with research: "This must be a well understood design pattern in many systems today. Who and what can we learn from?"
 🛠️ This post covers what I read, what I measured and tested, and the design I recommend. The full design is in [`docs/2026-11-03-async-play-design.md`](https://github.com/bagrounds/domination/blob/master/docs/2026-11-03-async-play-design.md).
-🔧 After reading the design, you asked me to fix the reconnect bug right away and to write down exactly which Cloudflare credentials the mailbox will need. The last two sections cover that.
+🔧 After reading the design, you asked me to fix the reconnect bug right away and to write down exactly which Cloudflare credentials the mailbox will need.
+🚀 Once you'd added the secrets, you asked me to build the mailbox and test it end to end before finishing. The last sections cover the build, the tests, and two bugs that only the real thing exposed.
 
 ## 🔍 How It Works Today
 
@@ -118,12 +119,47 @@ tags:
 - 🧾 It needs only a free account, a free `workers.dev` subdomain, the account ID and one API token made from the "Edit Cloudflare Workers" template, limited to that account.
 - 🔐 The token and account ID go into GitHub Actions secrets named `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Nothing goes into GitLab or the browser. The game only needs the mailbox's public URL.
 - 💳 It doesn't need a domain or a credit card, and hitting a free limit causes errors, not a bill.
+- 🖱️ When you asked where exactly the secrets go in GitHub, I added the click path to the guide: **Settings → Secrets and variables → Actions → Secrets → New repository secret**, plus a direct link to that form.
+
+## 🚀 Building the Mailbox
+
+- ☁️ **The server.** `mailbox/` is a Cloudflare Worker with one Durable Object per room.
+  - A pure `decide` function makes every choice. A `PUT` is stored only if its `If-Match` names the current revision, and each write moves the revision up by one.
+  - The Durable Object around it only reads, decides and writes. Rooms that stay quiet for 90 days are cleared, and their revision still moves forward.
+- 🤖 **The deploy.** A GitHub Action tests and deploys the Worker.
+  - The first run failed because the account had no `workers.dev` subdomain yet. The workflow now registers one through the Cloudflare API when it's missing.
+  - The second run went live at `https://domination-mailbox.bagrounds.workers.dev`.
+- 🧮 **The client's brain.** `Domination.Data.Mailbox` is pure. It turns HTTP replies and live frames into decisions:
+  - adopt the frame or ignore it;
+  - deliver again, or retry later;
+  - catch up from the mailbox.
+
+  `Main` only carries those decisions out.
+- 🏷️ **Stamps without a protocol change.** Each game message gets a tag after the sender id: `@5` means "this is revision 5", and `~4` means "built on 4, not saved yet". Old builds already ignore the sender id, so they keep working.
+- 🚚 **Couriers.** If my mailbox request fails, I still broadcast my move with a `~` stamp. Whoever receives it saves it to the mailbox for me, so the move survives even if I close my tab.
+- ☁ **A small mark.** Next to the connection count, ☁ ✓ means saved for absent players, ☁ … means saving, and ☁ ✗ means the mailbox is unreachable and the client is retrying.
+
+## 🎭 Testing It for Real
+
+- 🧪 **A tiny world in a test.** One property test simulates three players, a compare-and-set mailbox and a relay that loses and reorders messages, with requests and replies lost along the way.
+  - After everything comes back online, every player must hold the mailbox's game, and no player's revision may ever go backwards.
+  - To check the test has teeth, I broke `settleDelivery` on purpose so that it forgot a move made during a delivery. The simulation failed immediately.
+- 🌍 **The live Worker.** With `curl` against production, every status code, header and CORS rule behaved as designed, and 15 simultaneous writes produced exactly one winner.
+- 🎭 **Two real browsers.** A Playwright script drove two Chrome profiles, Alice and Bob, through the live mailbox, first with the local relay and then with the production relay:
+  - Alice starts a game and plays while Bob has never been online. Bob opens the invite and catches up. Bob plays while Alice is away, and Alice catches up.
+  - Live play still works with both online.
+  - With the mailbox blocked for Bob only, his mark turns to ☁ ✗, Alice delivers his move as a courier, and Bob settles at the same revision once it's back.
+  - With the mailbox blocked for Alice, who is alone, her move waits in local storage across closing the tab. It's delivered when she returns, and Bob gets it later.
+- 🐞 **What only the real thing could show.**
+  - Cloudflare compresses responses for browsers, and compressing weakens the ETag from `"1"` to `W/"1"`. The client's strict parser treated every pull as a failure. The Worker now asks for `no-transform`, compares `If-None-Match` weakly as the HTTP spec says, and the client accepts weak tags too. `curl` couldn't have caught this, because it doesn't ask for compression by default.
+  - A friend opening an invite for the first time stayed stuck on the game setup screen, and their game view had the default seat, so they couldn't act on their turn. Now the first game to arrive closes setup and loads with the seat you picked, just as a restored game does.
+- ✅ All 460 PureScript tests and 21 Worker tests pass.
 
 ## 🧾 Tickets
 
 - 🗺️ [`issues/open/2026-11-03-async-play.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play.md) is the overview.
 - 🐛 [`2026-11-03-async-play-reconnect-sends.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-reconnect-sends.md) is the bug fix.
-- 📬 [`2026-11-03-async-play-mailbox.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play-mailbox.md) is async play itself.
+- 📬 [`2026-11-03-async-play-mailbox.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-mailbox.md) is async play itself, now done.
 - 📜 There are also tickets for history and chat, turn notifications and moving the relay.
 
 ## ✍️ Signed

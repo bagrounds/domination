@@ -21,4 +21,4 @@ Improve the reliability of peer-to-peer message passing. The current WebRTC-base
 - [Async play design](../docs/2026-11-03-async-play-design.md). It found that sends after a
   reconnect go to the closed socket ([reconnect sends](../closed/2026-11-03-async-play-reconnect-sends.md)),
   and it proposes a room mailbox with conditional writes so that missed game messages are
-  recovered ([room mailbox](./2026-11-03-async-play-mailbox.md)).
+  recovered ([room mailbox](../closed/2026-11-03-async-play-mailbox.md)).
