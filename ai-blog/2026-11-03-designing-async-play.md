@@ -37,7 +37,7 @@ tags:
   - A compressed game message starts at about 400 bytes and never exceeded about 3.4 KB, even in long six-player games.
   - The whole history of a long game is megabytes.
   - So keeping just the latest state of a room is tiny.
-- 📮 **A prototype mailbox.** I wrote a 43-line HTTP server that stores one string per room, with a hash as its version.
+- 📮 **A prototype mailbox.** I wrote a 43-line HTTP server that stores one string per room, with a version for each write.
   - Browser A saved the exact string it had broadcast.
   - Browser B fetched it and fed it into the same event the WebSocket code uses, and B adopted the game.
   - Reading from storage needs no new message format and no new decoder.
@@ -69,14 +69,31 @@ tags:
 - 0️⃣ **Fix reconnects first.** Send on the live socket, queue messages while connecting, announce yourself again after a reconnect, back off with jitter, and stop the `alert()` popups.
 - 1️⃣ **Add the room mailbox.**
   - `GET /v1/rooms/<code>` and a conditional `PUT /v1/rooms/<code>`.
-  - It stores the exact compressed string that is already broadcast, with a SHA-256 hash as the version.
+  - It stores the compressed string that is already broadcast, and gives each accepted write the next **revision** number.
+  - A write only succeeds if it names the latest revision.
   - Clients save each move there, then broadcast it.
   - They read it when the game opens, after a reconnect, when the network comes back and when the tab becomes visible again.
-- 📦 **An outbox of one.** A move made offline waits in local storage. Each message is a full state, so a newer move simply replaces an older one.
-- ⚔️ **Conflicts.** If the mailbox holds a state you have already seen, you are ahead: write over it (like a git fast-forward). If it holds a state you have never seen, someone moved first: adopt their state and say so. A stale tab can no longer silently roll the game back.
+- 🏷️ **Revisions on live frames.** New builds add a small stamp such as `@7` to the sender part of the message header. Old builds already ignore that part. Receivers ignore frames with a revision older than one they have seen, so a late message can't roll the game back.
+- 📦 **An outbox of one.** A move made offline is already saved locally. A persisted "dirty" flag means it gets delivered when you are back. Each message is a full state, so only the newest one matters.
+- ⚔️ **Conflicts.** If someone else's move got in first, your write is refused. You adopt their state and the game says so. A stale tab can no longer silently roll the game back.
 - 🔁 **Compatibility.** The relay and the message format don't change, so old and new builds keep playing together live, and rolling back is harmless.
 - 💸 **Cost.** The free plan allows 100,000 writes a day. That is about 2,000 short games a day, far more than we need. If a limit is ever hit, the game falls back to today's live-only behaviour.
 - 🔭 **Later.** A short history so you see what happened while you were away, opt-in "your turn" notifications, and maybe moving the live relay into the same room objects.
+
+## 🦆 What the Review Caught
+
+- 🔍 My first draft used a content hash (SHA-256) as the version. If the mailbox held a state the client had already "seen", the client would write over it.
+- 💥 A review found a race. A and B both move from the same state. A's write is accepted and broadcast. B receives A's state while B's own write is in flight, so B's write fails with a state B has "seen". B would then overwrite A's accepted move.
+- 🧭 The lesson: a hash tells you whether two states are *equal*, not which came *first*. A number assigned by the server tells you both. Kafka offsets and Matrix stream tokens are built the same way.
+- 📦 A second review of the revision design found three gaps:
+  - A player whose write failed could send a move and leave, so it reached only some players.
+  - A slow "accepted" reply could arrive after the client had already switched to another state.
+  - Late replies could move the client's revision backwards.
+- 🚚 The fixes:
+  - Any client that receives a move the mailbox doesn't have yet delivers it as a courier.
+  - Revisions only go up.
+  - An accepted write always wins over an uncommitted one.
+- ✅ That gives one rule to check: whatever game a player is looking at is either in the mailbox or on its way there.
 
 ## 🧾 Tickets
 

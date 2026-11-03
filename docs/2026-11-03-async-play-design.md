@@ -34,27 +34,31 @@ The proposal:
    latest game envelope of each game room: `GET` and a conditional `PUT` on
    `/v1/rooms/<code>`. It is content-agnostic: it stores the same compressed string that
    is broadcast, and never decodes it. Host it on a **Cloudflare Worker with one Durable
-   Object per room** (free plan, durable, no cold start). Clients write through to it on
-   every move and read from it on load, on reconnect, on `online` and when the tab
-   becomes visible again. The WebSocket relay on Render does not change.
+   Object per room** (free plan, durable, no cold start). Each accepted write gets the
+   next **revision** number. Writes only succeed against the latest revision, and live
+   frames carry their revision, so neither a stale client nor a late frame can roll the
+   game back. Clients write to the mailbox on every move and read from it on load, on
+   reconnect, on `online` and when the tab becomes visible again. The WebSocket relay on
+   Render does not change.
 2. **Later, optional:** a short history of missed plays and chat (§6.5), "it's your turn"
    push notifications (§6.6), and moving the live relay into the same Durable Objects
    (§6.7).
 
-The relay, the wire layout of messages and the global room do not change. Old clients
-keep working with new ones.
+The relay, the layout of messages and the global room do not change. Old clients keep
+working with new ones: the revision rides in the header's sender segment, which old
+clients already ignore.
 
 ## 2. Goals and Constraints
 
 | # | Requirement | How this design meets it |
 |---|---|---|
-| R1 | A move reaches a player who was offline when it was made, as soon as they come back | Every move is written to the room mailbox. Clients read it on load and on every wake-up (§6.4.3) |
+| R1 | A move reaches a player who was offline when it was made, as soon as they come back | Every move is written to the room mailbox. Clients read it on load and on every wake-up (§6.4.4) |
 | R2 | No manual "push the state around" after a missed message | Reconnects really reconnect (§6.3). Pulls on wake replace manual *Load Game* |
 | R3 | Simplest and free (README principle *Zero cost infrastructure*) | One HTTP endpoint with two methods, about 60 lines of Worker code, on Cloudflare's free plan (§8). No change to the relay |
-| R4 | Robust | Durable storage (§5). Compare-and-set writes, so a stale client cannot overwrite a newer move (§6.4.5). Moves made offline wait in an outbox and are sent later (§6.4.4) |
+| R4 | Robust | Durable storage (§5). Compare-and-set writes on server-assigned revisions, so a stale client cannot overwrite a newer move and a late frame cannot roll anyone back (§6.4.6). Moves made offline are delivered later (§6.4.5) |
 | R5 | Fits the existing system | Rooms from the matchmaking design are the unit of a match. The mailbox stores the same envelope the relay carries, and replaying it uses the existing receive path (§3.4, M4) |
 | R6 | Smooth evolution | Additive, Parallel Change (§7). The relay is unchanged. Old and new clients keep playing together live |
-| R7 | Domain-driven, functional and testable | Pure `Domination.Data.Mailbox` module for every decision, effects behind a `Mailbox` capability (§6.4.6), property tests (§10) |
+| R7 | Domain-driven, functional and testable | Pure `Domination.Data.Mailbox` module for every decision, effects behind a `Mailbox` capability (§6.4.7), property tests (§10) |
 
 Non-goals: accounts, private or encrypted storage (§9.1), server-side validation of
 moves, time controls, and async play in the **global room** (it is being retired, see
@@ -148,23 +152,25 @@ pages and drove it from the same two browser profiles:
 | M5 | `PUT` with a stale `If-Match`, then with the current one, then with that same one again | `412` with the current body, then `200`, then `412` |
 
 M4 matters most: reading from the mailbox needs **no new decoding path and no new message
-type**. The mailbox is just another way to receive the same envelope.
+type**. The mailbox is just another way to receive the same envelope. The prototype used a
+SHA-256 of the body as the `ETag`. The design uses a revision number instead, for the
+reason in §6.4.6. The HTTP mechanics are the same.
 
 ## 4. Research: Who Has Solved This?
 
 | Source | What we take from it |
 |---|---|
-| Email: [RFC 5321 SMTP](https://www.rfc-editor.org/rfc/rfc5321) §4.5.4 (retry strategies) | The original **store and forward** system. A server that stays online takes custody of the message and retries until the receiver can take it. The sender's outbox retries too. We copy both: the mailbox keeps the move, and the client keeps an outbox (§6.4.4) |
+| Email: [RFC 5321 SMTP](https://www.rfc-editor.org/rfc/rfc5321) §4.5.4 (retry strategies) | The original **store and forward** system. A server that stays online takes custody of the message and retries until the receiver can take it. The sender's outbox retries too. We copy both: the mailbox keeps the move, and the client keeps an outbox (§6.4.5) |
 | [RFC 4838](https://www.rfc-editor.org/rfc/rfc4838), *Delay-Tolerant Networking Architecture* | Networks where the two ends are rarely connected at the same time. Nodes keep messages in **persistent storage** until they can be passed on. The general principle: when the ends do not overlap, something in between must hold the data, and memory that a restart erases is not enough |
 | XMPP [XEP-0160 Offline Messages](https://xmpp.org/extensions/xep-0160.html) and [XEP-0313 Message Archive Management](https://xmpp.org/extensions/xep-0313.html) | Chat servers keep messages for offline users and deliver them on the next login. Later, clients query the archive for "everything after the last message I saw". That is the model for the optional history in §6.5 |
-| [Matrix client-server API, syncing](https://spec.matrix.org/latest/client-server-api/#syncing) | A client calls `/sync` with the `since` token from its last sync and gets everything it missed. **Pull on wake with a cursor**. Our cursor is the `ETag` of the state we already have (§6.4.3) |
-| [MQTT 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) §3.3.1.3, *Retain* | A broker keeps the **last retained message per topic** and sends it to every new subscriber. That is exactly our mailbox: one topic per room, last value wins. MQTT also shows the trap: a retained value has no version, so a stale publisher silently replaces a newer value. We add a version, the `ETag` |
+| [Matrix client-server API, syncing](https://spec.matrix.org/latest/client-server-api/#syncing) | A client calls `/sync` with the `since` token from its last sync and gets everything it missed. **Pull on wake with a cursor**. Our cursor is the highest committed revision we have seen (§6.4.4) |
+| [MQTT 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) §3.3.1.3, *Retain* | A broker keeps the **last retained message per topic** and sends it to every new subscriber. That is exactly our mailbox: one topic per room, last value wins. MQTT also shows the trap: a retained value has no version, so a stale publisher silently replaces a newer value. We add a version, the revision |
 | Apache Kafka, [log compaction](https://kafka.apache.org/documentation/#compaction) | "Retain at least the last known value for each message key." When each message is a full state, history can be thrown away. Our `GameMessage` is a full state (§3.1) |
 | Apple GameKit, [`GKTurnBasedMatch`](https://developer.apple.com/documentation/gamekit/gkturnbasedmatch) and [sending messages in turn-based games](https://developer.apple.com/documentation/gamekit/sending-messages-to-players-in-turn-based-games) | The best-known async game API. Game Center stores one opaque, size-limited `matchData` blob per match. The current player saves it with `saveCurrentTurn` or `endTurn`, and the others load it when they open the game or get a turn notification. The server never reads the blob. Our mailbox is the same design: an opaque latest-state blob per room |
-| Google Play Games Services, [end of the multiplayer APIs](https://support.google.com/googleplay/android-developer/answer/9469745) | Google shut down its hosted turn-based multiplayer API on March 31, 2020 and pointed developers to Firebase. A vendor's game service can disappear. We keep the protocol tiny and portable, so the mailbox can move to any host (§6.4.7) |
+| Google Play Games Services, [end of the multiplayer APIs](https://support.google.com/googleplay/android-developer/answer/9469745) | Google shut down its hosted turn-based multiplayer API on March 31, 2020 and pointed developers to Firebase. A vendor's game service can disappear. We keep the protocol tiny and portable, so the mailbox can move to any host (§6.4.8) |
 | [Play-by-email games](https://en.wikipedia.org/wiki/Play-by-mail_game) and correspondence chess | Turn-based games have been played asynchronously for a long time by mailing the position or the save file. Because our state is at most about 3.4 KB, a "turn link" is a zero-infrastructure fallback (option B, §5) |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) §8.8.3 `ETag`, §13.1.1 `If-Match`; [RFC 6585](https://www.rfc-editor.org/rfc/rfc6585) §3, *428 Precondition Required* | The standard HTTP answer to the **lost update** problem. A client writes "only if the current version is still the one I read". A server can require such conditions with `428`. A content hash is a valid strong `ETag` |
-| Shapiro et al., [*A comprehensive study of Convergent and Commutative Replicated Data Types*](https://inria.hal.science/inria-00555588) (INRIA RR-7506, 2011) | The difference between **state-based** replication (send the whole state, keep the latest) and **operation-based** replication (send each operation, deliver all of them exactly once, in order). We are state-based, which is why one stored value is enough. Our state has no merge function, so concurrent writes need compare-and-set rather than a merge (§6.4.5) |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) §8.8.3 `ETag`, §13.1.1 `If-Match`; [RFC 6585](https://www.rfc-editor.org/rfc/rfc6585) §3, *428 Precondition Required* | The standard HTTP answer to the **lost update** problem. A client writes "only if the current version is still the one I read". A server can require such conditions with `428`. Any opaque value works as a strong `ETag`. We use a revision number |
+| Shapiro et al., [*A comprehensive study of Convergent and Commutative Replicated Data Types*](https://inria.hal.science/inria-00555588) (INRIA RR-7506, 2011) | The difference between **state-based** replication (send the whole state, keep the latest) and **operation-based** replication (send each operation, deliver all of them exactly once, in order). We are state-based, which is why one stored value is enough. Our state has no merge function, so concurrent writes need compare-and-set rather than a merge (§6.4.6) |
 | Demers et al., *Epidemic Algorithms for Replicated Database Maintenance* (PODC 1987) | **Anti-entropy:** peers compare state and the newer one wins. Catch-up on join is anti-entropy between peers. It only works when a peer that has the latest state is online at the same time, so it cannot deliver async play by itself (option A) |
 | Kleppmann et al., [*Local-First Software*](https://www.inkandswitch.com/local-first/) (Onward! 2019) | The app keeps working offline with its local copy. A server is just a peer that is always online and helps others sync. Domination already keeps the game in `localStorage`. The mailbox is that always-online peer, and it never decides the game |
 | Cloudflare, [Durable Objects](https://developers.cloudflare.com/durable-objects/) with [WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/), [limits](https://developers.cloudflare.com/durable-objects/platform/limits/) and [pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/); [Cloudflare acquires PartyKit](https://blog.cloudflare.com/cloudflare-acquires-partykit/) | A Durable Object is a single-threaded object with its own durable SQLite storage, addressed by name. **One object per room** is the standard design for multiplayer rooms (PartyKit is built on it). Single-threading makes compare-and-set trivial. SQLite-backed objects are on the free plan |
@@ -229,9 +235,9 @@ flowchart LR
   end
   A -- "live: WebSocket (unchanged)" --> R[("Relay on Render<br/>server/index.js")]
   R -- live --> B
-  A -- "PUT /v1/rooms/k7m2x9qp<br/>If-Match: ETag" --> W[Cloudflare Worker]
-  B -- "GET /v1/rooms/k7m2x9qp<br/>If-None-Match: ETag" --> W
-  W --> DO[("Durable Object k7m2x9qp<br/>latest envelope + ETag")]
+  A -- "PUT /v1/rooms/k7m2x9qp<br/>If-Match: revision" --> W[Cloudflare Worker]
+  B -- "GET /v1/rooms/k7m2x9qp<br/>If-None-Match: revision" --> W
+  W --> DO[("Durable Object k7m2x9qp<br/>revision + latest envelope")]
 ```
 
 ```mermaid
@@ -240,34 +246,35 @@ sequenceDiagram
   participant M as Mailbox (room k7m2x9qp)
   participant R as Relay
   participant B as Bob (offline)
-  A->>A: play a card → GameMessage, wire string s1
-  A->>M: PUT s1, If-Match: tag(s0)
-  M-->>A: 200, ETag: tag(s1)
-  A->>R: broadcast s1 (nobody else is online)
+  A->>A: play a card. Envelope stamped @5
+  A->>M: PUT envelope, If-Match: "4"
+  M-->>A: 200, ETag: "5"
+  A->>R: broadcast the same envelope (nobody else is online)
   Note over A,B: Alice closes the tab. Hours pass. The relay spins down.
-  B->>B: open the invite link → restore local game (s0)
-  B->>M: GET, If-None-Match: tag(s0)
-  M-->>B: 200 s1, ETag: tag(s1)
-  B->>B: replay s1 through ReceiveRemoteMessage → "your turn" beep
-  B->>B: play → s2
-  B->>M: PUT s2, If-Match: tag(s1) → 200
-  B->>R: broadcast s2
+  B->>B: open the invite link. Restore the local game (revision 4)
+  B->>M: GET, If-None-Match: "4"
+  M-->>B: 200 envelope, ETag: "5"
+  B->>B: replay it through ReceiveRemoteMessage. "Your turn" beep
+  B->>B: play. Envelope stamped @6
+  B->>M: PUT, If-Match: "5"
+  M-->>B: 200, ETag: "6"
+  B->>R: broadcast
 ```
 
 ### 6.2 Domain language
 
 | Term | Meaning |
 |---|---|
-| **Mailbox** | The durable store that keeps the latest game envelope of one game room |
-| **Envelope** | The exact compressed wire string a client broadcasts (`writeWire (Tuple header GameWireMessage)`). The mailbox stores it unchanged |
-| **Tag** | The `ETag` of an envelope: `"` + base64url(SHA-256(UTF-8 bytes)) + `"`. The same function runs in the Worker and the browser (M2) |
-| **Base** | The tag of the envelope a client's current game came from: the last one it received or sent |
-| **Seen tags** | A bounded list of the last 32 tags this client has adopted or written in a room |
+| **Mailbox** | The durable store that keeps the latest game envelope of one game room, plus its revision |
+| **Envelope** | The compressed wire string of a `GameMessage` (`writeWire (Tuple header message)`). The mailbox stores it unchanged and never decodes it |
+| **Revision** | A number the mailbox assigns to each accepted write: 0 for an empty room, then 1, 2, 3, and so on. It is the mailbox's `ETag`, and it never goes backwards. The mailbox's history is one line, like a Kafka partition's offsets or a Matrix stream token |
+| **Stamp** | An optional suffix on the sender segment of a game envelope's header. `@r` means "committed as revision r". `~r` means "not committed, based on revision r". No stamp means an old build |
+| **Confirmed** | The highest revision this client knows was committed. It comes from mailbox responses and stamps, and it never decreases |
+| **Dirty** | Whether the local game still has to reach the mailbox: `Clean`, `Moved` (our own change) or `Relaying` (someone else's frame that is not committed yet). It is a **single-slot outbox**: messages are full states, so the newest state is the only thing to deliver |
+| **Courier** | A client that delivers someone else's uncommitted frame to the mailbox |
 | **Pull** | `GET` the mailbox and replay a newer envelope through the normal receive path |
-| **Write-through** | On every own game change in a game room: conditional `PUT`, then broadcast |
-| **Outbox** | At most **one** pending write per room. Because messages are full states, a newer pending write replaces an older one |
-| **Fast-forward** | The mailbox is behind but holds a state this client has already seen, so writing over it loses nothing |
-| **Conflict** | The mailbox holds a state this client has never seen. Someone else moved first |
+| **Deliver** | `PUT` the current local game, stamped `@(confirmed + 1)`, with `If-Match: confirmed` |
+| **Conflict** | The mailbox accepted someone else's write after our confirmed revision. Their move wins |
 
 ### 6.3 Iteration 0: reconnect that really reconnects (client only)
 
@@ -275,15 +282,15 @@ This fixes the bug in E2. It also helps live play without async play.
 
 1. **Send on the current socket.** `send` in `src/FFI/WebSocket.js` should use
    `getWebSocket()` instead of the socket captured by the first `onopen`.
-   - While the socket is `CONNECTING` or closed, put the message in a small queue in the
-     FFI. `send` throws `InvalidStateError` while `CONNECTING`.
-   - Flush the queue on `onopen`. Keep chat and game messages and drop presence messages,
-     because a fresh `Join` replaces them.
+   - While the socket is `CONNECTING` or closed, queue the message in the FFI. `send`
+     throws `InvalidStateError` while `CONNECTING`.
+   - Keep chat messages and only the newest game message. Drop presence messages, because
+     a fresh `Join` replaces them. Flush the queue on `onopen`.
    - The broadcaster then stands for the connection, not for one socket.
 2. **Announce reconnects.** After a *re*connect, dispatch a `reconnected` event on
-   `#remote-message-target`. `Main` subscribes with a new `Reconnected` action. It
-   sends `JoinMessage` and `UsernameMessage` (peers have pruned us after 15 s), then
-   pulls the mailbox (iteration 1) or does catch-up on join.
+   `#remote-message-target`. `Main` subscribes with a new `Reconnected` action. It sends
+   `JoinMessage` and `UsernameMessage` (peers have pruned us after 15 s), then pulls the
+   mailbox (iteration 1) or does catch-up on join.
 3. **Back off with jitter.** Replace the fixed 5 s retry with a random delay that grows to
    about a minute, so that a Render restart does not bring every client back at the same
    instant.
@@ -297,22 +304,29 @@ This fixes the bug in E2. It also helps live play without async play.
 
 ```text
 GET  /v1/rooms/{room-code}
-     If-None-Match: <tag>        (optional)
-  -> 200 <envelope>  ETag: <tag>
-  -> 304             (the client already has it)
-  -> 404             (empty mailbox)
+     If-None-Match: "<revision>"    (optional)
+  -> 200 <envelope>  ETag: "<revision>"
+  -> 204             ETag: "<revision>"    (no game stored: a new or expired room)
+  -> 304             (the client already has this revision)
 
-PUT  /v1/rooms/{room-code}       body: <envelope>, at most 16 KiB
-     If-Match: <tag>             replace the current envelope
-     If-None-Match: *            first write
-  -> 200 / 201       ETag: <new tag>
-  -> 412 <current envelope>  ETag: <current tag>   (precondition failed)
+PUT  /v1/rooms/{room-code}          body: <envelope>, at most 16 KiB
+     If-Match: "<revision>"         required
+  -> 200             ETag: "<revision + 1>"
+  -> 412 <current envelope, if any>  ETag: "<current revision>"
   -> 413             (too large)
-  -> 428             (no precondition; every write must be conditional)
+  -> 428             (no If-Match: every write must be conditional)
 
 OPTIONS ...  -> CORS preflight
 ```
 
+- **Every room exists at revision 0.** A new room answers `204` with `ETag: "0"`, so the
+  first write is an ordinary `If-Match: "0"`. There is no special case for an empty
+  mailbox.
+- **Revisions are never reused.** After 90 days without a write, a Durable Object alarm
+  deletes the envelope and advances the revision by one, which costs a few bytes. A
+  client that still has the game saved sees the newer `204` and delivers its copy again
+  (§6.4.4). A room that comes back continues at the next revision, so no client can confuse an old revision
+  with a new one.
 - `room-code` uses the existing grammar, `[a-z0-9]{1,32}` (`Domination.Data.Room`).
   Anything else returns 404. The global room has no mailbox.
 - Responses set `Cache-Control: no-store`. CORS allows the two app origins
@@ -339,34 +353,89 @@ export default {
 export class Mailbox extends DurableObject {
   async fetch(request) {
     const body = await request.text()                            // read before touching storage
-    const current = await this.ctx.storage.get('latest')         // { envelope, tag } | undefined
-    const decision = decide(request.method, preconditionOf(request.headers), current, body, await tagOf(body))
+    const current = (await this.ctx.storage.get('latest')) ?? { revision: 0, envelope: null }
+    const decision = decide(request.method, request.headers, current, body)
     if (decision.store) {
-      await this.ctx.storage.put('latest', decision.store)
-      await this.ctx.storage.setAlarm(Date.now() + ninetyDays)   // expire idle rooms
+      await this.ctx.storage.put('latest', decision.store)       // { revision: n + 1, envelope }
+      await this.ctx.storage.setAlarm(Date.now() + ninetyDays)
     }
     return withCors(request, toResponse(decision))
   }
-  async alarm() { await this.ctx.storage.deleteAll() }
+  async alarm() {
+    const { revision } = await this.ctx.storage.get('latest')
+    await this.ctx.storage.put('latest', { revision: revision + 1, envelope: null })
+  }
 }
 ```
 
-- **`decide` is a pure function** (`mailbox/src/decide.js`): method × precondition ×
-  current × body → response and maybe a new value. It is tested with property tests in
-  Node (§10). The Durable Object is only the imperative shell.
+- **`decide` is a pure function** (`mailbox/src/decide.js`): method, headers, current
+  value and body go in; a response and maybe a new value come out. It is tested with
+  property tests in Node (§10). The Durable Object is only the imperative shell.
 - **Compare-and-set is atomic.** A Durable Object runs one piece of code at a time, and
   its input gates hold back other requests while it waits on its own storage. The sketch
-  reads the body and hashes it before the `get`, so nothing but storage happens between
-  `get` and `put`. Awaiting the body in between would let another request run there.
-- **Storage:** one row per room, at most about 3.4 KB. Idle rooms are deleted after 90
-  days by a Durable Object alarm.
+  reads the body before the `get`, so nothing but storage happens between `get` and
+  `put`. Awaiting the body in between would let another request run there.
+- **Storage:** one row per room, at most about 3.4 KB.
 - **Deployment:** `mailbox/wrangler.toml` with a SQLite-backed Durable Object class
   (`new_sqlite_classes`, required on the free plan). Deploy with `npx wrangler deploy`,
   by hand or from a GitHub Action that runs only on `master` using a
   `CLOUDFLARE_API_TOKEN` secret. `npx wrangler dev` runs the same code locally with local
   storage for manual and end-to-end tests.
 
-#### 6.4.3 Client: read path (pull)
+#### 6.4.3 Stamps: ordering live frames without changing the wire format
+
+The relay delivers frames in any order and some never arrive, so receivers need to know
+whether a frame is newer than what they have. Content alone cannot say that: *Undo*
+sends older states, and `i` goes backwards (§3.1). The mailbox's revision can.
+
+New builds append a **stamp** to the sender segment of a game envelope's header:
+
+```text
+v1-header = "dom/1/" room "/" sender
+sender    = client-id [ "/" stamp ]   ; old builds read all of it as the sender
+stamp     = "@" revision              ; committed as this revision
+          / "~" revision              ; not committed; based on this revision
+```
+
+This is backward compatible. `parseHeader` takes everything after the room as the
+sender (`src/Data/Room.purs`), and no receiver ever reads the sender (`Main.purs` only
+prints it). Old builds admit stamped frames as before, and their own frames have no
+stamp. The message layout (`WireMessage`, `WireEnvelope`) does not change.
+
+**The client invariant.** Each client keeps `confirmed`, the highest revision it knows
+was committed, and `dirty`, one of:
+
+- `Clean`: the local game **is** the committed state at `confirmed`.
+- `Moved`: the local game has our own changes on top of `confirmed`.
+- `Relaying`: the local game came from someone else and is not committed yet.
+
+When the local game is not `Clean`, the client delivers it to the mailbox (§6.4.5). So
+every state anyone is looking at either is in the mailbox or is being delivered to it.
+
+When a new build receives a game frame over the relay:
+
+| Stamp | Decision |
+|---|---|
+| `@r` with `r > confirmed` | Adopt. `confirmed := r`, `dirty := Clean` |
+| `@r` with `r ≤ confirmed` | Ignore. It is a duplicate or a late frame that has been overtaken |
+| `~b` with `b ≥ confirmed` | Adopt, as today. `confirmed := b`, `dirty := Relaying` |
+| `~b` with `b < confirmed` | Ignore. It was based on a revision that has since been replaced |
+| none (old build) | Adopt, as today. While `confirmed` is 0, `dirty := Relaying`. Later the frame may be arbitrarily old, so it is not delivered |
+
+A `Relaying` client acts as a **courier**: it delivers the frame for its author, whose own
+write failed or who is on an old build. If the author vanishes, the move still reaches
+the mailbox. If several couriers race, the first one wins and the others get a `412`
+with the same game. Unstamped frames from old builds carry no base revision, so they are
+only delivered before the room's first commit. After that, a move by an old build reaches
+the mailbox with the next move by a new build.
+
+Adopting a frame replaces the local game, as it does today. If `dirty` was `Moved`, our
+own unsent change is gone. If the adopted game differs from ours (a courier may deliver
+our own move) and its revision is `confirmed + 1` (a direct competitor, not a later
+state that may include our move), the client adds the chat line *(another move arrived first; yours was not
+applied)*.
+
+#### 6.4.4 Client: read path (pull)
 
 Pull when there may be news:
 
@@ -377,100 +446,120 @@ Pull when there may be news:
 | `window` `online` | Back from a network outage |
 | `document` `visibilitychange` to visible | Mobile tabs are frozen in the background and their sockets die quietly |
 
-A pull first delivers a pending outbox write, if there is one (§6.4.4). Its `412` path
-already adopts anything newer, so a pull never silently discards a move made offline.
-Otherwise a pull is `GET` with `If-None-Match: base`:
+If `dirty` is not `Clean`, a pull **delivers** instead (§6.4.5). The delivery either
+commits the local game or finds the newer state. Otherwise a pull is `GET` with
+`If-None-Match: confirmed`:
 
-- **304 or 404:** nothing to do. On 404 with a local game, seed the mailbox with
-  `If-None-Match: *`, so a room whose mailbox expired can recover from any member.
-- **200:** replay the body through the existing receive path (M4). That means header
-  admission, decode and `ReceiveGame`, which saves it and beeps if it is your turn. Add a
-  chat line: *(caught up: the game changed while you were away)*. Set `base` to the new
-  tag and add it to the seen tags.
+- **304:** nothing new. By the invariant, the local game is the latest committed state.
+- **200 or 204 with a revision above `confirmed`:** someone committed something we have
+  not seen. Replay the envelope through the existing receive path (M4): header
+  admission, decode and `ReceiveGame`, which saves it and beeps if it is your turn. Then
+  set `confirmed := revision` and add a chat line: *(caught up: the game changed while
+  you were away)*. A `204` means the room expired: update `confirmed` and, if a game is
+  saved locally, set `dirty := Moved` so the saved game is delivered again.
+- **A response with a revision at or below `confirmed`** (a late reply) is ignored.
 
-#### 6.4.4 Client: write path (write-through and outbox)
+#### 6.4.5 Client: write path (deliver)
 
 On every **own** game change in a game room (a play, a bot play hosted here, *Start*,
-*Undo*, *Load Game*):
+*Undo*, *Load Game*), set `dirty := Moved`, then deliver. A courier delivers right after
+adopting a frame. Deliveries are serialized per room. A new `PUT` waits until the
+previous one has settled, and a request is aborted after 15 s.
 
-1. Encode the envelope once, as today in `sendMessage`.
-2. Put `{ envelope, base }` in the room's **outbox**, replacing anything already there,
-   and persist it under `scopedKey room "mailbox_outbox"`. A move made offline survives a
-   reload.
-3. `PUT` with `If-Match: base`, or `If-None-Match: *` if there is no base.
-   - **2xx:** clear the outbox, set `base` to the returned tag, and broadcast the envelope.
-   - **412:** resolve (§6.4.5).
-   - **Network error, 5xx, quota exhausted or more than 3 s without a reply:** broadcast
-     anyway, so live play never waits on the mailbox. Leave the write in the outbox and
-     retry on the next pull trigger (§6.4.3).
-4. Received `GameMessage`s (from the relay or a pull) set `base` to the tag of the received
-   string. The tag is computed from the raw `detail` in `ReceiveRemoteMessage`.
-5. Every tag that is received or accepted is added to the seen tags. `base` and the seen
-   tags are persisted next to the outbox (`scopedKey room "mailbox_base"` and
-   `"mailbox_seen"`).
+1. Encode the current game as an envelope stamped `@(confirmed + 1)`.
+2. `PUT` it with `If-Match: confirmed`. Note whether any frame is adopted while the
+   request is in flight. On reply:
+   - **Any reply with a revision at or below `confirmed`:** stale. Ignore it, apart from
+     retrying the delivery if still not `Clean`. `confirmed` never goes down.
+   - **200:** set `confirmed` to the new revision.
+     - If nothing changed locally while the request was in flight, set `dirty := Clean`
+       and broadcast the envelope.
+     - If we made more moves meanwhile, stay `Moved`, broadcast, and deliver again.
+     - If we adopted a frame meanwhile, our write is the committed state and the adopted
+       frame (necessarily `~` or unstamped) is not. Replay our accepted envelope, set
+       `dirty := Clean`, and broadcast it. The other author's delivery will get a `412`
+       and adopt it. Any moves we made after the adoption built on the uncommitted frame,
+       so they are dropped too, with the *not applied* chat line.
+   - **412 with one of our own uncertain envelopes:** the returned envelope is
+     byte-for-byte one that this client sent but never heard back about (see below). That
+     write succeeded. Set `confirmed` to its revision. If the game has not changed since
+     that write, set `dirty := Clean`. Otherwise our game builds on it, so deliver again.
+   - **412 with anything else:** someone committed first. Replay the current envelope,
+     set `confirmed` to its revision and `dirty := Clean`. If we were `Moved` and the game
+     differs from ours and its revision is `confirmed + 1`, add the chat line *(another move arrived first; yours was not
+     applied)*. A courier adopts silently. Do not broadcast it, because its author already did.
+   - **Network error, 5xx, quota exhausted, or no reply within 3 s:** if we were `Moved`,
+     broadcast anyway, re-stamped `~confirmed`, so live play never waits for the mailbox.
+     A courier does not broadcast, because the author already did. Otherwise two couriers
+     would hand the same frame back and forth while the mailbox is down. Keep `dirty`,
+     remember the `@` envelope as **uncertain** (it may have been stored), and retry with
+     backoff (5 s, doubling up to 5 min) and on the next pull trigger. A reply that arrives later, before the 15 s abort, is handled
+     as above.
+3. Persist `confirmed`, `dirty` and the uncertain envelopes under
+   `scopedKey room "mailbox_sync"`. The uncertain list is emptied whenever `confirmed`
+   moves. The game itself is already saved by `saveGame`, so a move made offline
+   survives a reload.
 
-`base` only moves when the mailbox accepts a write or a game arrives from someone else. A
-chain of moves made offline therefore still carries the last base the mailbox knew, and
-the newest move in the outbox is accepted directly when the player is back online.
+Each `@` envelope is stamped with the revision it was written for, so a byte-equal
+envelope in a `412` is the same game state written as the same revision. Treating it as
+our own write is safe even if another tab of the same player (same client id) wrote it.
 
 Chat, presence and username messages do not go to the mailbox.
 
-#### 6.4.5 Conflicts: fast-forward or adopt
+#### 6.4.6 Why this is correct
 
-A `412` comes with the mailbox's current envelope `m`:
+The mailbox's revisions form a single history: each accepted write is the revision before
+it plus one, and it is accepted only if the writer had seen the revision before it. So:
 
-```purescript
-data Resolution
-  = FastForward Tag                        -- retry the PUT with If-Match: tag m
-  | Adopt { envelope :: String, tag :: Tag }
+- **No accepted move is ever overwritten by a client that has not seen it.** A `PUT`
+  succeeds only if `If-Match` equals the latest revision. Anyone who has not seen that
+  revision gets `412`.
+- **`confirmed` never decreases.** Every frame and reply with a revision at or below
+  it is ignored, so neither a late frame nor a late reply can move anyone backwards.
+- **Nothing anyone sees is stranded.** By the invariant (§6.4.3), every local game either
+  is the committed state or is being delivered. A frame whose author vanished is
+  delivered by its receivers, so clients cannot drift apart for good.
+- **A pull never moves a client backwards.** Its cursor is `confirmed`, and a `Clean`
+  client's game is exactly that revision.
+- **Moves made offline are not lost silently.** `dirty` persists. If nobody else moved,
+  the next delivery succeeds. If someone did, the client adopts their move and says so.
+  That is the same rule as Game Center's single current player.
+- **An uncertain write is recognized** by its exact envelope, which names its revision.
+- **Committed beats uncommitted.** When a committed state and an uncommitted one
+  compete, the committed one wins everywhere. Live play keeps today's "last arrival
+  wins" only among uncommitted frames, which exist only when the mailbox is unreachable
+  or an old build is in the room.
 
-resolve :: SeenTags -> { envelope :: String, tag :: Tag } -> Resolution
-resolve seen current
-  | current.tag `elem` seen = FastForward current.tag
-  | otherwise               = Adopt current
-```
+**Rejected alternative: content hashes as versions.** My first draft used the SHA-256 of
+the envelope as the `ETag`. On a `412`, it would "fast-forward" if the client had already
+seen the mailbox's state. A review found the flaw. A and B both move from state `m`. A
+commits `a` and broadcasts it, and B receives `a` while B's own `PUT` is in flight. B's
+`412` then shows `a`, which B has "seen", so B would overwrite A's accepted move. A hash
+says whether two states are *equal*, not which came *first*. A revision number assigned
+by the server says both. A second review of the revision design then found three gaps,
+which are closed above:
 
-- **Fast-forward.** We have already seen `m`, so our state comes after it. The mailbox is
-  behind because we received a later state over the relay that never reached the mailbox:
-  - a move by a peer whose `PUT` failed, or
-  - a move by a peer on a build without the mailbox.
+- a `~` frame whose author vanished,
+- a slow `200` after a frame had been adopted,
+- late replies lowering `confirmed`.
 
-  Retry with `If-Match: tag m`. This is git's fast-forward check. If the retry gets
-  another `412`, resolve again. Each round needs a new write by someone else, so this ends.
-- **Adopt.** `m` is new to us, so someone else moved first from a state we also had. Our
-  write loses:
-  - Replay `m` through the receive path.
-  - Broadcast `m`, so that any live peer who saw our move during an outage converges
-    again.
-  - Clear the outbox and add a chat line: *(another move arrived first; yours was not
-    applied)*.
-
-  This is what HTTP's lost-update rule and Game Center's single current player give.
-  First writer wins. Nobody's state is silently overwritten.
-- Tags are content hashes, so a state that comes back with exactly the same content (the
-  ABA problem) is harmless: the same content means the same game.
-- The seen tags are limited to 32 entries.
-
-Turn-based play makes conflicts rare. They need a stale or offline client to act. Today
-such a client silently rolls everyone back. With the mailbox, the stale write is refused.
-
-#### 6.4.6 Client modules
+#### 6.4.7 Client modules
 
 | Module | Contents |
 |---|---|
-| `src/Data/Mailbox.purs` (new, pure) | `Tag`, `SeenTags` (bounded, newest first), `Outbox`, `Precondition = IfMatch Tag \| IfNoneMatchAny`, `preconditionFor :: Maybe Tag -> Precondition`, `Delivery = Accepted Tag \| Rejected { envelope, tag } \| Unreachable String`, `resolve`, `nextOutbox`, `mailboxUrl :: String -> RoomCode -> String` |
-| `src/Capability/Mailbox.purs` (new) | `class Monad m <= Mailbox m` with `pull :: String -> Maybe Tag -> m (Either String (Maybe { envelope :: String, tag :: Tag }))`, `deliver :: String -> Precondition -> String -> m Delivery` and `tagOf :: String -> m Tag`. Instances for `AppM` and `HalogenM`, using `fetch` and `crypto.subtle.digest` through a small FFI, like `Dom`, `Storage` and `WireCodec` |
+| `src/Data/Mailbox.purs` (new, pure) | `Revision` (newtype over `Int`, ordered), `Stamp = Committed Revision \| Tentative Revision`, `printStamp` and `parseStamp`, `Dirty = Clean \| Moved \| Relaying`, `Sync = { confirmed :: Revision, dirty :: Dirty }`, `receiveFrame :: Sync -> Maybe Stamp -> Maybe Sync` (`Nothing` means ignore), `Delivery = Accepted Revision \| Rejected { revision :: Revision, envelope :: Maybe String } \| Unreachable String`, `resolve`, `mailboxUrl :: String -> RoomCode -> String` |
+| `src/Data/Room.purs` | `V1Header` gains an optional `Stamp` in the sender segment. `printHeader` and `parseHeader` round-trip it |
+| `src/Capability/Mailbox.purs` (new) | `class Monad m <= Mailbox m` with `pull :: String -> Revision -> m (Either String Pulled)` and `deliver :: String -> Revision -> String -> m Delivery`. Instances for `AppM` and `HalogenM`, using `fetch` through a small FFI, like `Dom`, `Storage` and `WireCodec` |
 | `src/FFI/WebSocket.js` | Iteration 0 changes (§6.3) |
-| `src/Main.purs` | `Pull` and `Reconnected` actions; subscriptions to `online` and `visibilitychange`; `publishGame` (outbox → `deliver` → broadcast) used by `HandleGameEvent` and `shareGame`; `base` updated in `ReceiveRemoteMessage` |
+| `src/Main.purs` | `Pull`, `Deliver` and `Reconnected` actions; subscriptions to `online` and `visibilitychange`; stamping in `sendMessage`; `receiveFrame` in `ReceiveRemoteMessage` |
 | `src/AppState.purs` | `mailboxUrl :: String` (default constant, like `defaultServerUrl`), `mailboxStatus :: Synced \| Pending \| Offline` |
 | `src/UI/Settings.purs` | Connection tab: a *Mailbox URL* input next to *Server URL*. An empty value turns async play off |
 | `src/Main.purs` render | A small cloud mark next to the connection count: ✓ synced, … pending, ✗ offline |
 | `mailbox/` (new) | Worker, Durable Object, pure `decide.js`, tests, `wrangler.toml` |
 
-There are no changes to `Message.WireMessage`, `WireEnvelope`, the header grammar or the
-relay.
+There are no changes to `Message.WireMessage`, `WireEnvelope` or the relay.
 
-#### 6.4.7 Portability
+#### 6.4.8 Portability
 
 The API is two HTTP methods with standard headers, and the stored value is an opaque
 string. Any host that can do compare-and-set per key can serve it: a Durable Object
@@ -518,12 +607,12 @@ be worth trimming first.
 
 | Sender ↓ / Receiver → | Old build (no mailbox) | New build |
 |---|---|---|
-| Old build | Live, as today | Live, as today. The new build updates `base` from the received string. The mailbox is behind until a new build writes, and fast-forward handles that (§6.4.5) |
-| New build | Live, as today (the envelope is unchanged) | Live and async |
+| Old build | Live, as today | Live, as today. Unstamped frames are adopted as now. The mailbox gets the old build's move with the next move by a new build, or by courier before the first commit (§6.4.3) |
+| New build | Live, as today. The stamp is read as part of the sender, which is ignored | Live and async, ordered by revision |
 
-- **Live play is unchanged** for every pair of builds: same relay, same envelope.
-- **Async play needs the moving player to be on a new build.** A move by an old build
-  reaches the mailbox only when a new build makes the next move.
+- **Live play is unchanged** for every pair of builds: same relay, same message layout.
+- **Async play works best with new builds.** A move by an old build reaches the mailbox
+  only when a new build in the room receives it and delivers it as a courier.
 - **The global room** keeps today's behaviour. It has no mailbox.
 
 **Rollout (Parallel Change):**
@@ -558,7 +647,7 @@ Cloudflare Workers Free ([Workers limits](https://developers.cloudflare.com/work
 From §3.4, one game is about 30 to 2,500 plays. So 100,000 writes a day is roughly 40 of
 the longest bot games or about 2,000 short two-player games every day, far above today's
 traffic. Pulls happen once per wake-up, not per play. If a quota runs out, Cloudflare returns errors
-until 00:00 UTC. The client treats that as *unreachable* (§6.4.4), so play falls back to
+until 00:00 UTC. The client treats that as *unreachable* (§6.4.5), so play falls back to
 today's live-only behaviour rather than breaking.
 
 The Render relay is unchanged and stays inside its 750 free hours a month.
@@ -578,13 +667,13 @@ can play at their own pace.
 
 | Risk | Mitigation |
 |---|---|
-| A stale or offline client overwrites a newer move | Conditional writes. Unseen states are adopted, never overwritten (§6.4.5) |
-| A move made offline is lost on reload | Persisted single-slot outbox (§6.4.4) |
+| A stale or offline client overwrites a newer move | Compare-and-set on revisions. Newer revisions are adopted, never overwritten (§6.4.6) |
+| A move made offline is lost on reload | The game is already saved locally, and `dirty` is persisted (§6.4.5) |
+| A late or reordered live frame rolls players back | Frames stamped with an old revision are ignored (§6.4.3) |
 | The mailbox is down or out of quota | Writes fall back to live broadcast and stay queued. Reads simply find nothing new. This is never worse than today |
 | Two clients host the same bot seat | They write conflicting plays. The second is refused and adopts the first |
 | Abuse: huge or numerous writes | 16 KiB limit, room-code grammar, CORS to app origins, 90-day expiry, and a 5 GB free cap that fails closed (errors, no bill). Rate limits can be added in the Durable Object if needed |
-| Two vendors (Render for live, Cloudflare for async) | The API is portable (§6.4.7). §6.7 can consolidate later |
-| `crypto.subtle` needs a secure context | Both app origins use HTTPS. `localhost` counts as secure for development |
+| Two vendors (Render for live, Cloudflare for async) | The API is portable (§6.4.8). §6.7 can consolidate later |
 | Cloudflare account and deploy token | One free account. The token is a GitHub Actions secret, never in the repository. Deploying by hand with `wrangler` also works |
 | Undo by one player while another is offline | Undo is a normal write. It is shared like a move, and conflicts resolve the same way |
 
@@ -592,38 +681,49 @@ can play at their own pace.
 
 **Pure client logic (QuickCheck, a new "Mailbox" section like `test/Room.purs`):**
 
-1. `resolve` returns `FastForward` exactly when the current tag is in the seen tags.
-2. Seen tags never exceed 32 entries, and the newest entry is always kept.
-3. The outbox keeps only the newest write. Any sequence of offline writes leaves the last
-   one.
-4. `preconditionFor Nothing == IfNoneMatchAny` and `preconditionFor (Just t) == IfMatch t`.
+1. Stamps round-trip: `parseHeader (printHeader h) == Right h` for headers with and
+   without a stamp, and an old build's parser still admits a stamped header with the
+   same room.
+2. `receiveFrame` and reply handling never lower `confirmed`. `receiveFrame` ignores
+   exactly the `@r ≤ confirmed` and `~b < confirmed` frames.
+3. Model test: random interleavings of moves, deliveries, conflicts, reordered and
+   duplicated frames, and lost replies, for two to four simulated clients and one
+   simulated mailbox. Once all messages are delivered and every client has pulled, all
+   clients hold the mailbox's state, every client is `Clean`, and every accepted
+   revision was based on the one before it.
+4. A `412` is treated as our own write exactly when its envelope is in the uncertain list.
+   A `200` that arrives after a frame was adopted replays the accepted envelope, and a
+   reply at or below `confirmed` changes nothing.
 5. `mailboxUrl` only builds `/v1/rooms/<code>` from valid room codes.
 
 **Pure server logic (`node --test` in `mailbox/`):**
 
-6. `decide` never stores a value unless the precondition holds, and it never accepts
-   a `PUT` without a precondition (428).
-7. Sequential model test: for random sequences of `GET` and `PUT` with random
-   preconditions, `decide` behaves like a compare-and-set register: every accepted write
-   was based on the previous value.
-8. The tag is the base64url SHA-256 of the body and matches the browser's `crypto.subtle`
-   result (M2).
-9. Bodies over 16 KiB return 413, and invalid room codes return 404.
+6. `decide` stores a value only when `If-Match` equals the current revision, and the new
+   revision is always the old one plus one. A `PUT` without `If-Match` gets `428`.
+7. Sequential model test: for random sequences of `GET`, `PUT` and expiry, `decide`
+   behaves like a compare-and-set register whose revisions never repeat, even after
+   expiry.
+8. Bodies over 16 KiB return 413, and invalid room codes return 404.
 
 **Browser scenarios** (manual first, then the suite in
 [`issues/open/2026-10-31-e2e-browser-tests.md`](../issues/open/2026-10-31-e2e-browser-tests.md)),
 using the local relay and `wrangler dev`:
 
-10. E2 again: after a relay restart, chat and moves flow in both directions without a
+9. E2 again: after a relay restart, chat and moves flow in both directions without a
     reload, and peers' connection counts recover.
-11. E3 again: B offline, A plays several moves and closes the tab, B opens the room and
+10. E3 again: B offline, A plays several moves and closes the tab, B opens the room and
     sees the latest state with A gone and the relay restarted.
-12. A goes offline (DevTools offline), plays, reloads, comes back online: the move is
-    delivered from the outbox.
-13. A and B both act from the same state while B is offline: B's write is refused, B
+11. A goes offline (DevTools offline), plays, reloads, comes back online: the move is
+    delivered, because `dirty` was persisted.
+12. A and B both act from the same state while B is offline: B's write is refused, B
     adopts A's state, and both end up with the same state.
-14. A mixed room with an old build: live play works both ways, and async play resumes
+13. A mixed room with an old build: live play works both ways, and async play resumes
     after the next move by a new build.
+14. Courier: the mailbox is blocked for A only, A plays (its frame goes out as `~`) and
+    closes the tab, B is online, C is offline. C later opens the room and sees A's move,
+    delivered by B.
+15. A committed frame is held back (for example by throttling one client) until a newer
+    revision has arrived: it is ignored, and nobody's game goes backwards.
 
 ## 11. Open Questions
 
