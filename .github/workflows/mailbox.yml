@@ -38,14 +38,35 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Ensure a workers.dev subdomain
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WANTED: ${{ vars.CLOUDFLARE_WORKERS_SUBDOMAIN || 'bagrounds' }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          current=$(curl -s -H "$auth" "$api" | jq -r '.result.subdomain // empty')
+          if [ -n "$current" ]; then
+            echo "workers.dev subdomain: $current"
+          else
+            echo "No workers.dev subdomain yet; registering '$WANTED'"
+            curl -s -X PUT -H "$auth" -H 'Content-Type: application/json' \
+              --data "{\"subdomain\":\"$WANTED\"}" "$api" | tee subdomain.json
+            jq -e '.success' subdomain.json > /dev/null
+          fi
+
       - name: Deploy
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -euo pipefail
           npx wrangler deploy | tee deploy.log
           url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -n 1)
+          test -n "$url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Mailbox URL: $url"
 
@@ -53,7 +74,12 @@ jobs:
         env:
           MAILBOX_URL: ${{ steps.deploy.outputs.url }}
         run: |
+          # A new workers.dev subdomain can take a few minutes to resolve.
           room="smoke$GITHUB_RUN_ID"
-          status=$(curl -s -o /dev/null -w '%{http_code}' "$MAILBOX_URL/v1/rooms/$room")
-          echo "GET $room -> $status"
-          test "$status" = 204
+          for attempt in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "$MAILBOX_URL/v1/rooms/$room" || true)
+            echo "attempt $attempt: GET $room -> $status"
+            if [ "$status" = 204 ]; then exit 0; fi
+            sleep 10
+          done
+          exit 1
