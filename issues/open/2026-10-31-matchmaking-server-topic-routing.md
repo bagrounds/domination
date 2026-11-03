@@ -22,3 +22,8 @@ codes, or end-to-end encryption with a key in the URL fragment.
 
 - [ ] Relay change of a few lines, backward compatible: no topic means the global topic.
 - [ ] Clients behave identically with and without the routing relay.
+
+## See Also
+
+- [Relay on Durable Objects](./2026-11-03-async-play-relay-on-durable-objects.md) would get
+  per-room routing for free by giving each room its own object.
