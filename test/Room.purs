@@ -1,4 +1,4 @@
-module Test.Room (room_tests) where
+module Test.Room (room_tests, all_success, quick_check) where
 
 import Prelude
 

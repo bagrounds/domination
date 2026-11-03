@@ -14,6 +14,7 @@ import Prelude
 import Audio.WebAudio.Types (AudioContext)
 import Data.HashMap (HashMap)
 import Data.HashMap as HashMap
+import Data.Map as Map
 import Data.Lens (lens')
 import Data.Lens.Lens (Lens', Lens)
 import Data.Lens.Record (prop)
@@ -26,6 +27,7 @@ import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
+import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
 import Message (RemoteMessage)
 
@@ -38,19 +40,21 @@ data SettingsTab
   = GameSetupTab
   | BotsTab
   | KingdomTab
+  | RenameTab
   | ConnectionTab
   | DebugTab
 
 derive instance eqSettingsTab :: Eq SettingsTab
 
 settingsTabs :: Array SettingsTab
-settingsTabs = [ GameSetupTab, BotsTab, KingdomTab, ConnectionTab, DebugTab ]
+settingsTabs = [ GameSetupTab, BotsTab, KingdomTab, RenameTab, ConnectionTab, DebugTab ]
 
 settingsTabLabel :: SettingsTab -> String
 settingsTabLabel = case _ of
   GameSetupTab -> "Game"
   BotsTab -> "Bots"
   KingdomTab -> "Kingdom"
+  RenameTab -> "Rename"
   ConnectionTab -> "Connection"
   DebugTab -> "Debug"
 
@@ -77,6 +81,7 @@ type AppState =
   , heartbeatTimeout :: Int
   , settingsTab :: SettingsTab
   , debugReport :: String
+  , renameProposals :: Proposals
   }
 
 _card :: Lens' CardSpec Card
@@ -140,6 +145,9 @@ _settingsTab = prop (Proxy :: Proxy "settingsTab")
 _debugReport :: Lens' AppState String
 _debugReport = prop (Proxy :: Proxy "debugReport")
 
+_renameProposals :: Lens' AppState Proposals
+_renameProposals = prop (Proxy :: Proxy "renameProposals")
+
 _room :: Lens' AppState Room
 _room = prop (Proxy :: Proxy "room")
 
@@ -182,6 +190,7 @@ newApp =
   , heartbeatTimeout: defaultHeartbeatTimeout
   , settingsTab: GameSetupTab
   , debugReport: ""
+  , renameProposals: Map.empty
   }
 
 newConfig :: Config

@@ -33,6 +33,7 @@ data Area
   | HandArea
   | ChoiceArea
   | KingdomConfigArea
+  | RenameArea
 
 derive instance genericArea :: Generic Area _
 derive instance eqArea :: Eq Area

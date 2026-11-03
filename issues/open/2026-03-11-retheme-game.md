@@ -78,3 +78,4 @@ The current game mechanics are inspired by deck-building card games. To ensure w
 - Card effects, costs, and values remain identical
 - The re-theme can be done incrementally, starting with UI text and card names
 - Consider making the theme configurable so both themes can coexist
+- Proposals can be drafted in the game itself: Settings → Rename has an input for every card name, card text, reaction text and core term, and copies a concise `Current → Proposed` mapping to the clipboard
