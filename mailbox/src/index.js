@@ -18,7 +18,8 @@ const toResponse = (decision, origin) =>
     status: decision.status,
     headers: {
       ...corsHeaders(origin),
-      'Cache-Control': 'no-store',
+      // no-transform: compressing would weaken the ETag to W/"n" (RFC 9110).
+      'Cache-Control': 'no-store, no-transform',
       ...(decision.revision === null ? {} : { ETag: printRevisionTag(decision.revision) }),
       ...(decision.body === null ? {} : { 'Content-Type': 'text/plain; charset=utf-8' }),
     },

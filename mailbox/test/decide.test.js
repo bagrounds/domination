@@ -42,6 +42,12 @@ test('GET answers 304 when the client already has the revision', () => fc.assert
     return d.status === 304 && d.body === null && d.store === null
   })))
 
+test('GET compares If-None-Match weakly', () => fc.assert(fc.property(
+  mailbox, m => decide(get(`W/${printRevisionTag(m.revision)}`), m).status === 304)))
+
+test('PUT compares If-Match strongly', () => fc.assert(fc.property(
+  mailbox, envelope, (m, e) => decide(put(`W/${printRevisionTag(m.revision)}`, e), m).status === 412)))
+
 test('GET with another revision answers with the current state', () => fc.assert(fc.property(
   mailbox, revision, (m, other) => {
     fc.pre(other !== m.revision)

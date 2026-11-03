@@ -15,6 +15,10 @@ export const parseRevisionTag = tag => {
   return match === null ? null : Number(match[1])
 }
 
+// If-None-Match uses weak comparison (RFC 9110 §13.1.2): W/"5" matches "5".
+export const parseWeakRevisionTag = tag =>
+  parseRevisionTag(typeof tag === 'string' ? tag.trim().replace(/^W\//, '') : tag)
+
 export const utf8ByteLength = text => new TextEncoder().encode(text).length
 
 const reply = (status, revision, body = null, store = null) =>
@@ -23,7 +27,7 @@ const reply = (status, revision, body = null, store = null) =>
 const bare = status => reply(status, null)
 
 const decideGet = ({ ifNoneMatch }, { revision, envelope }) =>
-  parseRevisionTag(ifNoneMatch) === revision
+  parseWeakRevisionTag(ifNoneMatch) === revision
     ? reply(304, revision)
     : envelope === null
       ? reply(204, revision)

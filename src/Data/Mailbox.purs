@@ -194,8 +194,9 @@ derive instance genericDelivery :: Generic Delivery _
 instance showDelivery :: Show Delivery where
   show = genericShow
 
+-- | Proxies that compress a body weaken its tag: `W/"5"` still names revision 5.
 revisionOf :: HttpResponse -> Maybe Revision
-revisionOf = _.etag >=> parseRevisionTag
+revisionOf = _.etag >=> \tag -> parseRevisionTag $ fromMaybe tag $ stripPrefix (Pattern "W/") tag
 
 nonEmpty :: String -> Maybe String
 nonEmpty = case _ of

@@ -99,7 +99,8 @@ mailbox_tests =
           && isUnreachable (interpretDelivery { status: 200, etag: Nothing, body: "" })
           && interpretPull { status: 304, etag: Just "\"4\"", body: "" } == Unchanged
           && interpretPull { status: 200, etag: Just "\"4\"", body: "e" } == Latest (Revision 4) (Just "e")
-          && interpretPull { status: 204, etag: Just "\"0\"", body: "" } == Latest (Revision 0) Nothing)
+          && interpretPull { status: 204, etag: Just "\"0\"", body: "" } == Latest (Revision 0) Nothing
+          && interpretPull { status: 200, etag: Just "W/\"4\"", body: "e" } == Latest (Revision 4) (Just "e"))
         "unexpected interpretation"
     }
   , { name: "pulls have no cursor before the first commit"
