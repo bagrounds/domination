@@ -38,6 +38,11 @@ data AppAction
   | ReceiveRemoteMessage Event
   | RelayLost
   | RelayRegained
+  | WriteMailboxUrl String
+  | PullMailbox
+  | DeliverMailbox
+  | MailboxRetryDue
+  | VisibilityChanged
   | HandleGameEvent GameEvent
   | AddBot Strategy
   | RemoveBot Int

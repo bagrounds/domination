@@ -239,7 +239,8 @@ button span,
   border: 1px solid black;
 }
 
-.server-url-input input {
+.server-url-input input,
+.mailbox-url-input input {
   height: 7vh;
   width: 50vw;
 }
@@ -267,6 +268,24 @@ button span,
 }
 
 .connections.offline {
+  background-color: darkred;
+}
+
+.mailbox-status {
+  position: absolute;
+  right: 1vw;
+  bottom: 18vh;
+  width: 7vh;
+  font-style: normal;
+  font-size: 0.9em;
+  text-align: center;
+  color: white;
+  background-color: black;
+  border-radius: 2vh;
+  opacity: 0.5;
+}
+
+.mailbox-status.offline {
   background-color: darkred;
 }
 

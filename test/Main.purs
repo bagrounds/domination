@@ -66,6 +66,7 @@ import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, randomSample')
 import AppState (Config, newConfig)
 import AppState as AppState
 import Test.Backoff (backoff_tests)
+import Test.Mailbox (mailbox_tests)
 import Test.Retheme (retheme_tests)
 import Test.Room (room_tests)
 
@@ -100,8 +101,9 @@ main = do
   room_results <- run_effect_section "Rooms" room_tests
   retheme_results <- run_effect_section "Re-theming" retheme_tests
   backoff_results <- run_effect_section "Reconnect Backoff" backoff_tests
-  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed + room_results.passed + retheme_results.passed + backoff_results.passed
-  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed + room_results.failed + retheme_results.failed + backoff_results.failed
+  mailbox_results <- run_effect_section "Room Mailbox" mailbox_tests
+  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed + room_results.passed + retheme_results.passed + backoff_results.passed + mailbox_results.passed
+  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed + room_results.failed + retheme_results.failed + backoff_results.failed + mailbox_results.failed
   let total = total_passed + total_failed
   log ""
   log $ "═══ Results: " <> show total_passed <> "/" <> show total <> " passed ═══"

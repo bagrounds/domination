@@ -27,6 +27,7 @@ import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
+import Domination.Data.Mailbox (Sync, initialSync)
 import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
 import Message (RemoteMessage)
@@ -70,6 +71,8 @@ type AppState =
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe WebSocketBroadcaster
   , relayReachable :: Boolean
+  , mailboxUrl :: String
+  , mailbox :: MailboxSession
   , room :: Room
   , roomNotice :: Maybe String
   , inviteBaseUrl :: String
@@ -120,6 +123,10 @@ _maybeBroadcaster = prop (Proxy :: Proxy "maybeBroadcaster")
 
 _relayReachable :: Lens' AppState Boolean
 _relayReachable = prop (Proxy :: Proxy "relayReachable")
+_mailboxUrl :: Lens' AppState String
+_mailboxUrl = prop (Proxy :: Proxy "mailboxUrl")
+_mailbox :: Lens' AppState MailboxSession
+_mailbox = prop (Proxy :: Proxy "mailbox")
 _dominationConfig :: Lens' AppState Config
 _dominationConfig = prop (Proxy :: Proxy "dominationConfig")
 _showMenu
@@ -164,6 +171,37 @@ _inviteBaseUrl = prop (Proxy :: Proxy "inviteBaseUrl")
 defaultServerUrl :: String
 defaultServerUrl = "wss://purescript-wip.onrender.com"
 
+-- | The room mailbox for async play (`mailbox/`). An empty URL turns it off.
+defaultMailboxUrl :: String
+defaultMailboxUrl = "https://domination-mailbox.bagrounds.workers.dev"
+
+-- | This page's side of the mailbox protocol. `sync` is persisted per room;
+-- | the rest only lives as long as the page. `outbox` is the local game,
+-- | `moves` and `adoptions` count local changes so a reply can tell what
+-- | happened while it was in flight.
+type MailboxSession =
+  { sync :: Sync
+  , outbox :: Maybe RemoteMessage
+  , moves :: Int
+  , adoptions :: Int
+  , inFlight :: Boolean
+  , retryScheduled :: Boolean
+  , failures :: Int
+  , unreachable :: Boolean
+  }
+
+newMailboxSession :: MailboxSession
+newMailboxSession =
+  { sync: initialSync
+  , outbox: Nothing
+  , moves: 0
+  , adoptions: 0
+  , inFlight: false
+  , retryScheduled: false
+  , failures: 0
+  , unreachable: false
+  }
+
 defaultHeartbeatInterval :: Int
 defaultHeartbeatInterval = 5000
 
@@ -183,6 +221,8 @@ newApp =
   , gameOn: false
   , maybeBroadcaster: Nothing
   , relayReachable: true
+  , mailboxUrl: defaultMailboxUrl
+  , mailbox: newMailboxSession
   , room: GlobalRoom
   , roomNotice: Nothing
   , inviteBaseUrl: ""
