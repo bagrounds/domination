@@ -3,35 +3,36 @@ module FFI.WebSocket where
 import Prelude
 
 import Data.Either (Either(..))
+import Domination.Data.Backoff (delay, reconnectBackoff)
 import Effect (Effect)
-import Effect.Aff (Canceler, Error)
+import Effect.Aff (Error, Milliseconds)
 import Web.Event.Event (Event)
 
 foreign import detail :: forall a. Event -> a
 
-foreign import data WebSocket :: Type
+-- | A connection to the relay that reconnects by itself. It dispatches
+-- | `purescript` events for received messages, and `disconnected` and
+-- | `reconnected` events, on the remote message target.
+foreign import data Connection :: Type
 
-foreign import showWebSocket :: WebSocket -> String
+foreign import showConnection :: Connection -> String
 
-makeWebSocket
+makeConnection
   :: String -- remote message target
-  -> String -- room code
   -> String -- serverUrl
-  -> (Either Error WebSocket -> Effect Unit)
-  -> Effect Canceler
-makeWebSocket = makeWebSocketFFI
-  Left
-  Right
+  -> (Either Error Connection -> Effect Unit)
+  -> Effect Unit
+makeConnection = makeConnectionFFI Left Right (delay reconnectBackoff)
 
-foreign import makeWebSocketFFI
+foreign import makeConnectionFFI
   :: (forall l r. l -> Either l r) -- Left
   -> (forall l r. r -> Either l r) -- Right
+  -> (Int -> Number -> Milliseconds) -- reconnect delay for an attempt and a random sample
   -> String
   -> String
-  -> String
-  -> (Either Error WebSocket -> Effect Unit)
-  -> Effect Canceler
+  -> (Either Error Connection -> Effect Unit)
+  -> Effect Unit
 
-foreign import send :: WebSocket -> String -> Effect Unit
+foreign import send :: Connection -> String -> Effect Unit
 
-foreign import address :: WebSocket -> Effect String
+foreign import address :: Connection -> Effect String

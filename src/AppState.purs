@@ -69,6 +69,7 @@ type AppState =
   , chatNumber :: Int
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe WebSocketBroadcaster
+  , relayReachable :: Boolean
   , room :: Room
   , roomNotice :: Maybe String
   , inviteBaseUrl :: String
@@ -116,6 +117,9 @@ _serverUrl :: Lens' AppState String
 _serverUrl = prop (Proxy :: Proxy "serverUrl")
 _maybeBroadcaster :: Lens' AppState (Maybe WebSocketBroadcaster)
 _maybeBroadcaster = prop (Proxy :: Proxy "maybeBroadcaster")
+
+_relayReachable :: Lens' AppState Boolean
+_relayReachable = prop (Proxy :: Proxy "relayReachable")
 _dominationConfig :: Lens' AppState Config
 _dominationConfig = prop (Proxy :: Proxy "dominationConfig")
 _showMenu
@@ -178,6 +182,7 @@ newApp =
   , chatNumber: 0
   , gameOn: false
   , maybeBroadcaster: Nothing
+  , relayReachable: true
   , room: GlobalRoom
   , roomNotice: Nothing
   , inviteBaseUrl: ""

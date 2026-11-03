@@ -126,6 +126,9 @@ serverUrlInput :: ClassName
 serverUrlInput = ClassName "server-url-input"
 connections :: ClassName
 connections = ClassName "connections"
+
+offline :: ClassName
+offline = ClassName "offline"
 statsContainer :: ClassName
 statsContainer = ClassName "stats-container"
 drawAttention :: ClassName

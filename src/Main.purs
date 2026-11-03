@@ -13,7 +13,7 @@ module Main where
 import Prelude
 
 import AppAction (AppAction(..))
-import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _inviteBaseUrl, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _messages, _renameProposals, _room, _roomNotice, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
+import AppState (AppState, CardSpecSelection, SettingsTab(..), _botDelay, _chatNumber, _connectedClients, _connectionCount, _debugReport, _dominationConfig, _id, _inviteBaseUrl, _kingdom, _longGame, _maybeAudioContext, _maybeBroadcaster, _message, _relayReachable, _messages, _renameProposals, _room, _roomNotice, _serverUrl, _settingsTab, _showMenu, _username, _usernames, addBot, clampBotDelay, defaultKingdom, defaultServerUrl, newApp, normalizeRoster, removeBot, setPlayerCount, setPlayerIndex, upgradeSelection)
 import DebugLog as DebugLog
 import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
@@ -159,6 +159,8 @@ render audioContext state = HH.main_ $
   [ HH.div
     [ HP.id $ remoteMessageTarget
     , HE.handler (EventType "purescript") ReceiveRemoteMessage
+    , HE.handler (EventType "disconnected") (const RelayLost)
+    , HE.handler (EventType "reconnected") (const RelayRegained)
     ]
     []
   , if state.showMenu
@@ -177,10 +179,19 @@ render audioContext state = HH.main_ $
     , nothing: DoNothing
     , state
     }
-  , HH.i
-    [ HP.class_ Css.connections ]
-    [ HH.text $ show state.connectionCount ]
+  , renderConnections state
   ]
+
+renderConnections :: forall w i. AppState -> HTML w i
+renderConnections { relayReachable, connectionCount }
+  | relayReachable = HH.i
+      [ HP.class_ Css.connections ]
+      [ HH.text $ show connectionCount ]
+  | otherwise = HH.i
+      [ HP.classes [ Css.connections, Css.offline ]
+      , HP.title "Offline: reconnecting to the server"
+      ]
+      [ HH.text "…" ]
 
 renderSettingsButton :: forall w. HTML w AppAction
 renderSettingsButton = HH.button
@@ -534,9 +545,20 @@ handleAction audioContext = case _ of
     SaveGame activeState -> saveGame activeState
     Undo { i } -> loadGame $ undoKey $ (i - 1) `mod` 10
   HeartbeatTick -> do
-    clientId <- H.gets _.id
+    { id: clientId, relayReachable } <- H.get
     timestamp <- now
-    sendMessage $ HeartbeatMessage { clientId, timestamp }
+    when relayReachable $
+      sendMessage $ HeartbeatMessage { clientId, timestamp }
+  RelayLost -> do
+    log "RelayLost: queueing messages until the server is back"
+    H.modify_ $ _relayReachable .~ false
+  RelayRegained -> do
+    log "RelayRegained: announcing ourselves again"
+    H.modify_ $ _relayReachable .~ true
+    { id: clientId, username } <- H.get
+    timestamp <- now
+    sendMessage $ JoinMessage { clientId, timestamp }
+    sendMessage $ UsernameMessage { username, id: clientId }
   where
     receiveMessage msg = case msg of
         UsernameMessage { username, id } -> do

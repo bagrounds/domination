@@ -1,125 +1,179 @@
-// Add singleton management at the top
-const getWebSocket = () => window._singletonWebSocket
-const setWebSocket = (ws) => { window._singletonWebSocket = ws }
-const clearWebSocket = () => {
-  const ws = getWebSocket()
-  if (ws) {
-    try {
-      ws.close()
-      logInfo('Closed existing WebSocket connection')
-    } catch (e) {
-      logError('Error closing existing WebSocket:', e)
-    }
-  }
-  window._singletonWebSocket = null
-}
+// One connection per page. It outlives the sockets it opens: when a socket
+// closes unexpectedly, the connection opens a new one after a backoff delay,
+// and `send` always uses the live socket. Messages sent while no socket is
+// open are queued and flushed when the next socket opens.
+const maxQueuedMessages = 100
+
+const getConnection = () => window._dominationConnection
+const setConnection = connection => { window._dominationConnection = connection }
 
 const log = level => (...args) => console[level]('WebSocket FFI: ', ...args)
-const logInfo = (...args) => log('log')(...args)
-const logError = (...args) => {
-  log('error')(...args)
-  const errorMessage = args.map(arg =>
-    typeof arg === 'object' ? JSON.stringify(arg) : arg
-  ).join(' ')
-  alert('Error: ' + errorMessage)
-}
+const logInfo = log('log')
+const logError = log('error')
 
-const broadcastEvent = messageTarget => event => {
-  const eventTarget = document.querySelector('#' + messageTarget)
-  if (eventTarget) {
-    eventTarget.dispatchEvent(customEvent(event))
-  }
-  else {
-    logError(`${messageTarget} undefined, cannot dispatch event: `, event)
+const dispatch = (targetId, event) => {
+  const target = document.querySelector('#' + targetId)
+  if (target) {
+    target.dispatchEvent(event)
+  } else {
+    logError(`#${targetId} not found, cannot dispatch ${event.type}`)
   }
 }
 
-const customEvent = detail =>
-  new CustomEvent('purescript', { detail })
+const purescriptEvent = detail => new CustomEvent('purescript', { detail })
 
 export const detail = ({ detail }) => detail
 
-export const showWebSocket = ws => `WebSocket(${ws.url})`
+export const showConnection = connection => `WebSocket(${connection.url})`
 
-export const makeWebSocketFFI = left =>
+const isOpen = socket => socket !== null && socket.readyState === WebSocket.OPEN
+
+const enqueue = (connection, message) => {
+  connection.queue.push(message)
+  if (connection.queue.length > maxQueuedMessages) {
+    connection.queue.shift()
+    logInfo(`queue full, dropped the oldest of ${maxQueuedMessages} messages`)
+  }
+}
+
+const flush = connection => {
+  logInfo(`flushing ${connection.queue.length} queued messages`)
+  while (connection.queue.length > 0 && isOpen(connection.socket)) {
+    connection.socket.send(connection.queue.shift())
+  }
+}
+
+export const makeConnectionFFI = left =>
   right =>
-  roomCode =>
+  reconnectDelay =>
   remoteMessageTarget =>
   serverUrl =>
   callback =>
   () => {
-    try {
-      // Check for existing connection
-      const existing = getWebSocket()
-      if (existing) {
-        logInfo('Reusing existing WebSocket connection')
-        callback(right(existing))()
-        return () => {} // No-op cleanup for reused connection
+    const existing = getConnection()
+    if (existing) {
+      logInfo('Reusing existing connection')
+      callback(right(existing))()
+      return
+    }
+
+    const connection = {
+      url: serverUrl,
+      address: crypto.randomUUID(),
+      socket: null,
+      queue: [],
+      attempt: 0,
+      lostOnce: false,
+      stopped: false,
+      retryTimer: null,
+    }
+    setConnection(connection)
+
+    let settled = false
+    const settle = result => {
+      if (!settled) {
+        settled = true
+        callback(result)()
       }
+    }
 
-      const ws = new WebSocket(serverUrl)
-      ws.address = crypto.randomUUID()
-      setWebSocket(ws)
+    const scheduleReconnect = () => {
+      const delay = reconnectDelay(connection.attempt)(Math.random())
+      connection.attempt += 1
+      logInfo(`reconnecting in ${Math.round(delay)} ms (attempt ${connection.attempt})`)
+      connection.retryTimer = setTimeout(open, delay)
+    }
 
-      const shutdown = (event) => {
-        try {
-          ws.close()
-          clearWebSocket()
-          logInfo(`closed websocket on '${event.type}'`)
-        } catch (e) {
-          logInfo(`failed to close websocket on '${event.type}'`)
-        }
+    const reconnectNow = () => {
+      if (connection.retryTimer !== null && !connection.stopped) {
+        logInfo('network is back, reconnecting now')
+        clearTimeout(connection.retryTimer)
+        open()
       }
+    }
 
-      window.addEventListener("unload", shutdown)
-      window.addEventListener("beforeunload", shutdown)
+    const open = () => {
+      connection.retryTimer = null
+      let socket
+      try {
+        socket = new WebSocket(serverUrl)
+      } catch (error) {
+        logError('Connection setup error:', error)
+        settle(left(error))
+        return
+      }
+      connection.socket = socket
 
-      ws.onopen = () => {
+      socket.onopen = () => {
         logInfo('WebSocket connected')
-        callback(right(ws))()
-      }
-
-      ws.onclose = (event) => {
-        logInfo('WebSocket disconnected', event.code, event.reason)
-
-        // Attempt reconnection if not intentionally closed
-        if (event.code !== 1000 && event.code !== 1001) {
-          logInfo('Attempting to reconnect in 5 seconds...')
-          setTimeout(() => {
-            clearWebSocket()
-            makeWebSocketFFI(left)(right)(roomCode)
-              (remoteMessageTarget)(serverUrl)(callback)()
-          }, 5000)
+        connection.attempt = 0
+        flush(connection)
+        settle(right(connection))
+        if (connection.lostOnce) {
+          dispatch(remoteMessageTarget, new CustomEvent('reconnected'))
         }
       }
 
-      ws.onmessage = event => {
+      socket.onclose = event => {
+        logInfo('WebSocket disconnected', event.code, event.reason)
+        if (connection.stopped) return
+        connection.lostOnce = true
+        dispatch(remoteMessageTarget, new CustomEvent('disconnected'))
+        scheduleReconnect()
+      }
+
+      socket.onmessage = event => {
         logInfo('Received message:', event.data)
         if (event.data instanceof Blob) {
           event.data.text().then(text => {
-            broadcastEvent(remoteMessageTarget)(text)
+            dispatch(remoteMessageTarget, purescriptEvent(text))
           })
         } else {
-          broadcastEvent(remoteMessageTarget)(event.data)
+          dispatch(remoteMessageTarget, purescriptEvent(event.data))
         }
       }
 
-      ws.onerror = error => {
-        logError('WebSocket error:', error)
-        callback(left(error))()
+      socket.onerror = () => {
+        logError(`could not reach ${serverUrl}`)
+        settle(left(new Error(`could not reach ${serverUrl}`)))
       }
-
-      return () => shutdown({ type: 'cancel' })
-    } catch (error) {
-      logError('Connection setup error:', error)
-      callback(left(error))()
-      return () => {}
     }
+
+    const shutdown = event => {
+      connection.stopped = true
+      clearTimeout(connection.retryTimer)
+      try {
+        if (connection.socket) connection.socket.close(1000)
+        logInfo(`closed websocket on '${event.type}'`)
+      } catch (e) {
+        logInfo(`failed to close websocket on '${event.type}'`)
+      }
+    }
+
+    const resume = event => {
+      if (event.persisted && connection.stopped) {
+        logInfo('page restored from the back-forward cache, reconnecting')
+        connection.stopped = false
+        connection.lostOnce = true
+        open()
+      }
+    }
+
+    window.addEventListener('pagehide', shutdown)
+    window.addEventListener('pageshow', resume)
+    window.addEventListener('online', reconnectNow)
+
+    open()
+  }
+
+export const send = connection => message => () => {
+  if (isOpen(connection.socket)) {
+    logInfo('sent message: ', message)
+    connection.socket.send(message)
+  } else {
+    logInfo('not connected, queued message: ', message)
+    enqueue(connection, message)
+  }
 }
 
-export const send = ws => message => () => {
-  logInfo("sent message: ", message)
-  ws.send(message)
-}
-
-export const address = ws => () => ws.address
+export const address = connection => () => connection.address

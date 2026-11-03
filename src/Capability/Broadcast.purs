@@ -33,7 +33,7 @@ class Monad m <= Broadcast b m where
 
 instance webSocketBroadcasterAppM :: Broadcast WebSocketBroadcaster AppM where
   create roomCode remoteMessageTarget serverUrl =
-    liftAff $ WebSocket.createWebSocketBroadcaster roomCode remoteMessageTarget serverUrl
+    liftAff $ WebSocket.createWebSocketBroadcaster remoteMessageTarget serverUrl
   address = liftAff <<< WebSocket.getWebSocketAddress
   broadcast broadcaster = liftAff <<< WebSocket.broadcastWebSocketMessage broadcaster
 

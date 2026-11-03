@@ -266,6 +266,10 @@ button span,
   opacity: 0.5;
 }
 
+.connections.offline {
+  background-color: darkred;
+}
+
 .settings-button {
   background-color: black;
   float: right;

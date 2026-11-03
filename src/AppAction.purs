@@ -36,6 +36,8 @@ data AppAction
   | Write (Lens' AppState String) String
   | SendMessage
   | ReceiveRemoteMessage Event
+  | RelayLost
+  | RelayRegained
   | HandleGameEvent GameEvent
   | AddBot Strategy
   | RemoveBot Int
