@@ -20,8 +20,8 @@ The design recommends a content-agnostic **room mailbox**: a Cloudflare Worker w
 Durable Object per game room. It keeps the latest game envelope and accepts only
 conditional writes. The WebSocket relay does not change.
 
-1. [Reconnect sends](./2026-11-03-async-play-reconnect-sends.md): a prerequisite bug fix
-   that is client only.
+1. [Reconnect sends](../closed/2026-11-03-async-play-reconnect-sends.md): a prerequisite bug fix,
+   client only. **Done.**
 2. [Room mailbox](./2026-11-03-async-play-mailbox.md): async play itself.
 3. Later, optional:
    - [History and async chat](./2026-11-03-async-play-history-and-chat.md)

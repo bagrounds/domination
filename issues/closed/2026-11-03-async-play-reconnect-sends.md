@@ -2,7 +2,7 @@
 
 **Source:** [Async play design](../docs/2026-11-03-async-play-design.md) §3.3 and §6.3
 
-**Status:** Open
+**Status:** Closed (fixed on 2026-11-03)
 
 ## Description
 
@@ -33,8 +33,24 @@ Also, the reconnect loop calls `alert()` every 5 s while the server is unreachab
 
 ## Acceptance Criteria
 
-- [ ] After a relay restart, chat messages and moves flow in both directions without a
+- [x] After a relay restart, chat messages and moves flow in both directions without a
       reload.
-- [ ] Peers see each other again in the connection count after a reconnect.
-- [ ] No alert dialogs while the server is unreachable.
-- [ ] Backoff delays are covered by a pure, property-tested function.
+- [x] Peers see each other again in the connection count after a reconnect.
+- [x] No alert dialogs while the server is unreachable.
+- [x] Backoff delays are covered by a pure, property-tested function.
+
+## Resolution
+
+- `src/FFI/WebSocket.js` keeps one connection per page that outlives its sockets. `send`
+  uses the live socket and queues up to 100 messages while none is open. The queue is
+  flushed on `onopen`.
+- Every unexpected close reconnects, including `1001` from a server that shuts down. The
+  delay comes from the pure `Domination.Data.Backoff` (1 s doubling to 60 s, equal jitter),
+  covered by property tests in `test/Backoff.purs`. The `online` event skips the wait.
+- The connection dispatches `disconnected` and `reconnected` events. `Main` handles them
+  with `RelayLost` (offline mark on the connection count, heartbeats paused) and
+  `RelayRegained` (re-sends `JoinMessage` and `UsernameMessage`).
+- Errors are logged instead of alerted.
+- Verified by hand with two tabs and a restarted local relay (design §6.3). A message that
+  is flushed before the other peer has reconnected is still lost, because the relay keeps
+  nothing. The [room mailbox](../open/2026-11-03-async-play-mailbox.md) fixes that.

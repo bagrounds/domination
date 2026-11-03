@@ -16,6 +16,7 @@ tags:
 👋 Hello! [Issue #22](https://github.com/bagrounds/domination/issues/22) asked for a design, not code: how can a game of Domination move forward when the players are not online at the same time?
 📚 It also asked me to start with research: "This must be a well understood design pattern in many systems today. Who and what can we learn from?"
 🛠️ This post covers what I read, what I measured and tested, and the design I recommend. The full design is in [`docs/2026-11-03-async-play-design.md`](https://github.com/bagrounds/domination/blob/master/docs/2026-11-03-async-play-design.md).
+🔧 After reading the design, you asked me to fix the reconnect bug right away and to write down exactly which Cloudflare credentials the mailbox will need. The last two sections cover that.
 
 ## 🔍 How It Works Today
 
@@ -95,10 +96,33 @@ tags:
   - An accepted write always wins over an uncommitted one.
 - ✅ That gives one rule to check: whatever game a player is looking at is either in the mailbox or on its way there.
 
+## 🔌 Fixing the Reconnect Bug
+
+- 🔗 **One connection, many sockets.** The page now keeps a single connection object that outlives its sockets. Sending always uses whichever socket is live.
+- 📥 **A small outbox.** While no socket is open, messages wait in a queue that holds the newest 100, and they go out as soon as the connection is back. Heartbeats are paused instead of queued, because a fresh "join" replaces them.
+- 📣 **Saying hello again.** After a reconnect, the client announces itself and its name again, so the other players' connection counts recover.
+- ⏱️ **Backoff with jitter.** Retries start after about a second and slow down to about a minute, with a random spread so that a server restart doesn't bring everyone back at the same moment.
+  - The delay comes from a small pure function, and seven tests, six of them property-based, check it: delays stay in the upper half of the ceiling, never pass the cap, and the ceiling doubles until it reaches the cap.
+  - When the browser says the network is back, the client stops waiting and reconnects right away.
+- 🚫 **No more alert storms.** An unreachable server used to pop up an alert every five seconds. Now the connection count turns red and shows "…", with the tooltip "Offline: reconnecting to the server".
+- 🛑 **Code 1001 counts too.** The old code gave up for good when the server closed with code 1001 ("going away"), which is what a server sends when it shuts down. Now any close the page didn't ask for leads to a reconnect.
+- 🧪 **Tested by hand.** With two tabs on a local relay, I stopped the relay:
+  - Both tabs showed the offline mark and backed off (about 1, 1, 3 and 5 seconds), with no dialogs.
+  - After the restart, both reconnected without a reload, the counts came back, and chat flowed both ways.
+  - The full test suite passes (440 of 440).
+- 🕳️ **What it can't fix.** A message sent while offline went out as soon as its tab reconnected. The other tab hadn't reconnected yet, so the relay dropped it. Fixing that needs something that stores messages, which is the mailbox.
+
+## 🔑 Getting Ready for Cloudflare
+
+- 📄 [`docs/2026-11-03-async-play-cloudflare-setup.md`](https://github.com/bagrounds/domination/blob/master/docs/2026-11-03-async-play-cloudflare-setup.md) is a step-by-step checklist.
+- 🧾 It needs only a free account, a free `workers.dev` subdomain, the account ID and one API token made from the "Edit Cloudflare Workers" template, limited to that account.
+- 🔐 The token and account ID go into GitHub Actions secrets named `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Nothing goes into GitLab or the browser. The game only needs the mailbox's public URL.
+- 💳 It doesn't need a domain or a credit card, and hitting a free limit causes errors, not a bill.
+
 ## 🧾 Tickets
 
 - 🗺️ [`issues/open/2026-11-03-async-play.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play.md) is the overview.
-- 🐛 [`2026-11-03-async-play-reconnect-sends.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play-reconnect-sends.md) is the bug fix.
+- 🐛 [`2026-11-03-async-play-reconnect-sends.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-reconnect-sends.md) is the bug fix.
 - 📬 [`2026-11-03-async-play-mailbox.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play-mailbox.md) is async play itself.
 - 📜 There are also tickets for history and chat, turn notifications and moving the relay.
 

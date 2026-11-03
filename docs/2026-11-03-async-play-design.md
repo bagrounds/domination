@@ -278,25 +278,42 @@ sequenceDiagram
 
 ### 6.3 Iteration 0: reconnect that really reconnects (client only)
 
+**Status: implemented** (closed ticket
+[`2026-11-03-async-play-reconnect-sends.md`](../issues/closed/2026-11-03-async-play-reconnect-sends.md)).
 This fixes the bug in E2. It also helps live play without async play.
 
-1. **Send on the current socket.** `send` in `src/FFI/WebSocket.js` should use
-   `getWebSocket()` instead of the socket captured by the first `onopen`.
-   - While the socket is `CONNECTING` or closed, queue the message in the FFI. `send`
-     throws `InvalidStateError` while `CONNECTING`.
-   - Keep chat messages and only the newest game message. Drop presence messages, because
-     a fresh `Join` replaces them. Flush the queue on `onopen`.
-   - The broadcaster then stands for the connection, not for one socket.
-2. **Announce reconnects.** After a *re*connect, dispatch a `reconnected` event on
-   `#remote-message-target`. `Main` subscribes with a new `Reconnected` action. It sends
-   `JoinMessage` and `UsernameMessage` (peers have pruned us after 15 s), then pulls the
-   mailbox (iteration 1) or does catch-up on join.
-3. **Back off with jitter.** Replace the fixed 5 s retry with a random delay that grows to
-   about a minute, so that a Render restart does not bring every client back at the same
-   instant.
-4. **No `alert()` storms.** The reconnect loop to an unreachable server shows an alert
-   every 5 s (I saw this in testing). Log the error and show a small *offline* state next
-   to the connection count instead.
+1. **Send on the current socket.** `src/FFI/WebSocket.js` now creates one **connection**
+   per page that outlives its sockets. The broadcaster stands for the connection, and
+   `send` uses whichever socket is live.
+   - While no socket is open, messages go into a queue that is flushed on `onopen`. The
+     queue keeps the newest 100 messages. Game messages carry the whole state, so the
+     newest one is enough.
+   - Heartbeats are not queued: `HeartbeatTick` skips sending while the relay is
+     unreachable, because a fresh `JoinMessage` replaces them.
+2. **Announce reconnects.** On every unexpected close the connection dispatches a
+   `disconnected` event on `#remote-message-target`, and after a reconnect a
+   `reconnected` event. `Main` handles them with `RelayLost` and `RelayRegained`.
+   `RelayRegained` sends `JoinMessage` and `UsernameMessage`, since peers have pruned us
+   after 15 s. Iteration 1 adds the mailbox pull here.
+3. **Back off with jitter.** The pure `Domination.Data.Backoff` gives the delay: the
+   ceiling starts at 1 s and doubles up to 60 s, and the delay is drawn from the upper half
+   of it (equal jitter). After a Render restart, clients come back spread out. Property
+   tests cover it (`test/Backoff.purs`). The `online` event skips the wait.
+4. **No `alert()` storms.** Errors are logged, never alerted. While the relay is
+   unreachable, the connection count shows `…` on a red background, with the tooltip
+   *Offline: reconnecting to the server*.
+
+Any unexpected close triggers a reconnect, including the `1001` a server sends when it
+shuts down. Before, codes `1000` and `1001` stopped the client for good. Only the page
+itself stops reconnecting, on `pagehide`, and it resumes if the page is restored from
+the back-forward cache.
+
+**Verified by hand** with two tabs and the local relay. I stopped the relay, and both
+tabs showed the offline mark and backed off (about 1, 1, 3 and 5 s), with no dialogs. A
+chat message sent offline was queued. After the relay restarted, both tabs reconnected
+without a reload, the counts recovered, and chat flowed both ways. The queued message was
+flushed, but the other tab had not reconnected yet, so the relay dropped it. Only a store
+can fix that, which is iteration 1.
 
 ### 6.4 Iteration 1: the room mailbox
 
@@ -376,11 +393,12 @@ export class Mailbox extends DurableObject {
   reads the body before the `get`, so nothing but storage happens between `get` and
   `put`. Awaiting the body in between would let another request run there.
 - **Storage:** one row per room, at most about 3.4 KB.
-- **Deployment:** `mailbox/wrangler.toml` with a SQLite-backed Durable Object class
-  (`new_sqlite_classes`, required on the free plan). Deploy with `npx wrangler deploy`,
+- **Deployment:** `mailbox/wrangler.toml` with a Durable Object class that uses SQLite
+  storage, which the free plan requires. Deploy with `npx wrangler deploy`,
   by hand or from a GitHub Action that runs only on `master` using a
   `CLOUDFLARE_API_TOKEN` secret. `npx wrangler dev` runs the same code locally with local
-  storage for manual and end-to-end tests.
+  storage for manual and end-to-end tests. The account, token and secrets this needs are
+  described step by step in [Async Play: Cloudflare Setup](./2026-11-03-async-play-cloudflare-setup.md).
 
 #### 6.4.3 Stamps: ordering live frames without changing the wire format
 
@@ -442,7 +460,7 @@ Pull when there may be news:
 | Trigger | Why |
 |---|---|
 | `Initialize` in a game room, after `restoreGame` | Coming back after being away (E3) |
-| `Reconnected` (iteration 0) | Anything broadcast while we were disconnected was lost |
+| `RelayRegained` (iteration 0) | Anything broadcast while we were disconnected was lost |
 | `window` `online` | Back from a network outage |
 | `document` `visibilitychange` to visible | Mobile tabs are frozen in the background and their sockets die quietly |
 
@@ -550,8 +568,8 @@ which are closed above:
 | `src/Data/Mailbox.purs` (new, pure) | `Revision` (newtype over `Int`, ordered), `Stamp = Committed Revision \| Tentative Revision`, `printStamp` and `parseStamp`, `Dirty = Clean \| Moved \| Relaying`, `Sync = { confirmed :: Revision, dirty :: Dirty }`, `receiveFrame :: Sync -> Maybe Stamp -> Maybe Sync` (`Nothing` means ignore), `Delivery = Accepted Revision \| Rejected { revision :: Revision, envelope :: Maybe String } \| Unreachable String`, `resolve`, `mailboxUrl :: String -> RoomCode -> String` |
 | `src/Data/Room.purs` | `V1Header` gains an optional `Stamp` in the sender segment. `printHeader` and `parseHeader` round-trip it |
 | `src/Capability/Mailbox.purs` (new) | `class Monad m <= Mailbox m` with `pull :: String -> Revision -> m (Either String Pulled)` and `deliver :: String -> Revision -> String -> m Delivery`. Instances for `AppM` and `HalogenM`, using `fetch` through a small FFI, like `Dom`, `Storage` and `WireCodec` |
-| `src/FFI/WebSocket.js` | Iteration 0 changes (§6.3) |
-| `src/Main.purs` | `Pull`, `Deliver` and `Reconnected` actions; subscriptions to `online` and `visibilitychange`; stamping in `sendMessage`; `receiveFrame` in `ReceiveRemoteMessage` |
+| `src/FFI/WebSocket.js` | Done in iteration 0 (§6.3) |
+| `src/Main.purs` | `Pull` and `Deliver` actions, a pull in `RelayRegained`; subscriptions to `online` and `visibilitychange`; stamping in `sendMessage`; `receiveFrame` in `ReceiveRemoteMessage` |
 | `src/AppState.purs` | `mailboxUrl :: String` (default constant, like `defaultServerUrl`), `mailboxStatus :: Synced \| Pending \| Offline` |
 | `src/UI/Settings.purs` | Connection tab: a *Mailbox URL* input next to *Server URL*. An empty value turns async play off |
 | `src/Main.purs` render | A small cloud mark next to the connection count: ✓ synced, … pending, ✗ offline |

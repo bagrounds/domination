@@ -2,6 +2,8 @@
 
 **Source:** [Async play design](../docs/2026-11-03-async-play-design.md) §6.4
 
+**Setup:** [Cloudflare account, token and GitHub secrets](../docs/2026-11-03-async-play-cloudflare-setup.md)
+
 **Status:** Open
 
 ## Description
@@ -40,7 +42,7 @@ on the free plan):
   delivers the frame as a courier, so a move whose author left still reaches the mailbox.
 - Retry deliveries with backoff while not `Clean`. Expiry advances the revision, and a
   client that still has the game saved delivers it again.
-- Pull on `Initialize`, `Reconnected`, `online` and `visibilitychange`, with
+- Pull on `Initialize`, `RelayRegained`, `online` and `visibilitychange`, with
   `If-None-Match: confirmed`. Replay through the existing receive path.
 - Deliver every own game change with `If-Match: confirmed`, then broadcast it.
   - If the mailbox is unreachable, broadcast it stamped `~` and keep `dirty`.

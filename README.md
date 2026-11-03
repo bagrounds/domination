@@ -34,7 +34,7 @@ or preview the latest push at [bagrounds.github.io/domination](https://bagrounds
 * Explicit game save and load controls
 * Card specific icons
 * Reliable message passing
-* Asynchronous play: moves reach players who were offline ([design](docs/2026-11-03-async-play-design.md))
+* Asynchronous play: moves reach players who were offline ([design](docs/2026-11-03-async-play-design.md), [Cloudflare setup](docs/2026-11-03-async-play-cloudflare-setup.md))
 * Custom card editor
 * Pseudo-random numbers (for deterministic shuffling and undo, and light weight game state diff based messages)
 * More expressive card effect Domain Specific Language (DSL)
