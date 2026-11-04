@@ -181,6 +181,7 @@ const run = async seed => {
     const actions = [
       [30, 'play', d => d.awake() && !d.hidden],
       [4, 'hide', d => d.awake() && !d.hidden],
+      [2, 'pagehide', d => d.awake() && !d.hidden],
       [5, 'show', d => d.awake() && d.hidden],
       [3, 'freeze', d => d.awake() && d.hidden],
       [4, 'resume', d => d.page !== null && d.frozen],
@@ -204,6 +205,12 @@ const run = async seed => {
           break
         }
         case 'hide': await d.setHidden(true); break
+        // Mobile browsers may fire pagehide on a page they keep alive and
+        // later show again without the back-forward cache.
+        case 'pagehide':
+          await d.setHidden(true)
+          await d.page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })))
+          break
         case 'show': await d.setHidden(false); break
         case 'freeze': await d.lifecycle('frozen'); break
         case 'resume': await d.lifecycle('active'); break
@@ -232,16 +239,13 @@ const run = async seed => {
       await perform('hide', a)
       if (leave === 'freeze') await perform('freeze', a)
       if (leave === 'close') await perform('close', a)
-      // Mobile browsers may fire pagehide on a page they keep alive and
-      // later show again without the back-forward cache.
-      if (leave === 'pagehide') await a.page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })))
+      if (leave === 'pagehide') await perform('pagehide', a)
       if (leave === 'offline') await perform('offline', a)
       if (leave === 'half-open') { await perform('freeze', a); servers.relay.halfOpen('A') }
       await sleep(Math.floor(random() * 20000))
       await playUntil(b, plays + 40, 400)
       await sleep(Math.floor(random() * 20000))
       journal(`away: A comes back after B made it ${plays} plays`)
-      if (leave === 'pagehide') await a.page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false })))
     }
     for (let n = 0; scenario === 'chaos' && n < stepCount; n++) {
       const options = devices.flatMap(d => actions.filter(([, , ok]) => ok(d)).map(([w, action]) => ({ w, action, d })))
