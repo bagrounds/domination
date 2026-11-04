@@ -15,5 +15,5 @@ data Version = Version Int Int Int
 version :: Version
 version = Version major minor patch where
   major = 0
-  minor = 39
+  minor = 40
   patch = 0

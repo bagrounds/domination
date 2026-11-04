@@ -48,6 +48,7 @@ import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Backoff as Backoff
 import Domination.Data.Card (CardSpec)
 import Domination.Data.Game (Game)
+import Domination.Data.LogicalClock (Verdict(..), judge, savedBeforeVersions, senderVersion, tick, versionSender)
 import Domination.Data.Mailbox (Delivery(..), Dirty(..), PullOutcome(..), Settlement(..), Stamp(..), Status(..), Sync, deliveryStamp, initialSync, interpretDelivery, interpretPull, isClean, mailboxBackoff, mailboxRoomUrl, overtakes, ownChange, printRevisionTag, pullCursor, receiveFrame, senderStamp, settleDelivery, settlePull, stampSender, status)
 import Domination.Data.Retheme (Proposals, proposeRename, renameMapping)
 import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, channelName, generateRoomCode, headerSender, isGameRoom, parseHeader, parseRoomHash, printHeader, roomFromHash, roomHash, scopedKey)
@@ -113,6 +114,9 @@ mailboxUrlKey = "mailbox-url"
 mailboxSyncKey :: String
 mailboxSyncKey = "mailbox_sync"
 
+gameVersionKey :: String
+gameVersionKey = "game_version"
+
 mailboxTimeoutMs :: Int
 mailboxTimeoutMs = 5000
 
@@ -139,11 +143,6 @@ gameOf = case _ of
 
 undoKey :: Int -> String
 undoKey saveNumber = "game_state_" <> show saveNumber
-
--- | A room member who reloads with a stale game must not roll the room back,
--- | so only the global room keeps today's share-on-startup behaviour.
-sharesSavedGameOnStartup :: Room -> Boolean
-sharesSavedGameOnStartup = not <<< isGameRoom
 
 main :: Effect Unit
 main = launchAff_ $ do
@@ -408,8 +407,9 @@ handleAction audioContext = case _ of
 
     log "Initialize: load game..."
     restored <- restoreGame gameStateKey
-    H.modify_ $ _mailbox %~ _ { outbox = toGameMessage <$> restored }
-    when (sharesSavedGameOnStartup room) $ traverse_ shareGame restored
+    eVersion <- load (scopedKey room gameVersionKey)
+    let version = either (const $ savedBeforeVersions <<< _.i <$> restored) Just eVersion
+    H.modify_ $ _mailbox %~ _ { outbox = toGameMessage <$> restored, version = version }
     when (isGameRoom room && isNothing restored) $ H.modify_
       $ (_showMenu .~ true) >>> (_settingsTab .~ GameSetupTab)
     configureBots
@@ -440,6 +440,7 @@ handleAction audioContext = case _ of
     timestamp <- now
     sendMessage $ JoinMessage { clientId: uuid, timestamp }
     sendMessage $ UsernameMessage { username, id: uuid }
+    offerGame
 
     interval <- H.gets _.heartbeatInterval
     _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
@@ -653,6 +654,7 @@ handleAction audioContext = case _ of
     timestamp <- now
     sendMessage $ JoinMessage { clientId, timestamp }
     sendMessage $ UsernameMessage { username, id: clientId }
+    offerGame
     pullMailbox
   where
     receiveMessage header msg = case msg of
@@ -682,6 +684,7 @@ handleAction audioContext = case _ of
           let count = HashMap.size clients
           H.modify_ $ _connectionCount .~ count
           log $ "Client joined: " <> clientId <> ", total clients: " <> show count
+          offerGame
         LeaveMessage { clientId } -> do
           H.modify_ $ _connectedClients %~ HashMap.delete clientId
           -- After removing client, broadcast the new count
@@ -807,23 +810,53 @@ handleAction audioContext = case _ of
       outbox <- H.gets _.mailbox.outbox
       pure $ (outbox >>= gameOf) /= gameOf msg
     -- Own changes go to the mailbox first and are broadcast once committed.
+    -- Without a mailbox they are broadcast at once, versioned.
     publishGame msg = do
       enabled <- H.gets $ isJust <<< mailboxTarget
+      modifySession \session -> session
+        { outbox = Just msg, moves = session.moves + 1 }
       if enabled
       then do
-        modifySession \session -> session
-          { outbox = Just msg, moves = session.moves + 1 }
         setSync <<< ownChange =<< H.gets _.mailbox.sync
         deliverMailbox
-      else sendMessage msg
+      else do
+        { id, mailbox: { version } } <- H.get
+        setVersion $ tick id version
+        offerGame
+    setVersion version = do
+      modifySession _ { version = Just version }
+      room <- H.gets _.room
+      save (scopedKey room gameVersionKey) version >>= logErrorToChat
+    -- Without a mailbox, the newest version wins (Domination.Data.LogicalClock):
+    -- whoever joins and whoever sees them join offer their games, and each
+    -- side takes only a game ahead of its own.
+    offerGame = do
+      enabled <- H.gets $ isJust <<< mailboxTarget
+      { outbox, version } <- H.gets _.mailbox
+      unless enabled $ traverse_ identity
+        $ broadcastVersioned <$> version <*> outbox
+    broadcastVersioned version msg = encodeEnvelope (versionSender version) msg
+      >>= either error broadcastWire
     receiveGameFrame header msg = do
       enabled <- H.gets $ isJust <<< mailboxTarget
       previous <- H.gets _.mailbox.sync
-      let stamp = either (const Nothing) (senderStamp <<< headerSender) (parseHeader header)
-      case enabled, receiveFrame stamp previous of
-        false, _ -> applyGame msg
-        true, Nothing -> log $ "Mailbox: ignored an overtaken game frame " <> header
-        true, Just next -> do
+      let sender = either (const Nothing) (Just <<< headerSender) (parseHeader header)
+      let stamp = senderStamp =<< sender
+      if enabled then receiveStamped header msg previous stamp
+      else do
+        { id, mailbox: { version } } <- H.get
+        case judge id version (senderVersion =<< sender) of
+          TakeTheirs next -> do
+            applyGame msg
+            setVersion next
+          SendOurs -> do
+            log $ "Clock: answered a game behind ours " <> header
+            offerGame
+          AlreadyHave -> log $ "Clock: ignored the game we already have " <> header
+    receiveStamped header msg previous stamp =
+      case receiveFrame stamp previous of
+        Nothing -> log $ "Mailbox: ignored an overtaken game frame " <> header
+        Just next -> do
           differs <- differsFromOurs msg
           applyGame msg
           setSync next
@@ -848,7 +881,7 @@ handleAction audioContext = case _ of
         other -> do
           error $ "Mailbox: stored game not admitted: " <> show other
           pure Nothing
-    broadcastGame stamp msg = encodeEnvelope (Just stamp) msg
+    broadcastGame stamp msg = encodeEnvelope (stampSender stamp) msg
       >>= either error broadcastWire
     pullMailbox = do
       state <- H.get
@@ -896,7 +929,7 @@ handleAction audioContext = case _ of
       case mailboxTarget state, session.outbox of
         Just url, Just outbox
           | not session.inFlight && not (isClean session.sync) -> do
-              eEnvelope <- encodeEnvelope (Just $ deliveryStamp session.sync) outbox
+              eEnvelope <- encodeEnvelope (stampSender $ deliveryStamp session.sync) outbox
               case eEnvelope of
                 Left e -> error e
                 Right envelope -> do
@@ -926,7 +959,7 @@ handleAction audioContext = case _ of
                   log $ "Mailbox: PUT " <> url <> " -> " <> show delivery
                   mine <- case delivery, after.outbox of
                     Conflict r _, Just game ->
-                      hush <$> encodeEnvelope (Just $ Committed r) game
+                      hush <$> encodeEnvelope (stampSender $ Committed r) game
                     _, _ -> pure Nothing
                   settleDelivered broadcastFirst
                     $ settleDelivery sent
@@ -991,21 +1024,22 @@ sendMessage
   => WireCodec m
   => RemoteMessage
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
-sendMessage message = encodeEnvelope Nothing message >>= either error broadcastWire
+sendMessage message = encodeEnvelope identity message >>= either error broadcastWire
 
 toGameMessage :: forall r. { state :: Game, i :: Int | r } -> RemoteMessage
 toGameMessage { state, i } = GameMessage { state, i, playMade: Nothing }
 
--- | Game envelopes carry a mailbox stamp after the sender id (§6.4.3).
+-- | Game envelopes carry a mailbox stamp or a version after the sender id
+-- | (§6.4.3); `decorate` adds it.
 encodeEnvelope
   :: forall t1 r o1 q1 output m
   . WireCodec m
-  => Maybe Stamp
+  => (String -> String)
   -> RemoteMessage
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m (Either String String)
-encodeEnvelope stamp message = do
+encodeEnvelope decorate message = do
   { room, id } <- H.get
-  let sender = maybe id (flip stampSender id) stamp
+  let sender = decorate id
   writeWire $ Tuple (printHeader $ V1Header room sender) (view Message._toWire message)
 
 broadcastWire

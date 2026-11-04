@@ -27,6 +27,7 @@ import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
+import Domination.Data.LogicalClock (Version)
 import Domination.Data.Mailbox (Sync, initialSync)
 import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
@@ -178,9 +179,12 @@ defaultMailboxUrl = "https://domination-mailbox.bagrounds.workers.dev"
 -- | This page's side of the mailbox protocol. `sync` is persisted per room;
 -- | the rest only lives as long as the page. `outbox` is the local game,
 -- | `moves` and `adoptions` count local changes so a reply can tell what
--- | happened while it was in flight.
+-- | happened while it was in flight. `version` orders copies of the game
+-- | where there is no mailbox (Domination.Data.LogicalClock); it is also
+-- | persisted per room.
 type MailboxSession =
   { sync :: Sync
+  , version :: Maybe Version
   , outbox :: Maybe RemoteMessage
   , moves :: Int
   , adoptions :: Int
@@ -193,6 +197,7 @@ type MailboxSession =
 newMailboxSession :: MailboxSession
 newMailboxSession =
   { sync: initialSync
+  , version: Nothing
   , outbox: Nothing
   , moves: 0
   , adoptions: 0
