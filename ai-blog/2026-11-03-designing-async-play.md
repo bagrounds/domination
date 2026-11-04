@@ -20,6 +20,7 @@ tags:
 🚀 Once you'd added the secrets, you asked me to build the mailbox and test it end to end before finishing. The last sections cover the build, the tests, and two bugs that only the real thing exposed.
 📱 Then you played one seat on your phone and your laptop, and saw the laptop rewind the game when it came back. You asked for a test that reproduces it and a fix, and for a version bump so you can tell which build you're on. That's the "Rewind" section.
 😴 Then you played a long game with your wife. Your phone slept at round 48, and when it woke it didn't catch up to round 50. You asked for property tests that reproduce the bugs before any fix, and for the algorithm to be written down and checked, with TLA+ if it fit in this task. It did. That's the "Phone That Fell Asleep" section.
+🚪 Then she left the app, you kept playing, and her game got stuck. That one became a model test, a fix, browser chaos tests and better bug reports, in "Leaving the App". Version 0.42.0 wraps it all up.
 
 ## 🔍 How It Works Today
 
@@ -193,6 +194,17 @@ tags:
 - 💸 **Still free.** Polling costs about 120 requests an hour for each open page. Cloudflare's free plan covers about 800 hours of open pages a day.
 - ✅ All 499 PureScript tests and 21 Worker tests pass.
 
+## 🚪 Leaving the App
+
+- 📱 **The report.** You played a while, she left the app, you kept playing, and when she came back her game was stuck behind yours.
+- 🛑 **A socket that stayed stopped.** On `pagehide` the page closes its socket and stops reconnecting, so a page parked in the back-forward cache doesn't hold one open. Only `pageshow` started it again. But a mobile browser can fire `pagehide` when you leave the app and later show the very same page again, with no `pageshow`. That page kept a stopped socket forever, and the game was never told, so it thought the socket was fine. In the global room, with no mailbox to poll, she never caught up.
+- 🔧 **The fix, v0.42.0.** Any sign of life restarts a stopped socket: `pageshow`, the page becoming visible, a `resume` after the browser froze it, or a resync reopen. Stopping now reports the relay lost, so the game knows.
+- 🧪 **Model first.** `test/Resync.purs` learned what `pagehide` does. Your story passes in both kinds of room, and with v0.41.0's connection rules it strands the room without a mailbox.
+- 🌪️ **Chaos in real browsers.** `e2e/` runs the app, the relay and the mailbox's own rules on local servers it can break, with two Chrome profiles at the table. A seeded random schedule makes valid plays and does what phones do to a page: hides it, freezes it, takes the network away, leaves its socket half-open, fires `pagehide`, closes or discards the tab, and takes the mailbox down. Then everything comes back and both devices must agree on the latest game in time. The `away` scenario plays your story with each way of leaving.
+- 🐞 **Better bug reports.** The bug report in Settings now carries a long sync journal (connection, mailbox, clock and page lifecycle) saved in `localStorage`, so it survives a reload or a discarded tab, plus facts about the page. A failing chaos run saves each device's report.
+- 🔢 **Version 0.42.0**, so you can tell this build from 0.41.0.
+- ✅ All 502 PureScript tests pass.
+
 ## 🧾 Tickets
 
 - 🗺️ [`issues/open/2026-11-03-async-play.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play.md) is the overview.
@@ -200,6 +212,7 @@ tags:
 - 📬 [`2026-11-03-async-play-mailbox.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-mailbox.md) is async play itself, now done.
 - ⏪ [`2026-11-04-async-play-rejoin-rewind.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-04-async-play-rejoin-rewind.md) is the phone and laptop rewind, now fixed.
 - 😴 [`2026-11-04-async-play-sleep-catch-up.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-04-async-play-sleep-catch-up.md) is the phone that fell asleep, now fixed.
+- 🚪 [`2026-11-04-async-play-pagehide-stuck.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-04-async-play-pagehide-stuck.md) is leaving the app, now fixed.
 - 📜 There are also tickets for history and chat, turn notifications and moving the relay.
 
 ## ✍️ Signed

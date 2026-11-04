@@ -27,6 +27,8 @@ conditional writes. The WebSocket relay does not change.
      games without a mailbox are now versioned. **Done.**
    - [A phone that sleeps doesn't catch up](../closed/2026-11-04-async-play-sleep-catch-up.md):
      visible pages poll and replace silent sockets, checked with TLA+. **Done.**
+   - [Leaving the app leaves the socket stopped](../closed/2026-11-04-async-play-pagehide-stuck.md):
+     any sign of life restarts it; browser chaos tests in `e2e/`. **Done.**
 3. Later, optional:
    - [History and async chat](./2026-11-03-async-play-history-and-chat.md)
    - [Turn notifications](./2026-11-03-async-play-turn-notifications.md)

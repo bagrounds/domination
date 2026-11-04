@@ -311,8 +311,9 @@ This fixes the bug in E2. It also helps live play without async play.
 
 Any unexpected close triggers a reconnect, including the `1001` a server sends when it
 shuts down. Before, codes `1000` and `1001` stopped the client for good. Only the page
-itself stops reconnecting, on `pagehide`, and it resumes if the page is restored from
-the back-forward cache.
+itself stops reconnecting, on `pagehide`. Since v0.42.0 it restarts on any sign of life:
+`pageshow`, the page becoming visible, a `resume` after a freeze, or a resync reopen
+(§6.4.12).
 
 **Verified by hand** with two tabs and the local relay. I stopped the relay, and both
 tabs showed the offline mark and backed off (about 1, 1, 3 and 5 s), with no dialogs. A
@@ -735,6 +736,42 @@ reactions. Since v0.41.0:
   the silence reopen breaks the global room. The reopen after a long nap only makes
   catching up faster. `tla/check` runs all four configurations.
 
+#### 6.4.12 Leaving the app: the socket that stayed stopped
+
+**The report.** They played a while, she left the app, he kept playing, and when she
+came back her game was stuck behind his.
+
+**The cause.** On `pagehide` the connection closes its socket and stops reconnecting, so
+a page going into the back-forward cache doesn't hold a socket open. In v0.41.0 only
+`pageshow` restarted it. But a mobile browser may fire `pagehide` when the user leaves the
+app and later show the very same page again, without the back-forward cache and without
+`pageshow`. That page kept a stopped socket for good, and Main was never told, so it
+believed the socket was open. In the global room, which has no mailbox to poll, she never
+caught up.
+
+**The fix, v0.42.0.**
+- Any sign of life restarts a stopped connection: `pageshow`, the page becoming visible,
+  a `resume` after a freeze, or a resync `reopen`.
+- Stopping reports the relay lost, so Main no longer believes a stopped socket is open.
+
+**Checking it.**
+- `test/Resync.purs` models `pagehide` (`PageHide`): the socket stops, and it restarts
+  according to the connection's rules. The story passes in both kinds of room, and under
+  v0.41.0's rules (`legacyConnection`) it strands the room without a mailbox.
+- `e2e/` is a browser chaos harness. It serves the app, the relay and the mailbox's own
+  rules on local servers it can break, and runs two Chrome profiles on seats 0 and 1. A
+  seeded random schedule makes valid plays and does what phones do to a page: hide it,
+  freeze it, take the network away, leave its socket half-open, fire `pagehide`, close or
+  discard the tab, and take the mailbox down. Then everything comes back, nobody plays,
+  and both devices must show the latest game within the window the resync policy
+  promises. The `away` scenario plays the report: A leaves in one of those ways, B plays
+  on, and A comes back. A failing run saves each device's bug report in `e2e/runs/`.
+
+**Bug reports.** The report in Settings now includes a sync journal (connection,
+mailbox, clock and page lifecycle lines, kept much longer than the console log and saved
+in `localStorage`, so it survives a reload or a discarded tab) and facts about the page,
+so a report like this one shows what each device saw.
+
 ### 6.5 Later: what happened while I was away (history and async chat)
 
 The mailbox gives the latest state, but the game log only shows the last play. To show
@@ -949,6 +986,10 @@ using the local relay and `wrangler dev`:
   the global room the phone never caught up. v0.41.0 passes in both, after a 5 s nap
   (shorter than the reopen threshold, so the poll and the silence reopen do the work)
   and after a 35 s nap (the socket is reopened on waking).
+- Leaving the app (§6.4.12): three more tests in the "Resync" section. The story passes
+  in both kinds of room, and v0.41.0's connection strands the room without a mailbox. The
+  browser chaos harness in `e2e/` plays the report against local servers
+  (`npm run chaos -- --scenario away --leave pagehide`).
 
 ## 11. Open Questions
 
