@@ -159,11 +159,17 @@ reactionTests =
         let pulls = elem PullMailbox (reactions (Ticked clock { visible = true }))
         pure $ (pulls == (clock.sincePull >= pollInterval)) <?> show clock
     }
-  , { name: "a visible page reopens its socket exactly when the relay has been silent too long"
+  , { name: "a visible page reopens an open socket exactly when the relay has been silent too long"
     , test: quick_check 200 do
         clock <- clockGen
-        let reopens = elem ReopenRelay (reactions (Ticked clock { visible = true }))
+        let reopens = elem ReopenRelay (reactions (Ticked clock { visible = true, relayOpen = true }))
         pure $ (reopens == (clock.sinceHeard >= allowedSilence clock.silentReopens)) <?> show clock
+    }
+  , { name: "a page leaves a socket it knows is closed to the socket's own reconnect backoff"
+    , test: quick_check 200 do
+        clock <- clockGen
+        let r = reactions (Ticked clock { relayOpen = false })
+        pure $ not (elem ReopenRelay r) <?> show clock
     }
   , { name: "each silent reopen waits longer, never beyond the longest silence"
     , test: quick_check 200 do
@@ -184,10 +190,11 @@ reactionTests =
 clockGen :: Gen Clock
 clockGen = do
   visible <- elements $ NEA.cons' true [ false ]
+  relayOpen <- elements $ NEA.cons' true [ false ]
   sincePull <- millisecondsGen
   sinceHeard <- millisecondsGen
   silentReopens <- chooseInt 0 8
-  pure { visible, sincePull, sinceHeard, silentReopens }
+  pure { visible, relayOpen, sincePull, sinceHeard, silentReopens }
 
 millisecondsGen :: Gen Milliseconds
 millisecondsGen = Milliseconds <<< toNumber <<< (_ * 1000) <$> chooseInt 0 300
@@ -555,6 +562,7 @@ tickDevice policy d world0 = occur policy d (Ticked clock) $ heartbeat $ retry c
     x' = device d (heartbeat (retry counted))
     clock =
       { visible: x'.visible
+      , relayOpen: x'.link /= Down
       , sincePull: ms x'.sincePull
       , sinceHeard: ms x'.sinceHeard
       , silentReopens: x'.silentReopens

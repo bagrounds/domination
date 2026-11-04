@@ -25,6 +25,8 @@ conditional writes. The WebSocket relay does not change.
 2. [Room mailbox](../closed/2026-11-03-async-play-mailbox.md): async play itself. **Done.**
    - [A device that rejoins rewinds the game](../closed/2026-11-04-async-play-rejoin-rewind.md):
      games without a mailbox are now versioned. **Done.**
+   - [A phone that sleeps doesn't catch up](../closed/2026-11-04-async-play-sleep-catch-up.md):
+     visible pages poll and replace silent sockets, checked with TLA+. **Done.**
 3. Later, optional:
    - [History and async chat](./2026-11-03-async-play-history-and-chat.md)
    - [Turn notifications](./2026-11-03-async-play-turn-notifications.md)

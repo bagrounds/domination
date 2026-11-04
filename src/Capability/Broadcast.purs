@@ -30,24 +30,29 @@ class Monad m <= Broadcast b m where
   create :: String -> String -> String -> m (Either Error b)
   address :: b -> m String
   broadcast :: b -> String -> m Unit
+  -- | Replace a connection that may be dead without knowing it.
+  reopen :: b -> m Unit
 
 instance webSocketBroadcasterAppM :: Broadcast WebSocketBroadcaster AppM where
   create roomCode remoteMessageTarget serverUrl =
     liftAff $ WebSocket.createWebSocketBroadcaster remoteMessageTarget serverUrl
   address = liftAff <<< WebSocket.getWebSocketAddress
   broadcast broadcaster = liftAff <<< WebSocket.broadcastWebSocketMessage broadcaster
+  reopen = liftAff <<< WebSocket.reopenWebSocket
 
 instance bugoutBroadcasterAppM :: Broadcast BugoutBroadcaster AppM where
   create roomCode remoteMessageTarget serverUrl =
     liftAff $ Bugout.createBugoutBroadcaster roomCode remoteMessageTarget serverUrl
   address = liftAff <<< Bugout.getBugoutAddress
   broadcast broadcaster = liftAff <<< Bugout.broadcastBugoutMessage broadcaster
+  reopen _ = pure unit
 
 instance broadcastHalogenM :: Broadcast b m => Broadcast b (HalogenM st act slots msg m) where
   create a b = lift <<< create a b
   address = lift <<< address
   broadcast :: b -> String -> (HalogenM st act slots msg m) Unit
   broadcast broadcaster = lift <<< broadcast broadcaster
+  reopen = lift <<< reopen
 
 newtype BroadcastM a = BroadcastM (Aff a)
 

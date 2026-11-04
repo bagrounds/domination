@@ -50,11 +50,14 @@ data Occasion
   | RetryDue
   | Ticked Clock
 
+-- | `relayOpen`: the browser says the socket is open (when it knows the
+-- | socket closed, it is already reconnecting with backoff).
 -- | `sincePull`: since the last mailbox pull. `sinceHeard`: since anything
 -- | arrived from the relay, or since the socket was last reopened.
 -- | `silentReopens`: reopens since anything last arrived.
 type Clock =
   { visible :: Boolean
+  , relayOpen :: Boolean
   , sincePull :: Milliseconds
   , sinceHeard :: Milliseconds
   , silentReopens :: Int
@@ -81,7 +84,10 @@ reactions = case _ of
   RetryDue -> [ PullMailbox ]
   Ticked clock ->
     (guard (clock.visible && clock.sincePull >= pollInterval) $> PullMailbox)
-      <> (guard (clock.visible && clock.sinceHeard >= allowedSilence clock.silentReopens) $> ReopenRelay)
+      <> (guard (clock.visible && clock.relayOpen && silentTooLong clock) $> ReopenRelay)
+
+silentTooLong :: Clock -> Boolean
+silentTooLong { sinceHeard, silentReopens } = sinceHeard >= allowedSilence silentReopens
 
 -- | A visible page asks the mailbox this often, so a move whose frame was
 -- | lost still arrives. About 120 requests an hour per visible page.
@@ -136,9 +142,10 @@ reopened at marks = marks { heardAt = at, silentReopens = marks.silentReopens + 
 hiddenFor :: Milliseconds -> Marks -> Milliseconds
 hiddenFor at = maybe (Milliseconds 0.0) (since at) <<< _.hiddenAt
 
-clockAt :: Milliseconds -> Boolean -> Marks -> Clock
-clockAt at visible marks =
+clockAt :: Milliseconds -> { visible :: Boolean, relayOpen :: Boolean } -> Marks -> Clock
+clockAt at { visible, relayOpen } marks =
   { visible
+  , relayOpen
   , sincePull: since at marks.pulledAt
   , sinceHeard: since at marks.heardAt
   , silentReopens: marks.silentReopens

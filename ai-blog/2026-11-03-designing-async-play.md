@@ -19,6 +19,7 @@ tags:
 🔧 After reading the design, you asked me to fix the reconnect bug right away and to write down exactly which Cloudflare credentials the mailbox will need.
 🚀 Once you'd added the secrets, you asked me to build the mailbox and test it end to end before finishing. The last sections cover the build, the tests, and two bugs that only the real thing exposed.
 📱 Then you played one seat on your phone and your laptop, and saw the laptop rewind the game when it came back. You asked for a test that reproduces it and a fix, and for a version bump so you can tell which build you're on. That's the "Rewind" section.
+😴 Then you played a long game with your wife. Your phone slept at round 48, and when it woke it didn't catch up to round 50. You asked for property tests that reproduce the bugs before any fix, and for the algorithm to be written down and checked, with TLA+ if it fit in this task. It did. That's the "Phone That Fell Asleep" section.
 
 ## 🔍 How It Works Today
 
@@ -177,12 +178,28 @@ tags:
 - 🔢 **Version 0.40.0.** The version had stayed at 0.39.0 through this whole PR, so there was no way to tell which build a device was running. It's now 0.40.0, in `src/Version.purs` and the service worker's cache name, so devices pick up the new build and you can see which one you're on.
 - ✅ All 474 PureScript tests and 21 Worker tests pass.
 
+## 😴 The Phone That Fell Asleep
+
+- 📱 **The report.** Round 48, the phone goes dark, your wife plays on, the phone wakes and stops short of round 50, "and other variations on that".
+- 🧟 **Half-open sockets.** A phone that sleeps, or hops networks, can leave its WebSocket half-open. The browser still says it's open, so no `close` event fires and the reconnect logic never runs, but nothing gets through in either direction.
+- 👀 **Looking only when poked.** v0.40.0 looked for news only on discrete events: startup, becoming visible, the network or relay coming back, and a retry timer. So the waking phone pulled once and caught up to that moment. Every later move went into its dead socket, and it never looked again while you kept it open. Its own moves reached the mailbox, but their frames went into the same dead socket, so your wife's device never pulled them. In the global room, with no mailbox, nothing rescued a half-open socket at all.
+- 📚 **What others do.** Long-lived connections are never trusted: TCP keepalive, WebSocket ping and pong, MQTT's keep-alive, and the heartbeats in Phoenix, Socket.IO and SignalR all treat silence as death. Clients that mustn't miss updates also re-read the source of truth: TanStack Query and SWR refetch on focus and can poll on an interval, and Matrix clients keep calling `/sync`.
+- 📋 **One table.** The new pure module `Domination.Data.Resync` lists every moment a client can notice (started, shown, network back, relay back, a peer joined, a retry due, a heartbeat tick) and what to do then (announce, offer the game, pull, reopen the socket). Main just performs the reactions, so the tests and the model can share the real table.
+- 🧪 **Bugs first.** `test/Resync.purs` models Main: the real pure decisions, sockets that are live, half-open or closed, sends queued while closed, a relay that only reaches live sockets, mailbox outages, retry backoff, and devices that sleep, wake, close and reopen. The report and three variations (moving right after waking, a short nap, a socket that dies while awake), in both kinds of room, all strand a device under v0.40.0's table.
+- 🔍 **TLA+.** `tla/RoomSync.tla` states the same algorithm with safety (nobody shows a game the mailbox never committed, nobody goes back to an older game) and liveness (once the chaos stops, everyone ends up on the latest game). TLC found a counterexample for v0.40.0 in both kinds of room. The mailbox one is your evening: the phone's socket is half-open, the other device moves twice, and the phone stays behind forever.
+- 🔧 **The fix, v0.41.0.** While a page is visible it polls the mailbox every 30 seconds, and reopens a socket that has heard nothing for 15 seconds, backing off to 2 minutes if the room stays quiet. It also reopens the socket when the network comes back and on waking after half a minute or more. Timers use the wall clock, because `performance.now` can stop while a phone sleeps.
+- ✅ **Checked.** TLC explores every behaviour of two devices with three moves, two naps, a broken socket and an outage, about 1.5 million states in the global room, and finds no error. Taking the poll out breaks mailbox rooms, and taking the silence reopen out breaks the global room. The reopen on waking only makes catching up faster. Random schedules in the PureScript model converge within two polls in mailbox rooms and within two minutes in the global room, and never rewind.
+- 🎭 **And for real.** A local relay that can stop forwarding without closing made a browser's socket half-open, against the live mailbox. Phone sleeps, wife plays, phone wakes and plays, wife plays again: v0.40.0 failed in both kinds of room, and v0.41.0 passed after a 5 second nap and a 35 second one.
+- 💸 **Still free.** Polling costs about 120 requests an hour for each open page. Cloudflare's free plan covers about 800 hours of open pages a day.
+- ✅ All 499 PureScript tests and 21 Worker tests pass.
+
 ## 🧾 Tickets
 
 - 🗺️ [`issues/open/2026-11-03-async-play.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play.md) is the overview.
 - 🐛 [`2026-11-03-async-play-reconnect-sends.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-reconnect-sends.md) is the bug fix.
 - 📬 [`2026-11-03-async-play-mailbox.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-mailbox.md) is async play itself, now done.
 - ⏪ [`2026-11-04-async-play-rejoin-rewind.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-04-async-play-rejoin-rewind.md) is the phone and laptop rewind, now fixed.
+- 😴 [`2026-11-04-async-play-sleep-catch-up.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-04-async-play-sleep-catch-up.md) is the phone that fell asleep, now fixed.
 - 📜 There are also tickets for history and chat, turn notifications and moving the relay.
 
 ## ✍️ Signed

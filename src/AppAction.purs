@@ -39,10 +39,10 @@ data AppAction
   | RelayLost
   | RelayRegained
   | WriteMailboxUrl String
-  | PullMailbox
   | DeliverMailbox
   | MailboxRetryDue
   | VisibilityChanged
+  | NetworkRegained
   | HandleGameEvent GameEvent
   | AddBot Strategy
   | RemoveBot Int

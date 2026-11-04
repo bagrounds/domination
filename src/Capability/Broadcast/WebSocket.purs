@@ -23,3 +23,6 @@ createWebSocketBroadcaster remoteMessageTarget serverUrl =
 
 getWebSocketAddress :: WebSocketBroadcaster -> Aff String
 getWebSocketAddress (WebSocketBroadcaster connection) = liftEffect $ FFI.address connection
+
+reopenWebSocket :: WebSocketBroadcaster -> Aff Unit
+reopenWebSocket (WebSocketBroadcaster connection) = liftEffect $ FFI.reopen connection

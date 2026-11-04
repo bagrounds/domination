@@ -34,13 +34,13 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing, maybe)
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
-import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster)
+import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster, reopen)
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Capability.Clock (class Clock, now)
 import Domination.Capability.Dom (class Dom, locationHash, pageBaseUrl, reload, setLocationHash, window)
 import Domination.Capability.GenUuid (class GenUuid, genUuid)
 import Domination.Capability.Log (class Log, error, log)
-import Domination.Capability.Mailbox (class Mailbox, isDocumentVisible, requestMailbox)
+import Domination.Capability.Mailbox (class Mailbox, isDocumentVisible, requestMailbox, wallClock)
 import Domination.Capability.Random (class Random, randomElement, randomIntBetween, shuffle)
 import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.Timer (class Timer, createTimer)
@@ -50,6 +50,8 @@ import Domination.Data.Card (CardSpec)
 import Domination.Data.Game (Game)
 import Domination.Data.LogicalClock (Verdict(..), judge, savedBeforeVersions, senderVersion, tick, versionSender)
 import Domination.Data.Mailbox (Delivery(..), Dirty(..), PullOutcome(..), Settlement(..), Stamp(..), Status(..), Sync, deliveryStamp, initialSync, interpretDelivery, interpretPull, isClean, mailboxBackoff, mailboxRoomUrl, overtakes, ownChange, printRevisionTag, pullCursor, receiveFrame, senderStamp, settleDelivery, settlePull, stampSender, status)
+import Domination.Data.Resync (Occasion(..), Reaction(..), clockAt, hiddenFor, initialMarks, reactions)
+import Domination.Data.Resync as Resync
 import Domination.Data.Retheme (Proposals, proposeRename, renameMapping)
 import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, channelName, generateRoomCode, headerSender, isGameRoom, parseHeader, parseRoomHash, printHeader, roomFromHash, roomHash, scopedKey)
 import Domination.Env (env)
@@ -426,6 +428,9 @@ handleAction audioContext = case _ of
     log $ "Initialize: server URL: " <> serverUrl
     H.modify_ (_serverUrl .~ serverUrl)
 
+    startedAt <- wallClock
+    H.modify_ _ { resync = initialMarks startedAt }
+
     maybeBroadcaster <- maybeCreateBroadcaster
       (channelName room) remoteMessageTarget serverUrl
 
@@ -436,11 +441,6 @@ handleAction audioContext = case _ of
     broadcaster <- H.gets _.maybeBroadcaster
 
     log $ "Initialize: broadcaster: " <> show broadcaster
-
-    timestamp <- now
-    sendMessage $ JoinMessage { clientId: uuid, timestamp }
-    sendMessage $ UsernameMessage { username, id: uuid }
-    offerGame
 
     interval <- H.gets _.heartbeatInterval
     _ <- H.subscribe =<< createTimer { interval } HeartbeatTick
@@ -468,7 +468,7 @@ handleAction audioContext = case _ of
       eventListener
         (EventType "online")
         (toEventTarget w)
-        \_ -> Just PullMailbox
+        \_ -> Just NetworkRegained
 
     doc <- liftEffect $ document w
     H.subscribe' \_ ->
@@ -478,7 +478,7 @@ handleAction audioContext = case _ of
         \_ -> Just VisibilityChanged
 
     log "Initialize completed"
-    pullMailbox
+    resync Started
 
   Finalize -> do
     clientId <- H.gets _.id
@@ -588,17 +588,23 @@ handleAction audioContext = case _ of
     save mailboxUrlKey mailboxUrl >>= logErrorToChat
     H.modify_ $ _mailboxUrl .~ mailboxUrl
 
-  PullMailbox -> pullMailbox
-
   DeliverMailbox -> deliverMailbox
 
   MailboxRetryDue -> do
     modifySession _ { retryScheduled = false }
-    pullMailbox
+    resync RetryDue
 
   VisibilityChanged -> do
     visible <- isDocumentVisible
-    when visible pullMailbox
+    at <- wallClock
+    marks <- H.gets _.resync
+    if visible
+    then do
+      H.modify_ _ { resync = Resync.shown marks }
+      resync $ Shown $ hiddenFor at marks
+    else H.modify_ _ { resync = Resync.hidden at marks }
+
+  NetworkRegained -> resync NetworkBack
 
   WriteUsername username -> do
     { id } <- H.get
@@ -611,6 +617,8 @@ handleAction audioContext = case _ of
   SendMessage -> sendChatMessage
 
   ReceiveRemoteMessage customEvent -> do
+    heardAt <- wallClock
+    H.modify_ \st -> st { resync = Resync.heard heardAt st.resync }
     let detail = FFI.detail customEvent
     room <- H.gets _.room
     (eHeader :: Either String String) <- readWire detail
@@ -640,23 +648,36 @@ handleAction audioContext = case _ of
     SaveGame activeState -> saveGame activeState
     Undo { i } -> loadGame $ undoKey $ (i - 1) `mod` 10
   HeartbeatTick -> do
-    { id: clientId, relayReachable } <- H.get
+    { id: clientId, relayReachable, resync: marks } <- H.get
     timestamp <- now
     when relayReachable $
       sendMessage $ HeartbeatMessage { clientId, timestamp }
+    visible <- isDocumentVisible
+    at <- wallClock
+    resync $ Ticked $ clockAt at { visible, relayOpen: relayReachable } marks
   RelayLost -> do
     log "RelayLost: queueing messages until the server is back"
     H.modify_ $ _relayReachable .~ false
   RelayRegained -> do
     log "RelayRegained: announcing ourselves again"
     H.modify_ $ _relayReachable .~ true
-    { id: clientId, username } <- H.get
-    timestamp <- now
-    sendMessage $ JoinMessage { clientId, timestamp }
-    sendMessage $ UsernameMessage { username, id: clientId }
-    offerGame
-    pullMailbox
+    resync RelayBack
   where
+    -- When to look again for the room's latest game: Domination.Data.Resync.
+    resync occasion = traverse_ react (reactions occasion)
+    react = case _ of
+      Announce -> do
+        { id: clientId, username } <- H.get
+        timestamp <- now
+        sendMessage $ JoinMessage { clientId, timestamp }
+        sendMessage $ UsernameMessage { username, id: clientId }
+      OfferGame -> offerGame
+      PullMailbox -> pullMailbox
+      ReopenRelay -> do
+        at <- wallClock
+        H.modify_ \st -> st { resync = Resync.reopened at st.resync }
+        log "Resync: reopening the relay socket"
+        H.gets _.maybeBroadcaster >>= traverse_ reopen
     receiveMessage header msg = case msg of
         UsernameMessage { username, id } -> do
           log $ "username incoming: " <> username
@@ -684,7 +705,7 @@ handleAction audioContext = case _ of
           let count = HashMap.size clients
           H.modify_ $ _connectionCount .~ count
           log $ "Client joined: " <> clientId <> ", total clients: " <> show count
-          offerGame
+          resync PeerJoined
         LeaveMessage { clientId } -> do
           H.modify_ $ _connectedClients %~ HashMap.delete clientId
           -- After removing client, broadcast the new count
@@ -884,6 +905,8 @@ handleAction audioContext = case _ of
     broadcastGame stamp msg = encodeEnvelope (stampSender stamp) msg
       >>= either error broadcastWire
     pullMailbox = do
+      pulledAt <- wallClock
+      H.modify_ \st -> st { resync = Resync.pulled pulledAt st.resync }
       state <- H.get
       let session = state.mailbox
       case mailboxTarget state of

@@ -1,7 +1,9 @@
 // One connection per page. It outlives the sockets it opens: when a socket
 // closes unexpectedly, the connection opens a new one after a backoff delay,
 // and `send` always uses the live socket. Messages sent while no socket is
-// open are queued and flushed when the next socket opens.
+// open are queued and flushed when the next socket opens. A socket can also
+// die without closing (half-open, after a phone sleeps or the network
+// switches); `reopen` replaces it at once (Domination.Data.Resync).
 const maxQueuedMessages = 100
 
 const getConnection = () => window._dominationConnection
@@ -66,6 +68,7 @@ export const makeConnectionFFI = left =>
       lostOnce: false,
       stopped: false,
       retryTimer: null,
+      reopen: () => {},
     }
     setConnection(connection)
 
@@ -84,12 +87,25 @@ export const makeConnectionFFI = left =>
       connection.retryTimer = setTimeout(open, delay)
     }
 
-    const reconnectNow = () => {
-      if (connection.retryTimer !== null && !connection.stopped) {
-        logInfo('network is back, reconnecting now')
-        clearTimeout(connection.retryTimer)
-        open()
+    // The old socket's handlers are detached first, so its late close
+    // neither reports a disconnection nor schedules a second socket.
+    connection.reopen = () => {
+      if (connection.stopped) return
+      logInfo('reopening the socket')
+      clearTimeout(connection.retryTimer)
+      const old = connection.socket
+      if (old) {
+        old.onopen = old.onclose = old.onmessage = old.onerror = null
+        try {
+          old.close(4000, 'reopen')
+        } catch (e) {
+          logInfo('failed to close the old socket')
+        }
       }
+      connection.socket = null
+      connection.attempt = 0
+      connection.lostOnce = true
+      open()
     }
 
     const open = () => {
@@ -161,7 +177,6 @@ export const makeConnectionFFI = left =>
 
     window.addEventListener('pagehide', shutdown)
     window.addEventListener('pageshow', resume)
-    window.addEventListener('online', reconnectNow)
 
     open()
   }
@@ -177,3 +192,5 @@ export const send = connection => message => () => {
 }
 
 export const address = connection => () => connection.address
+
+export const reopen = connection => () => connection.reopen()

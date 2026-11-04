@@ -36,3 +36,7 @@ foreign import makeConnectionFFI
 foreign import send :: Connection -> String -> Effect Unit
 
 foreign import address :: Connection -> Effect String
+
+-- | Replace the socket, which may be dead without knowing it, with a new one
+-- | at once. Its opening dispatches `reconnected`.
+foreign import reopen :: Connection -> Effect Unit

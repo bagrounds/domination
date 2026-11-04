@@ -474,6 +474,7 @@ Pull when there may be news:
 | `RelayRegained` (iteration 0) | Anything broadcast while we were disconnected was lost |
 | `window` `online` | Back from a network outage |
 | `document` `visibilitychange` to visible | Mobile tabs are frozen in the background and their sockets die quietly |
+| Every 30 s while the page is visible (since v0.41.0, §6.4.11) | A frame lost to a socket that died without closing is never sent again |
 
 If `dirty` is not `Clean`, a pull **delivers** instead (§6.4.5). The delivery either
 commits the local game or finds the newer state. Otherwise a pull is `GET` with
@@ -660,6 +661,80 @@ Old builds in the global room still take every frame. When a stale device rejoin
 build may briefly show the stale game until a newer device answers it. That is no worse
 than before, and the version bump makes devices load the new build.
 
+#### 6.4.11 Looking again: half-open sockets and a model-checked policy
+
+**The report.** Two players were at round 48 of a long game in a mailbox room. The phone
+slept, the other player played on, and when the phone woke it did not catch all the way
+up, "and other variations on that".
+
+**The cause.** Until v0.40.0 a client looked for news only on discrete events: startup,
+the page becoming visible, the network coming back, the relay reconnecting, a retry
+timer, and live frames. That misses one common failure. A phone that sleeps, or a
+network that switches, can leave its WebSocket **half-open**: the browser still reports
+it open, so no `close` event fires, the reconnect logic never runs, and nothing is
+delivered either way. So:
+
+- On waking, the phone pulled once and caught up to whatever had been committed at that
+  moment. Every later move was broadcast into its dead socket and lost, and the phone
+  never looked again while it stayed visible.
+- The phone's own moves were committed to the mailbox, but their frames went into the
+  same dead socket, so the other player, whose socket was fine, never pulled them.
+- In the global room, which has no mailbox, nothing at all replaced a half-open socket.
+- A failed pull backs off for up to five minutes, which a visible page also waited out.
+
+**The pattern.** Systems that keep long-lived connections do not trust them. They send
+keepalives and treat silence as death: TCP keepalive, WebSocket ping and pong, MQTT's
+keep-alive interval, and the heartbeat timeouts in Phoenix Channels, Socket.IO and
+SignalR all close a connection that has been quiet for too long. Clients that must not
+miss updates also re-read the source of truth: TanStack Query and SWR refetch when a
+window regains focus and can poll on an interval, and Matrix clients keep calling
+`/sync` with the last token they saw. Devices here already send a heartbeat every 5 s,
+so a socket that hears nothing for 15 s while anyone else is around is dead.
+
+**The policy, in one place.** `Domination.Data.Resync` names the moments a client can
+notice (`Occasion`) and what it then does (`Reaction`); `Main` only performs the
+reactions. Since v0.41.0:
+
+| Occasion | Reactions |
+|---|---|
+| `Started` | Announce, offer the game (no mailbox), pull |
+| `Shown` after being hidden | Pull; if hidden for 30 s or more, also reopen the socket |
+| `NetworkBack` (`online`) | Pull and reopen the socket |
+| `RelayBack` (the socket opened again) | Announce, offer the game, pull |
+| `PeerJoined` | Offer the game (no mailbox) |
+| `RetryDue` | Pull |
+| `Ticked` (every heartbeat, 5 s) | While visible: pull if the last pull is 30 s old; reopen the socket if it is open but has heard nothing for 15 s |
+
+- **Reopen** drops the socket without waiting for a `close`, and opens a new one at once.
+  Its opening is a `RelayBack`, so the client announces itself, offers its game and
+  pulls, and peers that see it join offer theirs.
+- **Silence backs off.** Each reopen that still hears nothing doubles the allowed silence,
+  up to 2 minutes, so a page alone in its room reopens rarely. Hearing anything resets it.
+- **A socket the browser knows is closed** is left to its own reconnect backoff (§6.3).
+- **Hidden pages do nothing** on a heartbeat. They catch up when shown.
+- **Times are wall-clock times** (`Date.now`), because `performance.now` can stop while a
+  phone sleeps.
+
+**Checking it.** Before any fix, two models reproduced the report:
+
+- `test/Resync.purs` models Main faithfully: the real pure decisions (`Mailbox`,
+  `LogicalClock`, `Resync`), sockets that are live, half-open or closed, sends queued
+  while closed, a relay that only reaches live sockets, mailbox outages, retry backoff,
+  and devices that sleep, wake, close and reopen. One tick is one heartbeat. The
+  reported story and three variations, each in both kinds of room, strand a device under
+  v0.40.0's policy (kept in the test as `legacy`). Under the new one, random schedules
+  converge within two polls in mailbox rooms and within the longest silence in the
+  global room, and nobody ever goes back to an older game.
+- [`tla/RoomSync.tla`](../tla/RoomSync.tla) states the same algorithm in TLA+, with safety
+  (`NeverAheadOfMailbox`, `NoRewind`) and liveness (`EventuallyConverged`: once the chaos
+  stops, every device ends up with the latest game). TLC finds liveness counterexamples
+  for v0.40.0 in both kinds of room. One is the report: the phone's socket is half-open,
+  the other device moves twice, and the phone stays behind forever. For v0.41.0 it
+  checks every behaviour of two devices with three moves, two naps, a broken socket and
+  an outage, and finds no error. Removing the poll breaks the mailbox room, and removing
+  the silence reopen breaks the global room. The reopen after a long nap only makes
+  catching up faster. `tla/check` runs all four configurations.
+
 ### 6.5 Later: what happened while I was away (history and async chat)
 
 The mailbox gives the latest state, but the game log only shows the last play. To show
@@ -741,7 +816,8 @@ Cloudflare Workers Free ([Workers limits](https://developers.cloudflare.com/work
 
 From §3.4, one game is about 30 to 2,500 plays. So 100,000 writes a day is roughly 40 of
 the longest bot games or about 2,000 short two-player games every day, far above today's
-traffic. Pulls happen once per wake-up, not per play. If a quota runs out, Cloudflare returns errors
+traffic. Since v0.41.0 a visible page also polls every 30 s (§6.4.11), about 120 requests
+an hour, so the free plan covers roughly 800 hours of open pages a day. If a quota runs out, Cloudflare returns errors
 until 00:00 UTC. The client treats that as *unreachable* (§6.4.5), so play falls back to
 today's live-only behaviour rather than breaking.
 
@@ -859,6 +935,20 @@ using the local relay and `wrangler dev`:
   relay, in a room with the mailbox off on the production relay, and when both devices
   hold games saved by v0.39.0. Before the fix, the global room failed: the laptop stayed
   on its old game.
+- Looking again (§6.4.11): 25 tests in the "Resync" section. Eight scenarios (the
+  report and three variations, in both kinds of room) pass under the new policy, and
+  eight more check that v0.40.0's policy strands a device in each. Random schedules on
+  two or three devices converge (400 runs per kind of room), nobody goes back to an
+  older game, and properties pin down the policy table. TLC checks `tla/RoomSync.tla` as
+  described in §6.4.11.
+- Browser, the same report: two Chrome profiles against the live mailbox and a local
+  relay that can make a socket half-open (it stops forwarding without closing). The
+  phone sleeps with a dead socket, the wife plays, the phone wakes, plays, and the wife
+  plays again; every step must show up on the other device within 75 s. v0.40.0 failed
+  in both kinds of room: in the mailbox room the wife never saw the phone's move, and in
+  the global room the phone never caught up. v0.41.0 passes in both, after a 5 s nap
+  (shorter than the reopen threshold, so the poll and the silence reopen do the work)
+  and after a 35 s nap (the socket is reopened on waking).
 
 ## 11. Open Questions
 

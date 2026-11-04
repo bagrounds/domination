@@ -35,5 +35,7 @@ export const requestFFI = nothing => just => request => (onError, onSuccess) => 
   }
 }
 
+export const wallClock = () => Date.now()
+
 export const documentVisible = () =>
   typeof document === 'undefined' || document.visibilityState !== 'hidden'

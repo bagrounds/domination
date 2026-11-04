@@ -2,6 +2,7 @@ module FFI.Mailbox
   ( MailboxRequest
   , request
   , documentVisible
+  , wallClock
   ) where
 
 import Prelude
@@ -39,6 +40,10 @@ foreign import requestFFI
   -> EffectFnAff HttpResponse
 
 foreign import documentVisible :: Effect Boolean
+
+-- | Milliseconds since the epoch. Unlike `performance.now`, it keeps
+-- | counting while a phone sleeps.
+foreign import wallClock :: Effect Number
 
 request :: MailboxRequest -> Aff HttpResponse
 request r = fromEffectFnAff $ requestFFI Nothing Just

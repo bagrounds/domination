@@ -23,12 +23,14 @@ import Data.Array (deleteAt, length, snoc)
 import Data.Maybe (Maybe(..), maybe)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
+import Effect.Aff (Milliseconds(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Domination.Data.LogicalClock (Version)
 import Domination.Data.Mailbox (Sync, initialSync)
+import Domination.Data.Resync (Marks, initialMarks)
 import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
 import Message (RemoteMessage)
@@ -74,6 +76,7 @@ type AppState =
   , relayReachable :: Boolean
   , mailboxUrl :: String
   , mailbox :: MailboxSession
+  , resync :: Marks
   , room :: Room
   , roomNotice :: Maybe String
   , inviteBaseUrl :: String
@@ -228,6 +231,7 @@ newApp =
   , relayReachable: true
   , mailboxUrl: defaultMailboxUrl
   , mailbox: newMailboxSession
+  , resync: initialMarks (Milliseconds 0.0)
   , room: GlobalRoom
   , roomNotice: Nothing
   , inviteBaseUrl: ""
