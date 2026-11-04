@@ -205,6 +205,21 @@ tags:
 - 🔢 **Version 0.42.0**, so you can tell this build from 0.41.0.
 - ✅ All 502 PureScript tests pass.
 
+## 📚 Deep Dives
+
+A series goes deeper into each part of this work. [Async Play Deep Dives](./2026-11-04-async-play-deep-dives) is the reading guide.
+
+- 📮 [Store and Forward](./2026-11-04-store-and-forward): the research, and what we learned from email, Matrix, MQTT, Kafka and Game Center.
+- ☁️ [A Room Mailbox on Durable Objects](./2026-11-04-a-room-mailbox-on-durable-objects): the Worker.
+- 🧾 [Revisions, Stamps and Couriers](./2026-11-04-revisions-stamps-and-couriers): mailbox sync on the client.
+- 🕰️ [Lamport Clocks for a Card Game](./2026-11-04-lamport-clocks-for-a-card-game): the rewind fix.
+- 🧟 [Half-Open Sockets and the Resync Table](./2026-11-04-half-open-sockets): the reconnect and sleep fixes.
+- 🚪 [What Phones Do to Web Pages](./2026-11-04-what-phones-do-to-web-pages): the page lifecycle and the `pagehide` fix.
+- 🔍 [TLA+ for a Card Game](./2026-11-04-tla-plus-for-a-card-game): the model-checked policy.
+- 🌍 [A Tiny World in a Property Test](./2026-11-04-a-tiny-world-in-a-property-test): the simulation tests.
+- 🌪️ [Chaos in Real Browsers](./2026-11-04-chaos-in-real-browsers): the Playwright harness.
+- 🗄️ [A Mailbox vs. a Database](./2026-11-04-mailbox-vs-database): an honest comparison with the traditional design.
+
 ## 🧾 Tickets
 
 - 🗺️ [`issues/open/2026-11-03-async-play.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play.md) is the overview.
