@@ -15,3 +15,5 @@ node_modules/
 .parcel-cache
 
 dist/
+/e2e/node_modules
+/e2e/runs

@@ -36,6 +36,13 @@ data AppAction
   | Write (Lens' AppState String) String
   | SendMessage
   | ReceiveRemoteMessage Event
+  | RelayLost
+  | RelayRegained
+  | WriteMailboxUrl String
+  | DeliverMailbox
+  | MailboxRetryDue
+  | VisibilityChanged
+  | NetworkRegained
   | HandleGameEvent GameEvent
   | AddBot Strategy
   | RemoveBot Int

@@ -1,0 +1,64 @@
+#!/bin/bash
+# Model-checks RoomSync.tla with TLC for every RoomSync_*.cfg and compares the
+# outcome with the cfg's "\* expect:" line (no error, or liveness violation).
+# Needs Java 11+. Downloads a pinned tla2tools.jar into tla/.tools on first use;
+# set TLA2TOOLS to use another jar.
+set -ue
+
+readonly here="$(cd "$(dirname "$0")" && pwd)"
+readonly version="v1.7.4"
+readonly sha256="936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
+readonly jar="${TLA2TOOLS:-$here/.tools/tla2tools-$version.jar}"
+
+fetch_tools () {
+  [ -f "$jar" ] && return
+  mkdir -p "$(dirname "$jar")"
+  curl -sSL -o "$jar.part" \
+    "https://github.com/tlaplus/tlaplus/releases/download/$version/tla2tools.jar"
+  echo "$sha256  $jar.part" | sha256sum --check --quiet
+  mv "$jar.part" "$jar"
+}
+
+expectation () {
+  sed -n 's/^\\\* expect: //p' "$1"
+}
+
+outcome () {
+  if grep -q "No error has been found" <<< "$1"; then
+    echo "no error"
+  elif grep -q "Temporal properties were violated\|EventuallyConverged was violated" <<< "$1" \
+    && grep -q "Stuttering\|Back to state" <<< "$1"; then
+    echo "liveness violation"
+  else
+    echo "other failure"
+  fi
+}
+
+check () (
+  local cfg="$1" log
+  cd "$here"
+  log="$(java -XX:+UseParallelGC -cp "$jar" tlc2.TLC -workers auto -deadlock \
+    -config "$cfg" -metadir "states/${cfg%.cfg}" RoomSync.tla 2>&1 || true)"
+  local expected actual
+  expected="$(expectation "$cfg")"
+  actual="$(outcome "$log")"
+  if [ "$expected" = "$actual" ]; then
+    echo "ok   $cfg: $actual"
+  else
+    echo "FAIL $cfg: expected $expected, got $actual"
+    echo "$log"
+    return 1
+  fi
+)
+
+main () {
+  fetch_tools
+  local failed=0 cfg
+  for cfg in "$here"/RoomSync_*.cfg; do
+    check "$(basename "$cfg")" || failed=1
+  done
+  rm -rf "$here/states" "$here"/*_TTrace_*
+  return $failed
+}
+
+main

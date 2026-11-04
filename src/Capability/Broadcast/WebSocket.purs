@@ -4,22 +4,25 @@ import Prelude
 
 import Control.Monad.Error.Class (try)
 import Data.Either (Either)
-import Effect.Aff (Aff, Error, makeAff)
+import Effect.Aff (Aff, Error, makeAff, nonCanceler)
 import Effect.Class (liftEffect)
 import FFI.WebSocket as FFI
 
-newtype WebSocketBroadcaster = WebSocketBroadcaster FFI.WebSocket
+newtype WebSocketBroadcaster = WebSocketBroadcaster FFI.Connection
 
 instance showWebSocketBroadcaster :: Show WebSocketBroadcaster where
-  show (WebSocketBroadcaster bugout) = FFI.showWebSocket bugout
+  show (WebSocketBroadcaster connection) = FFI.showConnection connection
 
 broadcastWebSocketMessage :: WebSocketBroadcaster -> String -> Aff Unit
-broadcastWebSocketMessage (WebSocketBroadcaster bugout) = liftEffect <<< FFI.send bugout
+broadcastWebSocketMessage (WebSocketBroadcaster connection) = liftEffect <<< FFI.send connection
 
-createWebSocketBroadcaster :: String -> String -> String -> Aff (Either Error WebSocketBroadcaster)
-createWebSocketBroadcaster roomCode remoteMessageTarget serverUrl =
-  try $ WebSocketBroadcaster <$> makeAff
-    (FFI.makeWebSocket roomCode remoteMessageTarget serverUrl)
+createWebSocketBroadcaster :: String -> String -> Aff (Either Error WebSocketBroadcaster)
+createWebSocketBroadcaster remoteMessageTarget serverUrl =
+  try $ WebSocketBroadcaster <$> makeAff \callback ->
+    FFI.makeConnection remoteMessageTarget serverUrl callback $> nonCanceler
 
 getWebSocketAddress :: WebSocketBroadcaster -> Aff String
-getWebSocketAddress (WebSocketBroadcaster bugout) = liftEffect $ FFI.address bugout
+getWebSocketAddress (WebSocketBroadcaster connection) = liftEffect $ FFI.address connection
+
+reopenWebSocket :: WebSocketBroadcaster -> Aff Unit
+reopenWebSocket (WebSocketBroadcaster connection) = liftEffect $ FFI.reopen connection

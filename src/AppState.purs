@@ -23,10 +23,14 @@ import Data.Array (deleteAt, length, snoc)
 import Data.Maybe (Maybe(..), maybe)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
+import Effect.Aff (Milliseconds(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
+import Domination.Data.LogicalClock (Version)
+import Domination.Data.Mailbox (Sync, initialSync)
+import Domination.Data.Resync (Marks, initialMarks)
 import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
 import Message (RemoteMessage)
@@ -69,6 +73,10 @@ type AppState =
   , chatNumber :: Int
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe WebSocketBroadcaster
+  , relayReachable :: Boolean
+  , mailboxUrl :: String
+  , mailbox :: MailboxSession
+  , resync :: Marks
   , room :: Room
   , roomNotice :: Maybe String
   , inviteBaseUrl :: String
@@ -116,6 +124,13 @@ _serverUrl :: Lens' AppState String
 _serverUrl = prop (Proxy :: Proxy "serverUrl")
 _maybeBroadcaster :: Lens' AppState (Maybe WebSocketBroadcaster)
 _maybeBroadcaster = prop (Proxy :: Proxy "maybeBroadcaster")
+
+_relayReachable :: Lens' AppState Boolean
+_relayReachable = prop (Proxy :: Proxy "relayReachable")
+_mailboxUrl :: Lens' AppState String
+_mailboxUrl = prop (Proxy :: Proxy "mailboxUrl")
+_mailbox :: Lens' AppState MailboxSession
+_mailbox = prop (Proxy :: Proxy "mailbox")
 _dominationConfig :: Lens' AppState Config
 _dominationConfig = prop (Proxy :: Proxy "dominationConfig")
 _showMenu
@@ -160,6 +175,41 @@ _inviteBaseUrl = prop (Proxy :: Proxy "inviteBaseUrl")
 defaultServerUrl :: String
 defaultServerUrl = "wss://purescript-wip.onrender.com"
 
+-- | The room mailbox for async play (`mailbox/`). An empty URL turns it off.
+defaultMailboxUrl :: String
+defaultMailboxUrl = "https://domination-mailbox.bagrounds.workers.dev"
+
+-- | This page's side of the mailbox protocol. `sync` is persisted per room;
+-- | the rest only lives as long as the page. `outbox` is the local game,
+-- | `moves` and `adoptions` count local changes so a reply can tell what
+-- | happened while it was in flight. `version` orders copies of the game
+-- | where there is no mailbox (Domination.Data.LogicalClock); it is also
+-- | persisted per room.
+type MailboxSession =
+  { sync :: Sync
+  , version :: Maybe Version
+  , outbox :: Maybe RemoteMessage
+  , moves :: Int
+  , adoptions :: Int
+  , inFlight :: Boolean
+  , retryScheduled :: Boolean
+  , failures :: Int
+  , unreachable :: Boolean
+  }
+
+newMailboxSession :: MailboxSession
+newMailboxSession =
+  { sync: initialSync
+  , version: Nothing
+  , outbox: Nothing
+  , moves: 0
+  , adoptions: 0
+  , inFlight: false
+  , retryScheduled: false
+  , failures: 0
+  , unreachable: false
+  }
+
 defaultHeartbeatInterval :: Int
 defaultHeartbeatInterval = 5000
 
@@ -178,6 +228,10 @@ newApp =
   , chatNumber: 0
   , gameOn: false
   , maybeBroadcaster: Nothing
+  , relayReachable: true
+  , mailboxUrl: defaultMailboxUrl
+  , mailbox: newMailboxSession
+  , resync: initialMarks (Milliseconds 0.0)
   , room: GlobalRoom
   , roomNotice: Nothing
   , inviteBaseUrl: ""

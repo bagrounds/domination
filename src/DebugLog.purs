@@ -18,12 +18,18 @@ type BugReport =
   { version :: Version
   , userAgent :: String
   , generatedAt :: String
+  , facts :: Array { label :: String, value :: String }
+  , journal :: Array String
   , entries :: Array String
   }
 
 foreign import install :: Effect Unit
 
 foreign import snapshot :: Effect (Array String)
+
+foreign import journal :: Effect (Array String)
+
+foreign import pageFacts :: Effect (Array { label :: String, value :: String })
 
 foreign import clear :: Effect Unit
 
@@ -32,9 +38,11 @@ foreign import userAgent :: Effect String
 foreign import nowIso :: Effect String
 
 currentReport :: Effect BugReport
-currentReport = { version, userAgent: _, generatedAt: _, entries: _ }
+currentReport = { version, userAgent: _, generatedAt: _, facts: _, journal: _, entries: _ }
   <$> userAgent
   <*> nowIso
+  <*> pageFacts
+  <*> journal
   <*> snapshot
 
 renderReport :: BugReport -> String
@@ -43,9 +51,12 @@ renderReport report = joinWith "\n" $
   , "Version: " <> showVersion report.version
   , "Generated: " <> report.generatedAt
   , "User agent: " <> report.userAgent
-  , "Entries: " <> show (length report.entries)
-  , ""
-  ] <> report.entries
+  ]
+  <> map (\{ label, value } -> label <> ": " <> value) report.facts
+  <> [ "", "Sync journal: " <> show (length report.journal) ]
+  <> report.journal
+  <> [ "", "Console: " <> show (length report.entries) ]
+  <> report.entries
 
 showVersion :: Version -> String
 showVersion (Version major minor patch) =

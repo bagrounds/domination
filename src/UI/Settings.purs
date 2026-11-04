@@ -29,6 +29,7 @@ import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DebugLog as DebugLog
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
+import Domination.UI.MailboxUrlInput as MailboxUrlInput
 import Domination.UI.Rename as Rename
 import Domination.UI.RenderText (renderText)
 import Domination.UI.ServerUrlInput as ServerUrlInput
@@ -140,6 +141,7 @@ renderTabContent
     ) AppAction
 renderTabContent ConnectionTab cs _ = HH.div_
   [ ServerUrlInput.render { onInput: WriteServerUrl, state: cs }
+  , MailboxUrlInput.render { onInput: WriteMailboxUrl, state: cs }
   , UsernameInput.render { onInput: WriteUsername, state: cs }
   ]
 renderTabContent GameSetupTab cs { nextPlayerIndex, nextPlayerCount, longGame, botStrategies } = HH.div_

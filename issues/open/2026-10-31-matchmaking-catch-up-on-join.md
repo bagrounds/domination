@@ -2,7 +2,7 @@
 
 **Source:** [Matchmaking design](../docs/2026-10-31-matchmaking-design.md) §6.3
 
-**Status:** Open
+**Status:** Open (done where there is no mailbox; see Progress)
 
 ## Description
 
@@ -28,3 +28,22 @@ should resend its latest `GameMessage`.
 - [ ] A late joiner sees the current game within one round trip.
 - [ ] Exactly one member responds per join (pure election function, property tested).
 - [ ] No behaviour change in the global room.
+
+## See Also
+
+- [Async play design](../docs/2026-11-03-async-play-design.md) §5, option A. Catch-up only
+  helps when a member with the game is online at the same time. The
+  [room mailbox](../closed/2026-11-03-async-play-mailbox.md) covers the case where nobody is. The
+  same responder logic should also run after a reconnect
+  ([reconnect sends](../closed/2026-11-03-async-play-reconnect-sends.md)).
+
+## Progress
+
+- **Rooms without a mailbox, including the global room** (v0.40.0,
+  [rejoin rewind](../closed/2026-11-04-async-play-rejoin-rewind.md)): games are versioned.
+  Whoever joins and every member who sees the join offer their game, and each side keeps
+  the newer one. This replaced the election and the "no change in the global room"
+  criterion: the global room's share on startup caused the rewind. Versions also make
+  Undo safe, since an undo is a newer change.
+- **Rooms with a mailbox:** a member who joins pulls the latest game from the mailbox.
+- **Left:** electing one responder, to send fewer frames in busy rooms.

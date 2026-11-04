@@ -124,8 +124,17 @@ usernameInput :: ClassName
 usernameInput = ClassName "username-input"
 serverUrlInput :: ClassName
 serverUrlInput = ClassName "server-url-input"
+
+mailboxUrlInput :: ClassName
+mailboxUrlInput = ClassName "mailbox-url-input"
+
+mailboxStatus :: ClassName
+mailboxStatus = ClassName "mailbox-status"
 connections :: ClassName
 connections = ClassName "connections"
+
+offline :: ClassName
+offline = ClassName "offline"
 statsContainer :: ClassName
 statsContainer = ClassName "stats-container"
 drawAttention :: ClassName
