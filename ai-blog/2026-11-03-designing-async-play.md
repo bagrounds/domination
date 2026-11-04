@@ -18,6 +18,7 @@ tags:
 🛠️ This post covers what I read, what I measured and tested, and the design I recommend. The full design is in [`docs/2026-11-03-async-play-design.md`](https://github.com/bagrounds/domination/blob/master/docs/2026-11-03-async-play-design.md).
 🔧 After reading the design, you asked me to fix the reconnect bug right away and to write down exactly which Cloudflare credentials the mailbox will need.
 🚀 Once you'd added the secrets, you asked me to build the mailbox and test it end to end before finishing. The last sections cover the build, the tests, and two bugs that only the real thing exposed.
+📱 Then you played one seat on your phone and your laptop, and saw the laptop rewind the game when it came back. You asked for a test that reproduces it and a fix, and for a version bump so you can tell which build you're on. That's the "Rewind" section.
 
 ## 🔍 How It Works Today
 
@@ -155,11 +156,33 @@ tags:
   - A friend opening an invite for the first time stayed stuck on the game setup screen, and their game view had the default seat, so they couldn't act on their turn. Now the first game to arrive closes setup and loads with the seat you picked, just as a restored game does.
 - ✅ All 460 PureScript tests and 21 Worker tests pass.
 
+## ⏪ The Phone, the Laptop and the Rewind
+
+- 📱 **The report.** Playing one seat on a phone and a laptop, I closed the laptop's tab and kept playing on the phone. When I reopened the laptop, its old game replaced the phone's, as if time had run backwards. Whoever is ahead should send their game to the other.
+- 🔬 **Reproducing it.** A browser script played exactly that story with two Chrome profiles on one seat. Rooms with a mailbox passed: the mailbox's revision decides who is ahead. The global room failed. It has no mailbox, so it had no notion of "ahead" at all:
+  - On startup it broadcast its saved game, however old, and every receiver took any game it was sent.
+  - Nobody sent the returning laptop the current game. It stayed on its old one, and its next move, built on that old game, rolled the phone back.
+- 🕰️ **Lamport clocks.** This is the problem Leslie Lamport's 1978 paper "Time, Clocks, and the Ordering of Events in a Distributed System" solved, and version vectors, CRDTs and many databases build on it. Each copy of the game now carries a version `(time, device)`:
+  - Every change, whether a play, an undo, a new game or a loaded game, gets a time one later than the newest the device has seen.
+  - Versions compare by time, then device, so every device agrees on which copy is newer.
+  - Undo and New Game win naturally. They happen after the game they replace, even though the move counter goes down.
+- 🤝 **Who sends what.** When a device joins, it offers its game, and everyone who sees it join offers theirs. A receiver keeps a game only if it's ahead of its own. If it's behind, the receiver answers with its own game, so whoever is ahead always brings the other up to date.
+- 🧳 **No new wire format.** The version rides in the header's sender segment, the same trick the mailbox's stamps use. Old builds ignore it.
+- 🧪 **Tests first.** A pure model of devices and a relay plays the reported story twice:
+  - Under the old rule (share on startup, take everything), the phone is rolled back.
+  - With versions, the phone keeps its game and the laptop catches up.
+  - Property tests over random schedules, with plays, undos, new games, closed tabs and reordered messages on three devices, check three things: nobody takes a game behind their own, versions never go backwards, and everyone ends on the newest game.
+  - Breaking `judge` so it takes everything makes 8 of the 14 tests fail.
+- 🎭 **And for real.** The browser story now passes in the global room and in mailbox rooms, on the local relay and on the production relay, and when both devices start from games saved before this change. Those old saves start at their move counter, so the one with more moves wins.
+- 🔢 **Version 0.40.0.** The version had stayed at 0.39.0 through this whole PR, so there was no way to tell which build a device was running. It's now 0.40.0, in `src/Version.purs` and the service worker's cache name, so devices pick up the new build and you can see which one you're on.
+- ✅ All 474 PureScript tests and 21 Worker tests pass.
+
 ## 🧾 Tickets
 
 - 🗺️ [`issues/open/2026-11-03-async-play.md`](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-03-async-play.md) is the overview.
 - 🐛 [`2026-11-03-async-play-reconnect-sends.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-reconnect-sends.md) is the bug fix.
 - 📬 [`2026-11-03-async-play-mailbox.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-03-async-play-mailbox.md) is async play itself, now done.
+- ⏪ [`2026-11-04-async-play-rejoin-rewind.md`](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-04-async-play-rejoin-rewind.md) is the phone and laptop rewind, now fixed.
 - 📜 There are also tickets for history and chat, turn notifications and moving the relay.
 
 ## ✍️ Signed

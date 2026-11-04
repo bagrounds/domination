@@ -23,6 +23,8 @@ conditional writes. The WebSocket relay does not change.
 1. [Reconnect sends](../closed/2026-11-03-async-play-reconnect-sends.md): a prerequisite bug fix,
    client only. **Done.**
 2. [Room mailbox](../closed/2026-11-03-async-play-mailbox.md): async play itself. **Done.**
+   - [A device that rejoins rewinds the game](../closed/2026-11-04-async-play-rejoin-rewind.md):
+     games without a mailbox are now versioned. **Done.**
 3. Later, optional:
    - [History and async chat](./2026-11-03-async-play-history-and-chat.md)
    - [Turn notifications](./2026-11-03-async-play-turn-notifications.md)

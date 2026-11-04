@@ -2,7 +2,8 @@
 
 - **Date:** 2026-11-03
 - **Status:** Iterations 0 and 1 are implemented: reconnect (§6.3) and the room mailbox
-  (§6.4), live at `https://domination-mailbox.bagrounds.workers.dev`. Sections 6.5–6.7
+  (§6.4), live at `https://domination-mailbox.bagrounds.workers.dev`. Since v0.40.0, games
+  without a mailbox are versioned (§6.4.10). Sections 6.5–6.7
   are not started. The iterations are tracked in
   [`issues/open/2026-11-03-async-play.md`](../issues/open/2026-11-03-async-play.md).
 - **Issue:** [#22 Async Play](https://github.com/bagrounds/domination/issues/22)
@@ -85,6 +86,9 @@ moves, time controls, and async play in the **global room** (it is being retired
   broadcast it, so a stale member cannot roll the room back (`sharesSavedGameOnStartup`
   in `src/Main.purs`). Nobody sends the current game to a member who joins late, which is
   tracked in [`issues/open/2026-10-31-matchmaking-catch-up-on-join.md`](../issues/open/2026-10-31-matchmaking-catch-up-on-join.md).
+  The global room did broadcast its saved game on startup, and every receiver took it,
+  so a device that came back with an old game rolled everyone back. §6.4.10 replaces
+  that with versioned games.
 
 ### 3.2 Hosting facts
 
@@ -573,6 +577,7 @@ which are closed above:
 | Module | Contents |
 |---|---|
 | `src/Data/Mailbox.purs` (new, pure) | `Revision`, `Stamp = Committed Revision \| Tentative Revision` with `stampSender` and `senderStamp`, `Dirty = Clean \| Moved \| Relaying`, `Sync = { confirmed, dirty, uncertain }`, `receiveFrame` (`Nothing` means ignore), `interpretDelivery` and `interpretPull` (HTTP reply → `Delivery` and `Pulled`), `settleDelivery` and `settlePull` (what to do next), `Status`, `mailboxRoomUrl`, `mailboxBackoff` |
+| `src/Data/LogicalClock.purs` (new in v0.40.0, pure) | Where there is no mailbox (§6.4.10): `Version time origin`, `tick`, `savedBeforeVersions`, `judge` (→ `TakeTheirs` / `SendOurs` / `AlreadyHave`), `versionSender` and `senderVersion` |
 | `src/FFI/Mailbox.js`, `src/FFI/Mailbox.purs` (new) | `request`: one `fetch` with `If-Match`/`If-None-Match`, a timeout that aborts it, and status 0 for no answer. `documentVisible` |
 | `src/Capability/Mailbox.purs` (new) | `class Monad m <= Mailbox m` with `requestMailbox` and `isDocumentVisible`. Instances for `AppM` and `HalogenM` |
 | `src/FFI/WebSocket.js` | Done in iteration 0 (§6.3) |
@@ -612,6 +617,48 @@ The client only knows a URL, which the Connection tab can change, like the serve
   setup, as a restored game does.
 - **Subdomain.** The deploy workflow registers the account's `workers.dev` subdomain
   when there is none.
+
+#### 6.4.10 Without a mailbox: versioned games
+
+A player on two devices reported a rewind. They closed the laptop's tab, played on with
+the phone, and reopened the laptop. The laptop's old game then replaced the phone's.
+A browser test with two profiles on the same seat reproduced it in the **global room**,
+which has no mailbox. Rooms with a mailbox passed. Two things were wrong:
+
+- On startup the global room broadcast its saved game, however old, and every receiver
+  took any game frame. Nothing said which copy was newer.
+- Nobody sent the returning device the current game, so it kept its old one, and its
+  next move, built on that old game, rolled the others back too.
+
+The fix is a **Lamport clock** (Lamport, 1978), the logical clock that version vectors,
+CRDTs and many replicated stores build on. It is in the pure module
+`Domination.Data.LogicalClock` and is used wherever there is no mailbox: the global room,
+or a room whose mailbox URL is empty.
+
+- **Every change gets a version.** A play, an undo, a new game or a loaded game gets
+  `Version (t + 1) me`, where `t` is the time of our current version and `me` is our client
+  id. Versions are ordered by time, then id, so every device agrees on which of two
+  copies is newer. Undo and New Game are changes too: they come after the game they
+  replace, so they win, even though the move counter `i` goes down.
+- **The version travels in the header.** `versionSender` appends `/^t:origin` to the sender
+  segment, as the mailbox's `/@r` stamps do (§6.4.3). Old builds ignore the sender, and
+  the wire layout does not change.
+- **Receivers take only games that are ahead.** `judge` returns `TakeTheirs` for a newer
+  version, `SendOurs` for an older one (we answer with our game, so the sender catches
+  up), and `AlreadyHave` for the same version. A frame from an old build has no version.
+  It is a live play, so we take it as a change we witnessed.
+- **Joining offers games both ways.** The device that joins, or reconnects, offers its
+  game, and every member who sees the `JoinMessage` offers theirs. Each side keeps the
+  newer one, so whoever is ahead brings the other up to date. The blind share on startup
+  (`sharesSavedGameOnStartup`) is gone.
+- **The version is saved** with the game (`game_version`, scoped to the room). A game
+  saved before v0.40.0 has none. It starts at its move counter `i` with an empty origin,
+  so between two old saves the one with more moves wins. Any real change at the same time
+  still beats it.
+
+Old builds in the global room still take every frame. When a stale device rejoins, an old
+build may briefly show the stale game until a newer device answers it. That is no worse
+than before, and the version bump makes devices load the new build.
 
 ### 6.5 Later: what happened while I was away (history and async chat)
 
@@ -660,7 +707,8 @@ be worth trimming first.
 - **Live play is unchanged** for every pair of builds: same relay, same message layout.
 - **Async play works best with new builds.** A move by an old build reaches the mailbox
   only when a new build in the room receives it and delivers it as a courier.
-- **The global room** keeps today's behaviour. It has no mailbox.
+- **The global room** has no mailbox. Since v0.40.0 its games are versioned (§6.4.10), so
+  a device that returns with an old game catches up instead of rolling others back.
 
 **Rollout (Parallel Change):**
 
@@ -776,7 +824,7 @@ using the local relay and `wrangler dev`:
 
 - Server: 21 `node --test` tests in `mailbox/`, including a compare-and-set model
   property (6–8).
-- Client: 19 tests in the "Room Mailbox" section (1–5), including a simulation of three
+- Client: 20 tests in the "Room Mailbox" section (1–5), including a simulation of three
   clients, a compare-and-set mailbox, and a relay that drops and reorders frames, with
   lost requests and lost replies. Every run must end converged, with `confirmed` never
   decreasing. Changing `settleDelivery` to forget a move made during a delivery makes
@@ -797,13 +845,30 @@ using the local relay and `wrangler dev`:
 
   Scenarios 9, 12, 13 and 15 are covered by the unit and simulation tests, not in a
   browser.
+- Versioned games (§6.4.10): 14 tests in the "Logical Clock" section. They include the
+  reported story, phone and laptop on one seat. Under the old rule (share on startup,
+  take every frame) the phone is rolled back; with versions it keeps its game and the
+  laptop catches up. There are also properties over random schedules of plays, undos, new
+  games, closed tabs and reordered frames on three devices: nobody takes a game behind
+  their own, versions never go down, and once everyone is back all hold the newest game.
+  Changing `judge` to take every frame makes 8 of them fail.
+- Browser, the same story: two Chrome profiles on one seat. The laptop closes, the phone
+  plays two moves, and the laptop comes back. Then the phone closes, the laptop plays, and
+  the phone comes back. Both must end on the newest game, and the laptop's next move must
+  reach the phone. It passes in the global room and in a mailbox room on the local
+  relay, in a room with the mailbox off on the production relay, and when both devices
+  hold games saved by v0.39.0. Before the fix, the global room failed: the laptop stayed
+  on its old game.
 
 ## 11. Open Questions
 
 1. Is a Cloudflare account acceptable as a second free vendor? If not, option D (Render
    plus a free database) is the fallback. The client side would be identical.
 2. Should async play also apply to the global room while it still exists? This design
-   says no, to avoid storing a state that everyone can overwrite.
+   says no, to avoid storing a state that everyone can overwrite. Since v0.40.0 the global
+   room orders its games by version (§6.4.10), so a returning device catches up whenever
+   another device is online.
 3. How long should idle rooms be kept? This design proposes 90 days.
 4. Should iteration 0 also add catch-up on join (option A) right away? It is small, and
-   it covers the case where the mailbox cannot be reached.
+   it covers the case where the mailbox cannot be reached. Done for rooms without a
+   mailbox in v0.40.0 (§6.4.10).
