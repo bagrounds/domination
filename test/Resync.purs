@@ -25,13 +25,14 @@ type EffectTest = { name :: String, test :: Effect Result }
 -- Resync), sockets that can be live, silently dead (half-open) or closed,
 -- sends queued while closed, a relay that only reaches live sockets, a
 -- mailbox that can be down, retry backoff, and devices that sleep, wake,
--- close and reopen. One tick is one heartbeat (5 s).
+-- close and reopen, and pages a mobile browser hides with `pagehide` and
+-- shows again without the back-forward cache. One tick is one heartbeat (5 s).
 --
 -- The property users care about: once everyone is back, the network is
 -- healthy and nobody moves, every device shows the latest game within a
 -- short window, without anyone reloading.
 resync_tests :: Array EffectTest
-resync_tests = (scenarios >>= scenarioTests) <> chaosTests <> reactionTests
+resync_tests = (scenarios >>= scenarioTests) <> pageHideTests <> chaosTests <> reactionTests
 
 -- v0.40.0's policy: it looked again only on discrete events, never while a
 -- page sat visible, and never doubted a socket the browser called open. The
@@ -67,6 +68,26 @@ scenarioTests { name: scenario, room, steps } =
     }
   ]
 
+-- The second report: they play a while, she leaves the app (her browser
+-- fires `pagehide` but keeps the page), he keeps playing, she comes back.
+pageHideTests :: Array EffectTest
+pageHideTests =
+  [ { name: "a page hidden by pagehide catches up when shown (mailbox room)"
+    , test: pure $ scenarioResult $ playWith connection reactions WithMailbox 2 leavesTheApp
+    }
+  , { name: "a page hidden by pagehide catches up when shown (no mailbox)"
+    , test: pure $ scenarioResult $ playWith connection reactions WithoutMailbox 2 leavesTheApp
+    }
+  , { name: "v0.41.0's socket stayed stopped after pagehide and stranded the room without a mailbox"
+    , test: pure $ strandedResult $ playWith legacyConnection reactions WithoutMailbox 2 leavesTheApp
+    }
+  ]
+
+leavesTheApp :: Array Step
+leavesTheApp =
+  (map Move (map (_ `mod` 2) (0 .. 99)) >>= \m -> [ m, Deliver 0 ])
+    <> [ PageHide 0, Move 1, Move 1, Tick 1, Move 1, Tick 0, Wake 0 600, Tick 0 ]
+
 -- The phone sleeps with its socket left half-open, she plays, the phone
 -- wakes (and looks once), she plays on.
 phoneSleeps :: Array Step
@@ -86,7 +107,11 @@ deadWhileAwake :: Array Step
 deadWhileAwake = [ Move 0, Deliver 0, Deliver 0, Deliver 0, Break 1 HalfOpen, Move 0 ]
 
 play :: Policy -> Room -> Int -> Array Step -> World
-play policy room n steps = calm policy (windowFor room) $ foldl (step policy) (start policy room n) steps
+play = playWith connection
+
+playWith :: Connection -> Policy -> Room -> Int -> Array Step -> World
+playWith rules policy room n steps = calm policy (windowFor room)
+  $ foldl (step policy) (start rules policy room n) steps
 
 chaosTests :: Array EffectTest
 chaosTests =
@@ -218,6 +243,19 @@ instance showLink :: Show Link where
     HalfOpen -> "HalfOpen"
     Down -> "Down"
 
+-- How src/FFI/WebSocket.js treats `pagehide`: it stops the socket (no
+-- reconnect timer). Since v0.42.0 it tells Main the relay is lost, a shown
+-- page restarts it, and a reopen restarts it; v0.41.0 did none of these, so
+-- a page that survived `pagehide` without the back-forward cache kept a
+-- dead socket that Main believed open, and reopening it did nothing.
+type Connection = { reportsStop :: Boolean, restartsWhenShown :: Boolean, reopenRestarts :: Boolean }
+
+connection :: Connection
+connection = { reportsStop: true, restartsWhenShown: true, reopenRestarts: true }
+
+legacyConnection :: Connection
+legacyConnection = { reportsStop: false, restartsWhenShown: false, reopenRestarts: false }
+
 data Kind = GameFrame | JoinFrame | HeartbeatFrame
 
 derive instance eqKind :: Eq Kind
@@ -230,6 +268,7 @@ type Device =
   { open :: Boolean
   , visible :: Boolean
   , link :: Link
+  , stopped :: Boolean
   , epoch :: Int
   , queue :: Array Outgoing
   , game :: Maybe String
@@ -247,6 +286,7 @@ type Device =
 
 type World =
   { room :: Room
+  , rules :: Connection
   , server :: { revision :: Revision, envelope :: Maybe String }
   , mailboxUp :: Boolean
   , devices :: Array Device
@@ -269,6 +309,7 @@ data Step
   | Open Int
   | Outage
   | Restore
+  | PageHide Int
 
 instance showStep :: Show Step where
   show = case _ of
@@ -283,6 +324,7 @@ instance showStep :: Show Step where
     Open d -> "Open " <> show d
     Outage -> "Outage"
     Restore -> "Restore"
+    PageHide d -> "PageHide " <> show d
 
 tickMs :: Int
 tickMs = 5000
@@ -295,24 +337,25 @@ name d = "c" <> show d
 
 session :: Device -> Device
 session x = x
-  { visible = true, link = Live, epoch = x.epoch + 1, queue = []
+  { visible = true, link = Live, stopped = false, epoch = x.epoch + 1, queue = []
   , moves = 0, adoptions = 0, unreachable = false, failures = 0, retryIn = Nothing
   , sincePull = 0, sinceHeard = 0, silentReopens = 0
   }
 
 newDevice :: Device
 newDevice = session
-  { open: true, visible: true, link: Live, epoch: 0, queue: []
+  { open: true, visible: true, link: Live, stopped: false, epoch: 0, queue: []
   , game: Nothing, sync: initialSync, version: Nothing
   , moves: 0, adoptions: 0, unreachable: false, failures: 0, retryIn: Nothing
   , sincePull: 0, sinceHeard: 0, silentReopens: 0
   }
 
-start :: Policy -> Room -> Int -> World
-start policy room n = foldl (\w d -> occur policy d Started w) world (0 .. (n - 1))
+start :: Connection -> Policy -> Room -> Int -> World
+start rules policy room n = foldl (\w d -> occur policy d Started w) world (0 .. (n - 1))
   where
     world =
       { room
+      , rules
       , server: { revision: Revision 0, envelope: Nothing }
       , mailboxUp: true
       , devices: map (const newDevice) (1 .. n)
@@ -355,6 +398,7 @@ step policy world = case _ of
     | otherwise -> occur policy d Started $ modify d (session >>> _ { open = true }) world
   Outage -> world { mailboxUp = false }
   Restore -> world { mailboxUp = true }
+  PageHide d -> whenOpen d (modify d _ { visible = false, stopped = true, link = Down }) world
   where
     sleepLink wanted current = case wanted, current of
       _, Down -> Down
@@ -368,7 +412,18 @@ wake :: Policy -> Int -> Int -> World -> World
 wake policy d seconds world
   | (device d world).visible = world
   | otherwise = occur policy d (Shown (Milliseconds (toNumber seconds * 1000.0)))
+      $ (if world.rules.restartsWhenShown then restart policy d else identity)
       $ modify d _ { visible = true } world
+
+restart :: Policy -> Int -> World -> World
+restart policy d world
+  | (device d world).stopped = occur policy d RelayBack $ flush d
+      $ modify d (\x -> x { stopped = false, link = Live, epoch = x.epoch + 1 }) world
+  | otherwise = world
+
+-- What Main believes: a stopped socket that was never reported lost looks open.
+believesOpen :: World -> Device -> Boolean
+believesOpen world x = x.link /= Down || (x.stopped && not world.rules.reportsStop)
 
 breakLink :: Int -> Link -> World -> World
 breakLink d link world = case (device d world).link, link of
@@ -377,17 +432,21 @@ breakLink d link world = case (device d world).link, link of
   _, Down -> modify d _ { link = Down } world
   _, _ -> world
 
--- The socket's own reconnect timer (FFI): only after a close it noticed.
+-- The socket's own reconnect timer (FFI): only after a close it noticed,
+-- and never once the page stopped it.
 reconnect :: Policy -> Int -> World -> World
 reconnect policy d world
-  | (device d world).link == Down = occur policy d RelayBack $ flush d
+  | (device d world).link == Down && not (device d world).stopped = occur policy d RelayBack $ flush d
       $ modify d (\x -> x { link = Live, epoch = x.epoch + 1 }) world
   | otherwise = world
 
 reopen :: Policy -> Int -> World -> World
-reopen policy d world = occur policy d RelayBack $ flush d
+reopen policy d world
+  | (device d world).stopped && not world.rules.reopenRestarts =
+      modify d (\x -> x { sinceHeard = 0, silentReopens = x.silentReopens + 1 }) world
+  | otherwise = occur policy d RelayBack $ flush d
   $ modify d (\x -> x
-      { link = Live, epoch = x.epoch + 1, sinceHeard = 0, silentReopens = x.silentReopens + 1 })
+      { link = Live, stopped = false, epoch = x.epoch + 1, sinceHeard = 0, silentReopens = x.silentReopens + 1 })
   world
 
 flush :: Int -> World -> World
@@ -562,7 +621,7 @@ tickDevice policy d world0 = occur policy d (Ticked clock) $ heartbeat $ retry c
     x' = device d (heartbeat (retry counted))
     clock =
       { visible: x'.visible
-      , relayOpen: x'.link /= Down
+      , relayOpen: believesOpen world0 x'
       , sincePull: ms x'.sincePull
       , sinceHeard: ms x'.sinceHeard
       , silentReopens: x'.silentReopens
@@ -613,5 +672,5 @@ stepsGen n = resize 40 $ arrayOf do
   elements $ NEA.cons' (Move d)
     [ Move d, Move d, Sleep d link, Wake d seconds, Break d link, Reconnect d
     , Deliver pick, Deliver pick, Deliver pick, Tick d, Tick d
-    , Close d, Open d, Outage, Restore
+    , Close d, Open d, Outage, Restore, PageHide d
     ]

@@ -4,6 +4,12 @@
 // open are queued and flushed when the next socket opens. A socket can also
 // die without closing (half-open, after a phone sleeps or the network
 // switches); `reopen` replaces it at once (Domination.Data.Resync).
+//
+// On `pagehide` the connection stops: it closes the socket, reconnects no
+// more and reports the relay lost. A mobile browser may fire `pagehide` and
+// later show the very same page without the back-forward cache, so any sign
+// of life (`pageshow`, the page becoming visible, a `resume` after a freeze,
+// or a `reopen`) restarts it (test/Resync.purs models this).
 const maxQueuedMessages = 100
 
 const getConnection = () => window._dominationConnection
@@ -90,8 +96,8 @@ export const makeConnectionFFI = left =>
     // The old socket's handlers are detached first, so its late close
     // neither reports a disconnection nor schedules a second socket.
     connection.reopen = () => {
-      if (connection.stopped) return
-      logInfo('reopening the socket')
+      logInfo(connection.stopped ? 'restarting the stopped socket' : 'reopening the socket')
+      connection.stopped = false
       clearTimeout(connection.retryTimer)
       const old = connection.socket
       if (old) {
@@ -156,27 +162,37 @@ export const makeConnectionFFI = left =>
     }
 
     const shutdown = event => {
+      if (connection.stopped) return
       connection.stopped = true
+      connection.lostOnce = true
       clearTimeout(connection.retryTimer)
-      try {
-        if (connection.socket) connection.socket.close(1000)
-        logInfo(`closed websocket on '${event.type}'`)
-      } catch (e) {
-        logInfo(`failed to close websocket on '${event.type}'`)
+      const socket = connection.socket
+      connection.socket = null
+      if (socket) {
+        socket.onopen = socket.onclose = socket.onmessage = socket.onerror = null
+        try {
+          socket.close(1000)
+        } catch (e) {
+          logInfo(`failed to close websocket on '${event.type}'`)
+        }
       }
+      logInfo(`stopped on '${event.type}' (persisted: ${Boolean(event.persisted)})`)
+      dispatch(remoteMessageTarget, new CustomEvent('disconnected'))
     }
 
-    const resume = event => {
-      if (event.persisted && connection.stopped) {
-        logInfo('page restored from the back-forward cache, reconnecting')
-        connection.stopped = false
-        connection.lostOnce = true
-        open()
-      }
+    const restart = event => {
+      if (!connection.stopped) return
+      if (event.type === 'visibilitychange' && document.visibilityState === 'hidden') return
+      logInfo(`restarting on '${event.type}' (persisted: ${Boolean(event.persisted)})`)
+      connection.stopped = false
+      connection.attempt = 0
+      open()
     }
 
     window.addEventListener('pagehide', shutdown)
-    window.addEventListener('pageshow', resume)
+    window.addEventListener('pageshow', restart)
+    document.addEventListener('visibilitychange', restart)
+    document.addEventListener('resume', restart)
 
     open()
   }
