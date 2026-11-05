@@ -39,11 +39,46 @@ These observations identify work worth measuring; none identifies the cause of t
 
 I did not reproduce a lockup, tab discard, or browser crash. I also did not run a browser experiment that measured catch-up time, memory, or bot-search duration. The available browser chaos harness exercises synchronization and lifecycle scenarios, but that alone would not demonstrate this performance failure without a targeted scenario and measurements.
 
+## 📋 What “Copy Bug Report” Actually Collects
+
+The **Settings → Debug → Copy bug report** feature assembles a report when asked. The button is in `src/UI/DebugLog.purs`; `src/Main.purs` refreshes and copies the report, `src/DebugLog.purs` formats it, and `src/DebugLog.js` records and persists the buffers. The clipboard helper is in `src/FFI.js`. It includes:
+
+- 🏷️ The app version, report-generation time, browser user-agent string, and page path plus its current room hash.
+- 🌐 A few page facts: visible/hidden state, browser online status, whether the page reports that it was discarded before this load, and whether it is running as an installed app.
+- 📓 A sync journal of up to 1,500 selected lines, including mailbox/clock/resync messages, selected WebSocket connection events, errors and unhandled rejections.
+- 🧾 Up to 400 recent console entries. Chatty entries such as received messages are shortened to 160 characters; other entries are limited to 1,000 characters. Errors and uncaught exceptions are also copied into the sync journal, where each line is limited to 1,000 characters.
+
+The two logs are separate ring buffers in `localStorage`, so they can be read after an ordinary reload or a tab discard in the same browser profile. Writes are normally debounced by about one second; visibility-hidden, freeze and pagehide events request an immediate save. A failed or unavailable `localStorage` write is deliberately ignored rather than interrupting the game. The report is assembled on demand, not kept as a separate, continuously refreshed report.
+
+This looks useful for **when and how synchronization failed**: it can show the app version, browser context, recent connection/lifecycle events, selected sync decisions and captured JavaScript errors. It is not a full diagnostic record. It does not directly ask what the player was doing, identify the exact game phase or action in structured fields, record a browser performance trace or heap profile, or guarantee that the last event was saved. The capped buffers can also roll older evidence away.
+
+There is a privacy wrinkle: the page fact includes the room hash, and mailbox log lines may include the room-specific request URL. A private room code is also an invite. Before posting a report publicly, replace that code consistently with a placeholder; keep the version, timing and surrounding sequence. The user-agent and logs can reveal browser/device details and should be shared only where appropriate.
+
+### 🧭 How to Gather and File One
+
+1. 🛑 If the page is merely slow or frozen but still responds, wait for it to recover rather than clearing the log. Open **Settings → Debug** and choose **Copy bug report**.
+2. 🔄 If the tab or browser has already restarted, reopen Domination in the same browser profile and origin, then open **Settings → Debug → Copy bug report**. The report is generated from the saved buffers on that origin.
+3. 📝 Paste it into the bug report, adding a short narrative: approximate time and time zone; what “crash” meant (unresponsive page, tab reload/discard, renderer crash, or whole browser exit); what you were doing; whether this was a private room or the global room; whether bots were enabled; and what you expected versus saw.
+4. 🔒 Redact the private room code before filing publicly. Do not press **Clear log** before copying. If clipboard access fails, the report is also shown in the read-only text area, so it may be possible to select and copy it manually.
+5. 📱 Include device model/OS and browser version if known; the user-agent may help, but it does not always identify these precisely.
+
+After an **ordinary tab discard or reload**, the earlier buffer is likely to be available if the browser preserved that site's `localStorage`; the `Discarded before this load` fact can sometimes help identify a discarded page. It is not a guarantee. After a sudden browser/renderer process crash, there may be no opportunity to copy before exit, the last roughly one second of debounced entries may not have reached storage, and the browser may not set the discard flag. The report cannot record the crash itself if JavaScript stopped running. If the browser profile/site data was cleared, storage was unavailable, or the origin changed, the buffers may be absent. Browser/OS crash diagnostics are separate evidence and are not included by this feature.
+
+### 🛠️ Possible Improvements to Consider
+
+- 🧹 Redact private room codes from copied reports while retaining a stable per-report placeholder, and make the privacy warning visible beside the copy button.
+- 🗒️ Offer optional fields for steps to reproduce, approximate event time/time zone, expected and actual behavior, and whether the page reloaded or the browser exited.
+- 🎮 Add a small, privacy-conscious snapshot of sync status and game context (for example room type, phase, whose turn, and move counter), without copying the full game state or invite link.
+- 💾 Make persistence loss visible in the report, and consider a more crash-resilient flush strategy if testing shows the debounce window loses useful final events.
+- ✅ Confirm successful clipboard copying and retain the manual-select route for browsers where clipboard access is unavailable.
+
+These are recommendations for a future change, not changes made here. Before adding richer diagnostics, it would be useful to decide what users consent to share and to test the report contents and persistence behavior across reload, discard, storage failure and a deliberately abrupt browser termination.
+
 ## 🔬 Questions for a Future Investigation
 
 - 📋 Which app version, browser and device were involved? Did the tab reload or disappear, or did the whole browser close?
 - 🧩 Was this a mailbox room or the global room? Were bots enabled? What game state and player turn were present?
-- ⏱️ Can a performance trace show whether the main thread was busy in bot generation, message decoding, storage, or rendering at the time?
+- ⏱️ Can a performance trace show whether the main thread was busy in bot generation, message decoding, storage, or rendering at the time? The copyable report does not include that trace.
 - 🧮 Does heap usage grow with game duration or history length? How do payload size, history size and catch-up duration change when testing short versus long games?
 - 🧾 Can the existing bug report's sync journal and console output be collected immediately after the event? A repeatable report with timestamps could distinguish a stalled page from a lost connection or a reload.
 - 🔁 Can a controlled two-player run reproduce the timing with bots off and on, mailbox and global rooms, and different game lengths? Change one condition at a time and keep the game state and browser trace.
