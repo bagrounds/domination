@@ -83,7 +83,6 @@ import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (RemoteMessage(..), WireEnvelope)
 import Message as Message
-import Util ((:~))
 import Web.Event.Event (EventType(..))
 import Web.HTML.Event.BeforeUnloadEvent.EventTypes as ET
 import Web.HTML.HTMLDocument as HTMLDocument
@@ -380,7 +379,7 @@ handleAction audioContext = case _ of
       Left e -> do
         log $ "Initialize: Failed to load messages. Error: " <> e
         pure []
-      Right m -> pure m
+      Right m -> pure $ Message.retainRecentMessages m
 
     log "Initialize: modify a bunch of stuff..."
     H.modify_ $ (_id .~ uuid)
@@ -636,7 +635,7 @@ handleAction audioContext = case _ of
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
-        Just x -> H.modify_ $ _messages :~ (PlayMadeMessage x)
+        Just x -> H.modify_ $ _messages %~ Message.rememberMessage (PlayMadeMessage x)
         Nothing -> pure unit
       queryGame $ LoadActiveState activeState
       saveGame activeState
@@ -684,9 +683,7 @@ handleAction audioContext = case _ of
           H.modify_ $ over _usernames
             $ HashMap.insert id username
         ChatMessage { message } -> do
-          H.modify_
-            $ (_messages :~ msg)
-            >>> (_messages %~ take 250)
+          H.modify_ $ _messages %~ Message.rememberMessage msg
           saveChat >>= logErrorToChat
           if message == "PING"
             then do
@@ -774,7 +771,9 @@ handleAction audioContext = case _ of
         chatNumber = oldChatNumber + 1
         chat = ChatMessage { username: id, message, chatNumber }
       H.modify_
-        $ (_message .~ "") <<< (_messages :~ chat) <<< (_chatNumber .~ chatNumber)
+        $ (_message .~ "")
+        <<< (_messages %~ Message.rememberMessage chat)
+        <<< (_chatNumber .~ chatNumber)
       -- if we log errors to chat while sending messages: infinite loop?
       errorOrUnit <- saveChat
       case errorOrUnit of
@@ -805,9 +804,8 @@ handleAction audioContext = case _ of
       save (scopedKey room mailboxSyncKey) sync >>= logErrorToChat
     markReachable = modifySession _ { failures = 0, unreachable = false }
     notify message = do
-      H.modify_
-        $ (_messages :~ ChatMessage { username: mailboxNoticeSender, message, chatNumber: 0 })
-        >>> (_messages %~ take 250)
+      H.modify_ $ _messages %~ Message.rememberMessage
+        (ChatMessage { username: mailboxNoticeSender, message, chatNumber: 0 })
       saveChat >>= logErrorToChat
     applyGame msg = case msg of
       GameMessage { i, state, playMade } -> do
@@ -823,7 +821,7 @@ handleAction audioContext = case _ of
             }
           H.modify_ $ _showMenu .~ false
         queryGame $ ReceiveGame { i, state }
-        traverse_ (\x -> H.modify_ $ _messages :~ PlayMadeMessage x) playMade
+        traverse_ (\x -> H.modify_ $ _messages %~ Message.rememberMessage (PlayMadeMessage x)) playMade
         modifySession \session -> session
           { outbox = Just msg, adoptions = session.adoptions + 1 }
       _ -> pure unit
