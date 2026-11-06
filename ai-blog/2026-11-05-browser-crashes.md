@@ -18,6 +18,7 @@ tags:
 ## 🔎 What the Report Adds
 
 - 📱 The report was collected from an Android 10 device running mobile Chrome, and was generated after a new app session had started. It contains many sync-journal entries and has reached the cap for recent console entries, so it is a substantial but incomplete trace.
+- 🪞 The accompanying account describes playing against oneself in Chrome and Brave. The report identifies the page that generated it as mobile Chrome, but it does not identify which browser displayed the original failure.
 - 📡 The session repeatedly lost and re-established its WebSocket relay connection. Mailbox synchronization and game activity continued through many of those interruptions. This establishes connection churn, not a cause of the browser failure.
 - 💤 The page recorded a long frozen/background interval and later resumed. Mobile browsers routinely freeze background pages; these lifecycle events do not prove that the page had hung or that the browser crashed.
 - 🔄 A later app session started at the base page without a room hash, while earlier activity was associated with a mailbox-backed game room. That is consistent with opening or reloading the app without returning to the prior room. It does not tell us why the session changed.
@@ -79,7 +80,7 @@ These are recommendations for a future investigation, not changes made here. In 
 
 ## 🔭 Questions for the Next Investigation
 
-- 🧩 At what exact point did the issue occur relative to iteration 152, the background/resume interval, and the later app session? Which of Chrome or Brave produced this report?
+- 🧩 At what exact point did the issue occur relative to iteration 152, the background/resume interval, and the later app session? Was the visible failure in the Chrome page, the Brave page, or both?
 - 🤖 Was a bot due to act at that iteration, and how long did candidate generation take?
 - 📬 Was the page adopting a mailbox snapshot or handling a live-relay update immediately before it became unresponsive?
 - 📊 What were the decoded payload size, game/chat history size, storage duration, main-thread time, and device memory near the event?
