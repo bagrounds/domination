@@ -3,7 +3,8 @@
 **Source:** [#28 Repro Browser Crash](https://github.com/bagrounds/domination/issues/28),
 reproduced with `e2e/chaos.js --scenario turns`
 
-**Status:** Open (reproduced, not fixed)
+**Status:** Open (reproduced, not fixed). Fix proposed in the
+[storage design](../../docs/2026-11-07-browser-crash-storage-design.md), waiting for review.
 
 ## Description
 
