@@ -17,6 +17,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Either (Either(..))
 import Data.Either as Either
+import Data.String as String
 import Domination.AppM (AppM)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -63,13 +64,20 @@ saveStorage
   => String -> a -> m (Either String Unit)
 saveStorage key value = liftEffect do
   result <- window >>= localStorage >>= setItem Left Right unit key stringValue
-  pure $ contextualizeError `mapLeft` result
+  pure $ saveFailureMessage key stringValue `mapLeft` result
   where
     stringValue = (stringify <<< encodeJson) value
-    contextualizeError error = "Error saving to local storage."
-      <> " key: '" <> key <> "'"
-      <> " value: '" <> stringValue <> "'"
-      <> " error: '" <> error <> "'"
+
+-- | Describes a failed save by its key and size, never its value: the value
+-- | can be megabytes, and an error that carries it grows with every retry.
+saveFailureMessage :: String -> String -> String -> String
+saveFailureMessage key value browserError = "Error saving to local storage."
+  <> " key: '" <> key <> "'"
+  <> " (" <> show (String.length value) <> " chars)"
+  <> " error: '" <> String.take maxBrowserErrorLength browserError <> "'"
+
+maxBrowserErrorLength :: Int
+maxBrowserErrorLength = 200
 
 loadStorage
   :: forall a m

@@ -18,31 +18,20 @@ import Data.Argonaut.Encode.Class (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.ArrayBuffer.Class (class DecodeArrayBuffer, class DynamicByteLength, class EncodeArrayBuffer, genericByteLength, genericPutArrayBuffer, genericReadArrayBuffer)
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe)
 import Data.Show.Generic (genericShow)
-import Data.Lens.Fold (preview, (^?))
 import Data.Lens.Getter (view)
 import Data.Lens.Iso (Iso', iso)
 import Data.Lens.Prism (review)
-import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
-import Domination.Data.Card as Card
-import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
-import Domination.Data.Game (_player, _stack) as Game
-import Domination.Data.Play (Play(..))
-import Domination.Data.Player as Player
-import Domination.Data.Reaction (Reaction(..))
+import Domination.Data.Play (Play)
 import Domination.Data.Wire.Game (WireGame)
 import Domination.Data.Wire.Game (_toWire) as Game
 import Domination.Data.Wire.Play (WirePlay)
 import Domination.Data.Wire.Play (_toWire) as Play
 import Domination.Data.Wire.Int (WireInt)
 import Domination.Data.Wire.Int as Int
-import Domination.UI.RenderText (renderTextInContext)
-import Halogen.HTML (ClassName(..), HTML)
-import Halogen.HTML (text) as HH
-import Halogen.HTML.Elements (div, span, span_) as HH
-import Halogen.HTML.Properties (class_) as HH
 
 type Envelope = { id :: String, message :: RemoteMessage }
 type WireEnvelope = Tuple String WireMessage
@@ -164,80 +153,3 @@ instance encodeArrayBuffeWireMessage
 instance decodeArrayBuffeWireMessage
   :: DecodeArrayBuffer WireMessage where
   readArrayBuffer = genericReadArrayBuffer
-
-renderHtml :: forall w i. RemoteMessage -> HTML w i
-renderHtml (JoinMessage { clientId }) = HH.div
-  [ HH.class_ $ ClassName "join-message" ]
-  [ HH.text $ "(" <> clientId <> " has joined the game)" ]
-renderHtml (HeartbeatMessage { clientId }) = HH.div
-  [ HH.class_ $ ClassName "heartbeat-message" ]
-  [ HH.text $ "(" <> clientId <> " is alive " ]
-renderHtml (LeaveMessage { clientId }) = HH.div
-  [ HH.class_ $ ClassName "leave-message" ]
-  [ HH.text $ "(" <> clientId <> " has left the game)" ]
-renderHtml (ChatMessage { username, message }) =
-  HH.div
-    [ HH.class_ $ ClassName "chat-message" ]
-    [ HH.span [ HH.class_ $ ClassName "username" ] [ HH.text username ]
-    , HH.text ": "
-    , HH.span [ HH.class_ $ ClassName "message" ] [ HH.text message ]
-    ]
-renderHtml (GameMessage _) =
-  HH.div
-    [ HH.class_ $ ClassName "game-state-message" ]
-    [ HH.div [ HH.class_ $ ClassName "game-state" ] [ HH.text "(Game Data Received)" ]
-    ]
-renderHtml (UsernameMessage { username, id }) =
-  HH.div
-    [ HH.class_ $ ClassName "username-message" ]
-    [ HH.text "("
-    , HH.span [ HH.class_ $ ClassName "username" ] [ HH.text $ show username ]
-    , HH.text " has ID: "
-    , HH.span [ HH.class_ $ ClassName "username" ] [ HH.text $ show id ]
-    , HH.text ")"
-    ]
-renderHtml (PlayMadeMessage { play, playerIndex: player, state }) =
-  case describePlay state play of
-    Nothing -> HH.span [] []
-    Just text -> HH.div
-      [ HH.class_ $ ClassName "play-made-message" ]
-      [ HH.text $ "Player " <> show (player + 1) <> ": "
-      , HH.span
-        [ HH.class_ $ ClassName "play-made" ]
-        [ text ]
-      ]
-
-describePlay :: forall w i. Game -> Play -> Maybe (HTML w i)
-describePlay state = case _ of
-  NewGame { playerCount } -> Just $
-    HH.span_
-      [ HH.text $ "created a new "
-        <> show playerCount <> " player game"
-      ]
-  EndPhase _ -> Nothing
-  PlayCard { playerIndex, cardIndex } -> Just $
-    HH.text $ "played: "
-      <> getPlayerCardName playerIndex state cardIndex
-  Purchase { stackIndex } -> Just $
-    HH.text $ "purchased: " <> text
-    where
-      text = case preview (Game._stack stackIndex) state of
-        Nothing -> "???"
-        Just { card } -> card.name
-  ResolveChoice { playerIndex, choice } ->
-    Just $ renderTextInContext playerIndex state choice
-  React { reaction } -> Just $
-    HH.text $ case reaction of
-      Nothing -> "did not react"
-      Just BlockAttack -> "blocked an attack"
-      Just (ReactWithChoice (StackChoice { description })) ->
-        "reacted: " <> description
-      Just (ReactWithChoice _) -> "reacted with a choice"
-  DoneReacting _ -> Just $
-    HH.text "finished reacting"
-
-getPlayerCardName :: Int -> Game -> Int -> String
-getPlayerCardName playerIndex state cardIndex = fromMaybe "???"
-  $ state ^? Game._player playerIndex
-    <<< Player._cardInHand cardIndex
-    <<< Card._name

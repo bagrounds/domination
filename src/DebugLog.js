@@ -4,8 +4,10 @@
 //   per-message lines shortened so they cannot push out the rest;
 // - `sync_journal`: only what explains whether a device kept up with its
 //   room (connection, mailbox, clock and page lifecycle), kept much longer.
-const consoleLog = { key: 'debug_log', max: 400 }
-const syncJournal = { key: 'sync_journal', max: 1500 }
+// Each buffer is bounded by both its number of lines and their total length,
+// so a burst of long lines cannot fill localStorage.
+const consoleLog = { key: 'debug_log', max: 400, maxChars: 200000 }
+const syncJournal = { key: 'sync_journal', max: 1500, maxChars: 400000 }
 const maxEntryLength = 1000
 const maxChattyLength = 160
 const persistDelayMs = 1000
@@ -40,11 +42,28 @@ const chattyPrefixes = [
   'username incoming',
 ]
 
-const readPersisted = ({ key, max }) => {
+const totalLength = lines => lines.reduce((sum, line) => sum + line.length, 0)
+
+const bufferOf = lines => ({ lines, chars: totalLength(lines) })
+
+const dropOldest = (buffer, count) => {
+  const dropped = buffer.lines.splice(0, count)
+  buffer.chars -= totalLength(dropped)
+}
+
+const trimToLimits = (channel, buffer) => {
+  while (buffer.lines.length > channel.max ||
+    (buffer.lines.length > 1 && buffer.chars > channel.maxChars)) {
+    dropOldest(buffer, 1)
+  }
+  return buffer
+}
+
+const readPersisted = channel => {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(key))
+    const parsed = JSON.parse(window.localStorage.getItem(channel.key))
     return Array.isArray(parsed)
-      ? parsed.filter(entry => typeof entry === 'string').slice(-max)
+      ? parsed.filter(entry => typeof entry === 'string')
       : []
   } catch (_) {
     return []
@@ -55,19 +74,41 @@ const buffers = new Map()
 let persistTimer = null
 let installed = false
 
-const entries = channel => {
-  if (!buffers.has(channel)) buffers.set(channel, readPersisted(channel))
+const buffer = channel => {
+  if (!buffers.has(channel)) buffers.set(channel, trimToLimits(channel, bufferOf(readPersisted(channel))))
   return buffers.get(channel)
+}
+
+const entries = channel => buffer(channel).lines
+
+const save = channel => {
+  try {
+    window.localStorage.setItem(channel.key, JSON.stringify(entries(channel)))
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+// When localStorage is full, halve the buffer and try once more, so the log
+// keeps its newest lines without retrying a failing write every second.
+const shrinkAfterFailedSave = channel => {
+  const log = buffer(channel)
+  const before = log.lines.length
+  dropOldest(log, Math.ceil(before / 2))
+  const note = `${new Date().toISOString()} WARN ${channel.key}: localStorage is full, dropped the oldest ${before - log.lines.length} of ${before} lines`
+  log.lines.push(note)
+  log.chars += note.length
 }
 
 const persist = () => {
   clearTimeout(persistTimer)
   persistTimer = null
   ;[consoleLog, syncJournal].forEach(channel => {
-    try {
-      window.localStorage.setItem(channel.key, JSON.stringify(entries(channel)))
-    } catch (_) {
+    if (!save(channel)) {
+      shrinkAfterFailedSave(channel)
       // A full or unavailable localStorage must never break the game.
+      save(channel)
     }
   })
 }
@@ -97,9 +138,10 @@ const isSync = startsWithAny(syncPrefixes)
 const isChatty = startsWithAny(chattyPrefixes)
 
 const append = (channel, line) => {
-  const log = entries(channel)
-  log.push(line)
-  log.splice(0, Math.max(0, log.length - channel.max))
+  const log = buffer(channel)
+  log.lines.push(line)
+  log.chars += line.length
+  trimToLimits(channel, log)
   schedulePersist()
 }
 
@@ -162,8 +204,8 @@ export const snapshot = () => entries(consoleLog).slice()
 export const journal = () => entries(syncJournal).slice()
 
 export const clear = () => {
-  buffers.set(consoleLog, [])
-  buffers.set(syncJournal, [])
+  buffers.set(consoleLog, bufferOf([]))
+  buffers.set(syncJournal, bufferOf([]))
   persist()
 }
 
