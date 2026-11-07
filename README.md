@@ -107,7 +107,14 @@ Browser chaos tests of room sync (needs Chrome, or set `CHROME`; run `npm run bu
 cd e2e && npm ci
 npm run chaos -- --room mailbox --runs 3
 npm run chaos -- --scenario away --leave pagehide --room global
+npm run chaos -- --scenario turns --seed 41 --steps 20 --fill-storage-kb 3500 --heap-mb 512
 ```
+
+`--scenario turns` plays a long game on two devices, one away each turn, so every turn starts
+with a catch-up. A tab crash fails the run with exit code 2. The journal, the JS heap,
+DOM size and localStorage probes, and each device's persisted debug log are kept in `e2e/runs/`.
+That last command currently crashes a tab
+([storage error chat loop](issues/open/2026-11-07-browser-crash-storage-error-chat-loop.md)).
 
 Model-check the sync algorithm with TLA+ (needs Java 11+):
 ```sh
