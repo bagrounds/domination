@@ -9,19 +9,23 @@
 // Then everything comes back, nobody plays, and both devices must show the
 // same game, the latest one, within the window the resync policy promises.
 //
+// `--scenario turns` is one person playing both seats on two devices: each
+// turn, the device whose turn it isn't is away, so every turn starts with a
+// catch-up; `--steps` counts turns there.
 //
 // A renderer crash (Playwright's page `crash` event) or the browser going
 // away fails the run at once and exits with code 2. Every few seconds the
-// journal records each device's JS heap, DOM size and localStorage size. The
-// steps a run took are saved as runs/<run>/schedule.json; `--schedule file`
-// plays such a list back (steps whose device can't do them are skipped), which
-// is how hunt.js shrinks a crash. `--heap-mb n` caps the page's JS heap, as a
-// phone's is smaller than a desktop's.
+// journal records each device's JS heap, DOM size and localStorage size.
+// `--heap-mb n` caps the page's JS heap, as a phone's is smaller than a
+// desktop's; `--fill-storage-kb n` starts each device with that much of its
+// localStorage (5 MB per origin in Chrome) already taken.
 //
-// usage: node chaos.js [--room mailbox|global] [--seed n] [--runs n] [--steps n]
-//                      [--schedule file] [--heap-mb n] [--probe-seconds n]
+// usage: node chaos.js [--scenario chaos|away|turns] [--room mailbox|global]
+//                      [--seed n] [--runs n] [--steps n] [--heap-mb n]
+//                      [--fill-storage-kb n] [--probe-seconds n]
 import { chromium } from 'playwright-core'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { startServers } from './servers.js'
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, arg, i, all) =>
@@ -29,9 +33,9 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, arg, i, all
 const roomKind = args.room ?? 'mailbox'
 const firstSeed = Number(args.seed ?? Date.now() % 100000)
 const runs = Number(args.runs ?? 1)
-const givenSchedule = args.schedule === undefined ? null : JSON.parse(await readFile(args.schedule, 'utf8'))
-const stepCount = givenSchedule?.length ?? Number(args.steps ?? 120)
+const stepCount = Number(args.steps ?? 120)
 const heapMb = args['heap-mb'] === undefined ? null : Number(args['heap-mb'])
+const fillStorageKb = Number(args['fill-storage-kb'] ?? 0)
 const probeMs = Number(args['probe-seconds'] ?? 10) * 1000
 const chrome = process.env.CHROME ?? '/usr/bin/google-chrome'
 
@@ -75,7 +79,7 @@ const randomClick = ({ r1, r2, key }) => {
   const myTurn = saved !== null && saved.state.turn === saved.playerIndex
   const candidates = dialogue.length > 0
     ? (r2 < 0.4 && resolve.length > 0 ? resolve : dialogue)
-    : myTurn ? all('.can-play, .can-buy, button.next-phase') : []
+    : myTurn ? all('.hand .can-play, .can-buy .card, button.next-phase') : []
   if (candidates.length === 0) return null
   const element = candidates[Math.floor(r1 * candidates.length)]
   const label = (element.className || element.tagName) + ' ' + (element.textContent || '').trim().slice(0, 30)
@@ -83,15 +87,26 @@ const randomClick = ({ r1, r2, key }) => {
   return label
 }
 
+// Whoever the game waits for: a player with a choice or reaction to make,
+// otherwise the player whose turn it is.
+const toMove = game => {
+  const choosing = game.players.findIndex(p => p.choices.length > 0 || p.pendingReactions.length > 0)
+  return choosing === -1 ? game.turn : choosing
+}
+
 const gameKey = room => room === null ? 'game_state' : `room/${room}/game_state`
 const syncKey = room => room === null ? 'mailbox_sync' : `room/${room}/mailbox_sync`
 
 const run = async seed => {
   const random = mulberry32(seed)
+  const chance = p => random() < p
   const pick = xs => xs[Math.floor(random() * xs.length)]
   const started = Date.now()
-  const lines = []
-  const journal = line => lines.push(`${((Date.now() - started) / 1000).toFixed(1).padStart(7)} ${line}`)
+  const dir = new URL(`./runs/${scenario}-${roomKind}-${seed}/`, import.meta.url)
+  await mkdir(dir, { recursive: true })
+  const journalFile = new URL('journal.txt', dir)
+  await writeFile(journalFile, '')
+  const journal = line => appendFileSync(journalFile, `${((Date.now() - started) / 1000).toFixed(1).padStart(7)} ${line}\n`)
   const port = 8100 + (seed % 800)
   const servers = await startServers({
     staticPort: port, relayPort: port + 1000, mailboxPort: port + 2000, journal,
@@ -116,6 +131,7 @@ const run = async seed => {
         username: JSON.stringify(name),
         player_index: JSON.stringify(seat),
         player_count: JSON.stringify(2),
+        ...(fillStorageKb > 0 ? { filler: 'x'.repeat(fillStorageKb * 1024) } : {}),
       },
     })
     const device = { name, seat, context, page: null, cdp: null, hidden: false, frozen: false, offline: false }
@@ -123,7 +139,9 @@ const run = async seed => {
       device.page = await context.newPage()
       device.page.on('console', message => {
         const text = message.text()
-        if (!/Received message|sent message|queued message|Heartbeat from|username incoming|maybeBroadcaster|Expected i/.test(text)) {
+        if (text.length > 100_000) {
+          journal(`${name} console (${(text.length / 2 ** 20).toFixed(1)} M chars): ${text.slice(0, 300)}`)
+        } else if (!/Received message|sent message|queued message|Heartbeat from|username incoming|maybeBroadcaster|Expected i/.test(text)) {
           journal(`${name} console: ${text.slice(0, 300)}`)
         }
       })
@@ -171,6 +189,8 @@ const run = async seed => {
     return {
       i: parsed?.i ?? null,
       turn: parsed?.state?.turn ?? null,
+      toMove: parsed === null ? null : toMove(parsed.state),
+      over: parsed !== null && parsed.state.result !== null,
       state: parsed === null ? null : JSON.stringify(parsed.state),
       sync,
     }
@@ -203,7 +223,6 @@ const run = async seed => {
     journal(`${d.name} probe: i=${i} heap ${heapMb.toFixed(1)} MB, ${metric('Nodes')} DOM nodes,`
       + ` localStorage ${(storage / 1024).toFixed(0)} kB (${biggest.join(', ')})`)
   }
-  const schedule = []
   let probing = null
   let plays = 0
   try {
@@ -240,11 +259,11 @@ const run = async seed => {
       [2, 'mailbox-up', () => room !== null && !servers.mailbox.isUp()],
       [6, 'wait', () => true],
     ]
-    const perform = async (action, d, draw = random) => {
+    const perform = async (action, d) => {
       doing = `${d.name} ${action}`
       switch (action) {
         case 'play': {
-          const label = await d.page.evaluate(randomClick, { r1: draw(), r2: draw(), key: gameKey(room) })
+          const label = await d.page.evaluate(randomClick, { r1: random(), r2: random(), key: gameKey(room) })
           if (label !== null) plays += 1
           if (label !== null) journal(`${d.name} play: ${label}`)
           await sleep(label === null ? 20 : 120)
@@ -260,7 +279,7 @@ const run = async seed => {
         case 'show': await d.setHidden(false); break
         case 'freeze': await d.lifecycle('frozen'); break
         case 'resume': await d.lifecycle('active'); break
-        case 'offline': await d.setOffline(true); if (draw() < 0.5) servers.relay.cut(d.name); else servers.relay.halfOpen(d.name); break
+        case 'offline': await d.setOffline(true); if (chance(0.5)) servers.relay.cut(d.name); else servers.relay.halfOpen(d.name); break
         case 'online': await d.setOffline(false); break
         case 'half-open': servers.relay.halfOpen(d.name); break
         case 'cut': servers.relay.cut(d.name); break
@@ -268,7 +287,7 @@ const run = async seed => {
         case 'open': await d.open(); break
         case 'mailbox-down': servers.mailbox.setUp(false); break
         case 'mailbox-up': servers.mailbox.setUp(true); break
-        case 'wait': await sleep(Math.floor(draw() * 8000)); break
+        case 'wait': await sleep(Math.floor(random() * 8000)); break
       }
     }
     // The reported stuck game: A and B play a while, A leaves the app, B
@@ -293,50 +312,47 @@ const run = async seed => {
       await sleep(Math.floor(random() * 20000))
       journal(`away: A comes back after B made it ${plays} plays`)
     }
-    const choose = n => {
-      if (givenSchedule === null) {
-        const options = devices.flatMap(d => actions.filter(([, , ok]) => ok(d)).map(([w, action]) => ({ w, action, d })))
-        const total = options.reduce((sum, { w }) => sum + w, 0)
-        let x = random() * total
-        return options.find(({ w }) => (x -= w) < 0) ?? options[0]
-      }
-      const { device, action } = givenSchedule[n]
-      const d = devices.find(({ name }) => name === device)
-      const can = actions.find(([, name]) => name === action)?.[2] ?? (() => false)
-      return can(d) ? { action, d } : null
-    }
-    const drawsFor = n => {
-      const given = [...(givenSchedule?.[n]?.r ?? [])]
-      const r = []
-      const draw = () => {
-        const x = givenSchedule === null ? random() : given.shift() ?? 0.5
-        r.push(x)
-        return x
-      }
-      return { r, draw }
-    }
-    for (let n = 0; scenario === 'chaos' && n < stepCount && crashes.length === 0; n++) {
-      const chosen = choose(n)
-      if (chosen === null) {
-        journal(`step ${n}: skip ${givenSchedule[n].device} ${givenSchedule[n].action}`)
-        continue
-      }
-      const { action, d } = chosen
-      const { r, draw } = drawsFor(n)
-      if (action !== 'play') journal(`step ${n}: ${d.name} ${action}`)
-      await perform(action, d, draw)
-      schedule.push({ device: d.name, action, r })
-    }
-    if (crashes.length > 0) throw new Error(crashes.join('; '))
-
-    journal(`calm: everyone comes back (${plays} plays made)`)
-    servers.mailbox.setUp(true)
-    for (const d of devices) {
+    // One person playing both seats on two devices, as in the reported crash:
+    // play a turn on one, put it away (background, closed, offline or with a
+    // dead socket), pick up the other, which catches up, and so on.
+    const comeBack = async d => {
       if (d.offline) await d.setOffline(false)
       if (d.page === null) await d.open()
       if (d.frozen) await d.lifecycle('active')
       if (d.hidden) await d.setHidden(false)
     }
+    const myMove = async d => (await summary(d)).toMove === d.seat
+    for (let n = 0; scenario === 'turns' && n < stepCount && crashes.length === 0; n++) {
+      const d = devices[n % devices.length]
+      doing = `turn ${n}: ${d.name} comes back`
+      await comeBack(d)
+      for (let tries = 0; tries < 50 && !await myMove(d); tries++) await sleep(200)
+      if ((await summary(d)).over) {
+        journal(`turn ${n}: the game is over; ${d.name} starts a new one`)
+        await startGame(d)
+        await sleep(1000)
+      }
+      const before = plays
+      for (let tries = 0; tries < 300 && await myMove(d) && crashes.length === 0; tries++) await perform('play', d)
+      const leave = pick(['freeze', 'close', 'offline', 'half-open'])
+      journal(`turn ${n}: ${d.name} made ${plays - before} plays, then ${leave}`)
+      await perform('hide', d)
+      if (leave === 'half-open') { await perform('freeze', d); servers.relay.halfOpen(d.name) } else await perform(leave, d)
+      await sleep(1000)
+    }
+    for (let n = 0; scenario === 'chaos' && n < stepCount && crashes.length === 0; n++) {
+      const options = devices.flatMap(d => actions.filter(([, , ok]) => ok(d)).map(([w, action]) => ({ w, action, d })))
+      const total = options.reduce((sum, { w }) => sum + w, 0)
+      let x = random() * total
+      const { action, d } = options.find(({ w }) => (x -= w) < 0) ?? options[0]
+      if (action !== 'play') journal(`step ${n}: ${d.name} ${action}`)
+      await perform(action, d)
+    }
+    if (crashes.length > 0) throw new Error(crashes.join('; '))
+
+    journal(`calm: everyone comes back (${plays} plays made)`)
+    servers.mailbox.setUp(true)
+    for (const d of devices) await comeBack(d)
     const deadline = Date.now() + windowMs
     let last = null
     for (;;) {
@@ -360,8 +376,6 @@ const run = async seed => {
     failure.push(crashes.length > 0 ? `CRASH: ${crashes.join('; ')}` : `harness error: ${error.stack}`)
   } finally {
     clearInterval(probing)
-    const dir = new URL(`./runs/${scenario}-${roomKind}-${seed}/`, import.meta.url)
-    await mkdir(dir, { recursive: true })
     // The logs persisted in localStorage outlive a crashed tab; a fresh page
     // of the same origin reads them.
     for (const d of devices) {
@@ -374,11 +388,9 @@ const run = async seed => {
         await writeFile(new URL(`${d.name}-sync-journal.json`, dir), logs.sync ?? '')
       } catch (error) { journal(`${d.name} logs unreadable: ${error.message}`) }
     }
-    await writeFile(new URL('schedule.json', dir), JSON.stringify(schedule) + '\n')
     closing = true
     await browser.close().catch(() => {})
     servers.close()
-    await writeFile(new URL('journal.txt', dir), lines.join('\n') + '\n')
   }
   const ok = failure.length === 0
   const peaks = `peak heap A ${peakHeapMb.A.toFixed(1)} MB, B ${peakHeapMb.B.toFixed(1)} MB`
