@@ -163,6 +163,10 @@ chat_tests =
             "trashed from the supply: Village"
         , assertEquals (movementText { cards: [ "Village" ], from: Pile.Trash, to: Pile.Discarding })
             "gained from the trash: Village to their discard pile"
+        , assertEquals (movementText { cards: [ "Gold" ], from: Pile.Hand, to: Pile.Deck })
+            "moved: 1 card from their hand to their deck"
+        , assertEquals (movementText { cards: [ "Gold", "Curse" ], from: Pile.Hand, to: Pile.Deck })
+            "moved: 2 cards from their hand to their deck"
         ]
     }
   , { name: "in bot games, the log names every card that entered or left the trash or the supply"

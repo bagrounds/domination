@@ -12,7 +12,7 @@ module Domination.UI.RenderText where
 
 import Prelude
 
-import Data.Array (intercalate)
+import Data.Array (intercalate, length)
 import Data.Lens ((^.))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), snd)
@@ -21,7 +21,7 @@ import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Buys (Buys)
 import Domination.Data.Buys as Buys
-import Domination.Data.CardMovement (CardMovement)
+import Domination.Data.CardMovement (CardMovement, seenByEveryone)
 import Domination.Data.Chat (LoggedPlay(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
@@ -141,7 +141,7 @@ movementsText :: Array CardMovement -> String
 movementsText = intercalate "; " <<< map movementText
 
 movementText :: CardMovement -> String
-movementText { cards, from, to } = case from, to of
+movementText movement@{ cards, from, to } = case from, to of
   Pile.Supply, Pile.Trash -> "trashed from the supply: " <> names
   _, Pile.Trash -> "trashed: " <> names
   Pile.Supply, _ -> "gained: " <> names <> " to their " <> pileName to
@@ -153,9 +153,11 @@ movementText { cards, from, to } = case from, to of
     <> " from their " <> pileName from
     <> " to their " <> pileName to
   where
-    names = case cards of
-      [] -> "nothing"
-      _ -> intercalate ", " cards
+    names = case cards, seenByEveryone movement of
+      [], _ -> "nothing"
+      [ _ ], false -> "1 card"
+      _, false -> show (length cards) <> " cards"
+      _, true -> intercalate ", " cards
 
 pileName :: Pile -> String
 pileName = case _ of
