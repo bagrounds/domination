@@ -1,11 +1,12 @@
-# Browser Crash: Bounded Chat, Logs and Storage Errors (Design Proposal)
+# Browser Crash: Bounded Chat, Logs and Storage Errors (Design)
 
 - **Date:** 2026-11-07
-- **Status:** Proposal, waiting for review. Nothing here is implemented yet.
+- **Status:** Approved and implemented: R1, R2, R3, R4a, R5, R6. Not chosen: R4b (the
+  alternative to R4a). Results are in §10.
 - **Issue:** [#30 Fix: Browser Crash: Storage Errors Snowball Through Chat](https://github.com/bagrounds/domination/issues/30)
 - **Bugs it addresses:**
-  [storage error chat loop](../issues/open/2026-11-07-browser-crash-storage-error-chat-loop.md),
-  [chat history unbounded](../issues/open/2026-11-07-browser-crash-chat-history-unbounded.md),
+  [storage error chat loop](../issues/closed/2026-11-07-browser-crash-storage-error-chat-loop.md),
+  [chat history unbounded](../issues/closed/2026-11-07-browser-crash-chat-history-unbounded.md),
   and part of [instrumentation](../issues/open/2026-11-07-browser-crash-instrumentation.md)
 
 ## 0. How to Review This
@@ -30,13 +31,13 @@ saves stop failing in the first place. R5 bounds the debug logs by size.
 
 | ID | Recommendation | Fixes | Depends on | Effort | Approve? |
 | --- | --- | --- | --- | --- | --- |
-| **R1** | Stop reporting errors in the chat. Send them to the console, where the debug log records them. | The loop | none | S | ☐ |
-| **R2** | Never put a stored value in an error message. Report the key, the size and the browser's error. | Multi-MB error strings | none | S | ☐ |
-| **R3** | Bound the chat by **size** (100,000 characters) as well as count (250), through one function every path uses. Cap each chat message at 500 characters. | Unbounded chat | R4, to be useful | S–M | ☐ |
-| **R4a** | Store **what was played**, not the whole game. Card names are looked up when the play is logged. *(recommended)* | Quota exhaustion | none | M | ☐ |
-| R4b | *Alternative to R4a:* store a pre-rendered plain-text line. Simpler, but loses the icons in the log. | Quota exhaustion | none | S–M | ☐ |
-| **R5** | Bound `debug_log` and `sync_journal` by **size**: 200,000 and 400,000 characters. | Debug logs taking 2 MB of quota | none | S | ☐ |
-| R6 | *Optional:* if persisting the debug log fails, drop its older half and try once more. | Debug log missing around a crash | R5 | S | ☐ |
+| **R1** | Stop reporting errors in the chat. Send them to the console, where the debug log records them. | The loop | none | S | ✅ done |
+| **R2** | Never put a stored value in an error message. Report the key, the size and the browser's error. | Multi-MB error strings | none | S | ✅ done |
+| **R3** | Bound the chat by **size** (100,000 characters) as well as count (250), through one function every path uses. Cap each chat message at 500 characters. | Unbounded chat | R4, to be useful | S–M | ✅ done |
+| **R4a** | Store **what was played**, not the whole game. Card names are looked up when the play is logged. *(recommended)* | Quota exhaustion | none | M | ✅ done |
+| R4b | *Alternative to R4a:* store a pre-rendered plain-text line. Simpler, but loses the icons in the log. | Quota exhaustion | none | S–M | — not chosen |
+| **R5** | Bound `debug_log` and `sync_journal` by **size**: 200,000 and 400,000 characters. | Debug logs taking 2 MB of quota | none | S | ✅ done |
+| R6 | *Optional:* if persisting the debug log fails, drop its older half and try once more. | Debug log missing around a crash | R5 | S | ✅ done |
 
 Effort: S is under about 50 lines plus tests, M is about 100–250 lines plus tests.
 

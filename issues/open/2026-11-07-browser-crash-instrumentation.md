@@ -2,12 +2,15 @@
 
 **Source:** [#28 Repro Browser Crash](https://github.com/bagrounds/domination/issues/28)
 
-**Status:** Open
+**Status:** Open. Partly done by the
+[storage design](../../docs/2026-11-07-browser-crash-storage-design.md): failed saves now
+log the key and value size to the console (and so to the debug log), never the value (R2);
+the debug logs are bounded by size and halve themselves once when the quota is full (R5, R6).
 
 ## Description
 
 We could only explain the crash in the
-[storage error chat loop](./2026-11-07-browser-crash-storage-error-chat-loop.md) once
+[storage error chat loop](../closed/2026-11-07-browser-crash-storage-error-chat-loop.md) once
 `e2e/chaos.js` measured from outside the page (heap via the DevTools protocol, localStorage
 by key, and the length of every console message). The app's own tools (`src/DebugLog.js`,
 the bug report) were blind to it:
@@ -28,14 +31,14 @@ the bug report) were blind to it:
 
 Keep it small, and reuse the debug log:
 
-- Log storage failures as data: key, value length, and the total localStorage length,
-  never the value itself. Count failures per key in memory.
+- ~~Log storage failures as data: key, value length~~ (done, R2). Still to do: the total
+  localStorage length, and a count of failures per key in memory.
 - Have the bug report include localStorage usage per key (the top few) and
   `performance.memory` where available (Chrome).
 - Record long tasks with a `PerformanceObserver` for `longtask` entries over about 1 s,
   in `sync_journal`.
-- Keep room for the debug log: if a persist fails, drop the oldest half of the buffers and
-  try once more, and log that it happened.
+- ~~Keep room for the debug log: if a persist fails, drop the oldest half of the buffers and
+  try once more, and log that it happened~~ (done, R6).
 - Put the size in the debug log's truncated lines, as `truncate` already does (`… (N chars)`),
   and record which log line was the largest.
 
@@ -51,5 +54,6 @@ For testing, as a small CI job:
 - [ ] After a localStorage failure, the bug report names the key, the value size and the
       quota usage.
 - [ ] A long main-thread stall shows up in `sync_journal`.
-- [ ] The debug log is still persisted when the quota is full.
+- [x] The debug log is still persisted when the quota is full (it halves itself and
+      retries once; see `src/DebugLog.js`).
 - [ ] The CI chaos job runs the turns scenario and keeps its journal on failure.

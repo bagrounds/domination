@@ -113,8 +113,10 @@ npm run chaos -- --scenario turns --seed 41 --steps 20 --fill-storage-kb 3500 --
 `--scenario turns` plays a long game on two devices, one away each turn, so every turn starts
 with a catch-up. A tab crash fails the run with exit code 2. The journal, the JS heap,
 DOM size and localStorage probes, and each device's persisted debug log are kept in `e2e/runs/`.
-That last command currently crashes a tab
-([storage error chat loop](issues/open/2026-11-07-browser-crash-storage-error-chat-loop.md)).
+That last command used to crash a tab within a minute
+([storage error chat loop](issues/closed/2026-11-07-browser-crash-storage-error-chat-loop.md));
+it now passes. With `--fill-storage-kb 4800` the `chaos` scenario still finds
+[a device left a play behind](issues/open/2026-11-07-async-play-stale-game-after-failed-save.md).
 
 Model-check the sync algorithm with TLA+ (needs Java 11+):
 ```sh
