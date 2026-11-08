@@ -3,9 +3,7 @@ module Domination.Data.Game.ResolveChoice where
 import Prelude hiding (Ordering(..))
 import Prim hiding (Constraint)
 
-import Control.Monad.Error.Class (class MonadError, class MonadThrow, throwError)
-import Control.Monad.Writer.Class (class MonadTell, tell)
-import Control.Monad.Writer.Trans (runWriterT)
+import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (all, filter, head, intercalate, length, replicate, uncons, (!!), (:))
 import Data.Array (drop, take) as Array
 import Data.Array.NonEmpty as NonEmpty
@@ -13,14 +11,11 @@ import Data.Lens.Fold ((^?))
 import Data.Lens.Index (ix)
 import Data.Lens.Setter (over, (.~))
 import Data.Lens.Traversal (Traversal', traverseOf)
-import Data.Either (Either)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (fst, snd)
 import Domination.Capability.Log (class Log, log)
 import Domination.Capability.Random (class Random)
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Card (Card, passFilter)
-import Domination.Data.CardMovement (CardMovement)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Constraint as Constraint
@@ -50,52 +45,7 @@ resolveChoice
   => { playerIndex :: Int, choice :: Choice }
   -> Game
   -> m Game
-resolveChoice x = map fst <<< runWriterT <<< resolveChoiceTellingMovements x
-
--- | The cards a choice moves, found by resolving it without chance: a
--- | shuffle only decides which cards get drawn, and drawing moves no card
--- | anyone else can see.
-choiceMovements
-  :: { playerIndex :: Int, choice :: Choice }
-  -> Game
-  -> Either String (Array CardMovement)
-choiceMovements x =
-  retell <<< map snd <<< runWriterT <<< resolveChoiceTellingMovements x
-
--- | Resolution without chance or console output: shuffles keep the order.
-newtype Retelling a = Retelling (Either String a)
-
-retell :: forall a. Retelling a -> Either String a
-retell (Retelling x) = x
-
-derive newtype instance functorRetelling :: Functor Retelling
-derive newtype instance applyRetelling :: Apply Retelling
-derive newtype instance applicativeRetelling :: Applicative Retelling
-derive newtype instance bindRetelling :: Bind Retelling
-derive newtype instance monadRetelling :: Monad Retelling
-derive newtype instance monadThrowRetelling :: MonadThrow String Retelling
-derive newtype instance monadErrorRetelling :: MonadError String Retelling
-
-instance randomRetelling :: Random Retelling where
-  shuffle = pure
-  randomElement = pure <<< head
-  randomIntBetween low _ = pure low
-  randomBoolean = pure false
-
-instance logRetelling :: Log Retelling where
-  log = const $ pure unit
-  error = const $ pure unit
-
-resolveChoiceTellingMovements
-  :: forall m
-  . MonadError String m
-  => MonadTell (Array CardMovement) m
-  => Log m
-  => Random m
-  => { playerIndex :: Int, choice :: Choice }
-  -> Game
-  -> m Game
-resolveChoiceTellingMovements z@{ playerIndex, choice } state = do
+resolveChoice z@{ playerIndex, choice } state = do
   log $ "resolveChoice " <> show z
   case choice of
     StackChoice { attack, expression, stack, description } -> do
@@ -222,7 +172,6 @@ resolveChoiceTellingMovements z@{ playerIndex, choice } state = do
 evalStackChoice'
   :: forall m
   . MonadError String m
-  => MonadTell (Array CardMovement) m
   => Log m
   => Random m
   => Int
@@ -592,7 +541,6 @@ type MoveFromToRecord =
 moveFromTo
   :: forall m
   . MonadError String m
-  => MonadTell (Array CardMovement) m
   => Random m
   => Int
   -> Game
@@ -619,7 +567,6 @@ moveFromTo playerIndex state
   check
     $ ("selected cards" <>! _) >>> (selected <@! _)
     $ all (passFilter filter) !> "illegal choice in"
-  tell [ { cards: _.name <$> selected, from: source, to: destination } ]
   pure
     $ _source .~ remaining
     $ over _destination (selected <> _)
@@ -628,7 +575,6 @@ moveFromTo playerIndex state
 gainCards
   :: forall m
   . MonadError String m
-  => MonadTell (Array CardMovement) m
   => Random m
   => Int
   -> Game
@@ -643,14 +589,12 @@ gainCards playerIndex state { n, cardName, destination } = do
     newCount = max zero (count - n)
     stackUpdate = Stack._count .~ newCount
     cards = replicate cardsToGain card
-  tell [ { cards: _.name <$> cards, from: Pile.Supply, to: destination } ]
   over _destination (cards <> _)
     <$> modifyStack stackIndex stackUpdate state
 
 gainCard
   :: forall m
   . MonadError String m
-  => MonadTell (Array CardMovement) m
   => Random m
   => Int
   -> Game
@@ -661,6 +605,5 @@ gainCard playerIndex state { destination, cardName } = do
   stack <- stackByName cardName state.supply
   stackIndex <- indexOfStack stack.card state.supply
   let cards = [ stack.card ]
-  tell [ { cards: _.name <$> cards, from: Pile.Supply, to: destination } ]
   over _destination (cards <> _)
     <$> modifyStack stackIndex Stack.take state

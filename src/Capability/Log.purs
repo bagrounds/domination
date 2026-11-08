@@ -14,7 +14,6 @@ import Prelude
 
 import Control.Monad.Except.Trans (ExceptT)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer.Trans (WriterT)
 import Domination.AppM (AppM)
 import Domination.Capability.Random (RandomM)
 import Effect (Effect)
@@ -49,10 +48,6 @@ derive newtype instance monadLogM :: Monad LogM
 derive newtype instance monadEffectLogM :: MonadEffect LogM
 
 instance logExceptTString :: Log m => Log (ExceptT String m) where
-  log = lift <<< log
-  error = lift <<< error
-
-instance logWriterT :: (Monoid w, Log m) => Log (WriterT w m) where
   log = lift <<< log
   error = lift <<< error
 

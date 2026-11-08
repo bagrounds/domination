@@ -2,48 +2,36 @@ module Test.Chat (chat_tests) where
 
 import Prelude
 
-import Control.Monad.Except.Trans (runExceptT)
 import Data.Argonaut.Decode.Class (decodeJson)
 import Data.Argonaut.Encode.Class (encodeJson)
-import Data.Array (drop, length, mapMaybe, take, (..))
+import Data.Array (all, drop, length, mapMaybe, take, (..))
 import Data.Array as Array
-import Data.Array.NonEmpty as NEA
-import Data.Either (Either(..), either)
+import Data.Either (Either(..))
 import Data.Foldable (foldl, sum)
-import Data.Lens.Setter ((%~), (.~))
+import Data.Lens.Setter ((.~))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Data.String.CodeUnits (fromCharArray)
-import Data.Traversable (traverse)
-import Domination.Capability.Random (runRandomM)
 import Domination.Capability.Storage (saveFailureMessage)
-import Domination.Data.AI as AI
-import Domination.Data.AI.Strategy as Strategy
-import Domination.Data.Bonus (Bonus(..))
-import Domination.Data.Card (CardSpec, Command(..))
+import Domination.Data.Card (Command(..))
 import Domination.Data.Card as Card
-import Domination.Data.CardMovement (CardMovement)
+import Domination.Data.Constraint (Constraint(..))
+import Domination.Data.Filter as Filter
+import Domination.Data.Pile as Pile
 import Domination.Data.Cards as Cards
 import Domination.Data.Chat (Chat, ChatEntry(..), LoggedPlay(..), chatLimits, emptyChat, encodedLength, entries, keepNewestWithin, logPlay, record, recordPlay)
 import Domination.Data.Choice (Choice(..))
-import Domination.Data.Constraint (Constraint(..))
-import Domination.Data.Filter as Filter
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
-import Domination.Data.Game.Engine as Engine
-import Domination.Data.Pile (Pile)
-import Domination.Data.Pile as Pile
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction(..))
-import Domination.Data.StackEvaluation (StackExpression(..))
-import Domination.Data.Var (Var(..))
-import Domination.UI.RenderText (movementText)
 import Effect (Effect)
 import Message (RemoteMessage(..))
 import Test.QuickCheck (Result(..), assertEquals, (<?>))
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, oneOf, vectorOf)
 import Test.Room (all_success, quick_check)
+import Data.Array.NonEmpty as NEA
 
 type EffectTest = { name :: String, test :: Effect Result }
 
@@ -120,68 +108,10 @@ chat_tests =
         (logPlay twoPlayers $ Purchase { playerIndex: 0, stackIndex })
         (Just $ Purchased { card: fromMaybe "???" $ _.card.name <$> Array.index twoPlayers.supply stackIndex })
     }
-  , { name: "logPlay names the cards a choice moved"
-    , test: pure $ assertEquals
-        (movedBy villageToTrash $ ResolveChoice { playerIndex: 0, choice: trashFromHand [ 0 ] })
-        [ { cards: [ "Village" ], from: Pile.Hand, to: Pile.Trash } ]
-    }
-  , { name: "logPlay logs a choice the game rejects without card movements"
-    , test: pure $ assertEquals
-        (movedBy villageToTrash $ ResolveChoice { playerIndex: 0, choice: trashFromHand [ 0, 7 ] })
-        []
-    }
-  , { name: "Remodel, Expand and Mine log what they trashed, then what they gained"
-    , test: all_success <$> traverse trashedThenGained
-        [ { card: Cards.remodel, trashed: Cards.estate, gained: Cards.silver, to: Pile.Discarding }
-        , { card: Cards.expand, trashed: Cards.copper, gained: Cards.silver, to: Pile.Discarding }
-        , { card: Cards.mine, trashed: Cards.copper, gained: Cards.silver, to: Pile.Hand }
-        ]
-    }
-  , { name: "Trading Post logs the two cards it trashed and the Silver it gained"
-    , test: pure
-        let
-          game = withChoiceAndHand Cards.tradingPost [ Cards.copper, Cards.estate, Cards.village ]
-          play = ResolveChoice { playerIndex: 0, choice: chooseCards [ 0, 1 ] $ specialChoice Cards.tradingPost }
-        in assertEquals (movedBy game play)
-          [ { cards: [ "Copper", "Estate" ], from: Pile.Hand, to: Pile.Trash }
-          , { cards: [ "Silver" ], from: Pile.Supply, to: Pile.Hand }
-          ]
-    }
-  , { name: "card movements read as the game log shows them"
-    , test: pure $ all_success
-        [ assertEquals (movementText { cards: [ "Copper" ], from: Pile.Hand, to: Pile.Trash }) "trashed: Copper"
-        , assertEquals (movementText { cards: [ "Gold" ], from: Pile.Supply, to: Pile.Discarding })
-            "gained: Gold to their discard pile"
-        , assertEquals (movementText { cards: [ "Silver" ], from: Pile.Supply, to: Pile.Hand })
-            "gained: Silver to their hand"
-        , assertEquals (movementText { cards: [ "Estate", "Copper" ], from: Pile.Hand, to: Pile.Discard })
-            "discarded: Estate, Copper"
-        , assertEquals (movementText { cards: [], from: Pile.Hand, to: Pile.Trash }) "trashed: nothing"
-        , assertEquals (movementText { cards: [ "Copper" ], from: Pile.Discard, to: Pile.Hand })
-            "moved: Copper from their discard pile to their hand"
-        , assertEquals (movementText { cards: [ "Village" ], from: Pile.Supply, to: Pile.Trash })
-            "trashed from the supply: Village"
-        , assertEquals (movementText { cards: [ "Village" ], from: Pile.Trash, to: Pile.Discarding })
-            "gained from the trash: Village to their discard pile"
-        , assertEquals (movementText { cards: [ "Gold" ], from: Pile.Hand, to: Pile.Deck })
-            "moved: 1 card from their hand to their deck"
-        , assertEquals (movementText { cards: [ "Gold", "Curse" ], from: Pile.Hand, to: Pile.Deck })
-            "moved: 2 cards from their hand to their deck"
-        ]
-    }
-  , { name: "in bot games, the log names every card that entered or left the trash or the supply"
-    , test: all_success <$> traverse (const $ loggedMovesMatchGame 600) (1 .. 3)
-    }
-  , { name: "a choice logged with the names of the cards it moved is read as card movements"
-    , test: pure $ assertEquals
-        (decodeJson $ encodeJson
-          { tag: "ResolvedChoice"
-          , values: [ { choice: trashFromHand [ 0 ], cards: [ "Village" ] } ]
-          })
-        (Right $ ResolvedChoice
-          { choice: trashFromHand [ 0 ]
-          , moved: [ { cards: [ "Village" ], from: Pile.Hand, to: Pile.Trash } ]
-          })
+  , { name: "logPlay names cards a choice moved, and ??? for missing ones"
+    , test: pure $ case logPlay withVillageInHand (ResolveChoice { playerIndex: 0, choice: trashFromHand [ 0, 7 ] }) of
+        Just (ResolvedChoice { cards }) -> assertEquals cards [ "Village", "???" ]
+        other -> Failed $ "unexpected " <> show other
     }
   , { name: "logPlay skips ending a phase and keeps the rest"
     , test: pure $ all_success
@@ -247,9 +177,6 @@ twoPlayers = Game.new 2 Cards.cardMap true
 withVillageInHand :: Game
 withVillageInHand = (Game._player 0 <<< Player._hand .~ [ Card._card Cards.village ]) twoPlayers
 
-villageToTrash :: Game
-villageToTrash = (Game._player 0 <<< Player._choices .~ [ trashFromHand [] ]) withVillageInHand
-
 trashFromHand :: Array Int -> Choice
 trashFromHand indices = MoveFromTo
   { n: UpTo 5
@@ -259,121 +186,6 @@ trashFromHand indices = MoveFromTo
   , resolution: Just indices
   , attack: false
   }
-
-movedBy :: Game -> Play -> Array CardMovement
-movedBy game play = case logPlay game play of
-  Just (ResolvedChoice { moved }) -> moved
-  _ -> []
-
-specialChoice :: CardSpec -> Choice
-specialChoice spec = case (Card._card spec).special of
-  Just { command: Choose choice } -> choice
-  Nothing -> GainBonus { bonus: Cash 0, attack: false, resolution: Nothing }
-
-withChoiceAndHand :: CardSpec -> Array CardSpec -> Game
-withChoiceAndHand card hand = twoPlayers # Game._player 0 %~
-  ( (Player._hand .~ (Card._card <$> hand))
-  >>> (Player._choices .~ [ specialChoice card ])
-  )
-
-chooseCards :: Array Int -> Choice -> Choice
-chooseCards cardIndices = bindFirstStep case _ of
-  StackChooseCards x -> StackChooseCards x { cards = Bound cardIndices }
-  other -> other
-
-chooseFromSupply :: String -> Choice -> Choice
-chooseFromSupply cardName = bindFirstStep case _ of
-  StackChooseCardFromSupply x -> StackChooseCardFromSupply x { cardName = Bound cardName }
-  other -> other
-
-bindFirstStep :: (StackExpression -> StackExpression) -> Choice -> Choice
-bindFirstStep bind = case _ of
-  StackChoice x -> StackChoice x
-    { expression = fromMaybe x.expression $ Array.modifyAt 0 bind x.expression }
-  other -> other
-
-trashedThenGained
-  :: { card :: CardSpec, trashed :: CardSpec, gained :: CardSpec, to :: Pile }
-  -> Effect Result
-trashedThenGained { card, trashed, gained, to } = do
-  let
-    game = withChoiceAndHand card [ trashed, Cards.village ]
-    trash = ResolveChoice { playerIndex: 0, choice: chooseCards [ 0 ] $ specialChoice card }
-    gainedName = (Card._card gained).name
-  eAfterTrash <- runRandomM $ runExceptT $ Engine.makePlay trash game
-  pure case eAfterTrash of
-    Left e -> Failed $ (Card._card card).name <> ": " <> e
-    Right afterTrash ->
-      let
-        gain = ResolveChoice
-          { playerIndex: 0
-          , choice: chooseFromSupply gainedName
-            $ fromMaybe (specialChoice card)
-            $ Array.head (NEA.head afterTrash.players).choices
-          }
-      in all_success
-        [ assertEquals (movedBy game trash)
-            [ { cards: [ (Card._card trashed).name ], from: Pile.Hand, to: Pile.Trash } ]
-        , assertEquals (movedBy afterTrash gain)
-            [ { cards: [ gainedName ], from: Pile.Supply, to } ]
-        ]
-
--- | Plays bots for up to `steps` plays, checking each play's log against the
--- | change it made to the trash and the supply, the piles everyone sees.
-loggedMovesMatchGame :: Int -> Effect Result
-loggedMovesMatchGame steps = runRandomM do
-  eGame <- Engine.makeAutoPlay
-    (NewGame { playerCount: 2, supply: Cards.cardMap, longGame: false })
-    twoPlayers
-  either (pure <<< Failed) (go steps) eGame
-  where
-    bots = [ { playerIndex: 0, strategy: Strategy.Random }, { playerIndex: 1, strategy: Strategy.Random } ]
-    go remaining game = case AI.findBotToAct bots game of
-      Just bot | remaining > 0 -> do
-        ePlay <- AI.generateBotPlay bot game
-        case ePlay of
-          Left e -> pure $ Failed e
-          Right play -> Engine.makeAutoPlay play game >>= case _ of
-            Left e -> pure $ Failed e
-            Right game'
-              | publicChange game game' == loggedChange (logPlay game play) ->
-                  go (remaining - 1) game'
-              | otherwise -> pure $ Failed $ show play
-                  <> " changed the trash and supply by " <> show (publicChange game game')
-                  <> " but was logged as " <> show (logPlay game play)
-      _ -> pure Success
-
-type PublicChange =
-  { intoTrash :: Array String
-  , outOfTrash :: Array String
-  , intoSupply :: Array String
-  , outOfSupply :: Array String
-  }
-
-publicChange :: Game -> Game -> PublicChange
-publicChange before after =
-  { intoTrash: Array.sort $ trashNames after `Array.difference` trashNames before
-  , outOfTrash: Array.sort $ trashNames before `Array.difference` trashNames after
-  , intoSupply: Array.sort $ supplyNames after `Array.difference` supplyNames before
-  , outOfSupply: Array.sort $ supplyNames before `Array.difference` supplyNames after
-  }
-  where
-    trashNames = map _.name <<< _.trash
-    supplyNames = Array.concatMap (\{ card, count } -> Array.replicate count card.name) <<< _.supply
-
-loggedChange :: Maybe LoggedPlay -> PublicChange
-loggedChange logged =
-  { intoTrash: cardsWhere (_.to >>> eq Pile.Trash)
-  , outOfTrash: cardsWhere (_.from >>> eq Pile.Trash)
-  , intoSupply: cardsWhere (_.to >>> eq Pile.Supply)
-  , outOfSupply: cardsWhere (_.from >>> eq Pile.Supply)
-  }
-  where
-    cardsWhere moving = Array.sort $ Array.concatMap _.cards $ Array.filter moving movements
-    movements = case logged of
-      Just (ResolvedChoice { moved }) -> moved
-      Just (Purchased { card }) -> [ { cards: [ card ], from: Pile.Supply, to: Pile.Buying } ]
-      _ -> []
 
 cardChoices :: Array Choice
 cardChoices = mapMaybe (map (_.command >>> commandChoice) <<< _.special) Cards.cardMap
