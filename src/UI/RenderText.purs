@@ -21,12 +21,14 @@ import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Buys (Buys)
 import Domination.Data.Buys as Buys
+import Domination.Data.CardMovement (CardMovement)
 import Domination.Data.Chat (LoggedPlay(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Filter as Filter
 import Domination.Data.Phase (Phase(..))
+import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Points (Points)
 import Domination.Data.Points as Points
@@ -117,7 +119,7 @@ instance loggedPlayRenderText :: RenderText LoggedPlay where
       [ HH.text $ "created a new " <> show playerCount <> " player game" ]
     PlayedCard { card } -> HH.text $ "played: " <> card
     Purchased { card } -> HH.text $ "purchased: " <> card
-    ResolvedChoice { choice, cards } -> renderResolvedChoice cards choice
+    ResolvedChoice { choice, moved } -> renderResolvedChoice moved choice
     Reacted { reaction } -> HH.text case reaction of
       Nothing -> "did not react"
       Just BlockAttack -> "blocked an attack"
@@ -126,9 +128,49 @@ instance loggedPlayRenderText :: RenderText LoggedPlay where
       Just (ReactWithChoice _) -> "reacted with a choice"
     FinishedReacting -> HH.text "finished reacting"
 
--- | A choice a player resolved, with the names of the cards it moved.
-renderResolvedChoice :: forall w i. Array String -> Choice -> HTML w i
-renderResolvedChoice movedCards c =
+-- | A choice a player resolved, told by the cards it moved. A stack choice
+-- | keeps its description, which says what else it did.
+renderResolvedChoice :: forall w i. Array CardMovement -> Choice -> HTML w i
+renderResolvedChoice moved choice = case moved, choice of
+  [], _ -> renderChosen choice
+  _, StackChoice { description } ->
+    HH.text $ description <> " — " <> movementsText moved
+  _, _ -> HH.text $ movementsText moved
+
+movementsText :: Array CardMovement -> String
+movementsText = intercalate "; " <<< map movementText
+
+movementText :: CardMovement -> String
+movementText { cards, from, to } = case from, to of
+  Pile.Supply, Pile.Trash -> "trashed from the supply: " <> names
+  _, Pile.Trash -> "trashed: " <> names
+  Pile.Supply, _ -> "gained: " <> names <> " to their " <> pileName to
+  Pile.Trash, _ -> "gained from the trash: " <> names <> " to their " <> pileName to
+  _, Pile.Supply -> "returned to the supply: " <> names
+  Pile.Hand, Pile.Discard -> "discarded: " <> names
+  Pile.Hand, Pile.Discarding -> "discarded: " <> names
+  _, _ -> "moved: " <> names
+    <> " from their " <> pileName from
+    <> " to their " <> pileName to
+  where
+    names = case cards of
+      [] -> "nothing"
+      _ -> intercalate ", " cards
+
+pileName :: Pile -> String
+pileName = case _ of
+  Pile.Supply -> "supply"
+  Pile.Trash -> "trash"
+  Pile.AtPlay -> "play area"
+  Pile.Buying -> "buying pile"
+  Pile.Deck -> "deck"
+  Pile.Discard -> "discard pile"
+  Pile.Discarding -> "discard pile"
+  Pile.Hand -> "hand"
+
+-- | A resolved choice that moved no cards.
+renderChosen :: forall w i. Choice -> HTML w i
+renderChosen c =
     HH.span_ case c of
       StackChoice { description } -> [ HH.text $ description ]
 
@@ -156,22 +198,7 @@ renderResolvedChoice movedCards c =
       Option { choice } ->
         [ HH.text "chose to optionally ", renderText choice ]
 
-      MoveFromTo
-        { destination, resolution: (Just _) } ->
-        case destination of
-          Pile.Supply -> [ HH.text $ "returned to supply: " ] <> cards
-          Pile.Trash -> [ HH.text $ "trashed: " ] <> cards
-          Pile.Discard -> [ HH.text $ "discarded: " ] <> cards
-          Pile.Discarding -> [ HH.text $ "will discard: " ] <> cards
-          Pile.Hand -> gainedCardsToTheir "hand"
-          Pile.Deck -> gainedCardsToTheir "deck"
-          Pile.AtPlay -> [ HH.text $ "played: " ] <> cards
-          Pile.Buying -> gainedCardsToTheir "buying pile"
-        where
-          gainedCardsToTheir pile = [ HH.text $ "gained: " ]
-            <> cards
-            <> [ HH.text $ " to their " <> pile ]
-          cards = intercalate [ HH.text ", " ] $ pure <<< HH.text <$> movedCards
+      MoveFromTo { resolution: Just _ } -> [ renderText c ]
 
       GainCards { n, cardName } ->
         [ HH.text $ "gain a card " <> show n <> "x " <> cardName ]

@@ -26,27 +26,28 @@ module Domination.Data.Chat
 import Prelude
 
 import Control.Alt ((<|>))
-import Data.Argonaut.Core (stringify)
+import Data.Argonaut.Core (Json, stringify)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Error (JsonDecodeError(..))
 import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Array (filter, length, mapMaybe, scanl, take, takeWhile, (:))
+import Data.Either (Either(..), either)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Fold ((^?))
-import Data.Lens.Index (ix)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Show.Generic (genericShow)
 import Data.String as String
 import Domination.Data.Card as Card
+import Domination.Data.CardMovement (CardMovement)
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Game (Game)
 import Domination.Data.Game as Game
-import Domination.Data.Pile (Pile)
+import Domination.Data.Game.ResolveChoice (choiceMovements)
 import Domination.Data.Play (Play(..))
 import Domination.Data.Player as Player
 import Domination.Data.Reaction (Reaction)
-import Domination.Data.Stack (_stacksToCardsIso)
 import Message (RemoteMessage(..))
 
 type PlayMade = { play :: Play, playerIndex :: Int, state :: Game }
@@ -55,7 +56,7 @@ data LoggedPlay
   = CreatedGame { playerCount :: Int }
   | PlayedCard { card :: String }
   | Purchased { card :: String }
-  | ResolvedChoice { choice :: Choice, cards :: Array String }
+  | ResolvedChoice { choice :: Choice, moved :: Array CardMovement }
   | Reacted { reaction :: Maybe Reaction }
   | FinishedReacting
 
@@ -66,7 +67,23 @@ instance showLoggedPlay :: Show LoggedPlay where
 instance encodeJsonLoggedPlay :: EncodeJson LoggedPlay where
   encodeJson = genericEncodeJson
 instance decodeJsonLoggedPlay :: DecodeJson LoggedPlay where
-  decodeJson = genericDecodeJson
+  decodeJson json = genericDecodeJson json <|> decodeNamedCardsChoice json
+
+-- | Chats saved before card movements were logged hold a resolved choice
+-- | with the names of the cards it moved, which only a `MoveFromTo` did.
+decodeNamedCardsChoice :: Json -> Either JsonDecodeError LoggedPlay
+decodeNamedCardsChoice json = do
+  logged :: { tag :: String, values :: Array { choice :: Choice, cards :: Array String } }
+    <- decodeJson json
+  case logged of
+    { tag: "ResolvedChoice", values: [ { choice, cards } ] } ->
+      Right $ ResolvedChoice { choice, moved: namedCardsMoved choice cards }
+    _ -> Left $ UnexpectedValue json
+
+namedCardsMoved :: Choice -> Array String -> Array CardMovement
+namedCardsMoved choice cards = case choice of
+  MoveFromTo { source, destination } -> [ { cards, from: source, to: destination } ]
+  _ -> []
 
 data ChatEntry
   = Said { sender :: String, text :: String, chatNumber :: Int }
@@ -169,7 +186,9 @@ playedEntry { play, playerIndex, state } =
   Played <<< { playerIndex, play: _ } <$> logPlay state play
 
 -- | What a play did, in the game it was played in. `Nothing` for plays the
--- | log doesn't show (ending a phase).
+-- | log doesn't show (ending a phase). A resolved choice is logged with the
+-- | cards the engine moves when it resolves it, so the log names what any
+-- | card trashed, gained or discarded, however the card is written.
 logPlay :: Game -> Play -> Maybe LoggedPlay
 logPlay state = case _ of
   NewGame { playerCount } -> Just $ CreatedGame { playerCount }
@@ -178,8 +197,9 @@ logPlay state = case _ of
     Just $ PlayedCard { card: handCardName playerIndex cardIndex state }
   Purchase { stackIndex } ->
     Just $ Purchased { card: supplyCardName stackIndex state }
-  ResolveChoice { playerIndex, choice } ->
-    Just $ ResolvedChoice { choice, cards: movedCardNames playerIndex state choice }
+  ResolveChoice resolved@{ choice } ->
+    Just $ ResolvedChoice
+      { choice, moved: either (const []) identity $ choiceMovements resolved state }
   React { reaction } -> Just $ Reacted { reaction }
   DoneReacting _ -> Just FinishedReacting
 
@@ -200,13 +220,3 @@ handCardName playerIndex cardIndex state = fromMaybe unknownCard
 supplyCardName :: Int -> Game -> String
 supplyCardName stackIndex state = fromMaybe unknownCard
   $ _.card.name <$> state ^? Game._stack stackIndex
-
-pileCardName :: Pile -> Int -> Game -> Int -> String
-pileCardName source playerIndex state cardIndex = fromMaybe unknownCard
-  $ _.name <$> state ^? Game._pile source playerIndex <<< _stacksToCardsIso <<< ix cardIndex
-
-movedCardNames :: Int -> Game -> Choice -> Array String
-movedCardNames playerIndex state = case _ of
-  MoveFromTo { source, resolution: Just cardIndices } ->
-    pileCardName source playerIndex state <$> cardIndices
-  _ -> []

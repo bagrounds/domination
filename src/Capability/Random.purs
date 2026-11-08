@@ -13,6 +13,7 @@ import Prelude
 
 import Control.Monad.Except.Trans (ExceptT)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Writer.Trans (WriterT)
 import Data.Array (drop, fromFoldable, length, take, uncons, (!!))
 import Data.Foldable (class Foldable)
 import Data.Maybe (Maybe)
@@ -63,6 +64,13 @@ instance exceptTStringRandomM
   :: Random m => Random (ExceptT String m) where
   shuffle xs = pure xs >>= lift <<< shuffle
   randomElement xs = pure xs >>= lift <<< randomElement
+  randomIntBetween a = lift <<< randomIntBetween a
+  randomBoolean = lift randomBoolean
+
+instance writerTRandom
+  :: (Monoid w, Random m) => Random (WriterT w m) where
+  shuffle = lift <<< shuffle
+  randomElement = lift <<< randomElement
   randomIntBetween a = lift <<< randomIntBetween a
   randomBoolean = lift randomBoolean
 

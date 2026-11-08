@@ -1574,7 +1574,8 @@ mill = let
 secretChamber :: CardSpec
 secretChamber = let
   attack = false
-  description = "Move 2 cards from your hand to the top of your deck."
+  description = "Discard any number of cards. +$1 per card discarded."
+  reactionDescription = "Move 2 cards from your hand to the top of your deck."
   in independentCard $ Card.actionReaction
   { name = "Secret Chamber"
   , cost = 2
@@ -1614,7 +1615,7 @@ secretChamber = let
         ]
       , stack: []
       , attack
-      , description
+      , description: reactionDescription
       }
    ) $ "When another player plays an Attack card, you may reveal"
     <> " this from your hand. If you do, +2 Cards, then put 2"
