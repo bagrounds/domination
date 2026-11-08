@@ -3,7 +3,10 @@
 **Source:** [#28 Repro Browser Crash](https://github.com/bagrounds/domination/issues/28),
 reproduced with `e2e/chaos.js --scenario turns`
 
-**Status:** Open (reproduced, not fixed)
+**Status:** Closed (fixed on 2026-11-07 in v0.43.0). R1, R2, R3, R4a, R5 and R6 of the
+[storage design](../../docs/2026-11-07-browser-crash-storage-design.md) are implemented:
+save errors go to the console only, name the key and size instead of the value, and the
+chat is bounded by size. Results are in §10 of the design.
 
 ## Description
 
@@ -90,7 +93,9 @@ The journal is in `e2e/runs/turns-mailbox-<seed>/journal.txt`. The devices' pers
 
 ## Acceptance Criteria
 
-- [ ] A property test: for any chat and any sequence of failing saves, the chat and every
-      error message stay below a fixed size.
-- [ ] `node chaos.js --scenario turns --seed 41 --steps 20 --fill-storage-kb 3500 --heap-mb 512`
+- [x] A property test: for any chat and any sequence of failing saves, the chat and every
+      error message stay below a fixed size (`test/Chat.purs`: errors no longer enter the
+      chat, the chat stays within 250 entries and 100,000 characters, and a failure message
+      stays within its key length plus 300 characters).
+- [x] `node chaos.js --scenario turns --seed 41 --steps 20 --fill-storage-kb 3500 --heap-mb 512`
       runs without a crash, and so does a 120-turn run without filler.

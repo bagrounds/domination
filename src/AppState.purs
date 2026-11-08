@@ -33,6 +33,7 @@ import Domination.Data.Mailbox (Sync, initialSync)
 import Domination.Data.Resync (Marks, initialMarks)
 import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
+import Domination.Data.Chat (Chat, emptyChat)
 import Message (RemoteMessage)
 
 type ClientInfo =
@@ -69,7 +70,7 @@ type AppState =
   , username :: String
   , usernames :: HashMap String String
   , message :: String
-  , messages :: Array RemoteMessage
+  , messages :: Chat
   , chatNumber :: Int
   , gameOn :: Boolean
   , maybeBroadcaster :: Maybe WebSocketBroadcaster
@@ -108,7 +109,7 @@ _cardSpecCard = _cardSpec <<< _card
 
 _id :: Lens' AppState String
 _id = prop (Proxy :: Proxy "id")
-_messages :: Lens' AppState (Array RemoteMessage)
+_messages :: Lens' AppState Chat
 _messages = prop (Proxy :: Proxy "messages")
 _message :: Lens' AppState String
 _message = prop (Proxy :: Proxy "message")
@@ -224,7 +225,7 @@ newApp =
   , serverUrl: defaultServerUrl
   , usernames: HashMap.empty
   , message: ""
-  , messages: []
+  , messages: emptyChat
   , chatNumber: 0
   , gameOn: false
   , maybeBroadcaster: Nothing

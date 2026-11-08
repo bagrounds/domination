@@ -85,8 +85,8 @@ The property-based tests belong in the fix, as pure tests in PureScript: "for an
 
 ## 🐛 Issues Filed
 
-- 🔁 [Storage errors snowball through chat until the tab runs out of memory](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-07-browser-crash-storage-error-chat-loop.md): the crash, with evidence and reproduction commands.
-- 🗂️ [Chat history holds a full game per play and outgrows localStorage](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-07-browser-crash-chat-history-unbounded.md): what fills the quota in the first place.
+- 🔁 [Storage errors snowball through chat until the tab runs out of memory](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-07-browser-crash-storage-error-chat-loop.md): the crash, with evidence and reproduction commands.
+- 🗂️ [Chat history holds a full game per play and outgrows localStorage](https://github.com/bagrounds/domination/blob/master/issues/closed/2026-11-07-browser-crash-chat-history-unbounded.md): what fills the quota in the first place.
 - ✅ [Choice "Done" buttons accept invalid selections without feedback](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-07-browser-crash-choice-done-accepts-invalid.md): unrelated to the crash. These are the caught choice-validation errors in the original report's log.
 - 🔬 [Instrumentation to catch memory and storage trouble early](https://github.com/bagrounds/domination/blob/master/issues/open/2026-11-07-browser-crash-instrumentation.md): the app's own debug log missed this crash. It stopped persisting once the quota was full, never logged the first error, and cuts every line to 1000 characters, so a 99 M-character error looks ordinary. The issue proposes logging sizes instead of values, per-key storage usage and heap size in the bug report, a long-task observer, reserved room for the debug log, and a short chaos job in CI.
 

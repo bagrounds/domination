@@ -13,30 +13,26 @@ module Domination.UI.RenderText where
 import Prelude
 
 import Data.Array (intercalate)
-import Data.Lens ((^?), (^.))
-import Data.Lens.Index (ix)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Lens ((^.))
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), snd)
 import Domination.Data.Actions (Actions)
 import Domination.Data.Actions as Actions
 import Domination.Data.Bonus (Bonus(..))
 import Domination.Data.Buys (Buys)
 import Domination.Data.Buys as Buys
+import Domination.Data.Chat (LoggedPlay(..))
 import Domination.Data.Choice (Choice(..))
 import Domination.Data.Condition (Condition(..))
 import Domination.Data.Constraint (Constraint(..))
 import Domination.Data.Filter as Filter
-import Domination.Data.Game (Game)
-import Domination.Data.Game as Game
 import Domination.Data.Phase (Phase(..))
-import Domination.Data.Pile (Pile)
 import Domination.Data.Pile as Pile
 import Domination.Data.Points (Points)
 import Domination.Data.Points as Points
 import Domination.Data.Reaction (Reaction(..))
 import Domination.Data.Result (Result(..))
 import Domination.Data.SelectCards (SelectCards(..))
-import Domination.Data.Stack (_stacksToCardsIso)
 import Domination.Data.Wire.Int as Int
 import Domination.UI.Icons as Icons
 import Domination.UI.Util (h2__)
@@ -44,14 +40,6 @@ import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Util ((.^))
 import Version (Version(..))
-
-class RenderTextInContext a where
-  renderTextInContext
-    :: forall w i
-    . Int
-    -> Game
-    -> a
-    -> HTML w i
 
 class RenderText a where
   renderText :: forall w i. a -> HTML w i
@@ -123,9 +111,24 @@ instance conditionRenderText :: RenderText Condition where
       where
         percentString = show $ percent .^ Int._toWire
 
-instance choiceRenderTextInContext
-  :: RenderTextInContext Choice where
-  renderTextInContext playerIndex state c =
+instance loggedPlayRenderText :: RenderText LoggedPlay where
+  renderText = case _ of
+    CreatedGame { playerCount } -> HH.span_
+      [ HH.text $ "created a new " <> show playerCount <> " player game" ]
+    PlayedCard { card } -> HH.text $ "played: " <> card
+    Purchased { card } -> HH.text $ "purchased: " <> card
+    ResolvedChoice { choice, cards } -> renderResolvedChoice cards choice
+    Reacted { reaction } -> HH.text case reaction of
+      Nothing -> "did not react"
+      Just BlockAttack -> "blocked an attack"
+      Just (ReactWithChoice (StackChoice { description })) ->
+        "reacted: " <> description
+      Just (ReactWithChoice _) -> "reacted with a choice"
+    FinishedReacting -> HH.text "finished reacting"
+
+-- | A choice a player resolved, with the names of the cards it moved.
+renderResolvedChoice :: forall w i. Array String -> Choice -> HTML w i
+renderResolvedChoice movedCards c =
     HH.span_ case c of
       StackChoice { description } -> [ HH.text $ description ]
 
@@ -154,7 +157,7 @@ instance choiceRenderTextInContext
         [ HH.text "chose to optionally ", renderText choice ]
 
       MoveFromTo
-        { source, destination, resolution: (Just cardIndices) } ->
+        { destination, resolution: (Just _) } ->
         case destination of
           Pile.Supply -> [ HH.text $ "returned to supply: " ] <> cards
           Pile.Trash -> [ HH.text $ "trashed: " ] <> cards
@@ -168,10 +171,7 @@ instance choiceRenderTextInContext
           gainedCardsToTheir pile = [ HH.text $ "gained: " ]
             <> cards
             <> [ HH.text $ " to their " <> pile ]
-          cards = intercalate [ HH.text ", " ]
-            $ pure
-            <<< getCardName source playerIndex state
-            <$> cardIndices
+          cards = intercalate [ HH.text ", " ] $ pure <<< HH.text <$> movedCards
 
       GainCards { n, cardName } ->
         [ HH.text $ "gain a card " <> show n <> "x " <> cardName ]
@@ -306,20 +306,6 @@ instance choiceRenderText :: RenderText Choice where
       [ HH.text "Discard your hand" ]
 
     Draw { n } -> [ HH.text $ "+" <> show n, Icons.cards ]
-
-getCardName
-  :: forall w i
-  . Pile
-  -> Int
-  -> Game
-  -> Int
-  -> HTML w i
-getCardName source playerIndex state cardIndex = HH.text
-  $ fromMaybe "???"
-  $ _.name
-  <$> state
-  ^? Game._pile source playerIndex <<< _stacksToCardsIso
-  <<< ix cardIndex
 
 parenthesize :: forall w i. HTML w i -> Array (HTML w i)
 parenthesize s = [ HH.text "(", s, HH.text ")" ]

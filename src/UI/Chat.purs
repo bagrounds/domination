@@ -20,13 +20,13 @@ import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Message (RemoteMessage(..))
-import Message as Message
+import Domination.Data.Chat (Chat, ChatEntry(..), entries)
+import Domination.UI.RenderText (renderText)
 import Web.UIEvent.KeyboardEvent as KE
 
 type State r =
   { usernames :: HashMap String String
-  , messages :: Array RemoteMessage
+  , messages :: Chat
   , message :: String
   | r
   }
@@ -45,19 +45,7 @@ render { sendEvent, onInput, state, nothing } =
   [ HP.class_ $ ClassName "chat" ]
   [ HH.div
     [ HP.class_ $ ClassName "chat-history" ]
-    $
-    ( Message.renderHtml
-      <<< case _ of
-        ChatMessage { username, message, chatNumber } ->
-          ChatMessage
-            { username: fromMaybe username
-              $ HashMap.lookup username usernames
-            , message
-            , chatNumber
-            }
-        y -> y
-      <$> messages
-    )
+    $ renderEntry usernames <$> entries messages
   , HH.div
     [ HP.class_ $ ClassName "chat-form"]
     [ HH.button
@@ -79,3 +67,25 @@ render { sendEvent, onInput, state, nothing } =
       ]
     ]
   ]
+
+renderEntry :: forall s a. HashMap String String -> ChatEntry -> HTML s a
+renderEntry usernames = case _ of
+  Said { sender, text } ->
+    renderSaid (fromMaybe sender $ HashMap.lookup sender usernames) text
+  Notice { text } -> renderSaid noticeSender text
+  Played { playerIndex, play } -> HH.div
+    [ HP.class_ $ ClassName "play-made-message" ]
+    [ HH.text $ "Player " <> show (playerIndex + 1) <> ": "
+    , HH.span [ HP.class_ $ ClassName "play-made" ] [ renderText play ]
+    ]
+
+renderSaid :: forall s a. String -> String -> HTML s a
+renderSaid username text = HH.div
+  [ HP.class_ $ ClassName "chat-message" ]
+  [ HH.span [ HP.class_ $ ClassName "username" ] [ HH.text username ]
+  , HH.text ": "
+  , HH.span [ HP.class_ $ ClassName "message" ] [ HH.text text ]
+  ]
+
+noticeSender :: String
+noticeSender = "📬"

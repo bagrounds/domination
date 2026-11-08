@@ -22,9 +22,10 @@ import Data.Array (elem, length, take)
 import Data.Foldable (traverse_)
 import Data.Foldable as Foldable
 import Data.Bifunctor (rmap)
-import Data.Either (Either(..), either, hush)
+import Data.Either (Either(..), either, hush, isRight)
 import Data.HashMap as HashMap
 import Data.Map as Map
+import Data.String as String
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Data.Lens.Getter (view)
 import Data.Lens.Prism (review)
@@ -47,6 +48,7 @@ import Domination.Capability.Timer (class Timer, createTimer)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Backoff as Backoff
 import Domination.Data.Card (CardSpec)
+import Domination.Data.Chat (ChatEntry(..), chatLimits, emptyChat, record, recordPlay)
 import Domination.Data.Game (Game)
 import Domination.Data.LogicalClock (Verdict(..), judge, savedBeforeVersions, senderVersion, tick, versionSender)
 import Domination.Data.Mailbox (Delivery(..), Dirty(..), PullOutcome(..), Settlement(..), Stamp(..), Status(..), Sync, deliveryStamp, initialSync, interpretDelivery, interpretPull, isClean, mailboxBackoff, mailboxRoomUrl, overtakes, ownChange, printRevisionTag, pullCursor, receiveFrame, senderStamp, settleDelivery, settlePull, stampSender, status)
@@ -83,7 +85,6 @@ import Halogen.Query.HalogenM (HalogenM)
 import Halogen.VDom.Driver (runUI)
 import Message (RemoteMessage(..), WireEnvelope)
 import Message as Message
-import Util ((:~))
 import Web.Event.Event (EventType(..))
 import Web.HTML.Event.BeforeUnloadEvent.EventTypes as ET
 import Web.HTML.HTMLDocument as HTMLDocument
@@ -121,9 +122,6 @@ gameVersionKey = "game_version"
 
 mailboxTimeoutMs :: Int
 mailboxTimeoutMs = 5000
-
-mailboxNoticeSender :: String
-mailboxNoticeSender = "📬"
 
 caughtUpNotice :: String
 caughtUpNotice = "(caught up: the game changed while you were away)"
@@ -303,7 +301,7 @@ handleAction audioContext = case _ of
         log $ "Initialize: no existing uuid found, generating a new one."
           <> " error: " <> e
         uuid <- genUuid
-        save uuidKey uuid >>= logErrorToChat
+        save uuidKey uuid >>= reportSaveFailure
         pure $ show uuid
       Right uuid -> pure uuid
 
@@ -379,7 +377,7 @@ handleAction audioContext = case _ of
     messages <- case eMessages of
       Left e -> do
         log $ "Initialize: Failed to load messages. Error: " <> e
-        pure []
+        pure emptyChat
       Right m -> pure m
 
     log "Initialize: modify a bunch of stuff..."
@@ -397,6 +395,8 @@ handleAction audioContext = case _ of
       >>> (_messages .~ messages)
       >>> (_renameProposals .~ renameProposals)
     log "Initialize: done modifying a bunch of stuff..."
+    -- Rewrites a chat saved in the old format, which held a game per play.
+    when (isRight eMessages) $ saveChat >>= reportSaveFailure
 
     eMailboxUrl <- load mailboxUrlKey
     mailboxUrl <- either
@@ -501,14 +501,14 @@ handleAction audioContext = case _ of
       cardsToKeep = take 16 $ _.cardSpec <$> shuffledKingdom
       newKingdom = selectIfElement cardsToKeep <$> kingdom
     H.modify_ $ _dominationConfig <<< _kingdom .~ newKingdom
-    save "kingdom" newKingdom >>= logErrorToChat
+    save "kingdom" newKingdom >>= reportSaveFailure
     where
       selectIfElement :: Array CardSpec -> CardSpecSelection -> CardSpecSelection
       selectIfElement keepers { cardSpec } =
         { cardSpec, selected: cardSpec `elem` keepers }
 
   ChooseKingdom kingdom -> do
-    save "kingdom" kingdom >>= logErrorToChat
+    save "kingdom" kingdom >>= reportSaveFailure
     H.modify_ $ _dominationConfig <<< _kingdom .~ kingdom
 
   ToggleLongGame ->
@@ -527,7 +527,7 @@ handleAction audioContext = case _ of
   WriteBotDelay delay -> do
     let botDelay = clampBotDelay delay
     H.modify_ $ _dominationConfig <<< _botDelay .~ botDelay
-    save "bot_delay" botDelay >>= logErrorToChat
+    save "bot_delay" botDelay >>= reportSaveFailure
     configureBots
 
   SwitchSettingsTab tab -> do
@@ -560,7 +560,7 @@ handleAction audioContext = case _ of
 
   ProposeRename target text -> do
     { renameProposals } <- H.modify $ _renameProposals %~ proposeRename target text
-    save renameProposalsKey renameProposals >>= logErrorToChat
+    save renameProposalsKey renameProposals >>= reportSaveFailure
 
   CopyRenameMapping -> do
     proposals <- H.gets _.renameProposals
@@ -568,7 +568,7 @@ handleAction audioContext = case _ of
 
   ClearRenameProposals -> do
     H.modify_ $ _renameProposals .~ Map.empty
-    save renameProposalsKey (Map.empty :: Proposals) >>= logErrorToChat
+    save renameProposalsKey (Map.empty :: Proposals) >>= reportSaveFailure
 
   StartNewGame -> do
     config <- H.gets _.dominationConfig
@@ -580,12 +580,12 @@ handleAction audioContext = case _ of
     H.modify_ $ _showMenu .~ false
 
   WriteServerUrl serverUrl -> do
-    save serverUrlKey serverUrl >>= logErrorToChat
+    save serverUrlKey serverUrl >>= reportSaveFailure
     log $ "saving server URL: " <> serverUrl
     H.modify_ $ set _serverUrl serverUrl
 
   WriteMailboxUrl mailboxUrl -> do
-    save mailboxUrlKey mailboxUrl >>= logErrorToChat
+    save mailboxUrlKey mailboxUrl >>= reportSaveFailure
     H.modify_ $ _mailboxUrl .~ mailboxUrl
 
   DeliverMailbox -> deliverMailbox
@@ -608,7 +608,7 @@ handleAction audioContext = case _ of
 
   WriteUsername username -> do
     { id } <- H.get
-    save usernameKey username >>= logErrorToChat
+    save usernameKey username >>= reportSaveFailure
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
     sendMessage $ UsernameMessage { username, id }
@@ -636,7 +636,7 @@ handleAction audioContext = case _ of
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
       case playMade of
-        Just x -> H.modify_ $ _messages :~ (PlayMadeMessage x)
+        Just x -> H.modify_ $ _messages %~ recordPlay x
         Nothing -> pure unit
       queryGame $ LoadActiveState activeState
       saveGame activeState
@@ -683,11 +683,9 @@ handleAction audioContext = case _ of
           log $ "username incoming: " <> username
           H.modify_ $ over _usernames
             $ HashMap.insert id username
-        ChatMessage { message } -> do
-          H.modify_
-            $ (_messages :~ msg)
-            >>> (_messages %~ take 250)
-          saveChat >>= logErrorToChat
+        ChatMessage { username: sender, message, chatNumber } -> do
+          H.modify_ $ _messages %~ record (Said { sender, text: message, chatNumber })
+          saveChat >>= reportSaveFailure
           if message == "PING"
             then do
               H.modify_ $ _message .~ "PONG"
@@ -760,8 +758,8 @@ handleAction audioContext = case _ of
     shareGame = publishGame <<< toGameMessage
     saveGame activeState = do
       room <- H.gets _.room
-      save (scopedKey room $ undoKey $ activeState.i `mod` 10) activeState >>= logErrorToChat
-      save (scopedKey room gameStateKey) activeState >>= logErrorToChat
+      save (scopedKey room $ undoKey $ activeState.i `mod` 10) activeState >>= reportSaveFailure
+      save (scopedKey room gameStateKey) activeState >>= reportSaveFailure
     queryGame state = do
       _ <- H.query
         Domination._component
@@ -772,26 +770,21 @@ handleAction audioContext = case _ of
       { id, message, chatNumber: oldChatNumber } <- H.get
       let
         chatNumber = oldChatNumber + 1
-        chat = ChatMessage { username: id, message, chatNumber }
+        text = String.take chatLimits.maxTextChars message
+        chat = ChatMessage { username: id, message: text, chatNumber }
       H.modify_
-        $ (_message .~ "") <<< (_messages :~ chat) <<< (_chatNumber .~ chatNumber)
-      -- if we log errors to chat while sending messages: infinite loop?
-      errorOrUnit <- saveChat
-      case errorOrUnit of
-        Left errorMessage -> error errorMessage
-        Right _ -> pure unit
+        $ (_message .~ "")
+        <<< (_messages %~ record (Said { sender: id, text, chatNumber }))
+        <<< (_chatNumber .~ chatNumber)
+      saveChat >>= reportSaveFailure
       sendMessage chat
-    logErrorToChat result = case result of
-      Left err -> do
-        H.modify_ $ _message .~ ("ERROR: " <> err)
-        sendChatMessage
-      Right _ -> pure unit
+    reportSaveFailure = either error pure
     updateRoster changeRoster = do
       H.modify_ $ _dominationConfig %~ changeRoster
       { nextPlayerIndex, nextPlayerCount, botStrategies } <- H.gets _.dominationConfig
-      save "player_index" nextPlayerIndex >>= logErrorToChat
-      save "player_count" nextPlayerCount >>= logErrorToChat
-      save "bot_strategies" botStrategies >>= logErrorToChat
+      save "player_index" nextPlayerIndex >>= reportSaveFailure
+      save "player_count" nextPlayerCount >>= reportSaveFailure
+      save "bot_strategies" botStrategies >>= reportSaveFailure
     configureBots = do
       { botStrategies, botDelay } <- H.gets _.dominationConfig
       queryGame $ ConfigureBots { botStrategies, botDelay }
@@ -802,13 +795,11 @@ handleAction audioContext = case _ of
     setSync sync = do
       modifySession _ { sync = sync }
       room <- H.gets _.room
-      save (scopedKey room mailboxSyncKey) sync >>= logErrorToChat
+      save (scopedKey room mailboxSyncKey) sync >>= reportSaveFailure
     markReachable = modifySession _ { failures = 0, unreachable = false }
     notify message = do
-      H.modify_
-        $ (_messages :~ ChatMessage { username: mailboxNoticeSender, message, chatNumber: 0 })
-        >>> (_messages %~ take 250)
-      saveChat >>= logErrorToChat
+      H.modify_ $ _messages %~ record (Notice { text: message })
+      saveChat >>= reportSaveFailure
     applyGame msg = case msg of
       GameMessage { i, state, playMade } -> do
         firstGame <- H.gets \st -> isGameRoom st.room && isNothing st.mailbox.outbox
@@ -823,7 +814,7 @@ handleAction audioContext = case _ of
             }
           H.modify_ $ _showMenu .~ false
         queryGame $ ReceiveGame { i, state }
-        traverse_ (\x -> H.modify_ $ _messages :~ PlayMadeMessage x) playMade
+        traverse_ (\x -> H.modify_ $ _messages %~ recordPlay x) playMade
         modifySession \session -> session
           { outbox = Just msg, adoptions = session.adoptions + 1 }
       _ -> pure unit
@@ -847,7 +838,7 @@ handleAction audioContext = case _ of
     setVersion version = do
       modifySession _ { version = Just version }
       room <- H.gets _.room
-      save (scopedKey room gameVersionKey) version >>= logErrorToChat
+      save (scopedKey room gameVersionKey) version >>= reportSaveFailure
     -- Without a mailbox, the newest version wins (Domination.Data.LogicalClock):
     -- whoever joins and whoever sees them join offer their games, and each
     -- side takes only a game ahead of its own.

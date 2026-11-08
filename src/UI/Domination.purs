@@ -63,6 +63,7 @@ import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
+import Domination.Data.Chat (logPlay)
 import Domination.UI.Util (acknowledge, chooseOne, h1__)
 import Halogen as H
 import Halogen.Component (ComponentSlot)
@@ -74,7 +75,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (HalogenM)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Message (describePlay)
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -271,7 +271,7 @@ renderBotOverlay { botConfig: { botDelay }, pendingBotPlay } =
             , HH.span
               [ HP.class_ $ HH.ClassName "play-made" ]
               [ fromMaybe (HH.text $ "ends the " <> phaseName pending.state.phase)
-                $ describePlay pending.state pending.play
+                $ renderText <$> logPlay pending.state pending.play
               ]
             ]
           ]

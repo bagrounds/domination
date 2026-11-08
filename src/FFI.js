@@ -253,7 +253,7 @@ export const setItem = left => right => unit => key => value => storage => () =>
     storage.setItem(key, value)
     return right(unit)
   } catch (e) {
-    return left(`Error: setItem: key='${key}', value='${value}', error message: '${e.message || e}'`)
+    return left(e && e.name ? `${e.name}: ${e.message}` : String(e))
   }
 }
 

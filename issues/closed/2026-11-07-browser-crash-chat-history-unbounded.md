@@ -3,7 +3,10 @@
 **Source:** [#28 Repro Browser Crash](https://github.com/bagrounds/domination/issues/28),
 found with `e2e/chaos.js --scenario turns`
 
-**Status:** Open (not fixed)
+**Status:** Closed (fixed on 2026-11-07 in v0.43.0) by R3 and R4a of the
+[storage design](../../docs/2026-11-07-browser-crash-storage-design.md): plays are logged by
+card name (`Domination.Data.Chat`), and `record` bounds the chat on every path. The chat is
+still saved on every notice; at a few kB that's cheap, so it's not debounced.
 
 ## Description
 
@@ -40,6 +43,6 @@ slow on phones even before the quota runs out.
 
 ## Acceptance Criteria
 
-- [ ] A property test: after any sequence of plays, applied games, notices and chats, the
-      encoded chat stays below a fixed size (for example 256 kB).
-- [ ] A 120-turn `node chaos.js --scenario turns` run never shows `Error saving to local storage`.
+- [x] A property test: after any sequence of plays, applied games, notices and chats, the
+      encoded chat stays below a fixed size (100,000 characters plus the JSON separators).
+- [x] A 120-turn `node chaos.js --scenario turns` run never shows `Error saving to local storage`.
