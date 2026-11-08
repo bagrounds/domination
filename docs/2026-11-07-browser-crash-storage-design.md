@@ -370,3 +370,83 @@ this fix:
   already uses LZString), or evicting rooms not used for a while.
 - **The rest of the instrumentation issue:** quota usage per key in the bug report, a
   long-task observer, and a CI chaos job.
+
+## 10. Results
+
+Implemented in v0.43.0: R1, R2, R3, R4a, R5 and R6. R4b wasn't chosen.
+
+### 10.1 What Changed
+
+| ID | Where | What |
+| --- | --- | --- |
+| R1 | `src/Main.purs` | `logErrorToChat` is now `reportSaveFailure = either error pure`. A failed save goes to the console, and from there to the debug log. It no longer goes into the chat, isn't broadcast, and doesn't overwrite the text box. |
+| R2 | `src/FFI.js`, `src/Capability/Storage.purs` | `setItem` returns only the browser's `name: message`. `saveFailureMessage` reports the key, the value's length and at most 200 characters of the browser's error. |
+| R3 | `src/Data/Chat.purs` | `Chat` is a newtype whose constructor isn't exported. `record` and the decoder are the only ways to build one, and both keep at most 250 entries and 100,000 encoded characters, using `keepNewestWithin`. Chat and notice text is cut to 500 characters, and the sender to 100. |
+| R4a | `src/Data/Chat.purs`, `src/UI/Chat.purs`, `src/Main.purs` | Plays are logged as `LoggedPlay`, built by the pure `logPlay :: Game -> Play -> Maybe LoggedPlay`, with card names looked up when the play is logged. Notices are `Notice` entries. The wire format is unchanged: a received `playMade` is logged the same way. |
+| R4a migration | `src/Data/Chat.purs` (`DecodeJson Chat`), `src/Main.purs` `Initialize` | A chat saved in the old `RemoteMessage` format is converted when the room is opened (`fromRemoteMessage`), then bounded and saved straight away, which frees the space the old chat took. |
+| R5 | `src/DebugLog.js` | `debug_log` and `sync_journal` keep a running character count and drop their oldest lines while over 200,000 or 400,000 characters, as well as over 400 or 1,500 lines. |
+| R6 | `src/DebugLog.js` | When writing a buffer to localStorage fails, it drops its older half, adds a `WARN … localStorage is full, dropped the oldest N of M lines` line, and tries once more. It doesn't retry a failing write every second. |
+
+Two limits differ from the plan in §6 and §8: the sender is cut to 100 characters too, and
+the property test bounds a logged play at 4,000 characters rather than 2,000.
+
+### 10.2 Tests
+
+`test/Chat.purs` adds 13 tests, 7 of them QuickCheck properties:
+
+- `keepNewestWithin` keeps the longest leading run within both limits.
+- For any entries, the encoded chat stays within 250 entries and 100,251 characters
+  (the 100,000 budget plus the commas and brackets).
+- A chat filled past its limits still keeps the newest entry.
+- Chat text and senders are cut to their limits.
+- A logged play stays under 4,000 characters, whatever the size of the game.
+- A chat survives encoding and decoding.
+- A failed save's message is at most the key's length + 300 characters and never
+  contains the value.
+- Examples: `logPlay` names the card played, the card bought and the cards a choice moved
+  (`???` for a missing one); it skips ending a phase; an old-format chat is read with
+  plays logged by name; `recordPlay` ignores ending a phase.
+
+To check that the size property catches a regression, I broke the size limit on purpose,
+and it failed. The full suite passes: 515 of 515.
+
+There's still no JS test runner for `src/`, so R5 and R6 were checked through the
+browser runs below.
+
+### 10.3 Size
+
+In a browser check, the whole chat for a short session was 4,312 characters. Before, a
+single play was about 48,000 (§2.3).
+
+### 10.4 Crash Runs
+
+`e2e/chaos.js --scenario turns`, the reproducer from the
+[bug](../issues/closed/2026-11-07-browser-crash-storage-error-chat-loop.md):
+
+| Run | Before | Now |
+| --- | --- | --- |
+| Seeds 41, 7 and 3, 20 turns, `--fill-storage-kb 3500 --heap-mb 512` | all three crashed in 47–65 s | all pass |
+| Seed 42, 120 turns, `--fill-storage-kb 3500` | crashed; without filler it already crashed at 418 s with a 4,022 MB heap | passes: 1,598 plays, peak heap 54 MB, no save errors |
+| Seed 43, 120 turns, no filler | crashed at 141 s | passes |
+
+### 10.5 What the Harder Runs Found
+
+I also tried harsher settings:
+
+| Run | Result |
+| --- | --- |
+| `--scenario chaos --room mailbox --runs 3 --seed 100 --steps 300 --heap-mb 256 --fill-storage-kb 4800` | 2 of 3 runs (seeds 100 and 102) never converged |
+| A long mailbox run, seed 200, 800 steps | passes |
+| Two relay-only runs with `--fill-storage-kb 4000` | pass |
+
+No tab crashed. The two failures are a different bug. With storage almost full, a
+device's game save (about 50 kB) fails on the quota, but its small mailbox sync record
+still saves, saying "up to date at revision N". After a reload the device has the
+older game, the mailbox answers "unchanged", and the device stays a play behind
+indefinitely. The short save errors from R2 made this easy to read in the journal.
+
+A full quota isn't only a test setting. Nothing ever removes a room's saved data, and
+each room keeps about 550 kB of saved games (§9), so about nine rooms fill the 5 MB
+quota. That bug is filed, with evidence and suggested fixes, as
+[a failed game save leaves a device a play behind](../issues/open/2026-11-07-async-play-stale-game-after-failed-save.md).
+It isn't fixed here.
