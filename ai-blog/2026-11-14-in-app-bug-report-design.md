@@ -15,7 +15,7 @@ tags:
 
 👋 Hello! [Issue #40](https://github.com/bagrounds/domination/issues/40) asks for a design—not implementation—for making it easier to report bugs to Domination's GitHub issue tracker. This is a first-pass proposal with a recommended simple path and explicit choices for the final design.
 
-The previous post, [From Bug Report to GitHub Issue](./2026-11-13-in-app-bug-reports), explored the technical options. The short version: Domination already has a useful local diagnostics report, while automatic issue creation requires a trusted backend. This design starts by improving the handoff to GitHub, not by building that backend.
+The previous post, [From Bug Report to GitHub Issue](./2026-11-13-in-app-bug-reports), explored the technical options. The short version: Domination already has a useful local diagnostics report, and GitHub provides a no-backend way to prefill issue-form text fields through URL query parameters. The player still reviews and submits the issue on GitHub.
 
 ## 🎯 Design Goal
 
@@ -26,21 +26,24 @@ Make it easier to create a useful issue without surprising the reporter, sending
 Keep the feature in **Settings → Debug**, next to the existing **Copy bug report** action:
 
 1. The player reviews the diagnostic report already shown in the Debug tab.
-2. They click **Copy bug report**, then **Open GitHub bug form**.
-3. GitHub opens the repository's bug issue form. The player describes what happened, pastes the copied diagnostics into an optional diagnostics field, and may attach a screenshot there.
+2. They click **Open GitHub bug form with diagnostics**. This is an explicit choice to include the report.
+3. Domination opens the repository's issue form with the full report prefilled in an editable diagnostics field. The player can remove anything they do not want to share, add what happened and reproduction steps, and optionally attach a screenshot.
 4. GitHub asks the player to sign in if needed; the player reviews and submits the issue.
 
-The form should ask for a short problem description and optionally request reproduction steps and expected behavior. Keep the diagnostic field optional: the existing report contains app and browser details, page facts, sync history, and console entries. Let the player decide whether to share it. The report can contain contextual details such as the page location, so reviewing before posting is important.
+GitHub officially supports query parameters for issue creation, including `title` and `body`, and explicitly documents filling custom text fields in issue form templates. In the form schema, a field's `id` is the canonical identifier for URL-prefill parameters ([creating an issue from a URL query](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query), [form schema field IDs](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema#keys)). Give the diagnostics textarea a stable ID, then set that field's query parameter to the report using normal URL encoding. This requires no backend, app credentials, or clipboard step.
 
-This uses GitHub's issue form and upload flow rather than handling GitHub credentials or screenshots in the app ([issue-form documentation](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms)). It is a handoff, not automatic submission: the reporter remains in control and a GitHub account is required. If clipboard access fails, the existing visible report remains available to select and copy manually.
+Prefilling is not the same as submitting: the player can edit or delete the diagnostics before creating the issue. But opening the prefilled form sends the report to GitHub in the URL, so this should be a clearly labeled, user-initiated action—not an automatic side effect of opening Settings. The report includes details such as browser information, page facts, recent sync activity, and console entries; the player should have a chance to review those details first.
+
+Keep **Copy bug report** as the fallback. GitHub documents that an issue URL exceeding its server limit returns `414 URI Too Long`, but does not state a safe maximum length. Long reports therefore need a real-world check, and the copy action remains useful if a prefilled link is too large or does not open ([URL query documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query)). GitHub's issue form can also accept screenshot uploads, so the app does not need to capture or upload images itself ([issue-form documentation](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms)).
 
 ### ✅ Why this is the recommended MVP
 
-- ♻️ Reuses the report and copy action that already exist in Settings → Debug.
-- 🔐 Sends nothing until the player chooses what to paste into GitHub and submits it.
+- ♻️ Reuses the existing diagnostic report and GitHub-hosted issue form.
+- 🪄 Prefills the full report without asking the player to copy and paste.
+- 👀 Lets the player remove private or irrelevant details before submitting.
 - 🧰 Avoids a new server, GitHub credentials, OAuth, and a public issue-writing endpoint.
 - 📸 Lets GitHub's form handle optional screenshot upload.
-- 🧪 Keeps failures understandable: if the copy step does not work, the report is still visible; if GitHub is unavailable, no report has been silently lost.
+- 🧪 Keeps **Copy bug report** as a straightforward fallback for URL-size or prefill problems.
 
 ## 🗳️ Choices for the Final Design
 
@@ -59,9 +62,9 @@ Pick one option per row. The bold choices form my recommended first version.
 
 ### 3. How much should the app prepare?
 
-- **A — Keep the copy-and-open handoff (recommended):** Keep the existing copy action and add the form link. The player pastes the report into GitHub and can edit or omit it.
-- B — Add an in-app notes composer and copy a combined report: more guided, but duplicates form fields and adds input state, validation, and clipboard-failure handling.
-- C — Send report contents directly from the app: less pasting, but requires a supported prefill or server submission path and an explicit consent/review design. Do not silently include diagnostics.
+- **A — Prefill the GitHub form (recommended):** Give the diagnostics textarea a stable form ID and open the issue form with the report in that field's query parameter. The player can edit or remove it before submitting; keep the existing copy action as a fallback for long URLs.
+- B — Keep copy and paste only: no diagnostics in the URL, but the reporter must switch back and forth and paste the full report.
+- C — Add an in-app notes composer: more guided, but duplicates form fields and adds input state and validation without avoiding the final GitHub handoff.
 
 ### 4. What about screenshots?
 
@@ -71,9 +74,9 @@ Pick one option per row. The bold choices form my recommended first version.
 
 ## 🧩 Suggested Decision
 
-For the simplest reliable first release, choose **1A, 2A, 3A, 4A**: a GitHub-hosted form linked from Settings → Debug, with the existing diagnostics copied only when the player asks, and screenshots handled by GitHub if the player wants one.
+For the simplest reliable first release, choose **1A, 2A, 3A, 4A**: a GitHub-hosted form linked from Settings → Debug, the full diagnostics prefilled after an explicit click, an editable field so the player can remove anything, a copy fallback for long URLs, and screenshots handled by GitHub if wanted.
 
-The resulting user experience is intentionally transparent: **copy, open, review, paste, submit**. It is not one-click issue creation, but avoids introducing a credential-bearing service before we know that the lower-cost handoff is not enough.
+The resulting user experience is intentionally transparent: **review, open prefilled form, edit, submit**. It is not one-click issue creation, and the report is included in the URL sent to GitHub when the form opens, but it avoids a credential-bearing service and removes the copy/paste step in the normal case.
 
 ## 💬 Reply with Your Picks
 
