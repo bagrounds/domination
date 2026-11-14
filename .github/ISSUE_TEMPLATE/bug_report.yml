@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug! In Domination, **Settings → Debug → Open GitHub bug form** opens this form with the diagnostics filled in.
+        Thanks for reporting a bug! In Domination, **Settings → Debug → Report Bug** opens this form with the diagnostics filled in.
   - type: textarea
     id: what-happened
     attributes:

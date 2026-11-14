@@ -13,14 +13,14 @@ tags:
 
 ## 🧑‍💻 Author's Note
 
-👋 Hello! [Issue #42](https://github.com/bagrounds/domination/issues/42) asks me to build the bug-report design from [Designing In-App Bug Reports](./2026-11-14-in-app-bug-report-design): choices 1A, 2A, 3A and 4A. **Settings → Debug** now has an **Open GitHub bug form** link. It opens a new GitHub issue form with the diagnostics filled in. The player reviews them, describes the bug, can attach a screenshot, and submits on GitHub. There is no new server and no GitHub credential in the app.
+👋 Hello! [Issue #42](https://github.com/bagrounds/domination/issues/42) asks me to build the bug-report design from [Designing In-App Bug Reports](./2026-11-14-in-app-bug-report-design): choices 1A, 2A, 3A and 4A. **Settings → Debug** now has a **Report Bug** link. It opens a new GitHub issue form with the diagnostics filled in. The player reviews them, describes the bug, can attach a screenshot, and submits on GitHub. There is no new server and no GitHub credential in the app.
 
 The design left one question open: how long can the link be? I measured it, and the answer changed the design.
 
 ## 🧭 What a Player Sees
 
-- 🐞 **Settings → Debug** explains what the report contains. It asks the player to remove anything they'd rather not share, such as their room code, and says they'll need a GitHub account.
-- 🔗 **Open GitHub bug form** is a plain link that opens in a new tab. Because it is a real link, pop-up blockers leave it alone, and an installed app opens it in the browser.
+- 🐞 **Settings → Debug** shows just the buttons and the report, with no instructions. The buttons explain themselves. The form's **Diagnostics** field reminds the player that the issue is public and that the report includes the page address and room code.
+- 🔗 **Report Bug** is a plain link that opens in a new tab. Because it is a real link, pop-up blockers leave it alone, and an installed app opens it in the browser.
 - 📝 The form asks **What happened?** and **Steps to reproduce**, has an optional **Screenshots** upload, and puts the report in an editable **Diagnostics** field. GitHub shows that field as a code block, so log text is not treated as Markdown and `@names` in it do not notify anyone.
 - 📋 **Copy bug report** still copies the whole report for anything the link leaves out.
 
@@ -75,6 +75,7 @@ I also checked the bundled app in headless Chrome. I opened Settings → Debug, 
 - 🌿 GitHub reads issue forms from the default branch. Until this PR is merged, `template=bug_report.yml` has no form to open, so the preview deployment's link will not fill in the diagnostics.
 - 🔒 The link sends the shortened report to GitHub when it opens, before the player submits anything. That is why it is a separate, clearly labeled action.
 - 🙈 I couldn't sign in to GitHub from the sandbox, so the signed-in path is based on GitHub's documentation, not on a test. GitHub's preview of `bug_report.yml` on this PR's branch shows all four fields, which means it accepted the form. After merging, open the link once while signed in to check the prefilled form.
+- 🏷️ This PR bumps the version to v0.44.0, in `src/Version.purs` and in the service worker's `CACHE_NAME`, so installed copies download the new Debug tab.
 - 🧭 The 4,000-character budget is based on measurements, not a documented guarantee. If GitHub changes its limits, change `urlBudget` in `src/Data/BugForm.purs`; the property tests keep working with any budget.
 
 ## ✍️ Signed
