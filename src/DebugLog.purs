@@ -1,10 +1,12 @@
 module DebugLog
   ( BugReport
+  , LogExcerpt
   , clear
   , currentReport
   , install
   , renderReport
   , showVersion
+  , wholeLog
   ) where
 
 import Prelude
@@ -14,13 +16,16 @@ import Data.String (joinWith)
 import Effect (Effect)
 import Version (Version(..), version)
 
+-- | The newest lines of a log, and how many older lines were left out.
+type LogExcerpt = { lines :: Array String, omitted :: Int }
+
 type BugReport =
   { version :: Version
   , userAgent :: String
   , generatedAt :: String
   , facts :: Array { label :: String, value :: String }
-  , journal :: Array String
-  , entries :: Array String
+  , journal :: LogExcerpt
+  , entries :: LogExcerpt
   }
 
 foreign import install :: Effect Unit
@@ -37,13 +42,16 @@ foreign import userAgent :: Effect String
 
 foreign import nowIso :: Effect String
 
+wholeLog :: Array String -> LogExcerpt
+wholeLog lines = { lines, omitted: 0 }
+
 currentReport :: Effect BugReport
 currentReport = { version, userAgent: _, generatedAt: _, facts: _, journal: _, entries: _ }
   <$> userAgent
   <*> nowIso
   <*> pageFacts
-  <*> journal
-  <*> snapshot
+  <*> (wholeLog <$> journal)
+  <*> (wholeLog <$> snapshot)
 
 renderReport :: BugReport -> String
 renderReport report = joinWith "\n" $
@@ -53,10 +61,16 @@ renderReport report = joinWith "\n" $
   , "User agent: " <> report.userAgent
   ]
   <> map (\{ label, value } -> label <> ": " <> value) report.facts
-  <> [ "", "Sync journal: " <> show (length report.journal) ]
-  <> report.journal
-  <> [ "", "Console: " <> show (length report.entries) ]
-  <> report.entries
+  <> renderLog "Sync journal" report.journal
+  <> renderLog "Console" report.entries
+
+renderLog :: String -> LogExcerpt -> Array String
+renderLog title { lines, omitted } = [ "", heading ] <> lines
+  where
+    total = length lines + omitted
+    heading
+      | omitted > 0 = title <> ": " <> show total <> ", oldest " <> show omitted <> " omitted"
+      | otherwise = title <> ": " <> show total
 
 showVersion :: Version -> String
 showVersion (Version major minor patch) =

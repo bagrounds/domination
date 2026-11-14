@@ -47,6 +47,7 @@ import Domination.Capability.Storage (class Storage, load, save)
 import Domination.Capability.Timer (class Timer, createTimer)
 import Domination.Capability.WireCodec (class WireCodec, readWire, writeWire)
 import Domination.Data.Backoff as Backoff
+import Domination.Data.BugForm as BugForm
 import Domination.Data.Card (CardSpec)
 import Domination.Data.Chat (ChatEntry(..), chatLimits, emptyChat, record, recordPlay)
 import Domination.Data.Game (Game)
@@ -535,8 +536,8 @@ handleAction audioContext = case _ of
     void refreshDebugReport
 
   CopyBugReport -> do
-    report <- refreshDebugReport
-    liftEffect $ FFI.copyToClipboard report
+    { text } <- refreshDebugReport
+    liftEffect $ FFI.copyToClipboard text
 
   ClearDebugLog -> do
     liftEffect DebugLog.clear
@@ -1027,9 +1028,10 @@ handleAction audioContext = case _ of
           liftAff $ Aff.delay wait
           handleAction audioContext MailboxRetryDue
     refreshDebugReport = do
-      report <- liftEffect $ DebugLog.renderReport <$> DebugLog.currentReport
-      H.modify_ $ _debugReport .~ report
-      pure report
+      report <- liftEffect DebugLog.currentReport
+      let debugReport = { text: DebugLog.renderReport report, bugFormUrl: BugForm.bugFormUrl report }
+      H.modify_ $ _debugReport .~ debugReport
+      pure debugReport
 
 sendMessage
   :: forall t1 r o1 q1 output m

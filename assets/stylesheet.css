@@ -968,7 +968,8 @@ button span,
   font-size: 0.8em;
 }
 
-.copy-log-button {
+.copy-log-button,
+.bug-form-link {
   padding: 0.3em 0.8em;
   border: 1px solid #484;
   border-radius: 3px;
