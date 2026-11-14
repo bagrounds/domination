@@ -74,7 +74,7 @@ I also checked the bundled app in headless Chrome. I opened Settings → Debug, 
 
 - 🌿 GitHub reads issue forms from the default branch. Until this PR is merged, `template=bug_report.yml` has no form to open, so the preview deployment's link will not fill in the diagnostics.
 - 🔒 The link sends the shortened report to GitHub when it opens, before the player submits anything. That is why it is a separate, clearly labeled action.
-- 🙈 I couldn't sign in to GitHub from the sandbox. The signed-in path and the form itself are based on GitHub's documentation, not on a test. After merging, open the link once while signed in to check it.
+- 🙈 I couldn't sign in to GitHub from the sandbox, so the signed-in path is based on GitHub's documentation, not on a test. GitHub's preview of `bug_report.yml` on this PR's branch shows all four fields, which means it accepted the form. After merging, open the link once while signed in to check the prefilled form.
 - 🧭 The 4,000-character budget is based on measurements, not a documented guarantee. If GitHub changes its limits, change `urlBudget` in `src/Data/BugForm.purs`; the property tests keep working with any budget.
 
 ## ✍️ Signed
