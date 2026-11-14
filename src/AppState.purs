@@ -26,6 +26,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff (Milliseconds(..))
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
+import Domination.Data.BugForm (prefilledUrl)
 import Domination.Data.Card (Card, CardSpec(..))
 import Domination.Data.Cards as Cards
 import Domination.Data.LogicalClock (Version)
@@ -63,6 +64,8 @@ settingsTabLabel = case _ of
   ConnectionTab -> "Connection"
   DebugTab -> "Debug"
 
+type DebugReport = { text :: String, bugFormUrl :: String }
+
 type AppState =
   { connectionCount :: Int
   , id :: String
@@ -89,7 +92,7 @@ type AppState =
   , heartbeatInterval :: Int
   , heartbeatTimeout :: Int
   , settingsTab :: SettingsTab
-  , debugReport :: String
+  , debugReport :: DebugReport
   , renameProposals :: Proposals
   }
 
@@ -158,7 +161,7 @@ _heartbeatTimeout = prop (Proxy :: Proxy "heartbeatTimeout")
 _settingsTab :: Lens' AppState SettingsTab
 _settingsTab = prop (Proxy :: Proxy "settingsTab")
 
-_debugReport :: Lens' AppState String
+_debugReport :: Lens' AppState DebugReport
 _debugReport = prop (Proxy :: Proxy "debugReport")
 
 _renameProposals :: Lens' AppState Proposals
@@ -244,7 +247,7 @@ newApp =
   , heartbeatInterval: defaultHeartbeatInterval
   , heartbeatTimeout: defaultHeartbeatTimeout
   , settingsTab: GameSetupTab
-  , debugReport: ""
+  , debugReport: { text: "", bugFormUrl: prefilledUrl "" }
   , renameProposals: Map.empty
   }
 

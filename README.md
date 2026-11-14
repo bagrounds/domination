@@ -29,6 +29,7 @@ or preview the latest push at [bagrounds.github.io/domination](https://bagrounds
 * In game chat and game log
 * Asynchronous play in game rooms: moves are kept in a free room mailbox (a Cloudflare Worker, `mailbox/`), so players who were offline catch up when they come back. Without a mailbox (the global room), games are versioned, so a device that comes back with an old game catches up instead of rewinding the others. Visible pages poll the mailbox and replace sockets that went silent, so a phone that slept catches up; a TLA+ model in `tla/` checks the sync algorithm (`tla/check`), and `e2e/` runs browser chaos tests against local servers ([design](docs/2026-11-03-async-play-design.md), [Cloudflare setup](docs/2026-11-03-async-play-cloudflare-setup.md))
 * Re-theming form: propose new names for cards, card text and game terms in Settings → Rename, then copy the mapping to share it
+* Bug reports: Settings → Debug opens this repository's GitHub bug form with the diagnostics filled in (the newest lines that fit in a link), or copies the full report
 
 ## TODO
 * Matchmaking: discover and join open games (invite-link rooms are done)

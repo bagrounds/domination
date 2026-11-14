@@ -223,6 +223,9 @@ debugLogContent = ClassName "debug-log-content"
 copyLogButton :: ClassName
 copyLogButton = ClassName "copy-log-button"
 
+bugFormLink :: ClassName
+bugFormLink = ClassName "bug-form-link"
+
 botDelay :: ClassName
 botDelay = ClassName "bot-delay"
 
