@@ -13,6 +13,7 @@ body {
   width: 100%;
   position: absolute;
   display: table;
+  overflow: hidden;
 }
 
 h1 {
@@ -57,6 +58,7 @@ main {
   left: 0;
   right: 0;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   font-size: 12pt;
   text-align: center;
@@ -78,6 +80,7 @@ li {
 .domination {
   width: 100%;
   height: 83vh;
+  height: 83dvh;
 }
 
 .title,
@@ -124,6 +127,7 @@ button span,
     inset: auto;
     max-width: 100vw;
     max-height: 100vh;
+    max-height: 100dvh;
     overflow-y: auto;
     z-index: 450;
   }
@@ -132,12 +136,14 @@ button span,
 .container {
   display: inline-block;
   height: 7vh;
+  height: 7dvh;
   margin: 0 auto;
 }
 
 .hud {
   width: 100%;
   height: 20vh;
+  height: 20dvh;
   text-align: center;
   vertical-align: middle;
   z-index: 100;
@@ -146,6 +152,7 @@ button span,
 
 .chat {
   height: 18vh;
+  height: 18dvh;
   width: 100%;
   text-align: center;
   vertical-align: middle;
@@ -159,6 +166,7 @@ button span,
   border-radius: 0.5em;
   background-color: darkgray;
   height: 10vh;
+  height: 10dvh;
   width: 100%;
   line-height: 1em;
   overflow-y: scroll;
@@ -173,6 +181,7 @@ button span,
 .chat-form input {
   width: 85%;
   height: 7vh;
+  height: 7dvh;
   border-radius: 0.5em;
 }
 
@@ -183,6 +192,7 @@ button span,
 
 .chat-form button {
   height: 7vh;
+  height: 7dvh;
   width: 15%;
   float: right;
 }
@@ -200,6 +210,7 @@ button span,
 .incrementer button,
 .incrementer input {
   height: 7vh;
+  height: 7dvh;
   width: 10vw;
   max-width: 3em;
   text-align: center;
@@ -242,11 +253,13 @@ button span,
 .server-url-input input,
 .mailbox-url-input input {
   height: 7vh;
+  height: 7dvh;
   width: 50vw;
 }
 
 .username-input input {
   height: 7vh;
+  height: 7dvh;
   width: 50vw;
 }
 
@@ -254,10 +267,15 @@ button span,
   position: absolute;
   right: 1vw;
   bottom: 10vh;
+  bottom: 10dvh;
   line-height: 7vh;
+  line-height: 7dvh;
   height: 7vh;
+  height: 7dvh;
   width: 7vh;
+  width: 7dvh;
   border-radius: 4vh;
+  border-radius: 4dvh;
   font-weight: bold;
   text-align: center;
   vertical-align: center;
@@ -275,13 +293,16 @@ button span,
   position: absolute;
   right: 1vw;
   bottom: 18vh;
+  bottom: 18dvh;
   width: 7vh;
+  width: 7dvh;
   font-style: normal;
   font-size: 0.9em;
   text-align: center;
   color: white;
   background-color: black;
   border-radius: 2vh;
+  border-radius: 2dvh;
   opacity: 0.5;
 }
 
@@ -295,6 +316,7 @@ button span,
   width: 3em;
   border-radius: 3em;
   height: 7vh;
+  height: 7dvh;
   padding: 0;
 }
 
@@ -302,7 +324,9 @@ button span,
   display: flex;
   justify-content: space-between;
   height: 7vh;
+  height: 7dvh;
   line-height: 7vh;
+  line-height: 7dvh;
 }
 
 .settings-menu {
@@ -317,6 +341,7 @@ button span,
 
 .settings-menu.showing {
   max-height: 100vh;
+  max-height: 100dvh;
 }
 
 .settings-menu.collapsed {
@@ -326,6 +351,7 @@ button span,
 .new-game-button,
 .load-game-button {
   height: 7vh;
+  height: 7dvh;
 }
 
 .toggle-long-game {
@@ -398,6 +424,7 @@ button span,
 .kingdom {
   overflow-y: scroll;
   height: 58vh;
+  height: 58dvh;
 }
 
 .kingdom .inactive {
@@ -421,6 +448,7 @@ button span,
 
 .supply.showing {
   max-height: 49vh;
+  max-height: 49dvh;
 }
 
 .supply {
@@ -435,7 +463,9 @@ button span,
 .hand {
   width: 100%;
   height: 29vh;
+  height: 29dvh;
   font-size: 2.4vh;
+  font-size: 2.4dvh;
   overflow-x: scroll;
   white-space: nowrap;
 }
@@ -451,6 +481,7 @@ button span,
 .table {
   width: 100%;
   height: 20vh;
+  height: 20dvh;
 }
 
 .play,
@@ -458,7 +489,9 @@ button span,
   overflow-x: scroll;
   white-space: nowrap;
   font-size: 1.68vh;
+  font-size: 1.68dvh;
   height: 20vh;
+  height: 20dvh;
   display: inline-block;
   border-radius: 0.6em;
 }
@@ -474,14 +507,18 @@ button span,
 .hand-title {
   position: absolute;
   font-size: 7vh;
+  font-size: 7dvh;
   transform: rotate(-90deg) translate(-8vh, -3vh);
+  transform: rotate(-90deg) translate(-8dvh, -3dvh);
 }
 
 .play-title,
 .buying-title {
   position: absolute;
   font-size: 6vh;
+  font-size: 6dvh;
   transform: rotate(-90deg) translate(-6.4vh, -2.4vh);
+  transform: rotate(-90deg) translate(-6.4dvh, -2.4dvh);
   opacity: 0.8;
 }
 
@@ -502,7 +539,9 @@ button span,
   flex-direction: row;
   align-items: center;
   height: 6.7vh;
+  height: 6.7dvh;
   font-size: 5vh;
+  font-size: 5dvh;
   width: 100%;
 }
 
@@ -587,6 +626,7 @@ button span,
 
 .controls {
   height: 7.3vh;
+  height: 7.3dvh;
   width: 100%;
   max-width: 48em;
   z-index: 400;
@@ -678,6 +718,7 @@ button span,
 
 .stats-container {
   height: 13vh;
+  height: 13dvh;
   width: 100%;
   overflow-y: scroll;
 }
@@ -734,7 +775,9 @@ button span,
   left: 0;
   right: 0;
   top: 20vh;
+  top: 20dvh;
   height: 49vh;
+  height: 49dvh;
   z-index: 300;
   background-color: rgba(0, 0, 0, 0.8);
   padding: auto;
@@ -960,6 +1003,7 @@ button span,
   box-sizing: border-box;
   width: 100%;
   height: 40vh;
+  height: 40dvh;
   margin-top: 0.5em;
   padding: 0.5em;
   background: #111;
@@ -1027,6 +1071,7 @@ button span,
 .rename-entries {
   overflow-y: scroll;
   height: 58vh;
+  height: 58dvh;
   padding: 0 0.5em;
 }
 
