@@ -1,6 +1,6 @@
 'use strict'
 
-const CACHE_NAME = 'v0.44.0'
+const CACHE_NAME = 'v0.44.1'
 const cacheAllowlist = [ CACHE_NAME ]
 const urlsToCache = [
   '/',

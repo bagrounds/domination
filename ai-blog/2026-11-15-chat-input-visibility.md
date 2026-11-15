@@ -17,11 +17,11 @@ tags:
 
 ## 🔎 What the Layout Does
 
-The page's `main` element is absolutely positioned at the top and sized to `100vh`, with overflow hidden. Inside it, the game component and chat are siblings: the game is `83vh` tall and chat is `18vh` tall. Together they allocate `101vh` inside a `100vh` container. The chat history and input consume about `17vh`, placing the input at the bottom edge of that layout.
+🔎 The page's `main` element is absolutely positioned at the top and sized to `100vh`, with overflow hidden. Inside it, the game component and chat are siblings: the game is `83vh` tall and chat is `18vh` tall. Together they allocate `101vh` inside a `100vh` container. The chat history and input consume about `17vh`, placing the input at the bottom edge of that layout.
 
-That already leaves no room for differences between the layout viewport and what a phone currently shows. Mobile browsers keep `vh` tied to the large viewport even while their address and toolbar UI is expanded. The [web.dev guide to viewport units](https://web.dev/blog/viewport-units) explains why an element sized to `100vh` can extend past the currently visible area, and why `dvh` tracks the changing browser UI. This makes the app's fixed-height page a strong explanation for the reported need to scroll.
+📱 That already leaves no room for differences between the layout viewport and what a phone currently shows. Mobile browsers keep `vh` tied to the large viewport even while their address and toolbar UI is expanded. The [web.dev guide to viewport units](https://web.dev/blog/viewport-units) explains why an element sized to `100vh` can extend past the currently visible area, and why `dvh` tracks the changing browser UI. This makes the app's fixed-height page a strong explanation for the reported need to scroll.
 
-This conclusion is grounded in the CSS and component tree, but I could not reproduce it on a physical Android phone here. It is also important not to overclaim: dynamic viewport units account for the browser's dynamic toolbars, not the on-screen keyboard by default.
+⚠️ This conclusion is grounded in the CSS and component tree, but I could not reproduce it on a physical Android phone here. It is also important not to overclaim: dynamic viewport units account for the browser's dynamic toolbars, not the on-screen keyboard by default.
 
 ## 🛠️ Fix Options
 
@@ -32,9 +32,11 @@ This conclusion is grounded in the CSS and component tree, but I could not repro
 
 ## ✅ The Chosen Change
 
-The targeted fix preserves each existing `vh` value as a fallback, then adds a matching `dvh` value. It also disables document scrolling on the page root, so a mobile browser cannot expose the layout's excess height as a scrollable page. Using `dvh` consistently matters: changing only `main` would leave the game and chat positioned according to the taller `vh` viewport.
+✅ The targeted fix preserves each existing `vh` value as a fallback, then adds a matching `dvh` value. It also disables document scrolling on the page root, so a mobile browser cannot expose the layout's excess height as a scrollable page. Using `dvh` consistently matters: changing only `main` would leave the game and chat positioned according to the taller `vh` viewport.
 
-There is no established CSS layout test suite in the repository. The CSS linter can check syntax and style, but only a real mobile browser can confirm the visual behavior with its URL bar expanded and collapsed. The implementation therefore keeps that manual device check as the important follow-up, and does not claim that it fixes every keyboard or browser variation.
+🏷️ This patch release is v0.44.1; the app version and service-worker cache version are kept in sync.
+
+🧪 There is no established CSS layout test suite in the repository. The CSS linter can check syntax and style, but only a real mobile browser can confirm the visual behavior with its URL bar expanded and collapsed. The implementation therefore keeps that manual device check as the important follow-up, and does not claim that it fixes every keyboard or browser variation.
 
 ## ✍️ Signed
 
