@@ -13,7 +13,7 @@ tags:
 
 ## 🧑‍💻 Author's Note
 
-👋 [Issue #48](https://github.com/bagrounds/domination/issues/48) asks for a more interesting bot than Random or Big Money, and specifically asks for researched strategy candidates rather than an implementation. I studied the current bot and game model, then compared three approaches against published Dominion research and strategy guidance.
+👋 [Issue #48](https://github.com/bagrounds/domination/issues/48) asks for a more interesting bot than Random or Big Money, and specifically asks for researched strategy candidates rather than an implementation. I studied the current bot and game model, then compared four approaches against published Dominion research and strategy guidance.
 
 ## 🃏 What the Current Bots Leave on the Table
 
@@ -21,15 +21,14 @@ tags:
 - 🔄 A purchase does not help the hand that bought it: cards go into the discard pile and become available after a later shuffle. Dominion strategy is therefore about the quality and timing of future hands, not just spending all available money. The [Dominion AI research paper](https://arxiv.org/abs/2405.06846) describes this deck-building loop and uses Big Money as a simple heuristic baseline.
 - 🧰 The app already represents common card effects with data: cards have typed action, draw, treasure, buy, and victory-point fields; more complex effects are represented as choices and stack expressions. The [`Card`](https://github.com/bagrounds/domination/blob/3bb8e21f148f49f8f7ac4aa1db1e7f3bf0fc53e1/src/Data/Card.purs), [`Choice`](https://github.com/bagrounds/domination/blob/3bb8e21f148f49f8f7ac4aa1db1e7f3bf0fc53e1/src/Data/Choice.purs), and [`Game.Engine`](https://github.com/bagrounds/domination/blob/3bb8e21f148f49f8f7ac4aa1db1e7f3bf0fc53e1/src/Data/Game/Engine.purs) modules provide a foundation for strategies that reason about effects instead of card names.
 
-## 💡 Three Candidate Strategies
+## 💡 Four Candidate Strategies
 
-### 1. 🏗️ Build a Useful Action Engine
+### 1. 🧩 Score Generic Effects, Not Card Names
 
-- 🧭 Score a play by the resources and options it creates: cards drawn, actions and buys gained, treasure added, and whether it leaves enough actions to play the rest of the hand. Treat an action as valuable when it improves the turn, not simply because it is an action.
-- 🧮 Compare purchases by their expected marginal help to future turns, not by cost alone. A card that draws and replaces itself may be worth more than a pricier card that competes for the same single action.
-- 📚 This follows the [strategy guide's account of action engines](https://www.meeplemountain.com/articles/dominion-strategy-guide/): actions, cards, treasure, and buys contribute different things, and chaining actions together can make a deck more effective than a simple treasure pile.
-- ✅ **Why it fits:** the evaluator can use generic card fields and the result of applying an effect through the engine. A future card using already-supported effects can be valued without adding its name to a priority list.
-- ⚠️ **Trade-off:** hand-written weights can miss unusual combinations or effects whose value arrives several turns later.
+- 🧮 Represent each candidate effect by generic features—net cards, actions, buys, treasure, points, and changes to the player's piles—then score the resulting game state. The [Dominion AI research paper](https://arxiv.org/html/2405.06846v1) describes earlier work that vectorized cards by their effects, with the goal of generalizing to unseen cards that reused known effects.
+- 🏗️ Use those features to build an action engine: value draws and treasure in context, and discount a terminal action when it competes with other actions for the turn's limited action count. The [strategy guide's account of action engines](https://www.meeplemountain.com/articles/dominion-strategy-guide/) explains how actions, cards, treasure, and buys complement each other.
+- ✅ **Why it fits:** card names do not enter the score. A new card composed of effects the engine already understands can be evaluated through the same feature map.
+- ⚠️ **Trade-off:** the paper notes that the earlier effect-vector approach was outdated and costly to scale. This is a promising design direction, not evidence that a particular hand-written feature score will win.
 
 ### 2. 🎲 Choose Cards by Expected Future Hands
 
@@ -47,9 +46,16 @@ tags:
 - ✅ **Why it fits:** the policy can adapt to supply counts and current scores without knowing the names of future cards.
 - ⚠️ **Trade-off:** ending the game is a race against opponents. The bot needs a conservative estimate of their likely points, not just its own deck quality.
 
+### 4. 🎯 Compare Candidates with Short Rollouts
+
+- 🎲 For each legal choice, use the actual game engine to simulate several possible next hands and turns, then compare the average score or win chance. Randomly sampled draws make this a practical approximation instead of searching every possible shuffle.
+- 📚 The research paper describes an earlier Monte Carlo Dominion bot, but notes that its tests used only ten of the simplest action cards and that scaling the method to the full card set is not trivial. That makes rollouts a credible research direction, not a proven shortcut for every future card.
+- ✅ **Why it fits:** a rollout observes what an effect does through the rules engine, rather than needing a handcrafted meaning for every card name.
+- ⚠️ **Trade-off:** simulations cost more than scoring a feature vector, and rollout quality depends on the opponent policy and the state-value estimate.
+
 ## ⭐ Recommended First Version
 
-🧭 Start with **Strategy 2**, using Strategy 1's action-economy signals and Strategy 3's endgame adjustment. It is a useful middle ground: more thoughtful than a fixed buy menu, but small enough to test and explain.
+🧭 Start with **Strategy 1**, add Strategy 2's expected-hand estimate, then use Strategy 3's endgame adjustment. This is more thoughtful than a fixed buy menu, but smaller and easier to explain than full rollouts. The [Provincial AI](https://graphics.stanford.edu/~mdfisher/DominionAI.html) is an instructive counterpoint: kingdom-specific training can produce strong strategies, but it must be repeated for a new kingdom, which is a poor fit for a bot intended to adapt to unfamiliar card sets.
 
 - 🧪 Generate legal plays as today, then rank them by a generic estimate of their effect on the deck and future turns.
 - 🎴 For purchases and card choices, estimate the expected benefit of the resulting deck over a few future hands, with a penalty for dilution and unplayable action collisions.
