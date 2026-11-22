@@ -46,6 +46,7 @@ import Domination.Data.Player (Player)
 import Domination.Data.Player as Player
 import Domination.Data.SelectCards (SelectCards(..))
 import Domination.Data.Stack (Stack, stackCards)
+import Domination.Data.Standings (standings)
 import Domination.Data.StackEvaluation (StackExpression(..))
 import Domination.Data.Supply (negativePoints, nonEmptyStacks, positivePoints)
 import Domination.Data.Var (Var(..))
@@ -63,6 +64,7 @@ import Domination.UI.Hud as Hud
 import Domination.UI.Icons as Icons
 import Domination.UI.PickN as PickN
 import Domination.UI.RenderText (renderText)
+import Domination.UI.Standings as Standings
 import Domination.Data.Chat (logPlay)
 import Domination.UI.Util (acknowledge, chooseOne, h1__)
 import Halogen as H
@@ -245,6 +247,8 @@ renderPlayerN cs = HH.div
     Just result ->
       [ Hud.render activeState
       , renderText result
+      , Standings.render activeState.playerIndex
+        $ standings activeState.state.players
       ]
   ) <> renderBotOverlay cs
   where
