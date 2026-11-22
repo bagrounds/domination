@@ -2,7 +2,7 @@ module Test.Standings (standings_tests) where
 
 import Prelude
 
-import Data.Array (all, filter, length, sort, zipWith, (..))
+import Data.Array (all, filter, length, nub, sort, zipWith, (..))
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NEA
@@ -20,8 +20,9 @@ import Data.Lens.Getter (view)
 import Domination.Data.Points (Points)
 import Domination.Data.Points as Points
 import Domination.Data.Result as GameResult
+import Domination.Data.Stack (Stack)
 import Domination.Data.Stack as Stack
-import Domination.Data.Standings (Standing, scoreSources, standings)
+import Domination.Data.Standings (Standing, finalDeck, standings)
 import Domination.UI.Standings (ordinal)
 import Effect (Effect)
 import Test.QuickCheck (Result, assertEquals, (<?>))
@@ -32,12 +33,14 @@ type EffectTest = { name :: String, test :: Effect Result }
 
 standings_tests :: Array EffectTest
 standings_tests =
-  [ { name: "∀ players: each standing's score is the player's score, and its sources add up to it"
+  [ { name: "∀ players: each standing's score and card count are the player's, and its deck adds up to both"
     , test: quick_check 300 do
         players <- playersGen
         pure $ all
           (\s -> s.score == Player.score (playerAt players s.playerIndex)
-            && sum (Stack.points <$> s.scoreSources) == s.score)
+            && sum (Stack.points <$> s.deck) == s.score
+            && s.cardCount == length (Player.allCards (playerAt players s.playerIndex))
+            && sum (_.count <$> s.deck) == s.cardCount)
           (NEA.toArray $ standings players)
           <?> describe players
     }
@@ -79,17 +82,17 @@ standings_tests =
           <?> describe players <> " first place " <> show firstPlace
             <> " result " <> show (gameResult game)
     }
-  , { name: "∀ player: score sources are every nonzero-point card, highest points first"
+  , { name: "∀ player: the final deck has one stack per card owned, in points then count order"
     , test: quick_check 300 do
         player <- playerGen
         let
-          sources = scoreSources player
-          points = Stack.points <$> sources
-          scoringCards = filter ((_ /= zero) <<< _.victoryPoints) $ Player.allCards player
-        pure $ (sum (_.count <$> sources) == length scoringCards
-          && all (_ /= zero) points
-          && all identity (zipWith (>=) points (Array.drop 1 points)))
-          <?> show (_.name <$> Player.allCards player)
+          deck = finalDeck player
+          names = _.name <$> Player.allCards player
+          count name = length $ filter (_ == name) names
+        pure $ (sort (_.card.name <$> deck) == sort (nub names)
+          && all (\stack -> stack.count == count stack.card.name) deck
+          && all identity (zipWith deckOrder deck (Array.drop 1 deck)))
+          <?> show names
     }
   , { name: "a three player example: a tie for first, then a one point loss"
     , test: pure do
@@ -107,7 +110,13 @@ standings_tests =
             , { playerIndex: 1, place: 3, score: 11, behindLeader: 1 }
             ]
           , assertEquals
-            (sourceSummaries <$> Array.last ranked)
+            (deckSummaries <$> Array.head ranked)
+            (Just
+              [ { name: "Province", count: 2, points: 12 }
+              , { name: "Copper", count: 1, points: 0 }
+              ])
+          , assertEquals
+            (deckSummaries <$> Array.last ranked)
             (Just
               [ { name: "Duchy", count: 2, points: 6 }
               , { name: "Province", count: 1, points: 6 }
@@ -139,10 +148,14 @@ summarize
 summarize { playerIndex, place, score, behindLeader } =
   { playerIndex, place, score: toInt score, behindLeader: toInt behindLeader }
 
-sourceSummaries
+deckOrder :: Stack -> Stack -> Boolean
+deckOrder a b = Stack.points a > Stack.points b
+  || (Stack.points a == Stack.points b && a.count >= b.count)
+
+deckSummaries
   :: Standing
   -> Array { name :: String, count :: Int, points :: Int }
-sourceSummaries = map summarizeSource <<< _.scoreSources
+deckSummaries = map summarizeSource <<< _.deck
   where
     summarizeSource stack =
       { name: stack.card.name

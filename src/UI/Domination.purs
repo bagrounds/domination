@@ -245,9 +245,7 @@ renderPlayerN cs = HH.div
   ( case activeState.state.result of
     Nothing -> renderPlayers activeState
     Just result ->
-      [ Hud.render activeState
-      , renderText result
-      , Standings.render activeState.playerIndex
+      [ Standings.render activeState.playerIndex result
         $ standings activeState.state.players
       ]
   ) <> renderBotOverlay cs

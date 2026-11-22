@@ -1,12 +1,12 @@
 -- | The final standings of a game: every player's place, score, how far
--- | behind the leader they finished, and the cards their points came from.
+-- | behind the leader they finished, and the full deck they finished with.
 -- |
 -- | Everything here is derived from the players' final cards with the same
 -- | scoring rule the game uses (`Player.score`), so the standings always agree
 -- | with the game's result. Players with equal scores share a place.
 module Domination.Data.Standings
   ( Standing
-  , scoreSources
+  , finalDeck
   , standings
   ) where
 
@@ -27,7 +27,8 @@ type Standing =
   , place :: Int
   , score :: Points
   , behindLeader :: Points
-  , scoreSources :: Array Stack
+  , cardCount :: Int
+  , deck :: Array Stack
   }
 
 standings :: NonEmptyArray Player -> NonEmptyArray Standing
@@ -42,14 +43,20 @@ standings players =
       , place: one + length (filter (_ > score) scores)
       , score
       , behindLeader: leaderScore - score
-      , scoreSources: scoreSources player
+      , cardCount: length $ Player.allCards player
+      , deck: finalDeck player
       }
       where
         score = Player.score player
 
-scoreSources :: Player -> Array Stack
-scoreSources =
-  sortBy (flip (comparing Stack.points) <> comparing _.card.name)
-    <<< filter ((_ /= zero) <<< Stack.points)
+-- | Every card a player owns, one stack per card name: the cards worth the
+-- | most points first, then the most numerous, then alphabetically.
+finalDeck :: Player -> Array Stack
+finalDeck =
+  sortBy
+    ( flip (comparing Stack.points)
+      <> flip (comparing _.count)
+      <> comparing _.card.name
+    )
     <<< stackCards
     <<< Player.allCards
