@@ -73,6 +73,7 @@ import Test.Resync (resync_tests)
 import Test.Mailbox (mailbox_tests)
 import Test.Retheme (retheme_tests)
 import Test.Room (room_tests)
+import Test.Standings (standings_tests)
 
 
 -- ══════════════════════════════════════════════════════════════════
@@ -110,8 +111,9 @@ main = do
   resync_results <- run_effect_section "Resync" resync_tests
   chat_results <- run_effect_section "Chat" chat_tests
   bug_form_results <- run_effect_section "Bug Form" bug_form_tests
-  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed + room_results.passed + retheme_results.passed + backoff_results.passed + mailbox_results.passed + clock_results.passed + resync_results.passed + chat_results.passed + bug_form_results.passed
-  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed + room_results.failed + retheme_results.failed + backoff_results.failed + mailbox_results.failed + clock_results.failed + resync_results.failed + chat_results.failed + bug_form_results.failed
+  standings_results <- run_effect_section "End of Game Standings" standings_tests
+  let total_passed = results.passed + simulation_results.passed + play_results.passed + property_results.passed + reaction_results.passed + ai_results.passed + room_results.passed + retheme_results.passed + backoff_results.passed + mailbox_results.passed + clock_results.passed + resync_results.passed + chat_results.passed + bug_form_results.passed + standings_results.passed
+  let total_failed = results.failed + simulation_results.failed + play_results.failed + property_results.failed + reaction_results.failed + ai_results.failed + room_results.failed + retheme_results.failed + backoff_results.failed + mailbox_results.failed + clock_results.failed + resync_results.failed + chat_results.failed + bug_form_results.failed + standings_results.failed
   let total = total_passed + total_failed
   log ""
   log $ "═══ Results: " <> show total_passed <> "/" <> show total <> " passed ═══"
