@@ -50,7 +50,6 @@ You can edit this file as you like.
   , "unsafe-coerce"
   , "web-events"
   , "web-html"
-  , "web-storage"
   , "web-uievents"
   ]
 , packages = ./packages.dhall

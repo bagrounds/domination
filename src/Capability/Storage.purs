@@ -15,22 +15,19 @@ import Control.Monad.Trans.Class (lift)
 import Data.Argonaut.Core (stringify)
 import Data.Argonaut.Decode.Class (class DecodeJson)
 import Data.Argonaut.Encode.Class (class EncodeJson, encodeJson)
-import Data.Either (Either(..))
-import Data.Either as Either
+import Data.Either (Either(..), note)
+import Data.Maybe (Maybe(..))
 import Data.String as String
 import Domination.AppM (AppM)
+import Domination.Data.StorageError (BrowserFailure, LoadError(..), SaveError(..), describeBrowserFailure, printSaveError, saveError)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FFI (setItem)
 import Halogen.Query.HalogenM (HalogenM)
 import Util (mapLeft, readJson)
-import Web.HTML (window)
-import Web.HTML.Window (localStorage)
-import Web.Storage.Storage (getItem)
 
 class Monad m <= Storage m where
-  save :: forall a. EncodeJson a => DecodeJson a => String -> a -> m (Either String Unit)
-  load :: forall a. EncodeJson a => DecodeJson a => String -> m (Either String a)
+  save :: forall a. EncodeJson a => DecodeJson a => String -> a -> m (Either SaveError Unit)
+  load :: forall a. EncodeJson a => DecodeJson a => String -> m (Either LoadError a)
 
 instance storageHalogenM :: Storage m => Storage (HalogenM st act slots msg m) where
   save key = lift <<< save key
@@ -56,38 +53,48 @@ instance storageAppM :: Storage AppM where
   save key = liftEffect <<< saveStorage key
   load = liftEffect <<< loadStorage
 
+foreign import setItemFFI
+  :: (forall r. BrowserFailure -> Either BrowserFailure r)
+  -> (forall l. Either l Unit)
+  -> String
+  -> String
+  -> Effect (Either BrowserFailure Unit)
+
+foreign import getItemFFI
+  :: (forall r. BrowserFailure -> Either BrowserFailure r)
+  -> (forall l r. r -> Either l r)
+  -> (forall a. a -> Maybe a)
+  -> (forall a. Maybe a)
+  -> String
+  -> Effect (Either BrowserFailure (Maybe String))
+
 saveStorage
   :: forall a m
   . MonadEffect m
   => EncodeJson a
   => DecodeJson a
-  => String -> a -> m (Either String Unit)
+  => String -> a -> m (Either SaveError Unit)
 saveStorage key value = liftEffect do
-  result <- window >>= localStorage >>= setItem Left Right unit key stringValue
-  pure $ saveFailureMessage key stringValue `mapLeft` result
+  result <- setItemFFI Left (Right unit) key stringValue
+  pure $ saveError { key, chars: String.length stringValue } `mapLeft` result
   where
     stringValue = (stringify <<< encodeJson) value
 
--- | Describes a failed save by its key and size, never its value: the value
--- | can be megabytes, and an error that carries it grows with every retry.
+-- | The log line for a failed save of `value` at `key`, failing with
+-- | `browserError`.
 saveFailureMessage :: String -> String -> String -> String
-saveFailureMessage key value browserError = "Error saving to local storage."
-  <> " key: '" <> key <> "'"
-  <> " (" <> show (String.length value) <> " chars)"
-  <> " error: '" <> String.take maxBrowserErrorLength browserError <> "'"
-
-maxBrowserErrorLength :: Int
-maxBrowserErrorLength = 200
+saveFailureMessage key value browserError = printSaveError
+  $ SaveRejected { key, chars: String.length value, detail: browserError }
 
 loadStorage
   :: forall a m
   . MonadEffect m
   => EncodeJson a
   => DecodeJson a
-  => String -> m (Either String a)
-loadStorage key = liftEffect $ do
-  maybeItem <- window >>= localStorage >>= getItem key
-  let eitherItemOrError = Either.note error maybeItem
-  pure $ eitherItemOrError >>= readJson
+  => String -> m (Either LoadError a)
+loadStorage key = liftEffect do
+  result <- getItemFFI Left Right Just Nothing key
+  pure $ unavailable `mapLeft` result >>= note (Absent { key }) >>= (mapLeft unreadable <<< readJson)
   where
-    error = "Error loading item from storage at key: '" <> key <> "'"
+    unavailable failure = LoadUnavailable { key, detail: describeBrowserFailure failure }
+    unreadable detail = Unreadable { key, detail }

@@ -5,11 +5,13 @@ import Prelude
 import Data.Array (length, replicate, takeEnd, (..))
 import Data.Array as Array
 import Data.Foldable (fold)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as String
 import Data.String.CodeUnits as CodeUnits
 import DebugLog (BugReport, LogExcerpt, renderReport, wholeLog)
-import Domination.Data.BugForm (bugFormUrl, diagnosticsField, fitReport, prefilledUrl, signInRedirectLength, templateFile, urlBudget)
+import Domination.Data.BugForm (bugFormUrl, diagnosticsField, fitReport, fitReportFor, prefilledUrl, problemFormUrl, problemUrl, signInRedirectLength, templateFile, titleField, urlBudget, whatHappenedField)
+import Domination.Data.Problem (Problem, headline, message)
+import Test.Problem (problemGen)
 import Effect (Effect)
 import Test.QuickCheck (Result(..), assertEquals, (<?>))
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, frequency, vectorOf)
@@ -127,6 +129,35 @@ bug_form_tests =
         pure $ String.contains (String.Pattern $ "id: " <> diagnosticsField <> "\n") form
           <?> "no " <> diagnosticsField <> " field in " <> templateFile
     }
+  , { name: "∀ problem, report: the problem's link fits the budget whenever its header does"
+    , test: quick_check 100 do
+        problem <- problemGen
+        report <- reportGen
+        let size = problemUrlLength problem report
+        pure $ (size <= urlBudget || problemUrlLength problem (headerOnly report) > urlBudget)
+          <?> "link of " <> show size
+    }
+  , { name: "∀ problem, report: the problem's link prefills its title, what happened and the diagnostics"
+    , test: quick_check 100 do
+        problem <- problemGen
+        report <- reportGen
+        let
+          url = problemFormUrl problem report
+          whatHappened = fromMaybe "" $ queryParam whatHappenedField url
+        pure $ all_success
+          [ assertEquals (queryParam titleField url) (Just $ "Bug: " <> headline problem)
+          , String.contains (String.Pattern $ message problem) whatHappened <?> whatHappened
+          , assertEquals (queryParam diagnosticsField url)
+              (Just $ renderReport $ fitReportFor (problemUrl problem) urlBudget report)
+          , assertEquals (queryParam "template" url) (Just templateFile)
+          ]
+    }
+  , { name: "the issue form the problem's link opens has the fields it fills"
+    , test: do
+        form <- readTextFile $ ".github/ISSUE_TEMPLATE/" <> templateFile
+        pure $ String.contains (String.Pattern $ "id: " <> whatHappenedField <> "\n") form
+          <?> "no " <> whatHappenedField <> " field in " <> templateFile
+    }
   , { name: "a short console leaves the rest of the room to the journal"
     , test: pure do
         let
@@ -151,6 +182,10 @@ lineCost :: String -> Int
 lineCost line = urlLength' ("\n" <> line) - urlLength' ""
   where
     urlLength' = signInRedirectLength <<< prefilledUrl
+
+problemUrlLength :: Problem -> BugReport -> Int
+problemUrlLength problem = signInRedirectLength <<< problemUrl problem <<< renderReport
+  <<< fitReportFor (problemUrl problem) urlBudget
 
 headerOnly :: BugReport -> BugReport
 headerOnly report = report { journal = omitAll report.journal, entries = omitAll report.entries }

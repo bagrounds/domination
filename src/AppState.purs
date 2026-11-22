@@ -28,6 +28,8 @@ import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.BugForm (prefilledUrl)
 import Domination.Data.Card (Card, CardSpec(..))
+import Domination.Data.Notices (Notices, noNotices)
+import Domination.Data.Undo (FailedSaves)
 import Domination.Data.Cards as Cards
 import Domination.Data.LogicalClock (Version)
 import Domination.Data.Mailbox (Sync, initialSync)
@@ -94,6 +96,9 @@ type AppState =
   , settingsTab :: SettingsTab
   , debugReport :: DebugReport
   , renameProposals :: Proposals
+  , notices :: Notices
+  , failedSaves :: FailedSaves
+  , problemLink :: String
   }
 
 _card :: Lens' CardSpec Card
@@ -249,6 +254,9 @@ newApp =
   , settingsTab: GameSetupTab
   , debugReport: { text: "", bugFormUrl: prefilledUrl "" }
   , renameProposals: Map.empty
+  , notices: noNotices
+  , failedSaves: Map.empty
+  , problemLink: prefilledUrl ""
   }
 
 newConfig :: Config

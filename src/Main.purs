@@ -52,6 +52,10 @@ import Domination.Data.Card (CardSpec)
 import Domination.Data.Chat (ChatEntry(..), chatLimits, emptyChat, record, recordPlay)
 import Domination.Data.Game (Game)
 import Domination.Data.LogicalClock (Verdict(..), judge, savedBeforeVersions, senderVersion, tick, versionSender)
+import Domination.Data.Notices (dismiss, notice, showing, summary)
+import Domination.Data.Problem (Problem(..), headline, consequence, loadProblem, message, saveProblem)
+import Domination.Data.StorageError (LoadError, SaveError, printLoadError)
+import Domination.Data.Undo (UndoOutcome(..), historySlot, recordSaveAttempt, undoOutcome)
 import Domination.Data.Mailbox (Delivery(..), Dirty(..), PullOutcome(..), Settlement(..), Stamp(..), Status(..), Sync, deliveryStamp, initialSync, interpretDelivery, interpretPull, isClean, mailboxBackoff, mailboxRoomUrl, overtakes, ownChange, printRevisionTag, pullCursor, receiveFrame, senderStamp, settleDelivery, settlePull, stampSender, status)
 import Domination.Data.Resync (Occasion(..), Reaction(..), clockAt, hiddenFor, initialMarks, reactions)
 import Domination.Data.Resync as Resync
@@ -65,13 +69,15 @@ import Domination.UI.Domination (GameQuery(..))
 import Domination.UI.Domination as Domination
 import Domination.UI.Domination.ActiveState (_playerIndex)
 import Domination.UI.Domination.ActiveState as ActiveState
-import Domination.UI.Domination.GameEvent (GameEvent(..))
+import Domination.UI.Domination.GameEvent (GameEvent(NewState, SaveGame, Undo))
+import Domination.UI.Domination.GameEvent as GameEvent
+import Domination.UI.Domination.ActiveState (ActiveState)
 import Domination.UI.Icons as Icons
 import Domination.UI.Settings as Settings
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Aff as Aff
-import Effect.Class (liftEffect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Emojis (emojis)
 import FFI as FFI
 import Halogen (Component)
@@ -89,6 +95,8 @@ import Message as Message
 import Web.Event.Event (EventType(..))
 import Web.HTML.Event.BeforeUnloadEvent.EventTypes as ET
 import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.HTMLElement as HTMLElement
+import Web.UIEvent.KeyboardEvent as KeyboardEvent
 import Web.HTML.Window (document, toEventTarget)
 
 remoteMessageTarget :: String
@@ -220,7 +228,59 @@ render audioContext state = HH.main_ $
     }
   , renderMailboxStatus state
   , renderConnections state
+  , renderProblem state
   ]
+
+-- | The dialog for the first problem waiting, if any (Domination.Data.Notices).
+renderProblem :: forall w. AppState -> HTML w AppAction
+renderProblem { notices, problemLink } = maybe (HH.text "") dialog (showing notices)
+  where
+    dialog shown = HH.div
+      [ HP.class_ Css.problemBackdrop ]
+      [ HH.div
+        [ HP.class_ Css.problemDialog
+        , HP.id "problem-dialog"
+        , HH.attr (H.AttrName "role") "alertdialog"
+        , HH.attr (H.AttrName "aria-modal") "true"
+        , HH.attr (H.AttrName "aria-labelledby") "problem-headline"
+        , HH.attr (H.AttrName "aria-describedby") "problem-consequence"
+        , HE.onKeyDown \event -> if KeyboardEvent.key event == "Escape" then DismissProblem else DoNothing
+        ]
+        [ HH.div
+          [ HP.class_ Css.problemHeader ]
+          [ HH.h2 [ HP.id "problem-headline" ] [ HH.text $ headline shown.problem ]
+          , HH.button
+            [ HP.class_ Css.problemClose
+            , HH.attr (H.AttrName "aria-label") "Dismiss"
+            , HE.onClick \_ -> DismissProblem
+            ]
+            [ HH.text "×" ]
+          ]
+        , HH.p [ HP.id "problem-consequence" ] [ HH.text $ consequence shown.problem ]
+        , HH.pre [ HP.class_ Css.problemMessage ] [ HH.text $ message shown.problem ]
+        , maybe (HH.text "") (HH.p [ HP.class_ Css.problemSummary ] <<< pure <<< HH.text) (summary shown)
+        , HH.div
+          [ HP.class_ Css.problemActions ]
+          [ HH.a
+            [ HP.class_ Css.bugFormLink
+            , HP.href problemLink
+            , HP.target "_blank"
+            , HP.rel "noopener noreferrer"
+            ]
+            [ HH.text "Report bug on GitHub" ]
+          , HH.button
+            [ HP.class_ Css.copyLogButton
+            , HE.onClick \_ -> CopyBugReport
+            ]
+            [ HH.text "Copy bug report" ]
+          , HH.button
+            [ HP.ref dismissProblemRef
+            , HE.onClick \_ -> DismissProblem
+            ]
+            [ HH.text "Dismiss" ]
+          ]
+        ]
+      ]
 
 renderMailboxStatus :: forall w i. AppState -> HTML w i
 renderMailboxStatus state = maybe (HH.text "") (const mark) (mailboxTarget state)
@@ -268,7 +328,7 @@ saveChat
   => EncodeJson messages
   => DecodeJson messages
   => Log m
-  => m (Either String Unit)
+  => m (Either SaveError Unit)
 saveChat = do
   { messages, room } <- H.get
   result <- save (scopedKey room chatKey) messages
@@ -296,11 +356,17 @@ handleAction
 handleAction audioContext = case _ of
   Initialize -> do
     log "Initialize"
+    problemTarget <- toEventTarget <$> window
+    H.subscribe' \_ ->
+      eventListener
+        (EventType DebugLog.problemEvent)
+        problemTarget
+        \event -> Just $ ProblemOccurred $ Unexpected { detail: FFI.detail event }
     eUuid <- load uuidKey
     uuid <- case eUuid of
       Left e -> do
         log $ "Initialize: no existing uuid found, generating a new one."
-          <> " error: " <> e
+          <> " error: " <> printLoadError e
         uuid <- genUuid
         save uuidKey uuid >>= reportSaveFailure
         pure $ show uuid
@@ -310,7 +376,7 @@ handleAction audioContext = case _ of
     username <- case eUsername of
       Left e -> do
         log $ "Initialize: no existing username found, using default."
-          <> " error: " <> e
+          <> " error: " <> printLoadError e
         emoji <- fromMaybe ":)" <$> randomElement emojis
         pure $ emoji <> "lurker" <> emoji
       Right u -> pure u
@@ -328,7 +394,7 @@ handleAction audioContext = case _ of
     kingdom <- case eKingdom of
       Left e -> do
         log $ "Initialize: Failed to load kingdom. Falling back to default."
-          <> "Error: " <> e
+          <> "Error: " <> printLoadError e
         pure defaultKingdom
       Right k ->
         if length k == length defaultKingdom
@@ -339,7 +405,7 @@ handleAction audioContext = case _ of
     nextPlayerIndex <- case ePlayerIndex of
       Left e -> do
         log $ "Initialize: Failed to load playerIndex. Falling back to default."
-          <> "Error: " <> e
+          <> "Error: " <> printLoadError e
         pure 0
       Right i -> pure i
 
@@ -347,7 +413,7 @@ handleAction audioContext = case _ of
     nextPlayerCount <- case ePlayerCount of
       Left e -> do
         log $ "Initialize: Failed to load playerCount. Falling back to default."
-          <> "Error: " <> e
+          <> "Error: " <> printLoadError e
         pure 1
       Right i -> pure i
 
@@ -355,7 +421,7 @@ handleAction audioContext = case _ of
     botStrategies <- case eBotStrategies of
       Left e -> do
         log $ "Initialize: Failed to load botStrategies. Falling back to default."
-          <> "Error: " <> e
+          <> "Error: " <> printLoadError e
         pure []
       Right s -> pure s
 
@@ -363,21 +429,21 @@ handleAction audioContext = case _ of
     botDelay <- case eBotDelay of
       Left e -> do
         log $ "Initialize: Failed to load botDelay. Falling back to default."
-          <> "Error: " <> e
+          <> "Error: " <> printLoadError e
         pure 2000
       Right d -> pure $ clampBotDelay d
 
     eRenameProposals <- load renameProposalsKey
     renameProposals <- case eRenameProposals of
       Left e -> do
-        log $ "Initialize: no rename proposals found. Error: " <> e
+        log $ "Initialize: no rename proposals found. Error: " <> printLoadError e
         pure Map.empty
       Right p -> pure p
 
     eMessages <- load (scopedKey room chatKey)
     messages <- case eMessages of
       Left e -> do
-        log $ "Initialize: Failed to load messages. Error: " <> e
+        log $ "Initialize: Failed to load messages. Error: " <> printLoadError e
         pure emptyChat
       Right m -> pure m
 
@@ -422,7 +488,7 @@ handleAction audioContext = case _ of
     serverUrl <- case eServerUrl of
       Left e -> do
         log $ "Initialize: no existing server URL found, using default."
-          <> " error: " <> e
+          <> " error: " <> printLoadError e
         pure $ defaultServerUrl
       Right u -> pure u
 
@@ -544,7 +610,7 @@ handleAction audioContext = case _ of
     void refreshDebugReport
 
   CreateRoom -> generateRoomCode >>= maybe
-    (error "CreateRoom: failed to generate a room code")
+    (reportProblem RoomNotCreated)
     (setLocationHash <<< roomHash <<< GameRoom)
 
   LeaveRoom -> setLocationHash $ roomHash GlobalRoom
@@ -632,7 +698,7 @@ handleAction audioContext = case _ of
       Right Admit -> do
         (eWireEnvelope :: Either String WireEnvelope) <- readWire detail
         case rmap (review Message._toWire) <$> eWireEnvelope of
-          Left e -> error $ "problem receiving message: " <> e
+          Left e -> reportProblem $ MoveNotReceived { detail: e }
           Right (Tuple header msg) -> receiveMessage header msg
   HandleGameEvent gameEvent -> case gameEvent of
     NewState activeState playMade -> do
@@ -647,7 +713,12 @@ handleAction audioContext = case _ of
         , playMade
         }
     SaveGame activeState -> saveGame activeState
-    Undo { i } -> loadGame $ undoKey $ (i - 1) `mod` 10
+    Undo { i } -> undo i
+    GameEvent.ProblemOccurred problem -> reportProblem problem
+  ProblemOccurred problem -> reportProblem problem
+  DismissProblem -> do
+    H.modify_ \st -> st { notices = dismiss st.notices }
+    showProblem
   HeartbeatTick -> do
     { id: clientId, relayReachable, resync: marks } <- H.get
     timestamp <- now
@@ -743,23 +814,38 @@ handleAction audioContext = case _ of
             <> "; Clients after new heartbeat: " <> show updatedClientCount
     loadGame key = restoreGame key >>= traverse_ shareGame
     restoreGame key = do
-      { dominationConfig: { nextPlayerIndex }, room } <- H.get
-      mbGame <- load $ scopedKey room key
-      case mbGame of
+      room <- H.gets _.room
+      loaded <- load $ scopedKey room key
+      case loaded of
         Left e -> do
-          error e
+          maybe (log $ printLoadError e) reportProblem (loadProblem e)
           pure Nothing
-        Right activeState -> do
-          let
-            newActiveState = ActiveState.upgrade
-              $ (_playerIndex .~ nextPlayerIndex)
-              $ activeState
-          queryGame $ LoadActiveState newActiveState
-          pure $ Just activeState
+        Right activeState -> Just <$> applySaved activeState
+    applySaved activeState = do
+      { nextPlayerIndex } <- H.gets _.dominationConfig
+      queryGame $ LoadActiveState
+        $ ActiveState.upgrade
+        $ (_playerIndex .~ nextPlayerIndex)
+        $ activeState
+      pure activeState
+    -- Undo: Domination.Data.Undo tells refusals from faults.
+    undo i = do
+      { room, failedSaves } <- H.get
+      (loaded :: Either LoadError ActiveState) <- load
+        $ scopedKey room $ undoKey $ historySlot (i - 1)
+      case undoOutcome { i, failedSaves } loaded of
+        Restore saved -> applySaved saved >>= shareGame
+        NothingToUndo -> log "Refused: Undo: there is no earlier step"
+        OutsideHistory -> log $ "Refused: Undo: step " <> show (i - 1)
+          <> " is not in this device's history"
+        HistoryLost step -> reportProblem $ UndoHistoryLost { step }
+        HistoryUnreadable e -> maybe (log $ printLoadError e) reportProblem (loadProblem e)
     shareGame = publishGame <<< toGameMessage
     saveGame activeState = do
       room <- H.gets _.room
-      save (scopedKey room $ undoKey $ activeState.i `mod` 10) activeState >>= reportSaveFailure
+      historySave <- save (scopedKey room $ undoKey $ historySlot activeState.i) activeState
+      H.modify_ \st -> st { failedSaves = recordSaveAttempt activeState.i historySave st.failedSaves }
+      reportSaveFailure historySave
       save (scopedKey room gameStateKey) activeState >>= reportSaveFailure
     queryGame state = do
       _ <- H.query
@@ -779,7 +865,7 @@ handleAction audioContext = case _ of
         <<< (_chatNumber .~ chatNumber)
       saveChat >>= reportSaveFailure
       sendMessage chat
-    reportSaveFailure = either error pure
+    reportSaveFailure = either (reportProblem <<< saveProblem) pure
     updateRoster changeRoster = do
       H.modify_ $ _dominationConfig %~ changeRoster
       { nextPlayerIndex, nextPlayerCount, botStrategies } <- H.gets _.dominationConfig
@@ -849,7 +935,7 @@ handleAction audioContext = case _ of
       unless enabled $ traverse_ identity
         $ broadcastVersioned <$> version <*> outbox
     broadcastVersioned version msg = encodeEnvelope (versionSender version) msg
-      >>= either error broadcastWire
+      >>= either reportNotSent broadcastWire
     receiveGameFrame header msg = do
       enabled <- H.gets $ isJust <<< mailboxTarget
       previous <- H.gets _.mailbox.sync
@@ -885,17 +971,15 @@ handleAction audioContext = case _ of
             Right (Tuple _ msg@(GameMessage _)) -> do
               applyGame msg
               pure $ Just msg
-            Right _ -> do
-              error "Mailbox: the room mailbox held something other than a game"
-              pure Nothing
-            Left e -> do
-              error $ "Mailbox: could not decode the stored game: " <> e
-              pure Nothing
-        other -> do
-          error $ "Mailbox: stored game not admitted: " <> show other
+            Right _ -> unreadable "the room mailbox held something other than a game"
+            Left e -> unreadable $ "could not decode the stored game: " <> e
+        other -> unreadable $ "stored game not admitted: " <> show other
+      where
+        unreadable detail = do
+          reportProblem $ MailboxGameUnreadable { detail }
           pure Nothing
     broadcastGame stamp msg = encodeEnvelope (stampSender stamp) msg
-      >>= either error broadcastWire
+      >>= either reportNotSent broadcastWire
     pullMailbox = do
       pulledAt <- wallClock
       H.modify_ \st -> st { resync = Resync.pulled pulledAt st.resync }
@@ -946,7 +1030,7 @@ handleAction audioContext = case _ of
           | not session.inFlight && not (isClean session.sync) -> do
               eEnvelope <- encodeEnvelope (stampSender $ deliveryStamp session.sync) outbox
               case eEnvelope of
-                Left e -> error e
+                Left e -> reportNotSent e
                 Right envelope -> do
                   let
                     -- While the mailbox is known to be down, live play does
@@ -1038,9 +1122,48 @@ sendMessage
   . Log m
   => Broadcast WebSocketBroadcaster m
   => WireCodec m
+  => MonadEffect m
   => RemoteMessage
   -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
-sendMessage message = encodeEnvelope identity message >>= either error broadcastWire
+sendMessage message = encodeEnvelope identity message >>= either reportNotSent broadcastWire
+
+reportNotSent
+  :: forall t1 r o1 q1 output m
+  . Log m
+  => MonadEffect m
+  => String
+  -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
+reportNotSent detail = reportProblem $ MoveNotSent { detail }
+
+-- | Logs a fault and queues it for the problem dialog
+-- | (Domination.Data.Notices).
+reportProblem
+  :: forall t1 r o1 q1 output m
+  . Log m
+  => MonadEffect m
+  => Problem
+  -> HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
+reportProblem problem = do
+  error $ message problem
+  before <- H.gets shownProblem
+  after <- shownProblem <$> H.modify \st -> st { notices = notice problem st.notices }
+  when (after /= before) showProblem
+  where
+    shownProblem = map _.problem <<< showing <<< _.notices
+
+-- | Points the dialog's bug-report link at the shown problem and moves focus
+-- | to the dialog, so keyboard and screen reader users meet it at once.
+showProblem
+  :: forall t1 r o1 q1 output m
+  . MonadEffect m
+  => HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
+showProblem = H.gets (showing <<< _.notices) >>= traverse_ \{ problem } -> do
+  report <- liftEffect DebugLog.currentReport
+  H.modify_ _ { problemLink = BugForm.problemFormUrl problem report }
+  H.getHTMLElementRef dismissProblemRef >>= traverse_ (liftEffect <<< HTMLElement.focus)
+
+dismissProblemRef :: H.RefLabel
+dismissProblemRef = H.RefLabel "dismiss-problem"
 
 toGameMessage :: forall r. { state :: Game, i :: Int | r } -> RemoteMessage
 toGameMessage { state, i } = GameMessage { state, i, playMade: Nothing }
