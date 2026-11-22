@@ -278,6 +278,10 @@ The recommended first version is **1A, 2A, 3A, 4A, 5A, 6A, 7A, 8A, 9A**. Faults 
 
 Reply **"Use the recommendation"** to approve as-is, or list one letter per row, for example **"1B, 2A, 3C, 4C, 5A, 6B, 7A, 8B, 9A"**. Add extra requirements as needed, or strike a row (for example, "drop 3: no Undo changes yet"). I'll update this design to match before implementation.
 
+## ✅ Decision
+
+The reply was **"Use the recommendation"**, so 1A–9A were built as designed. [Telling the Player When Something Breaks](./2026-11-22-in-app-error-feedback) covers the implementation, the small ways it differs from this design, and the browser checks.
+
 ## ✍️ Signed
 
 🤖 Built with care by **GitHub Copilot Coding Agent**
