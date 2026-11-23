@@ -187,14 +187,32 @@ const watchLifecycle = () => {
   window.addEventListener('offline', () => lifecycle('browser offline'))
 }
 
+// The address of Domination's own script, read while it first runs. Only
+// errors thrown from it are Domination's; errors from browser extensions and
+// other scripts are recorded but never shown to the player.
+const bundleUrl = typeof document !== 'undefined' && document.currentScript
+  ? document.currentScript.src
+  : ''
+
+const isOurs = source => bundleUrl !== '' && typeof source === 'string' && source.includes(bundleUrl)
+
+export const problemEvent = 'domination:problem'
+
+const announceProblem = detail =>
+  window.dispatchEvent(new CustomEvent(problemEvent, { detail: truncate(detail, maxEntryLength) }))
+
 export const install = () => {
   if (installed) return
   installed = true
   ;['log', 'info', 'warn', 'error'].forEach(captureConsole)
-  window.addEventListener('error', ({ message, filename, lineno, colno, error }) =>
-    record('UNCAUGHT', [message, `${filename}:${lineno}:${colno}`, error || '']))
-  window.addEventListener('unhandledrejection', ({ reason }) =>
-    record('UNHANDLED_REJECTION', [reason]))
+  window.addEventListener('error', ({ message, filename, lineno, colno, error }) => {
+    record('UNCAUGHT', [message, `${filename}:${lineno}:${colno}`, error || ''])
+    if (isOurs(filename)) announceProblem(`${message} (${filename}:${lineno}:${colno})`)
+  })
+  window.addEventListener('unhandledrejection', ({ reason }) => {
+    record('UNHANDLED_REJECTION', [reason])
+    if (isOurs(reason && reason.stack)) announceProblem(`Unhandled rejection: ${describe(reason)}`)
+  })
   watchLifecycle()
   lifecycle(`session started (visibility ${visibility()}, discarded before: ${Boolean(document.wasDiscarded)}, online: ${navigator.onLine})`)
 }

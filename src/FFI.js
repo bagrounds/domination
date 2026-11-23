@@ -248,13 +248,4 @@ export const decompressStringFFI = just => nothing => s => {
     : just(result)
 }
 
-export const setItem = left => right => unit => key => value => storage => () => {
-  try {
-    storage.setItem(key, value)
-    return right(unit)
-  } catch (e) {
-    return left(e && e.name ? `${e.name}: ${e.message}` : String(e))
-  }
-}
-
 export const now = () => performance.now()

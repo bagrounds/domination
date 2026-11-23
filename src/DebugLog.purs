@@ -4,6 +4,7 @@ module DebugLog
   , clear
   , currentReport
   , install
+  , problemEvent
   , renderReport
   , showVersion
   , wholeLog
@@ -29,6 +30,10 @@ type BugReport =
   }
 
 foreign import install :: Effect Unit
+
+-- | The window event announcing an uncaught error from Domination's own
+-- | script; its detail is the error text.
+foreign import problemEvent :: String
 
 foreign import snapshot :: Effect (Array String)
 

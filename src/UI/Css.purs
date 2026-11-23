@@ -264,3 +264,18 @@ renameLabel = ClassName "rename-label"
 
 renameCurrent :: ClassName
 renameCurrent = ClassName "rename-current"
+
+problemBackdrop :: ClassName
+problemBackdrop = ClassName "problem-backdrop"
+problemDialog :: ClassName
+problemDialog = ClassName "problem-dialog"
+problemHeader :: ClassName
+problemHeader = ClassName "problem-header"
+problemClose :: ClassName
+problemClose = ClassName "problem-close"
+problemMessage :: ClassName
+problemMessage = ClassName "problem-message"
+problemSummary :: ClassName
+problemSummary = ClassName "problem-summary"
+problemActions :: ClassName
+problemActions = ClassName "problem-actions"

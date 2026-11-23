@@ -4,6 +4,10 @@
 - No `[[wiki links]]` in the body: posts are copied to bagrounds.org, whose automation adds those links. Only link to things that exist (GitHub URLs, external sources, `./<slug>` for other posts). Book recommendations, if any, are plain text.
 - Pin GitHub source-code links in blog posts to an immutable commit SHA, not a branch such as `master`.
 
+## Versioning
+- Bump the version for every PR, but only once per PR. New features get a minor version bump, bug fixes get a patch. We haven't gone to 1.0.0 yet, so don't do a major bump unless we've agreed to explicitly.
+- See `./scripts/bump-version` to understand the process.
+
 ## Engineering Excellence
 - Strong static types - inspiration from Haskell
 - Thorough test coverage, ideally with property based tests

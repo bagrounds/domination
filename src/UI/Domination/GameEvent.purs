@@ -12,6 +12,7 @@ module Domination.UI.Domination.GameEvent where
 import Data.Maybe (Maybe)
 import Domination.Data.Game (Game)
 import Domination.Data.Play (Play)
+import Domination.Data.Problem (Problem)
 import Domination.UI.Domination.ActiveState (ActiveState)
 
 data GameEvent
@@ -20,3 +21,4 @@ data GameEvent
     (Maybe { play :: Play, playerIndex :: Int, state :: Game })
   | SaveGame ActiveState
   | Undo ActiveState
+  | ProblemOccurred Problem

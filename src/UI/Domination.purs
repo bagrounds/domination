@@ -30,7 +30,7 @@ import Data.Int (toNumber)
 import Domination.Capability.Audio (class Audio, beep)
 import Domination.Capability.Audio as Sound
 import Domination.Capability.Dom (class Dom)
-import Domination.Capability.Log (class Log, error, log)
+import Domination.Capability.Log (class Log, log)
 import Domination.Capability.Random (class Random)
 import Domination.Capability.Storage (class Storage)
 import Domination.Data.Card (Card, _card, passFilter)
@@ -58,6 +58,7 @@ import Domination.UI.Css as Css
 import Domination.UI.DomSlot (Area(..), DomSlot(..))
 import Domination.UI.Domination.Action (Action(..))
 import Domination.Data.AI as AI
+import Domination.Data.Problem (Problem(..))
 import Domination.UI.Domination.ActiveState (ActiveState, BotConfig, ComponentState, PendingBotPlay, isPendingFor, mkComponentState, _active, _i, _playerIndex, _showSupply, _state)
 import Domination.UI.Domination.GameEvent (GameEvent(..))
 import Domination.UI.Hud as Hud
@@ -214,6 +215,7 @@ handleQuery audioContext = case _ of
       playerIndex
       (NewGame { playerCount, supply, longGame })
       audioContext
+      (refuse audioContext)
     pure $ Just a
 
   ConfigureBots botConfig a -> do
@@ -889,7 +891,7 @@ handleAction
 handleAction audioContext = case _ of
   MakePlay play -> do
     let playerIndex = fromMaybe zero $ play ^? Play._playerIndex
-    playAndReport playerIndex play audioContext
+    playAndReport playerIndex play audioContext $ refuse audioContext
   UndoRequest as -> do
     cancelPendingBotPlay
     H.raise $ Undo as
@@ -900,6 +902,7 @@ handleAction audioContext = case _ of
       Just pending | isPendingFor cs.active pending -> do
         H.modify_ _ { pendingBotPlay = Nothing, botTimer = Nothing }
         playAndReport pending.bot.playerIndex pending.play audioContext
+          $ reportBotStuck pending.bot
       _ -> pure unit
   DoNothing -> pure unit
 
@@ -911,8 +914,9 @@ playAndReport
   => Int
   -> Play
   -> AudioContext
+  -> (String -> HalogenM ComponentState Action s GameEvent m Unit)
   -> HalogenM ComponentState Action s GameEvent m Unit
-playAndReport playerIndex play audioContext = do
+playAndReport playerIndex play audioContext onRefused = do
   cs <- H.get
   let activeState = cs.active
   let { state, showSupply } = activeState
@@ -921,9 +925,7 @@ playAndReport playerIndex play audioContext = do
     lastTurn = state.turn
   result <- Game.makeAutoPlay play activeState.state
   case result of
-    Left e -> do
-      beep audioContext Sound.Error
-      error e
+    Left e -> onRefused e
     Right gameState -> do
       case play of
         Purchase _ -> beep audioContext Sound.Purchase
@@ -959,6 +961,27 @@ playAndReport playerIndex play audioContext = do
         (((_i .~ newI) >>> (_state .~ gameState)) activeState)
         playMade
 
+-- | The rules refused what the player asked for: expected, so not a problem.
+refuse
+  :: forall s m
+  . Log m
+  => Audio m
+  => AudioContext
+  -> String
+  -> HalogenM ComponentState Action s GameEvent m Unit
+refuse audioContext reason = do
+  beep audioContext Sound.Error
+  log $ "Refused: " <> reason
+
+-- | A bot that can't choose a play, or chooses one the rules refuse, leaves
+-- | the game waiting for it: a fault, unlike a refused human click.
+reportBotStuck
+  :: forall s m
+  . AI.Bot
+  -> String
+  -> HalogenM ComponentState Action s GameEvent m Unit
+reportBotStuck bot detail = H.raise $ ProblemOccurred $ BotStuck { bot: AI.botLabel bot, detail }
+
 playBotTurns
   :: forall s m
   . Log m
@@ -978,7 +1001,7 @@ playBotTurns audioContext = do
     cancelPendingBotPlay
     for_ botToAct \bot ->
       AI.generateBotPlay bot cs.active.state >>= case _ of
-        Left e -> error $ "Bot error: " <> e
+        Left e -> reportBotStuck bot e
         Right play -> scheduleBotPlay audioContext
           { bot, play, i: cs.active.i, state: cs.active.state }
 
