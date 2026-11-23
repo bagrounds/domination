@@ -4,6 +4,9 @@
 - No `[[wiki links]]` in the body: posts are copied to bagrounds.org, whose automation adds those links. Only link to things that exist (GitHub URLs, external sources, `./<slug>` for other posts). Book recommendations, if any, are plain text.
 - Pin GitHub source-code links in blog posts to an immutable commit SHA, not a branch such as `master`.
 
+## Versioning
+- Bump the patch version for every PR before it is ready for review. Run `./scripts/bump-version dev`; it increments the patch in `src/Version.purs` and updates the service-worker cache name in `assets/sw.js` without committing or tagging.
+
 ## Engineering Excellence
 - Strong static types - inspiration from Haskell
 - Thorough test coverage, ideally with property based tests
