@@ -5,7 +5,8 @@
 - Pin GitHub source-code links in blog posts to an immutable commit SHA, not a branch such as `master`.
 
 ## Versioning
-- Bump the patch version for every PR before it is ready for review. Run `./scripts/bump-version dev`; it increments the patch in `src/Version.purs` and updates the service-worker cache name in `assets/sw.js` without committing or tagging.
+- Bump the version for every PR, but only once per PR. New features get a minor version bump, bug fixes get a patch. We haven't gone to 1.0.0 yet, so don't do a major bump unless we've agreed to explicitly.
+- See `./scripts/bump-version` to understand the process.
 
 ## Engineering Excellence
 - Strong static types - inspiration from Haskell
