@@ -1,12 +1,16 @@
 module DebugLog
   ( BugReport
+  , Fact
   , LogExcerpt
   , clear
+  , consoleLogKey
   , currentReport
+  , forget
   , install
   , problemEvent
   , renderReport
   , showVersion
+  , syncJournalKey
   , wholeLog
   ) where
 
@@ -20,16 +24,30 @@ import Version (Version(..), version)
 -- | The newest lines of a log, and how many older lines were left out.
 type LogExcerpt = { lines :: Array String, omitted :: Int }
 
+type Fact = { label :: String, value :: String }
+
 type BugReport =
   { version :: Version
   , userAgent :: String
   , generatedAt :: String
-  , facts :: Array { label :: String, value :: String }
+  , facts :: Array Fact
   , journal :: LogExcerpt
   , entries :: LogExcerpt
   }
 
-foreign import install :: Effect Unit
+-- | Starts recording the console and page lifecycle. The logs stop saving
+-- | once `stillCurrent` is false: the Storage panel deleted data this page
+-- | holds, and the page is about to reload.
+foreign import install :: Effect Boolean -> Effect Unit
+
+-- | The localStorage keys of the console log and the sync journal.
+foreign import consoleLogKey :: String
+
+foreign import syncJournalKey :: String
+
+-- | Empties the log stored at a key, so removing the key isn't undone by the
+-- | next save; other keys are ignored.
+foreign import forget :: String -> Effect Unit
 
 -- | The window event announcing an uncaught error from Domination's own
 -- | script; its detail is the error text.
@@ -39,7 +57,7 @@ foreign import snapshot :: Effect (Array String)
 
 foreign import journal :: Effect (Array String)
 
-foreign import pageFacts :: Effect (Array { label :: String, value :: String })
+foreign import pageFacts :: Effect (Array Fact)
 
 foreign import clear :: Effect Unit
 
@@ -50,11 +68,12 @@ foreign import nowIso :: Effect String
 wholeLog :: Array String -> LogExcerpt
 wholeLog lines = { lines, omitted: 0 }
 
-currentReport :: Effect BugReport
-currentReport = { version, userAgent: _, generatedAt: _, facts: _, journal: _, entries: _ }
+-- | The report as of now, with `extraFacts` after the page facts.
+currentReport :: Array Fact -> Effect BugReport
+currentReport extraFacts = { version, userAgent: _, generatedAt: _, facts: _, journal: _, entries: _ }
   <$> userAgent
   <*> nowIso
-  <*> pageFacts
+  <*> ((_ <> extraFacts) <$> pageFacts)
   <*> (wholeLog <$> journal)
   <*> (wholeLog <$> snapshot)
 

@@ -202,6 +202,9 @@ settingsTab = ClassName "settings-tab"
 settingsTabActive :: ClassName
 settingsTabActive = ClassName "settings-tab-active"
 
+settingsTabPanel :: ClassName
+settingsTabPanel = ClassName "settings-tab-panel"
+
 botPlayOverlay :: ClassName
 botPlayOverlay = ClassName "bot-play-overlay"
 
@@ -237,6 +240,45 @@ inviteLink = ClassName "invite-link"
 
 roomNotice :: ClassName
 roomNotice = ClassName "room-notice"
+
+storagePanel :: ClassName
+storagePanel = ClassName "storage-panel"
+
+storagePanelHeader :: ClassName
+storagePanelHeader = ClassName "storage-panel-header"
+
+storageNote :: ClassName
+storageNote = ClassName "storage-note"
+
+storageGroup :: ClassName
+storageGroup = ClassName "storage-group"
+
+storageActions :: ClassName
+storageActions = ClassName "storage-actions"
+
+storageItem :: ClassName
+storageItem = ClassName "storage-item"
+
+storageItemRow :: ClassName
+storageItemRow = ClassName "storage-item-row"
+
+storageItemLabel :: ClassName
+storageItemLabel = ClassName "storage-item-label"
+
+storageItemName :: ClassName
+storageItemName = ClassName "storage-item-name"
+
+storageItemSize :: ClassName
+storageItemSize = ClassName "storage-item-size"
+
+storageValue :: ClassName
+storageValue = ClassName "storage-value"
+
+storageConfirm :: ClassName
+storageConfirm = ClassName "storage-confirm"
+
+storageClearAll :: ClassName
+storageClearAll = ClassName "storage-clear-all"
 
 renameForm :: ClassName
 renameForm = ClassName "rename-form"

@@ -2,9 +2,10 @@
   "name": "domination-e2e",
   "private": true,
   "type": "module",
-  "description": "Browser chaos tests for room sync",
+  "description": "Browser tests: chaos tests for room sync, and settings scroll reachability",
   "scripts": {
-    "chaos": "node chaos.js"
+    "chaos": "node chaos.js",
+    "settings-scroll": "node settings-scroll.js"
   },
   "dependencies": {
     "playwright-core": "1.64.1",
