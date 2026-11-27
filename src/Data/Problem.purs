@@ -73,10 +73,12 @@ problemKind = case _ of
   RoomNotCreated -> Rooms
   Unexpected _ -> Script
 
-saveProblem :: SaveError -> Problem
+-- | A skipped save after a clear is no fault: the page reloads instead.
+saveProblem :: SaveError -> Maybe Problem
 saveProblem error = case error of
-  QuotaExceeded _ -> StorageFull { detail: printSaveError error }
-  SaveRejected _ -> StorageUnavailable { detail: printSaveError error }
+  QuotaExceeded _ -> Just $ StorageFull { detail: printSaveError error }
+  SaveRejected _ -> Just $ StorageUnavailable { detail: printSaveError error }
+  Superseded _ -> Nothing
 
 -- | A saved game that isn't there yet is expected, not a problem.
 loadProblem :: LoadError -> Maybe Problem

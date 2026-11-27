@@ -15,6 +15,7 @@ import Domination.Data.AI.Strategy (Strategy)
 import Domination.Data.Card (CardSpec)
 import Domination.Data.Problem (Problem)
 import Domination.Data.Retheme (RenameTarget)
+import Domination.Data.StorageInventory (Locator, Selection)
 import Domination.UI.Domination.GameEvent (GameEvent)
 import Web.Event.Event (Event)
 
@@ -51,6 +52,14 @@ data AppAction
   | SwitchSettingsTab SettingsTab
   | CopyBugReport
   | ClearDebugLog
+  | RefreshStorage
+  | StorageChanged
+  | AskToRemove Selection
+  | CancelRemoval
+  | ConfirmRemoval Selection
+  | ShowStoredValue Locator
+  | HideStoredValue
+  | CopyStoredValue Locator
   | CreateRoom
   | LeaveRoom
   | RoomChanged

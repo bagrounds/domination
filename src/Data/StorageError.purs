@@ -26,9 +26,12 @@ type BrowserFailure = { name :: String, message :: String }
 
 type SaveFailure = { key :: String, chars :: Int, detail :: String }
 
+-- | `Superseded`: the save was skipped because the Storage panel deleted
+-- | data this page holds; the page must reload rather than write it back.
 data SaveError
   = QuotaExceeded SaveFailure
   | SaveRejected SaveFailure
+  | Superseded { key :: String }
 
 data LoadError
   = Absent { key :: String }
@@ -69,6 +72,8 @@ printSaveError :: SaveError -> String
 printSaveError = case _ of
   QuotaExceeded failure -> printSaveFailure failure
   SaveRejected failure -> printSaveFailure failure
+  Superseded { key } -> "Skipped saving to local storage after its data was cleared."
+    <> " key: '" <> key <> "'"
 
 printSaveFailure :: SaveFailure -> String
 printSaveFailure { key, chars, detail } = "Error saving to local storage."

@@ -24,7 +24,8 @@ import Domination.Capability.Dom (class Dom)
 import Domination.Capability.Log (class Log)
 import Domination.Data.AI.Strategy (Strategy(..), allStrategies, botName)
 import Domination.Data.Card (Card, CardSpec, _card, _requirements)
-import Domination.Data.Room (Room(..), roomHash, unRoomCode)
+import Domination.Data.Mailbox (isClean)
+import Domination.Data.Room (Room(..), isGameRoom, roomHash, unRoomCode)
 import Domination.UI.Card as Card
 import Domination.UI.Css as Css
 import Domination.UI.DebugLog as DebugLog
@@ -33,6 +34,7 @@ import Domination.UI.MailboxUrlInput as MailboxUrlInput
 import Domination.UI.Rename as Rename
 import Domination.UI.RenderText (renderText)
 import Domination.UI.ServerUrlInput as ServerUrlInput
+import Domination.UI.Storage as Storage
 import Domination.UI.UsernameInput as UsernameInput
 import Domination.UI.Util as Util
 import Halogen.Component (ComponentSlot)
@@ -195,6 +197,11 @@ renderTabContent BotsTab _ { botStrategies, botDelay } = HH.div_
   , renderBotDelay botDelay
   ]
 renderTabContent DebugTab cs _ = DebugLog.render cs.debugReport
+renderTabContent StorageTab cs _ = Storage.render
+  { panel: cs.storagePanel
+  , room: cs.room
+  , unsentMove: isGameRoom cs.room && not (isClean cs.mailbox.sync)
+  }
 renderTabContent RenameTab cs _ = Rename.render cs.renameProposals
 renderTabContent KingdomTab _ { kingdom } = HH.div_
   [ HH.button

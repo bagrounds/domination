@@ -19,15 +19,17 @@ import Data.Either (Either(..), note)
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Domination.AppM (AppM)
+import Domination.Capability.ClearGeneration as ClearGeneration
 import Domination.Data.StorageError (BrowserFailure, LoadError(..), SaveError(..), describeBrowserFailure, printSaveError, saveError)
+import Domination.Data.StorageKey (StorageKey, printKey)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Halogen.Query.HalogenM (HalogenM)
 import Util (mapLeft, readJson)
 
 class Monad m <= Storage m where
-  save :: forall a. EncodeJson a => DecodeJson a => String -> a -> m (Either SaveError Unit)
-  load :: forall a. EncodeJson a => DecodeJson a => String -> m (Either LoadError a)
+  save :: forall a. EncodeJson a => DecodeJson a => StorageKey -> a -> m (Either SaveError Unit)
+  load :: forall a. EncodeJson a => DecodeJson a => StorageKey -> m (Either LoadError a)
 
 instance storageHalogenM :: Storage m => Storage (HalogenM st act slots msg m) where
   save key = lift <<< save key
@@ -68,17 +70,21 @@ foreign import getItemFFI
   -> String
   -> Effect (Either BrowserFailure (Maybe String))
 
+-- | Writes nothing once the Storage panel has deleted data this page holds
+-- | (Domination.Capability.ClearGeneration): the page must reload instead.
 saveStorage
   :: forall a m
   . MonadEffect m
   => EncodeJson a
   => DecodeJson a
-  => String -> a -> m (Either SaveError Unit)
-saveStorage key value = liftEffect do
-  result <- setItemFFI Left (Right unit) key stringValue
-  pure $ saveError { key, chars: String.length stringValue } `mapLeft` result
+  => StorageKey -> a -> m (Either SaveError Unit)
+saveStorage storageKey value = liftEffect do
+  current <- ClearGeneration.isCurrent
+  if current then write else pure $ Left $ Superseded { key }
   where
+    key = printKey storageKey
     stringValue = (stringify <<< encodeJson) value
+    write = mapLeft (saveError { key, chars: String.length stringValue }) <$> setItemFFI Left (Right unit) key stringValue
 
 -- | The log line for a failed save of `value` at `key`, failing with
 -- | `browserError`.
@@ -91,10 +97,11 @@ loadStorage
   . MonadEffect m
   => EncodeJson a
   => DecodeJson a
-  => String -> m (Either LoadError a)
-loadStorage key = liftEffect do
+  => StorageKey -> m (Either LoadError a)
+loadStorage storageKey = liftEffect do
   result <- getItemFFI Left Right Just Nothing key
   pure $ unavailable `mapLeft` result >>= note (Absent { key }) >>= (mapLeft unreadable <<< readJson)
   where
+    key = printKey storageKey
     unavailable failure = LoadUnavailable { key, detail: describeBrowserFailure failure }
     unreadable detail = Unreadable { key, detail }

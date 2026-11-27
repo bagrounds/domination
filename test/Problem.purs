@@ -16,7 +16,7 @@ import Domination.Data.Problem (Problem(..), ProblemKind(..), allProblemKinds, c
 import Domination.Data.StorageError (LoadError(..), SaveError(..), quotaErrorNames, saveError)
 import Domination.Data.Undo (FailedSaves, UndoOutcome(..), historySlot, historySlots, recordSaveAttempt, undoOutcome)
 import Effect (Effect)
-import Test.QuickCheck (Result, assertEquals, (<?>))
+import Test.QuickCheck (Result(..), assertEquals, (<?>))
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, oneOf, vectorOf)
 import Test.Room (all_success, quick_check)
 
@@ -44,19 +44,26 @@ problem_tests =
         pure $ case saved of
           QuotaExceeded _ -> (name `elem` quotaErrorNames) <?> "quota for " <> show name
           SaveRejected _ -> not (name `elem` quotaErrorNames) <?> "rejected for " <> show name
+          Superseded _ -> Failed $ "superseded for " <> show name
     }
   , { name: "∀ save error: it is a storage problem whose message names the key, never the value"
     , test: quick_check 300 do
         key <- textGen 20
         name <- elements $ NEA.cons' "SecurityError" quotaErrorNames
         text <- textGen 2000
-        let problem = saveProblem $ saveError { key, chars: 123456 } { name, message: text }
-        pure $ all_success
-          [ assertEquals (problemKind problem) Storage
-          , String.contains (String.Pattern $ "key: '" <> key <> "' (123456 chars)") (message problem)
-              <?> message problem
-          , (String.length (message problem) <= String.length key + 300) <?> message problem
-          ]
+        pure $ case saveProblem $ saveError { key, chars: 123456 } { name, message: text } of
+          Nothing -> Failed "no problem for a failed save"
+          Just problem -> all_success
+            [ assertEquals (problemKind problem) Storage
+            , String.contains (String.Pattern $ "key: '" <> key <> "' (123456 chars)") (message problem)
+                <?> message problem
+            , (String.length (message problem) <= String.length key + 300) <?> message problem
+            ]
+    }
+  , { name: "∀ key: a save skipped after a clear is not a problem"
+    , test: quick_check 100 do
+        key <- textGen 20
+        pure $ assertEquals (saveProblem $ Superseded { key }) Nothing
     }
   , { name: "a missing saved game is expected; a broken or blocked one is a problem"
     , test: pure $ all_success

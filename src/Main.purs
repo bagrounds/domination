@@ -19,7 +19,8 @@ import Audio.WebAudio.Types (AudioContext)
 import Control.Monad.State (class MonadState)
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (elem, length, take)
-import Data.Foldable (traverse_)
+import Data.Array as Array
+import Data.Foldable (for_, traverse_)
 import Data.Foldable as Foldable
 import Data.Bifunctor (rmap)
 import Data.Either (Either(..), either, hush, isRight)
@@ -35,6 +36,8 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing, maybe)
 import Data.Tuple (Tuple(..))
 import Domination.AppM (runAppM)
 import Domination.Capability.Audio (class Audio, newAudioContext, runAudioM)
+import Domination.Capability.ClearGeneration as ClearGeneration
+import Domination.Capability.StorageInspector as StorageInspector
 import Domination.Capability.Broadcast (class Broadcast, broadcast, maybeCreateBroadcaster, reopen)
 import Domination.Capability.Broadcast.WebSocket (WebSocketBroadcaster)
 import Domination.Capability.Clock (class Clock, now)
@@ -55,12 +58,14 @@ import Domination.Data.LogicalClock (Verdict(..), judge, savedBeforeVersions, se
 import Domination.Data.Notices (dismiss, notice, showing, summary)
 import Domination.Data.Problem (Problem(..), headline, consequence, loadProblem, message, saveProblem)
 import Domination.Data.StorageError (LoadError, SaveError, printLoadError)
-import Domination.Data.Undo (UndoOutcome(..), historySlot, recordSaveAttempt, undoOutcome)
+import Domination.Data.StorageInventory (Locator(..), WebStorage(..), discoveredEntries, item, removalPlan, storageSummary)
+import Domination.Data.StorageKey (DeviceKey(..), RoomKey(..), StorageKey(..), undoStep)
+import Domination.Data.Undo (UndoOutcome(..), recordSaveAttempt, undoOutcome)
 import Domination.Data.Mailbox (Delivery(..), Dirty(..), PullOutcome(..), Settlement(..), Stamp(..), Status(..), Sync, deliveryStamp, initialSync, interpretDelivery, interpretPull, isClean, mailboxBackoff, mailboxRoomUrl, overtakes, ownChange, printRevisionTag, pullCursor, receiveFrame, senderStamp, settleDelivery, settlePull, stampSender, status)
 import Domination.Data.Resync (Occasion(..), Reaction(..), clockAt, hiddenFor, initialMarks, reactions)
 import Domination.Data.Resync as Resync
 import Domination.Data.Retheme (Proposals, proposeRename, renameMapping)
-import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, channelName, generateRoomCode, headerSender, isGameRoom, parseHeader, parseRoomHash, printHeader, roomFromHash, roomHash, scopedKey)
+import Domination.Data.Room (Admission(..), Header(..), Room(..), admission, channelName, generateRoomCode, headerSender, isGameRoom, parseHeader, parseRoomHash, printHeader, roomFromHash, roomHash)
 import Domination.Env (env)
 import Domination.UI.Chat as Chat
 import Domination.UI.Css as Css
@@ -74,6 +79,7 @@ import Domination.UI.Domination.GameEvent as GameEvent
 import Domination.UI.Domination.ActiveState (ActiveState)
 import Domination.UI.Icons as Icons
 import Domination.UI.Settings as Settings
+import Domination.UI.Storage as Storage
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Aff as Aff
@@ -102,33 +108,6 @@ import Web.HTML.Window (document, toEventTarget)
 remoteMessageTarget :: String
 remoteMessageTarget = "remote-message-target"
 
-uuidKey :: String
-uuidKey = "player-id"
-
-serverUrlKey :: String
-serverUrlKey = "server-url"
-
-usernameKey :: String
-usernameKey = "username"
-
-chatKey :: String
-chatKey = "chat"
-
-renameProposalsKey :: String
-renameProposalsKey = "rename_proposals"
-
-gameStateKey :: String
-gameStateKey = "game_state"
-
-mailboxUrlKey :: String
-mailboxUrlKey = "mailbox-url"
-
-mailboxSyncKey :: String
-mailboxSyncKey = "mailbox_sync"
-
-gameVersionKey :: String
-gameVersionKey = "game_version"
-
 mailboxTimeoutMs :: Int
 mailboxTimeoutMs = 5000
 
@@ -150,12 +129,9 @@ gameOf = case _ of
   GameMessage { state } -> Just state
   _ -> Nothing
 
-undoKey :: Int -> String
-undoKey saveNumber = "game_state_" <> show saveNumber
-
 main :: Effect Unit
 main = launchAff_ $ do
-  liftEffect DebugLog.install
+  liftEffect $ DebugLog.install ClearGeneration.isCurrent
   liftEffect $ FFI.registerServiceWorker
   audioContext <- liftEffect $ runAudioM newAudioContext
   HA.awaitLoad
@@ -331,7 +307,7 @@ saveChat
   => m (Either SaveError Unit)
 saveChat = do
   { messages, room } <- H.get
-  result <- save (scopedKey room chatKey) messages
+  result <- save (InRoom room Chat) messages
   log "saved chat messages"
   pure result
 
@@ -362,17 +338,17 @@ handleAction audioContext = case _ of
         (EventType DebugLog.problemEvent)
         problemTarget
         \event -> Just $ ProblemOccurred $ Unexpected { detail: FFI.detail event }
-    eUuid <- load uuidKey
+    eUuid <- load (OnDevice PlayerId)
     uuid <- case eUuid of
       Left e -> do
         log $ "Initialize: no existing uuid found, generating a new one."
           <> " error: " <> printLoadError e
         uuid <- genUuid
-        save uuidKey uuid >>= reportSaveFailure
+        save (OnDevice PlayerId) uuid >>= reportSaveFailure
         pure $ show uuid
       Right uuid -> pure uuid
 
-    eUsername <- load usernameKey
+    eUsername <- load (OnDevice Username)
     username <- case eUsername of
       Left e -> do
         log $ "Initialize: no existing username found, using default."
@@ -390,7 +366,7 @@ handleAction audioContext = case _ of
       >>> (_roomNotice .~ either Just (const Nothing) eRoom)
       >>> (_inviteBaseUrl .~ inviteBaseUrl)
 
-    eKingdom <- load "kingdom"
+    eKingdom <- load (OnDevice Kingdom)
     kingdom <- case eKingdom of
       Left e -> do
         log $ "Initialize: Failed to load kingdom. Falling back to default."
@@ -401,7 +377,7 @@ handleAction audioContext = case _ of
         then pure $ upgradeSelection <$> k
         else pure defaultKingdom
 
-    ePlayerIndex <- load "player_index"
+    ePlayerIndex <- load (OnDevice PlayerIndex)
     nextPlayerIndex <- case ePlayerIndex of
       Left e -> do
         log $ "Initialize: Failed to load playerIndex. Falling back to default."
@@ -409,7 +385,7 @@ handleAction audioContext = case _ of
         pure 0
       Right i -> pure i
 
-    ePlayerCount <- load "player_count"
+    ePlayerCount <- load (OnDevice PlayerCount)
     nextPlayerCount <- case ePlayerCount of
       Left e -> do
         log $ "Initialize: Failed to load playerCount. Falling back to default."
@@ -417,7 +393,7 @@ handleAction audioContext = case _ of
         pure 1
       Right i -> pure i
 
-    eBotStrategies <- load "bot_strategies"
+    eBotStrategies <- load (OnDevice BotStrategies)
     botStrategies <- case eBotStrategies of
       Left e -> do
         log $ "Initialize: Failed to load botStrategies. Falling back to default."
@@ -425,7 +401,7 @@ handleAction audioContext = case _ of
         pure []
       Right s -> pure s
 
-    eBotDelay <- load "bot_delay"
+    eBotDelay <- load (OnDevice BotDelay)
     botDelay <- case eBotDelay of
       Left e -> do
         log $ "Initialize: Failed to load botDelay. Falling back to default."
@@ -433,14 +409,14 @@ handleAction audioContext = case _ of
         pure 2000
       Right d -> pure $ clampBotDelay d
 
-    eRenameProposals <- load renameProposalsKey
+    eRenameProposals <- load (OnDevice RenameProposals)
     renameProposals <- case eRenameProposals of
       Left e -> do
         log $ "Initialize: no rename proposals found. Error: " <> printLoadError e
         pure Map.empty
       Right p -> pure p
 
-    eMessages <- load (scopedKey room chatKey)
+    eMessages <- load (InRoom room Chat)
     messages <- case eMessages of
       Left e -> do
         log $ "Initialize: Failed to load messages. Error: " <> printLoadError e
@@ -465,18 +441,18 @@ handleAction audioContext = case _ of
     -- Rewrites a chat saved in the old format, which held a game per play.
     when (isRight eMessages) $ saveChat >>= reportSaveFailure
 
-    eMailboxUrl <- load mailboxUrlKey
+    eMailboxUrl <- load (OnDevice MailboxUrl)
     mailboxUrl <- either
       (const $ pure defaultMailboxUrl)
       pure
       eMailboxUrl
-    eSync <- load (scopedKey room mailboxSyncKey)
+    eSync <- load (InRoom room MailboxSync)
     let (sync :: Sync) = either (const initialSync) identity eSync
     H.modify_ $ (_mailboxUrl .~ mailboxUrl) >>> (_mailbox %~ _ { sync = sync })
 
     log "Initialize: load game..."
-    restored <- restoreGame gameStateKey
-    eVersion <- load (scopedKey room gameVersionKey)
+    restored <- restoreGame CurrentGame
+    eVersion <- load (InRoom room GameVersion)
     let version = either (const $ savedBeforeVersions <<< _.i <$> restored) Just eVersion
     H.modify_ $ _mailbox %~ _ { outbox = toGameMessage <$> restored, version = version }
     when (isGameRoom room && isNothing restored) $ H.modify_
@@ -484,7 +460,7 @@ handleAction audioContext = case _ of
     configureBots
     log "Initialize: done loading game..."
 
-    eServerUrl <- load serverUrlKey
+    eServerUrl <- load (OnDevice ServerUrl)
     serverUrl <- case eServerUrl of
       Left e -> do
         log $ "Initialize: no existing server URL found, using default."
@@ -533,6 +509,12 @@ handleAction audioContext = case _ of
 
     H.subscribe' \_ ->
       eventListener
+        (EventType "storage")
+        (toEventTarget w)
+        \_ -> Just StorageChanged
+
+    H.subscribe' \_ ->
+      eventListener
         (EventType "online")
         (toEventTarget w)
         \_ -> Just NetworkRegained
@@ -568,14 +550,14 @@ handleAction audioContext = case _ of
       cardsToKeep = take 16 $ _.cardSpec <$> shuffledKingdom
       newKingdom = selectIfElement cardsToKeep <$> kingdom
     H.modify_ $ _dominationConfig <<< _kingdom .~ newKingdom
-    save "kingdom" newKingdom >>= reportSaveFailure
+    save (OnDevice Kingdom) newKingdom >>= reportSaveFailure
     where
       selectIfElement :: Array CardSpec -> CardSpecSelection -> CardSpecSelection
       selectIfElement keepers { cardSpec } =
         { cardSpec, selected: cardSpec `elem` keepers }
 
   ChooseKingdom kingdom -> do
-    save "kingdom" kingdom >>= reportSaveFailure
+    save (OnDevice Kingdom) kingdom >>= reportSaveFailure
     H.modify_ $ _dominationConfig <<< _kingdom .~ kingdom
 
   ToggleLongGame ->
@@ -594,12 +576,13 @@ handleAction audioContext = case _ of
   WriteBotDelay delay -> do
     let botDelay = clampBotDelay delay
     H.modify_ $ _dominationConfig <<< _botDelay .~ botDelay
-    save "bot_delay" botDelay >>= reportSaveFailure
+    save (OnDevice BotDelay) botDelay >>= reportSaveFailure
     configureBots
 
   SwitchSettingsTab tab -> do
     H.modify_ $ _settingsTab .~ tab
     void refreshDebugReport
+    when (tab == StorageTab) refreshStorage
 
   CopyBugReport -> do
     { text } <- refreshDebugReport
@@ -608,6 +591,43 @@ handleAction audioContext = case _ of
   ClearDebugLog -> do
     liftEffect DebugLog.clear
     void refreshDebugReport
+
+  RefreshStorage -> refreshStorage
+
+  StorageChanged -> do
+    current <- liftEffect ClearGeneration.isCurrent
+    { settingsTab, showMenu } <- H.get
+    if not current then reload
+    else when (showMenu && settingsTab == StorageTab) refreshStorage
+
+  AskToRemove selection -> modifyStoragePanel _ { confirming = Just selection, outcomes = [] }
+
+  CancelRemoval -> modifyStoragePanel _ { confirming = Nothing }
+
+  ConfirmRemoval selection -> do
+    { storagePanel, room } <- H.get
+    for_ storagePanel.snapshot \{ discovery, scope } -> do
+      let
+        ctx = Storage.context room scope
+        plan = removalPlan ctx (item ctx <$> discoveredEntries discovery) selection
+        advanceGeneration = liftEffect $ when plan.advancesGeneration $ void ClearGeneration.advance
+      advanceGeneration
+      liftEffect $ traverse_ DebugLog.forget $ Array.mapMaybe (localKeyName <<< _.locator) plan.items
+      outcomes <- liftAff $ StorageInspector.remove $ _.locator <$> plan.items
+      advanceGeneration
+      if plan.reloadsThisPage then reload else do
+        liftEffect ClearGeneration.adopt
+        modifyStoragePanel _ { confirming = Nothing, shown = Nothing, outcomes = outcomes }
+        refreshStorage
+
+  ShowStoredValue locator -> do
+    value <- liftEffect $ StorageInspector.readValue locator
+    modifyStoragePanel _ { shown = Just { locator, text: maybe "(gone)" (String.take shownValueLength) value } }
+
+  HideStoredValue -> modifyStoragePanel _ { shown = Nothing }
+
+  CopyStoredValue locator ->
+    liftEffect $ StorageInspector.readValue locator >>= traverse_ FFI.copyToClipboard
 
   CreateRoom -> generateRoomCode >>= maybe
     (reportProblem RoomNotCreated)
@@ -627,7 +647,7 @@ handleAction audioContext = case _ of
 
   ProposeRename target text -> do
     { renameProposals } <- H.modify $ _renameProposals %~ proposeRename target text
-    save renameProposalsKey renameProposals >>= reportSaveFailure
+    save (OnDevice RenameProposals) renameProposals >>= reportSaveFailure
 
   CopyRenameMapping -> do
     proposals <- H.gets _.renameProposals
@@ -635,7 +655,7 @@ handleAction audioContext = case _ of
 
   ClearRenameProposals -> do
     H.modify_ $ _renameProposals .~ Map.empty
-    save renameProposalsKey (Map.empty :: Proposals) >>= reportSaveFailure
+    save (OnDevice RenameProposals) (Map.empty :: Proposals) >>= reportSaveFailure
 
   StartNewGame -> do
     config <- H.gets _.dominationConfig
@@ -643,16 +663,16 @@ handleAction audioContext = case _ of
     H.modify_ $ _showMenu .~ false
 
   LoadGameRequest -> do
-    loadGame gameStateKey
+    loadGame CurrentGame
     H.modify_ $ _showMenu .~ false
 
   WriteServerUrl serverUrl -> do
-    save serverUrlKey serverUrl >>= reportSaveFailure
+    save (OnDevice ServerUrl) serverUrl >>= reportSaveFailure
     log $ "saving server URL: " <> serverUrl
     H.modify_ $ set _serverUrl serverUrl
 
   WriteMailboxUrl mailboxUrl -> do
-    save mailboxUrlKey mailboxUrl >>= reportSaveFailure
+    save (OnDevice MailboxUrl) mailboxUrl >>= reportSaveFailure
     H.modify_ $ _mailboxUrl .~ mailboxUrl
 
   DeliverMailbox -> deliverMailbox
@@ -675,7 +695,7 @@ handleAction audioContext = case _ of
 
   WriteUsername username -> do
     { id } <- H.get
-    save usernameKey username >>= reportSaveFailure
+    save (OnDevice Username) username >>= reportSaveFailure
     H.modify_ $ set _username username
       <<< over _usernames (HashMap.insert id username)
     sendMessage $ UsernameMessage { username, id }
@@ -815,7 +835,7 @@ handleAction audioContext = case _ of
     loadGame key = restoreGame key >>= traverse_ shareGame
     restoreGame key = do
       room <- H.gets _.room
-      loaded <- load $ scopedKey room key
+      loaded <- load $ InRoom room key
       case loaded of
         Left e -> do
           maybe (log $ printLoadError e) reportProblem (loadProblem e)
@@ -832,7 +852,7 @@ handleAction audioContext = case _ of
     undo i = do
       { room, failedSaves } <- H.get
       (loaded :: Either LoadError ActiveState) <- load
-        $ scopedKey room $ undoKey $ historySlot (i - 1)
+        $ InRoom room $ undoStep (i - 1)
       case undoOutcome { i, failedSaves } loaded of
         Restore saved -> applySaved saved >>= shareGame
         NothingToUndo -> log "Refused: Undo: there is no earlier step"
@@ -843,10 +863,10 @@ handleAction audioContext = case _ of
     shareGame = publishGame <<< toGameMessage
     saveGame activeState = do
       room <- H.gets _.room
-      historySave <- save (scopedKey room $ undoKey $ historySlot activeState.i) activeState
+      historySave <- save (InRoom room $ undoStep activeState.i) activeState
       H.modify_ \st -> st { failedSaves = recordSaveAttempt activeState.i historySave st.failedSaves }
       reportSaveFailure historySave
-      save (scopedKey room gameStateKey) activeState >>= reportSaveFailure
+      save (InRoom room CurrentGame) activeState >>= reportSaveFailure
     queryGame state = do
       _ <- H.query
         Domination._component
@@ -865,13 +885,19 @@ handleAction audioContext = case _ of
         <<< (_chatNumber .~ chatNumber)
       saveChat >>= reportSaveFailure
       sendMessage chat
-    reportSaveFailure = either (reportProblem <<< saveProblem) pure
+    reportSaveFailure = either (maybe reload reportProblem <<< saveProblem) pure
+    modifyStoragePanel change = H.modify_ \st -> st { storagePanel = change st.storagePanel }
+    refreshStorage = do
+      discovery <- liftAff StorageInspector.discover
+      scope <- liftEffect StorageInspector.serviceWorkerScope
+      online <- liftEffect StorageInspector.isOnline
+      modifyStoragePanel _ { snapshot = Just { discovery, scope, online } }
     updateRoster changeRoster = do
       H.modify_ $ _dominationConfig %~ changeRoster
       { nextPlayerIndex, nextPlayerCount, botStrategies } <- H.gets _.dominationConfig
-      save "player_index" nextPlayerIndex >>= reportSaveFailure
-      save "player_count" nextPlayerCount >>= reportSaveFailure
-      save "bot_strategies" botStrategies >>= reportSaveFailure
+      save (OnDevice PlayerIndex) nextPlayerIndex >>= reportSaveFailure
+      save (OnDevice PlayerCount) nextPlayerCount >>= reportSaveFailure
+      save (OnDevice BotStrategies) botStrategies >>= reportSaveFailure
     configureBots = do
       { botStrategies, botDelay } <- H.gets _.dominationConfig
       queryGame $ ConfigureBots { botStrategies, botDelay }
@@ -882,7 +908,7 @@ handleAction audioContext = case _ of
     setSync sync = do
       modifySession _ { sync = sync }
       room <- H.gets _.room
-      save (scopedKey room mailboxSyncKey) sync >>= reportSaveFailure
+      save (InRoom room MailboxSync) sync >>= reportSaveFailure
     markReachable = modifySession _ { failures = 0, unreachable = false }
     notify message = do
       H.modify_ $ _messages %~ record (Notice { text: message })
@@ -925,7 +951,7 @@ handleAction audioContext = case _ of
     setVersion version = do
       modifySession _ { version = Just version }
       room <- H.gets _.room
-      save (scopedKey room gameVersionKey) version >>= reportSaveFailure
+      save (InRoom room GameVersion) version >>= reportSaveFailure
     -- Without a mailbox, the newest version wins (Domination.Data.LogicalClock):
     -- whoever joins and whoever sees them join offer their games, and each
     -- side takes only a game ahead of its own.
@@ -1112,7 +1138,7 @@ handleAction audioContext = case _ of
           liftAff $ Aff.delay wait
           handleAction audioContext MailboxRetryDue
     refreshDebugReport = do
-      report <- liftEffect DebugLog.currentReport
+      report <- liftEffect <<< DebugLog.currentReport <<< pure =<< liftEffect <<< storageFact =<< H.gets _.room
       let debugReport = { text: DebugLog.renderReport report, bugFormUrl: BugForm.bugFormUrl report }
       H.modify_ $ _debugReport .~ debugReport
       pure debugReport
@@ -1158,9 +1184,25 @@ showProblem
   . MonadEffect m
   => HalogenM AppState AppAction (ChildComponents t1 r o1 q1) output m Unit
 showProblem = H.gets (showing <<< _.notices) >>= traverse_ \{ problem } -> do
-  report <- liftEffect DebugLog.currentReport
+  report <- liftEffect <<< DebugLog.currentReport <<< pure =<< liftEffect <<< storageFact =<< H.gets _.room
   H.modify_ _ { problemLink = BugForm.problemFormUrl problem report }
   H.getHTMLElementRef dismissProblemRef >>= traverse_ (liftEffect <<< HTMLElement.focus)
+
+-- | The bug report's one line about storage: sizes by category only.
+storageFact :: Room -> Effect DebugLog.Fact
+storageFact room = do
+  scope <- StorageInspector.serviceWorkerScope
+  entries <- StorageInspector.localStorageEntries
+  pure { label: "Storage", value: storageSummary (Storage.context room scope) entries }
+
+-- | How much of a stored value Show displays; Copy copies all of it.
+shownValueLength :: Int
+shownValueLength = 2000
+
+localKeyName :: Locator -> Maybe String
+localKeyName = case _ of
+  WebStorageKey Local name -> Just name
+  _ -> Nothing
 
 dismissProblemRef :: H.RefLabel
 dismissProblemRef = H.RefLabel "dismiss-problem"

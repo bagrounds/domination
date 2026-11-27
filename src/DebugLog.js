@@ -8,6 +8,8 @@
 // so a burst of long lines cannot fill localStorage.
 const consoleLog = { key: 'debug_log', max: 400, maxChars: 200000 }
 const syncJournal = { key: 'sync_journal', max: 1500, maxChars: 400000 }
+const channels = [consoleLog, syncJournal]
+const channelOf = key => channels.find(channel => channel.key === key)
 const maxEntryLength = 1000
 const maxChattyLength = 160
 const persistDelayMs = 1000
@@ -73,6 +75,7 @@ const readPersisted = channel => {
 const buffers = new Map()
 let persistTimer = null
 let installed = false
+let mayWrite = () => true
 
 const buffer = channel => {
   if (!buffers.has(channel)) buffers.set(channel, trimToLimits(channel, bufferOf(readPersisted(channel))))
@@ -104,7 +107,8 @@ const shrinkAfterFailedSave = channel => {
 const persist = () => {
   clearTimeout(persistTimer)
   persistTimer = null
-  ;[consoleLog, syncJournal].forEach(channel => {
+  if (!mayWrite()) return
+  channels.forEach(channel => {
     if (!save(channel)) {
       shrinkAfterFailedSave(channel)
       // A full or unavailable localStorage must never break the game.
@@ -201,9 +205,21 @@ export const problemEvent = 'domination:problem'
 const announceProblem = detail =>
   window.dispatchEvent(new CustomEvent(problemEvent, { detail: truncate(detail, maxEntryLength) }))
 
-export const install = () => {
+// Another tab removed a log's key (or cleared all of localStorage): drop
+// this tab's copy too, so its next save doesn't bring the old lines back.
+const watchRemovals = () => {
+  window.addEventListener('storage', ({ key, newValue }) => {
+    const removed = key === null ? channels : channels.filter(channel => channel.key === key && newValue === null)
+    removed.forEach(channel => buffers.set(channel, bufferOf([])))
+  })
+}
+
+// `stillCurrent` tells whether this page may still write: it turns false
+// once the Storage panel deleted data this page holds, until it reloads.
+export const install = stillCurrent => () => {
   if (installed) return
   installed = true
+  mayWrite = stillCurrent
   ;['log', 'info', 'warn', 'error'].forEach(captureConsole)
   window.addEventListener('error', ({ message, filename, lineno, colno, error }) => {
     record('UNCAUGHT', [message, `${filename}:${lineno}:${colno}`, error || ''])
@@ -214,12 +230,24 @@ export const install = () => {
     if (isOurs(reason && reason.stack)) announceProblem(`Unhandled rejection: ${describe(reason)}`)
   })
   watchLifecycle()
+  watchRemovals()
   lifecycle(`session started (visibility ${visibility()}, discarded before: ${Boolean(document.wasDiscarded)}, online: ${navigator.onLine})`)
 }
 
 export const snapshot = () => entries(consoleLog).slice()
 
 export const journal = () => entries(syncJournal).slice()
+
+export const consoleLogKey = consoleLog.key
+
+export const syncJournalKey = syncJournal.key
+
+// Empties the buffer stored at `key` without saving it, before the Storage
+// panel removes the key; any other key is left alone.
+export const forget = key => () => {
+  const channel = channelOf(key)
+  if (channel) buffers.set(channel, bufferOf([]))
+}
 
 export const clear = () => {
   buffers.set(consoleLog, bufferOf([]))

@@ -37,6 +37,8 @@ import Domination.Data.Resync (Marks, initialMarks)
 import Domination.Data.Retheme (Proposals)
 import Domination.Data.Room (Room(..))
 import Domination.Data.Chat (Chat, emptyChat)
+import Domination.Data.StorageInventory (Discovery, Locator, Removal)
+import Domination.Data.StorageInventory as StorageInventory
 import Message (RemoteMessage)
 
 type ClientInfo =
@@ -50,12 +52,13 @@ data SettingsTab
   | KingdomTab
   | RenameTab
   | ConnectionTab
+  | StorageTab
   | DebugTab
 
 derive instance eqSettingsTab :: Eq SettingsTab
 
 settingsTabs :: Array SettingsTab
-settingsTabs = [ GameSetupTab, BotsTab, KingdomTab, RenameTab, ConnectionTab, DebugTab ]
+settingsTabs = [ GameSetupTab, BotsTab, KingdomTab, RenameTab, ConnectionTab, StorageTab, DebugTab ]
 
 settingsTabLabel :: SettingsTab -> String
 settingsTabLabel = case _ of
@@ -64,9 +67,28 @@ settingsTabLabel = case _ of
   KingdomTab -> "Kingdom"
   RenameTab -> "Rename"
   ConnectionTab -> "Connection"
+  StorageTab -> "Storage"
   DebugTab -> "Debug"
 
 type DebugReport = { text :: String, bugFormUrl :: String }
+
+-- | What the Storage tab last found: the discovery itself, plus what the
+-- | page needs to classify it (its service worker scope) and to offer a
+-- | reinstall (whether the browser is online).
+type StorageSnapshot = { discovery :: Discovery, scope :: String, online :: Boolean }
+
+-- | `confirming`: a removal waiting for its second tap.
+-- | `shown`: a value opened with Show, already cut to length.
+-- | `outcomes`: how each entry of the last removal went.
+type StoragePanel =
+  { snapshot :: Maybe StorageSnapshot
+  , confirming :: Maybe StorageInventory.Selection
+  , shown :: Maybe { locator :: Locator, text :: String }
+  , outcomes :: Array (Tuple Locator Removal)
+  }
+
+emptyStoragePanel :: StoragePanel
+emptyStoragePanel = { snapshot: Nothing, confirming: Nothing, shown: Nothing, outcomes: [] }
 
 type AppState =
   { connectionCount :: Int
@@ -95,6 +117,7 @@ type AppState =
   , heartbeatTimeout :: Int
   , settingsTab :: SettingsTab
   , debugReport :: DebugReport
+  , storagePanel :: StoragePanel
   , renameProposals :: Proposals
   , notices :: Notices
   , failedSaves :: FailedSaves
@@ -253,6 +276,7 @@ newApp =
   , heartbeatTimeout: defaultHeartbeatTimeout
   , settingsTab: GameSetupTab
   , debugReport: { text: "", bugFormUrl: prefilledUrl "" }
+  , storagePanel: emptyStoragePanel
   , renameProposals: Map.empty
   , notices: noNotices
   , failedSaves: Map.empty
