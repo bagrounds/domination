@@ -19,7 +19,7 @@ import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
 import DebugLog (showVersion)
 import Domination.Data.Room (Room(..), unRoomCode)
-import Domination.Data.StorageInventory (Area(..), Context, Group(..), Item, Locator(..), Measure(..), Plan, Removal(..), Section, Selection(..), Summary(..), areaName, areaOf, describeItem, discoveredEntries, emptyAreas, formatCount, formatSize, groupLabel, inventory, isDeletable, item, locatorName, measureOf, removalPlan, roughShare, summaryOf, unavailableAreas)
+import Domination.Data.StorageInventory (Area(..), Context, Group(..), Item, Locator(..), Measure(..), Plan, Removal(..), Section, Selection(..), Summary(..), areaName, countOf, areaOf, describeItem, discoveredEntries, emptyAreas, formatCount, formatSize, groupLabel, inventory, isDeletable, item, locatorName, measureOf, removalPlan, roughShare, summaryOf, unavailableAreas)
 import Domination.UI.Css as Css
 import Halogen.HTML (HTML)
 import Halogen.HTML as HH
@@ -76,7 +76,7 @@ renderSnapshot view snapshot@{ discovery } =
 
 localStorageLine :: Array Section -> String
 localStorageLine sections = "Local storage: " <> formatSize Characters (toNumber size)
-  <> " in " <> formatCount entries <> " keys (" <> roughShare usualLimit (toNumber size)
+  <> " in " <> countOf "key" entries <> " (" <> roughShare usualLimit (toNumber size)
   <> " of the usual limit of about 5 million characters)"
   where
     Summary { size, entries } = summaryOf
@@ -100,7 +100,7 @@ summaryText measure (Summary { entries, size, unknownSizes }) =
     <> if unknownSizes > 0 then " (" <> formatCount unknownSizes <> " of unknown size)" else ""
   where
     countText = case measure of
-      Characters -> \n -> formatCount n <> if n == 1 then " key" else " keys"
+      Characters -> countOf "key"
       Bytes -> \n -> formatCount n <> if n == 1 then " entry" else " entries"
 
 sectionLabel :: Room -> Group -> String

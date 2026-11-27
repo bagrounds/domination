@@ -382,6 +382,12 @@ presentation_tests =
           ])
         "3,531 chars in 7 keys; 2 rooms (largest 1,500); global room 7; preferences 3; diagnostics 2,000; not recognized 1"
     }
+  , { name: "the bug report's storage line counts one of a kind in the singular"
+    , test: pure $ assertEquals
+        (storageSummary { room: GlobalRoom, version: "v0.46.0", scope }
+          [ { locator: WebStorageKey Local "room/abc/chat", size: Just 1 } ])
+        "1 char in 1 key; 1 room (largest 1); global room 0; preferences 0; diagnostics 0; not recognized 0"
+    }
   , { name: "∀ single deletion: the confirmation states its consequence, and the reload when there is one"
     , test: quick_check 200 do
         { ctx, items } <- scenarioGen

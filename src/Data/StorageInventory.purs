@@ -25,6 +25,7 @@ module Domination.Data.StorageInventory
   , areaName
   , areaOf
   , classify
+  , countOf
   , describeItem
   , discoveredEntries
   , emptyAreas
@@ -458,6 +459,10 @@ formatCount n
       | Array.length chars <= 3 = [ chars ]
       | otherwise = [ Array.take 3 chars ] <> chunksOf3 (Array.drop 3 chars)
 
+-- | `1 key`, `2 keys`.
+countOf :: String -> Int -> String
+countOf noun n = formatCount n <> " " <> noun <> if n == 1 then "" else "s"
+
 -- | A size in its area's measure: characters exactly, bytes in round units.
 formatSize :: Measure -> Number -> String
 formatSize Characters n = formatCount (round n) <> " characters"
@@ -491,8 +496,8 @@ roughShare limit size
 -- | and no room codes, since an old invite code still opens its room.
 storageSummary :: Context -> Array Entry -> String
 storageSummary context entries =
-  formatCount total.size <> " chars in " <> show total.entries <> " keys; "
-  <> show (Map.size rooms) <> " rooms"
+  countOf "char" total.size <> " in " <> countOf "key" total.entries <> "; "
+  <> countOf "room" (Map.size rooms)
   <> maybe "" (\largest -> " (largest " <> formatCount largest <> ")") (maximum $ Map.values rooms)
   <> category "global room" ThisRoom
   <> category "preferences" Preferences
