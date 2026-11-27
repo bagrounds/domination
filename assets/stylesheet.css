@@ -337,6 +337,8 @@ button span,
   background-color: black;
   transition: max-height 0.5s ease;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-menu.showing {
@@ -921,6 +923,14 @@ button span,
   background: #333;
   color: white;
   border-bottom-color: #333;
+}
+
+.settings-tab-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 2em;
 }
 
 /* Bot Play Overlay */

@@ -98,14 +98,19 @@ render cs@{ showMenu, dominationConfig, settingsTab } = let
     ]
   , renderText version
   , renderTabs settingsTab
-  , renderTabContent settingsTab cs
-    { nextPlayerIndex
-    , nextPlayerCount
-    , longGame
-    , kingdom
-    , botStrategies
-    , botDelay
-    }
+  , HH.div
+    [ HP.class_ Css.settingsTabPanel
+    , HP.attr (HH.AttrName "role") "tabpanel"
+    ]
+    [ renderTabContent settingsTab cs
+      { nextPlayerIndex
+      , nextPlayerCount
+      , longGame
+      , kingdom
+      , botStrategies
+      , botDelay
+      }
+    ]
   ]
 
 renderTabs :: forall w. SettingsTab -> HTML w AppAction

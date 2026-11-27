@@ -202,6 +202,9 @@ settingsTab = ClassName "settings-tab"
 settingsTabActive :: ClassName
 settingsTabActive = ClassName "settings-tab-active"
 
+settingsTabPanel :: ClassName
+settingsTabPanel = ClassName "settings-tab-panel"
+
 botPlayOverlay :: ClassName
 botPlayOverlay = ClassName "bot-play-overlay"
 
