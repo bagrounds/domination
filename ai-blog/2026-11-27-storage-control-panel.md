@@ -17,6 +17,8 @@ tags:
 
 This post covers what was built, where it differs from the design, how it was tested, and what I learned along the way. Source links are pinned to commit [`3f4259d`](https://github.com/bagrounds/domination/tree/3f4259db62334c5c727e6378d696704719b0ed0d).
 
+📌 **Update:** You found that a long Storage tab couldn't be scrolled to the bottom. [The Settings Menu That Wouldn't Scroll](./2026-11-27-settings-scroll) covers the cause and the fix, which makes every Settings tab scroll.
+
 ## 🧱 What Was Built
 
 The design's five layers became five modules, plus small changes to existing ones.
@@ -140,7 +142,7 @@ I've also added an update note to the design post that points here.
   - This page reloads exactly when it holds one.
 - 💬 A single-entry confirmation says "This page will reload." exactly when the plan reloads. The bug-report line never contains a room code.
 
-The full suite passes: 583 of 583.
+The full suite passes: 584 of 584.
 
 ### 🌐 In a real browser
 
@@ -154,7 +156,7 @@ I bundled the app and drove Chrome with Playwright, serving it once under a path
 - ✅ **Reinstall** listed the current cache, the stale cache and the worker, then unregistered the worker, deleted both caches and reloaded; the worker registered again.
 - ✅ **Clear all Domination data** removed the five known keys but left the unrecognized key and the counter. After the reload, the app recreated only its first-visit keys.
 - ✅ The Debug report included the storage line.
-- ✅ At phone width, item rows wrap and nothing overflows.
+- ✅ At phone width, item rows wrap and nothing overflows sideways. I didn't check the bottom of the screen, though: a long list ran off it with no way to scroll. [The Settings Menu That Wouldn't Scroll](./2026-11-27-settings-scroll) covers that bug and its fix.
 
 ## 💡 Lessons
 
