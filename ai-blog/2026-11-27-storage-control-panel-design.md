@@ -19,6 +19,14 @@ This post is the design only. I'll build it in the same pull request after you r
 
 The post covers what Domination stores today, what a web page can discover and delete, a recommended design in independent layers, a suggested delivery order, and a list of choices. The bold option in each row is my recommendation. All source links point to the revision I studied.
 
+📌 **Update:** You approved the recommendation, and the panel shipped in Domination 0.46.0. [Building the Storage Control Panel](./2026-11-27-storage-control-panel) describes the implementation. A few details changed while building it, and the snippets below are updated to match:
+
+- `StorageInspector` is a module of plain functions, not a type class.
+- The `Registration` locator holds no browser handle.
+- `classify`, `inventory` and `removalPlan` take a context of room, version and service-worker scope.
+- The generation advances both before and after removal.
+- The storage fact is passed into the Debug report rather than read by it.
+
 ## 🧭 Context: What Domination Stores Today
 
 Almost everything lives in `localStorage`. The [storage adapter](https://github.com/bagrounds/domination/blob/4a7b109567caac6a2f233ee8a2f1eac47db058c4/src/Capability/Storage.js#L8-L24) writes JSON strings under plain key names that are [defined in `Main`](https://github.com/bagrounds/domination/blob/4a7b109567caac6a2f233ee8a2f1eac47db058c4/src/Main.purs#L105-L154) or written directly as string literals (`"kingdom"`, `"bot_delay"`, ...). Room state is prefixed by [`scopedKey`](https://github.com/bagrounds/domination/blob/4a7b109567caac6a2f233ee8a2f1eac47db058c4/src/Data/Room.purs#L218-L221) as `room/<code>/<name>`; the global room uses the bare name.
@@ -107,7 +115,7 @@ data Locator
   = WebStorageKey WebStorage String
   | Database { name :: String, version :: Int }
   | Cache String                                  -- requests listed for visibility only
-  | Registration { scope :: String, script :: String } ServiceWorkerRegistration
+  | Registration { scope :: String, script :: String }   -- looked up again by scope to remove
   | OriginFile String                             -- a top-level OPFS entry
   | Cookie String                                 -- listed only
 
@@ -116,10 +124,12 @@ type Entry = { locator :: Locator, size :: Maybe Int }
 data Owner
   = Known StorageKey              -- parsed by StorageKey
   | RoomData RoomCode String      -- under room/<code>/ with an unknown name
-  | AppShell Version              -- a cache or worker that looks like Domination's
+  | AppShell Freshness            -- a cache or worker that looks like Domination's
   | Unrecognized                  -- anything else on this origin
 
-classify :: Entry -> Owner
+type Context = { room :: Room, version :: String, scope :: String }
+
+classify :: Context -> Locator -> Owner
 ```
 
 `RoomData` is what keeps rooms dynamic: a new room key added with `scopedKey` is shown with its room before anyone gives it a description. A cache named `vX.Y.Z` is shown as app files, marked **current** when it matches the running `Version` and **stale** otherwise. Only `Known` is certain, and even that only on an origin that serves nothing else; the other owners are informed guesses, and layer 5 treats them that way.
@@ -132,24 +142,31 @@ Grouping is a `foldMap` from entries into a map of summaries:
 data Group = ThisRoom | OtherRoom RoomCode | GlobalRoomGroup | Preferences
            | Diagnostics | AppFiles | NotRecognized | OtherArea Area
 
-newtype Summary = Summary { entries :: Int, size :: Additive Int, unknownSizes :: Int }
+newtype Summary = Summary { entries :: Int, size :: Int, unknownSizes :: Int }
 -- Semigroup/Monoid by field-wise addition
 
-inventory :: Room -> Array Entry -> Map Group (Tuple Summary (Array Entry))
+type Section = { group :: Group, summary :: Summary, items :: Array Item }
+
+inventory :: Context -> Array Entry -> Array Section
 ```
 
 - ➕ `Summary` is a commutative monoid, so the panel's totals and each group's totals come from the same fold. Groups and entries are listed largest-first, so the thing filling storage is at the top.
-- 🧹 A removal is a pure plan as well: `removalPlan :: Room -> Selection -> Plan` turns "this key", "this group" or "all Domination data" into the exact locators to delete, plus whether the clear generation has to advance (layer 5).
+- 🧹 A removal is a pure plan as well: `removalPlan :: Context -> Array Item -> Selection -> Plan` turns "this key", "this group" or "all Domination data" into the exact locators to delete, plus whether the clear generation has to advance (layer 5).
 
 ### 4. 🔌 Discovery and removal at the browser edge
 
-One small FFI module, `src/Capability/StorageInspector.js`, in the style of the [existing storage FFI](https://github.com/bagrounds/domination/blob/4a7b109567caac6a2f233ee8a2f1eac47db058c4/src/Capability/Storage.js): every call is wrapped in `try`/`catch`, every area is feature-detected, and each area reports either its entries or why it's unavailable. Async APIs (IndexedDB, caches, OPFS, `estimate`) are wrapped with `Aff.makeAff` in callback style, as the existing FFI does, so **no new dependencies** are needed.
+One small FFI module, `src/Capability/StorageInspector.js`, in the style of the [existing storage FFI](https://github.com/bagrounds/domination/blob/4a7b109567caac6a2f233ee8a2f1eac47db058c4/src/Capability/Storage.js): every call is wrapped in `try`/`catch`, every area is feature-detected, and each area reports either its entries or why it's unavailable. Async APIs (IndexedDB, caches, OPFS, `estimate`) are wrapped with `Effect.Aff.Compat`, which is already a dependency, so **no new dependencies** are needed.
 
 ```purescript
-class Monad m <= StorageInspector m where
-  discover :: m (Array (Either AreaUnavailable (Array Entry)))
-  estimate :: m (Maybe { usage :: Number, quota :: Number, persisted :: Boolean })
-  remove :: Array Locator -> m (Array (Tuple Locator Removal))
+type AreaReport = { area :: Area, found :: Either String (Array Entry) }
+type Discovery =
+  { origin :: String
+  , areas :: Array AreaReport
+  , estimate :: Maybe { usage :: Number, quota :: Number, persisted :: Boolean }
+  }
+
+discover :: Aff Discovery
+remove :: Array Locator -> Aff (Array (Tuple Locator Removal))
 
 data Removal = Removed | Waiting String | Failed String   -- Waiting: e.g. a database still open
 ```
